@@ -14,7 +14,7 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  const parser = StreamParser.parseTokens([buffer.data], {}, { tdsVersion: '7_2' });
+  const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
   return parser;
 }
 
@@ -29,9 +29,9 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!token.more);
-    assert.strictEqual(token.curCmd, curCmd);
-    assert.isOk(!token.rowCount);
+    assert.isOk(!(token as any).more);
+    assert.strictEqual((token as any).curCmd, curCmd);
+    assert.isOk(!(token as any).rowCount);
   });
 
   it('should more', async () => {
@@ -44,9 +44,9 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(token.more);
-    assert.strictEqual(token.curCmd, curCmd);
-    assert.isOk(!token.rowCount);
+    assert.isOk((token as any).more);
+    assert.strictEqual((token as any).curCmd, curCmd);
+    assert.isOk(!(token as any).rowCount);
   });
 
   it('should done row count', async () => {
@@ -59,8 +59,8 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!token.more);
-    assert.strictEqual(token.curCmd, 1);
-    assert.strictEqual(token.rowCount, doneRowCount);
+    assert.isOk(!(token as any).more);
+    assert.strictEqual((token as any).curCmd, 1);
+    assert.strictEqual((token as any).rowCount, doneRowCount);
   });
 });

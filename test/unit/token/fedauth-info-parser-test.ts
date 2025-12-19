@@ -4,8 +4,8 @@ import { assert } from 'chai';
 
 describe('Fedauth Info Parser', () => {
   it('should contain fed auth info', async () => {
-    const buffer = new WritableTrackingBuffer(50, 'ucs-2');
-    buffer.writeUInt8('0xEE');
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    buffer.writeUInt8(0xEE);
     buffer.writeUInt32LE(40);
     buffer.writeUInt32LE(2);
     buffer.writeUInt8(2);
@@ -17,12 +17,12 @@ describe('Fedauth Info Parser', () => {
     buffer.writeString('spn');
     buffer.writeString('stsurl');
 
-    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual(token.stsurl, 'stsurl');
-    assert.strictEqual(token.spn, 'spn');
+    assert.strictEqual((token as any).stsurl, 'stsurl');
+    assert.strictEqual((token as any).spn, 'spn');
 
     assert.isTrue((await parser.next()).done);
   });

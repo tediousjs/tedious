@@ -13,7 +13,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...Int.generateParameterData(item.param, {})]);
+        const buffer = Buffer.concat([...Int.generateParameterData(item.param, {} as any)]);
         assert.equal(buffer.readInt32LE(0), item.expected);
       });
     });
@@ -28,7 +28,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, {})]);
+        const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, {} as any)]);
         assert.equal(buffer.readInt16LE(0), item.expected);
       });
     });
@@ -43,7 +43,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, {})]);
+        const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, {} as any)]);
         assert.equal(buffer.readInt8(0), item.expected);
       });
     });
@@ -57,7 +57,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...BigInt.generateParameterData(item.param, {})]);
+        const buffer = Buffer.concat([...BigInt.generateParameterData(item.param, {} as any)]);
         assert.equal(buffer.readBigInt64LE(0), item.expected);
       });
     });

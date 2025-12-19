@@ -1,7 +1,7 @@
 import Connection from '../../src/connection';
 import Request from '../../src/request';
-import Transaction from '../../src/transaction';
-import async from 'async';
+import { ISOLATION_LEVEL } from '../../src/transaction';
+import * as async from 'async';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 import { assert } from 'chai';
 
@@ -38,11 +38,11 @@ class Tester {
     this.done = done;
     this.connection = new Connection(config);
 
-    this.connection.on('end', (info) => {
+    this.connection.on('end' as any, (info: any) => {
       this.done();
     });
 
-    this.connection.on('errorMessage', (error) => {
+    this.connection.on('errorMessage', (error: any) => {
       console.log(`${error.number} : ${error.message}`);
     });
 
@@ -136,7 +136,7 @@ GO`,
     this.connection.beginTransaction((err, transactionDescriptor) => {
       assert.ifError(err);
       assert.ok(
-        config.options.tdsVersion < '7_2' ? true : transactionDescriptor
+        config.options.tdsVersion! < '7_2' ? true : transactionDescriptor
       );
 
       callback(err);
@@ -261,35 +261,35 @@ describe('Transactions Test', function() {
     // From 2.2.7.8, ENVCHANGE_TOKEN type Begin Transaction (8) is only supported
     // in TDS version 7.2 and above. 'rollbackTransaction' event fires in response
     // to that token type and hence won't be firing for lower versions.
-    if (config.options.tdsVersion < '7_2') {
+    if (config.options.tdsVersion! < '7_2') {
       // test.expect(4);
     } else {
       // test.expect(5);
     }
 
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message))
 
-    connection.connect(function(err) {
+    connection.connect(function(err: any) {
       let req = new Request('create table #temp (value varchar(50))', function(
-        err
+        err: any
       ) {
         assert.ifError(err);
 
-        req = new Request('SET XACT_ABORT ON', function(err) {
+        req = new Request('SET XACT_ABORT ON', function(err: any) {
           assert.ifError(err);
 
-          connection.beginTransaction(function(err) {
+          connection.beginTransaction(function(err: any) {
             assert.ifError(err);
 
-            connection.on('rollbackTransaction', function() {
+            connection.on('rollbackTransaction' as any, function() {
               // Ensure rollbackTransaction event is fired
               assert.ok(true);
             });
 
-            req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
+            req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err: any) {
               assert.match((err as Error).message, /^String or binary data would be truncated/);
 
               connection.close();
@@ -305,18 +305,18 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      connection.transaction(function(err, outerDone) {
+    connection.connect(function(err: any) {
+      connection.transaction(function(err: any, outerDone: any) {
         assert.ifError(err);
 
-        connection.transaction(function(err, innerDone) {
+        connection.transaction(function(err: any, innerDone: any) {
           assert.ifError(err);
 
-          innerDone!(null, outerDone, function(err) {
+          innerDone!(null, outerDone, function(err: any) {
             assert.ifError(err);
             connection.close();
           });
@@ -327,44 +327,44 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper selective rollback', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      let request = new Request('create table #temp (id int)', function(err) {
+    connection.connect(function(err: any) {
+      let request = new Request('create table #temp (id int)', function(err: any) {
         assert.ifError(err);
 
-        connection.transaction(function(err, outerDone) {
+        connection.transaction(function(err: any, outerDone: any) {
           assert.ifError(err);
 
           request = new Request('insert into #temp (id) VALUES (1)', function(
-            err
+            err: any
           ) {
             assert.ifError(err);
 
-            connection.transaction(function(err, innerDone) {
+            connection.transaction(function(err: any, innerDone: any) {
               assert.ifError(err);
 
               request = new Request('insert into #temp (id) VALUES (2)', function(
-                err
+                err: any
               ) {
                 assert.ifError(err);
 
                 const expectedError = new Error('Something failed');
-                innerDone!(expectedError, function(err) {
+                innerDone!(expectedError, function(err: any) {
                   assert.strictEqual(err, expectedError);
 
                   // Do not pass the error to the outer transaction continuation
-                  outerDone!(null, function(err) {
+                  outerDone!(null, function(err: any) {
                     assert.ifError(err);
 
-                    request = new Request('select * from #temp', function(err) {
+                    request = new Request('select * from #temp', function(err: any) {
                       assert.ifError(err);
                       connection.close();
                     });
 
-                    request.on('row', function(row) {
+                    request.on('row', function(row: any) {
                       assert.strictEqual(row[0].value, 1);
                     });
 
@@ -385,40 +385,40 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper full rollback', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      let request = new Request('create table #temp (id int)', function(err) {
+    connection.connect(function(err: any) {
+      let request = new Request('create table #temp (id int)', function(err: any) {
         assert.ifError(err);
 
-        connection.transaction(function(err, outerDone) {
+        connection.transaction(function(err: any, outerDone: any) {
           assert.ifError(err);
 
           request = new Request('insert into #temp (id) VALUES (1)', function(
-            err
+            err: any
           ) {
             assert.ifError(err);
 
-            connection.transaction(function(err, innerDone) {
+            connection.transaction(function(err: any, innerDone: any) {
               assert.ifError(err);
 
               request = new Request('insert into #temp (id) VALUES (2)', function(
-                err
+                err: any
               ) {
                 assert.ifError(err);
 
                 const expectedError = new Error('Something failed');
-                innerDone!(expectedError, outerDone, function(err) {
+                innerDone!(expectedError, outerDone, function(err: any) {
                   assert.strictEqual(err, expectedError);
 
-                  request = new Request('select * from #temp', function(err) {
+                  request = new Request('select * from #temp', function(err: any) {
                     assert.ifError(err);
                     connection.close();
                   });
 
-                  request.on('row', function(row) {
+                  request.on('row', function(row: any) {
                     throw new Error('Did not expect any rows');
                   });
 
@@ -438,22 +438,22 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper batch aborting error', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      connection.transaction(function(err, outerDone) {
+    connection.connect(function(err: any) {
+      connection.transaction(function(err: any, outerDone: any) {
         assert.ifError(err);
 
-        connection.transaction(function(err, innerDone) {
+        connection.transaction(function(err: any, innerDone: any) {
           assert.ifError(err);
 
-          let request = new Request('create table #temp (id int)', function(err) {
+          let request = new Request('create table #temp (id int)', function(err: any) {
             assert.ifError(err);
 
-            request = new Request('create table #temp (id int)', function(err) {
-              innerDone!(err, outerDone, function(err) {
+            request = new Request('create table #temp (id int)', function(err: any) {
+              innerDone!(err, outerDone, function(err: any) {
                 assert.equal(
                   (err as Error).message,
                   "There is already an object named '#temp' in the database."
@@ -473,26 +473,26 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper socket error', function(done) {
     const connection = new Connection(config);
-    connection.on('end', function(info) {
+    connection.on('end' as any, function(info: any) {
       done();
     });
-    connection.on('error', function(err) {
+    connection.on('error', function(err: any) {
       assert.ok(~err.message.indexOf('socket error'));
     });
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      connection.transaction(function(err, outerDone) {
+    connection.connect(function(err: any) {
+      connection.transaction(function(err: any, outerDone: any) {
         assert.ifError(err);
 
-        connection.transaction(function(err, innerDone) {
+        connection.transaction(function(err: any, innerDone: any) {
           assert.ifError(err);
 
-          const request = new Request('WAITFOR 00:00:30', function(err) {
+          const request = new Request('WAITFOR 00:00:30', function(err: any) {
             assert.ok(~(err as Error).message.indexOf('socket error'));
 
-            innerDone!(err, outerDone, function(err) {
+            innerDone!(err, outerDone, function(err: any) {
               assert.ok(~(err as Error).message.indexOf('socket error'));
             });
           });
@@ -506,41 +506,41 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper isolation level', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      connection.transaction(function(err, outerDone) {
+    connection.connect(function(err: any) {
+      connection.transaction(function(err: any, outerDone: any) {
         assert.ifError(err);
 
         let request = new Request(
           'SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID',
-          function(err) {
+          function(err: any) {
             assert.ifError(err);
 
-            connection.transaction(function(err, innerDone) {
+            connection.transaction(function(err: any, innerDone: any) {
               assert.ifError(err);
 
               request = new Request(
                 'SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID',
-                function(err) {
+                function(err: any) {
                   assert.ifError(err);
 
-                  innerDone!(null, outerDone, function(err) {
+                  innerDone!(null, outerDone, function(err: any) {
                     request = new Request(
                       'SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID',
-                      function(err) {
+                      function(err: any) {
                         assert.ifError(err);
 
                         connection.close();
                       }
                     );
 
-                    request.on('row', function(row) {
+                    request.on('row', function(row: any) {
                       assert.equal(
                         row[0].value,
-                        Transaction.ISOLATION_LEVEL.SERIALIZABLE
+                        ISOLATION_LEVEL.SERIALIZABLE
                       );
                     });
 
@@ -549,41 +549,41 @@ describe('Transactions Test', function() {
                 }
               );
 
-              request.on('row', function(row) {
+              request.on('row', function(row: any) {
                 assert.equal(
                   row[0].value,
-                  Transaction.ISOLATION_LEVEL.SERIALIZABLE
+                  ISOLATION_LEVEL.SERIALIZABLE
                 );
               });
 
               connection.execSqlBatch(request);
-            }, Transaction.ISOLATION_LEVEL.SERIALIZABLE);
+            }, ISOLATION_LEVEL.SERIALIZABLE);
           }
         );
 
-        request.on('row', function(row) {
+        request.on('row', function(row: any) {
           assert.equal(
             row[0].value,
-            Transaction.ISOLATION_LEVEL.REPEATABLE_READ
+            ISOLATION_LEVEL.REPEATABLE_READ
           );
         });
 
         connection.execSqlBatch(request);
-      }, Transaction.ISOLATION_LEVEL.REPEATABLE_READ);
+      }, ISOLATION_LEVEL.REPEATABLE_READ);
     });
   });
 
   it('should test transaction helper reset open transaction count', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      connection.transaction(function(err) {
+    connection.connect(function(err: any) {
+      connection.transaction(function(err: any) {
         assert.ifError(err);
 
-        connection.reset(function(err) {
+        connection.reset(function(err: any) {
           assert.ifError(err);
 
           assert.strictEqual(connection.inTransaction, false);
@@ -595,35 +595,35 @@ describe('Transactions Test', function() {
 
   it('should test transaction helper mixed with low level transaction methods', function(done) {
     const connection = new Connection(config);
-    connection.on('end', (info) => done());
+    connection.on('end' as any, (info: any) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
 
-    connection.connect(function(err) {
-      connection.beginTransaction(function(err) {
+    connection.connect(function(err: any) {
+      connection.beginTransaction(function(err: any) {
         assert.ifError(err);
 
         assert.strictEqual(connection.inTransaction, true);
 
-        connection.transaction(function(err, txDone) {
+        connection.transaction(function(err: any, txDone: any) {
           assert.ifError(err);
 
           assert.strictEqual(connection.inTransaction, true);
 
-          connection.beginTransaction(function(err) {
+          connection.beginTransaction(function(err: any) {
             assert.ifError(err);
 
             assert.strictEqual(connection.inTransaction, true);
 
-            connection.commitTransaction(function(err) {
+            connection.commitTransaction(function(err: any) {
               assert.ifError(err);
 
               assert.strictEqual(connection.inTransaction, true);
 
-              txDone!(null, function(err) {
+              txDone!(null, function(err: any) {
                 assert.strictEqual(connection.inTransaction, true);
 
-                connection.commitTransaction(function(err) {
+                connection.commitTransaction(function(err: any) {
                   assert.ifError(err);
 
                   assert.strictEqual(connection.inTransaction, false);

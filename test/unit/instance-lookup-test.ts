@@ -1,7 +1,9 @@
+// @ts-expect-error - sinon types are not properly configured
 import sinon from 'sinon';
 import * as url from 'node:url';
 import { assert } from 'chai';
 import * as dgram from 'dgram';
+import type { AddressInfo } from 'net';
 import * as dns from 'dns';
 import { instanceLookup, parseBrowserResponse } from '../../src/instance-lookup';
 
@@ -9,7 +11,7 @@ describe('instanceLookup invalid args', function() {
   it('invalid server', async function() {
     let error: Error | undefined;
     try {
-      await instanceLookup({ server: 4 as any });
+      await instanceLookup({ server: 4 as any, instanceName: 'test', signal: new AbortController().signal });
     } catch (err) {
       error = err as Error;
     }
@@ -21,7 +23,7 @@ describe('instanceLookup invalid args', function() {
   it('invalid instanceName', async function() {
     let error: Error | undefined;
     try {
-      await instanceLookup({ server: 'serverName', instanceName: 4 as any });
+      await instanceLookup({ server: 'serverName', instanceName: 4 as any, signal: new AbortController().signal });
     } catch (err) {
       error = err as Error;
     }
@@ -36,7 +38,8 @@ describe('instanceLookup invalid args', function() {
       await instanceLookup({
         server: 'server',
         instanceName: 'instance',
-        timeout: 'some string' as any
+        timeout: 'some string' as any,
+        signal: new AbortController().signal
       });
     } catch (err) {
       error = err as Error;
@@ -53,7 +56,8 @@ describe('instanceLookup invalid args', function() {
         server: 'server',
         instanceName: 'instance',
         timeout: 1000,
-        retries: 'some string' as any
+        retries: 'some string' as any,
+        signal: new AbortController().signal
       });
     } catch (err) {
       error = err as Error;
@@ -85,8 +89,8 @@ describe('InstanceLookup', function() {
 
     try {
       await instanceLookup({
-        server: (server.address() as dgram.AddressInfo).address,
-        port: (server.address() as dgram.AddressInfo).port,
+        server: (server.address() as AddressInfo).address,
+        port: (server.address() as AddressInfo).port,
         instanceName: 'second',
         timeout: 500,
         retries: 1,
@@ -108,8 +112,8 @@ describe('InstanceLookup', function() {
     let error: Error | undefined;
     try {
       await instanceLookup({
-        server: (server.address() as dgram.AddressInfo).address,
-        port: (server.address() as dgram.AddressInfo).port,
+        server: (server.address() as AddressInfo).address,
+        port: (server.address() as AddressInfo).port,
         instanceName: 'first',
         timeout: 500,
         retries: 1,
@@ -137,8 +141,8 @@ describe('InstanceLookup', function() {
     let error: Error | undefined;
     try {
       await instanceLookup({
-        server: (server.address() as dgram.AddressInfo).address,
-        port: (server.address() as dgram.AddressInfo).port,
+        server: (server.address() as AddressInfo).address,
+        port: (server.address() as AddressInfo).port,
         instanceName: 'first',
         timeout: 500,
         retries: 1,
@@ -168,8 +172,8 @@ describe('InstanceLookup', function() {
     let error: Error | undefined;
     try {
       await instanceLookup({
-        server: (server.address() as dgram.AddressInfo).address,
-        port: (server.address() as dgram.AddressInfo).port,
+        server: (server.address() as AddressInfo).address,
+        port: (server.address() as AddressInfo).port,
         instanceName: 'first',
         timeout: 500,
         retries: 1,
@@ -192,8 +196,8 @@ describe('InstanceLookup', function() {
       let error: Error | undefined;
       try {
         await instanceLookup({
-          server: (server.address() as dgram.AddressInfo).address,
-          port: (server.address() as dgram.AddressInfo).port,
+          server: (server.address() as AddressInfo).address,
+          port: (server.address() as AddressInfo).port,
           instanceName: 'instance',
           timeout: 500,
           retries: 0,
@@ -227,8 +231,8 @@ describe('InstanceLookup', function() {
       const controller = new AbortController();
 
       const result = await instanceLookup({
-        server: (server.address() as dgram.AddressInfo).address,
-        port: (server.address() as dgram.AddressInfo).port,
+        server: (server.address() as AddressInfo).address,
+        port: (server.address() as AddressInfo).port,
         instanceName: 'second',
         timeout: 500,
         retries: 1,
@@ -256,8 +260,8 @@ describe('InstanceLookup', function() {
       let error: Error | undefined;
       try {
         await instanceLookup({
-          server: (server.address() as dgram.AddressInfo).address,
-          port: (server.address() as dgram.AddressInfo).port,
+          server: (server.address() as AddressInfo).address,
+          port: (server.address() as AddressInfo).port,
           instanceName: 'other',
           timeout: 500,
           retries: 1,
@@ -283,8 +287,8 @@ describe('InstanceLookup', function() {
       let error: Error | undefined;
       try {
         await instanceLookup({
-          server: (server.address() as dgram.AddressInfo).address,
-          port: (server.address() as dgram.AddressInfo).port,
+          server: (server.address() as AddressInfo).address,
+          port: (server.address() as AddressInfo).port,
           instanceName: 'other',
           timeout: 500,
           retries: 1,

@@ -33,8 +33,8 @@ describe('tedious-test', function() {
 
     const connection = new Connection(config);
 
-    assert.notStrictEqual(connection.config, config);
-    assert.notStrictEqual(connection.config.options, config.options);
+    assert.notStrictEqual(connection.config, config as any);
+    assert.notStrictEqual(connection.config.options, config.options as any);
 
     // Test that we did not do a deep copy of the cryptoCredentialsDetails,
     // as we never modify that value inside tedious.

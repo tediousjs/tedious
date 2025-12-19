@@ -33,7 +33,7 @@ describe('Packet Tests', function() {
       }
     });
 
-    return debug.packet('dir', new Packet());
+    return debug.packet('dir', new Packet() as any);
   });
 
   it('should enable payload', function(done) {
@@ -55,7 +55,7 @@ describe('Packet Tests', function() {
       assert.isOk(false);
     });
 
-    debug.payload(payload);
+    debug.payload(() => payload);
 
     done();
   });
@@ -68,7 +68,7 @@ describe('Packet Tests', function() {
       done();
     });
 
-    debug.data(new Packet());
+    debug.data(new Packet() as any);
   });
 
   it('should not enable data', function(done) {
@@ -77,7 +77,7 @@ describe('Packet Tests', function() {
       assert.isOk(false);
     });
 
-    debug.data(new Packet());
+    debug.data(new Packet() as any);
 
     done();
   });
@@ -90,7 +90,7 @@ describe('Packet Tests', function() {
       done();
     });
 
-    debug.token({ name: 'test' });
+    debug.token({ name: 'test' } as any);
   });
 
   it('should not enable payload', function(done) {
@@ -99,7 +99,7 @@ describe('Packet Tests', function() {
       assert.isOk(false);
     });
 
-    debug.token({ name: 'test' });
+    debug.token({ name: 'test' } as any);
 
     done();
   });

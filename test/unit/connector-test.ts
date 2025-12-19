@@ -1,4 +1,6 @@
+// @ts-expect-error - no type definitions
 import Mitm from 'mitm';
+// @ts-expect-error - no type definitions
 import sinon from 'sinon';
 import * as dns from 'dns';
 import { assert } from 'chai';

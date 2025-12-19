@@ -247,7 +247,7 @@ describe('Login7Payload', function() {
           clientTimeZone: 120,
           clientLcid: 0x00000409,
           isFabric: true,
-        });
+        } as any);
 
         payload.hostname = 'example.com';
         payload.appName = 'app';

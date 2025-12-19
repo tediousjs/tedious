@@ -12,7 +12,7 @@ function buildRoutingEnvChangeToken(hostname: string, port: number): Buffer {
   const valueBuffer = new WritableTrackingBuffer(0);
   valueBuffer.writeUInt8(0); // Protocol
   valueBuffer.writeUInt16LE(port); // Port
-  valueBuffer.writeUsVarchar(hostname, 'ucs-2');
+  valueBuffer.writeUsVarchar(hostname, 'ucs2');
 
   const envValueDataBuffer = new WritableTrackingBuffer(0);
   envValueDataBuffer.writeUInt8(20); // Type

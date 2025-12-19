@@ -1,4 +1,5 @@
 import * as dgram from 'dgram';
+import type { AddressInfo } from 'net';
 import { assert } from 'chai';
 import * as dns from 'dns';
 import { sendMessage } from '../../src/sender';
@@ -22,7 +23,7 @@ describe('sendMessage', function() {
       server.bind(0, address, () => {
         server!.removeListener('error', onError);
 
-        port = (server!.address() as dgram.AddressInfo).port;
+        port = (server!.address() as AddressInfo).port;
 
         done();
       });
@@ -57,8 +58,8 @@ describe('sendMessage', function() {
     it('forwards any errors happening during lookup', async function() {
       const expectedError = new Error('fail');
 
-      function lookup(hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses?: dns.LookupAddress[]) => void) {
-        process.nextTick(callback, expectedError);
+      function lookup(hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) {
+        process.nextTick(callback, expectedError as any);
       }
 
       server!.once('message', (message, rinfo) => {
@@ -193,7 +194,7 @@ describe('sendMessage', function() {
       server.bind(0, address, () => {
         server!.removeListener('error', onError);
 
-        port = (server!.address() as dgram.AddressInfo).port;
+        port = (server!.address() as AddressInfo).port;
 
         done();
       });
@@ -228,8 +229,8 @@ describe('sendMessage', function() {
     it('forwards any errors happening during lookup', async function() {
       const expectedError = new Error('fail');
 
-      function lookup(hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses?: dns.LookupAddress[]) => void) {
-        process.nextTick(callback, expectedError);
+      function lookup(hostname: string, options: dns.LookupAllOptions, callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void) {
+        process.nextTick(callback, expectedError as any);
       }
 
       server!.once('message', (message, rinfo) => {
@@ -296,7 +297,7 @@ describe('sendMessage', function() {
         server.bind(port, address, () => {
           server.removeListener('error', onError);
 
-          port = (server.address() as dgram.AddressInfo).port;
+          port = (server.address() as AddressInfo).port;
           servers.push(server);
 
           done();
@@ -323,7 +324,7 @@ describe('sendMessage', function() {
 
       servers.forEach((server) => {
         server.on('message', (message, rinfo) => {
-          messages.push([(server.address() as dgram.AddressInfo).address, message]);
+          messages.push([(server.address() as AddressInfo).address, message]);
 
           server.send(Buffer.from('response'), rinfo.port, rinfo.address);
         });
@@ -352,7 +353,7 @@ describe('sendMessage', function() {
 
       servers.forEach((server) => {
         server.on('message', (message, rinfo) => {
-          messages.push([(server.address() as dgram.AddressInfo).address, message]);
+          messages.push([(server.address() as AddressInfo).address, message]);
 
           if (messages.length === 3) {
             server.send(Buffer.from(`response #${messages.length}`), rinfo.port, rinfo.address);

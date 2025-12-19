@@ -29,11 +29,11 @@ describe('Token Stream Parser', () => {
   it('should envChange', (done) => {
     const buffer = createDbChangeBuffer();
 
-    const parser = new Parser([buffer], debug, {
-      onDatabaseChange: function(token) {
+    const parser = new Parser([buffer] as any, debug, {
+      onDatabaseChange: function(token: any) {
         assert.isOk(token);
       }
-    });
+    } as any, {} as any);
 
     parser.on('end', done);
   });
@@ -41,11 +41,11 @@ describe('Token Stream Parser', () => {
   it('should split token across buffers', (done) => {
     const buffer = createDbChangeBuffer();
 
-    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)], debug, {
-      onDatabaseChange: function(token) {
+    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as any, debug, {
+      onDatabaseChange: function(token: any) {
         assert.isOk(token);
       }
-    });
+    } as any, {} as any);
 
     parser.on('end', done);
   });

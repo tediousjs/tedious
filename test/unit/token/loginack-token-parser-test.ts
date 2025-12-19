@@ -30,15 +30,15 @@ describe('Loginack Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
     // console.log(buffer)
 
-    const parser = StreamParser.parseTokens([data], { tdsVersion: '7_2' });
+    const parser = StreamParser.parseTokens([data], {} as any, { tdsVersion: '7_2' } as any);
 
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual(token.interface, 'SQL_TSQL');
-    assert.strictEqual(token.tdsVersion, '7_2');
-    assert.strictEqual(token.progName, progName);
-    assert.deepEqual(token.progVersion, progVersion);
+    assert.strictEqual((token as any).interface, 'SQL_TSQL');
+    assert.strictEqual((token as any).tdsVersion, '7_2');
+    assert.strictEqual((token as any).progName, progName);
+    assert.deepEqual((token as any).progVersion, progVersion);
 
     assert.isTrue((await parser.next()).done);
   });

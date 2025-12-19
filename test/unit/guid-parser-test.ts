@@ -170,14 +170,14 @@ describe('Guid Parser Test', function() {
   it('bufferToLowerCaseGuid', () => {
     for (let i = 0; i < arrays.length; i++) {
       const array = arrays[i];
-      assert.strictEqual(guidParser.bufferToLowerCaseGuid(array), lowerGuids[i]);
+      assert.strictEqual(guidParser.bufferToLowerCaseGuid(Buffer.from(array)), lowerGuids[i]);
     }
   });
 
   it('bufferToUpperCaseGuid', () => {
     for (let i = 0; i < arrays.length; i++) {
       const array = arrays[i];
-      assert.strictEqual(guidParser.bufferToUpperCaseGuid(array), upperGuids[i]);
+      assert.strictEqual(guidParser.bufferToUpperCaseGuid(Buffer.from(array)), upperGuids[i]);
     }
   });
 });

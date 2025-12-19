@@ -24,7 +24,7 @@ describe('sspi token parser', () => {
 
     const data = source.data;
     data.writeUInt16LE(data.length - 3, 1);
-    const parser = StreamParser.parseTokens([data], {}, { tdsVersion: '7_2' });
+    const parser = StreamParser.parseTokens([data], {} as any, { tdsVersion: '7_2' } as any);
 
 
     const expected = {
@@ -46,9 +46,9 @@ describe('sspi token parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.deepEqual(token.ntlmpacket, expected);
+    assert.deepEqual((token as any).ntlmpacket, expected);
     // Skip token (first byte) and length of VarByte (2 bytes).
-    assert.isOk(token.ntlmpacketBuffer.equals(data.slice(3)));
+    assert.isOk((token as any).ntlmpacketBuffer.equals(data.slice(3)));
 
     assert.isTrue((await parser.next()).done);
   });

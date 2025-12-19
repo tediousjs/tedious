@@ -22,12 +22,12 @@ describe('Feature Ext Parser', () => {
 
     buffer.writeUInt8(0xFF); // terminator
 
-    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
-    assert.isUndefined(token.utf8Support); // feature ext ack for UTF8_SUPPORT was not received
+    assert.isOk((token as any).fedAuth.equals(Buffer.from('bc')));
+    assert.isUndefined((token as any).utf8Support); // feature ext ack for UTF8_SUPPORT was not received
     assert.isTrue((await parser.next()).done);
   });
 
@@ -41,13 +41,13 @@ describe('Feature Ext Parser', () => {
 
     buffer.writeUInt8(0xFF); // TERMINATOR
 
-    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
     const result = await parser.next();
     assert.isFalse(result.done);
 
     const token = result.value;
-    assert.strictEqual(token.utf8Support, true); // feature ext ack for UTF8_SUPPORT was positive
-    assert.isUndefined(token.fedAuth); // fed auth not ack'd
+    assert.strictEqual((token as any).utf8Support, true); // feature ext ack for UTF8_SUPPORT was positive
+    assert.isUndefined((token as any).fedAuth); // fed auth not ack'd
 
     assert.isTrue((await parser.next()).done);
   });

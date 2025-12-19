@@ -29,16 +29,16 @@ describe('NBCRow Token Parser', function() {
         buffer.writeUsVarchar(i.toString());
       }
 
-      const parser = Parser.parseTokens([buffer.data], {}, options, colMetadata);
+      const parser = Parser.parseTokens([buffer.data], {} as any, options as any, colMetadata as any);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.strictEqual(token.columns.length, 1024);
+      assert.strictEqual((token as any).columns.length, 1024);
 
       for (let i = 0; i < 1024; i += 1) {
-        assert.strictEqual(token.columns[i].value, i.toString());
-        assert.strictEqual(token.columns[i].metadata, colMetadata[i]);
+        assert.strictEqual((token as any).columns[i].value, i.toString());
+        assert.strictEqual((token as any).columns[i].metadata, colMetadata[i]);
       }
 
       assert.isTrue((await parser.next()).done);

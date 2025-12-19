@@ -66,7 +66,7 @@ end\
   const connection = new Connection(config);
 
   function createTable(callback: (err?: Error) => void): void {
-    const request = new Request(createTableSql, function(err: Error | undefined, rowCount: number) {
+    const request = new Request(createTableSql, function(err: any) {
       callback(err);
     });
 
@@ -75,7 +75,7 @@ end\
   }
 
   function insertRows(callback: (err?: Error) => void): void {
-    const request = new Request(insertRowsSql, function(err: Error | undefined, rowCount: number) {
+    const request = new Request(insertRowsSql, function(err: any) {
       callback(err);
     });
 
@@ -85,7 +85,7 @@ end\
 
   function select(callback: (err?: Error) => void): void {
     const start = Date.now();
-    const request = new Request(selectSql, function(err: Error | undefined, rowCount: number) {
+    const request = new Request(selectSql, function(err: any, rowCount: any) {
       test.strictEqual(rows, rowCount);
 
       const durationMillis = Date.now() - start;
@@ -106,7 +106,7 @@ end\
     connection.execSqlBatch(request);
   }
 
-  connection.connect(function(err: Error | undefined) {
+  connection.connect(function(err: any) {
     test.ok(!err);
 
     async.series([
@@ -119,7 +119,7 @@ end\
     ]);
   });
 
-  connection.on('end', function(info: any) {
+  connection.on('end', function() {
     test.done();
   });
 
@@ -131,7 +131,7 @@ end\
     // console.log("#{error.number} : #{error.message}")
   });
 
-  connection.on('debug', function(text: string) {
+  connection.on('debug', function(text: any) {
     // console.log(text)
   });
 }
