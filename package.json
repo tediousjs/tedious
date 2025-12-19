@@ -66,6 +66,7 @@
     "@types/depd": "^1.1.37",
     "@types/lru-cache": "^5.1.1",
     "@types/mocha": "^10.0.10",
+    "@types/sinon": "^21.0.0",
     "@types/sprintf-js": "^1.1.4",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",

@@ -24,7 +24,7 @@ describe('Packet Tests', function() {
 
       switch (emitCount) {
         case 2:
-          assert.isOk(/dir/.test(text));
+          assert.isOk(/Sent/.test(text));
           break;
         case 3:
           assert.isOk(/header/.test(text));
@@ -33,7 +33,7 @@ describe('Packet Tests', function() {
       }
     });
 
-    return debug.packet('dir', new Packet() as any);
+    return debug.packet('Sent', new Packet() as any);
   });
 
   it('should enable payload', function(done) {

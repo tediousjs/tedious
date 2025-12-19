@@ -1,4 +1,3 @@
-// @ts-expect-error - sinon types are not properly configured
 import sinon from 'sinon';
 import * as url from 'node:url';
 import { assert } from 'chai';
