@@ -2,8 +2,8 @@ import { assert } from 'chai';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import async from 'async';
-import Connection from '../../src/connection';
-import Request from '../../src/request';
+import Connection, { type ConnectionOptions } from '../../src/connection';
+import Request, { type ParameterOptions } from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
@@ -29,10 +29,10 @@ function execSql(
   type: DataType,
   value: unknown,
   tdsVersion?: TdsVersion,
-  options?: import('../../src/request').ParameterOptions | null,
+  options?: ParameterOptions | null,
   expectedValue?: unknown,
   cast?: boolean,
-  connectionOptions?: import('../../src/connection').ConnectionOptions
+  connectionOptions?: ConnectionOptions
 ): void {
   const config = getConfig();
   // config.options.packetSize = 32768
@@ -103,7 +103,7 @@ function execSqlOutput(
   type: DataType,
   value: unknown,
   expectedValue?: unknown,
-  connectionOptions?: import('../../src/connection').ConnectionOptions
+  connectionOptions?: ConnectionOptions
 ): void {
   const config = getConfig();
 
