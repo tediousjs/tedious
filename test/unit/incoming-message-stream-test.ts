@@ -22,12 +22,12 @@ describe('IncomingMessageStream', function() {
 
     const incoming = new IncomingMessageStream(new Debug());
 
-    incoming.on('data', function(message: Message) {
+    incoming.on('data', function(message) {
       assert.instanceOf(message, Message);
       assert.strictEqual(message.type, 0x11);
       assert.strictEqual(message.resetConnection, false);
 
-      const result = new BufferList(function(err: Error | null, res: Buffer) {
+      const result = new BufferList(function(err, res) {
         if (err) {
           return done(err);
         }
@@ -69,7 +69,7 @@ describe('IncomingMessageStream', function() {
 
     const incoming = new IncomingMessageStream(new Debug());
 
-    const result = new BufferList(function(err: Error | null, res: Buffer) {
+    const result = new BufferList(function(err, res) {
       if (err) {
         return done(err);
       }
@@ -80,7 +80,7 @@ describe('IncomingMessageStream', function() {
     });
 
     let messageEnded = false;
-    incoming.on('data', function(message: Message) {
+    incoming.on('data', function(message) {
       assert.instanceOf(message, Message);
 
       message.on('end', function() {
@@ -133,7 +133,7 @@ describe('IncomingMessageStream', function() {
 
     const incoming = new IncomingMessageStream(new Debug());
 
-    const result = new BufferList(function(err: Error | null, res: Buffer) {
+    const result = new BufferList(function(err, res) {
       if (err) {
         return done(err);
       }
@@ -144,7 +144,7 @@ describe('IncomingMessageStream', function() {
     });
 
     let messageEnded = false;
-    incoming.on('data', function(message: Message) {
+    incoming.on('data', function(message) {
       assert.instanceOf(message, Message);
 
       message.on('end', function() {
