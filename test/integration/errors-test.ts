@@ -1,12 +1,8 @@
-// @ts-check
-
-const assert = require('chai').assert;
-
+import { assert } from 'chai';
 import { RequestError } from '../../src/errors';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
-
 import defaultConfig from '../config';
 
 const config = {
@@ -19,12 +15,7 @@ const config = {
   }
 };
 
-/**
- * @param {Mocha.Done} done
- * @param {string | undefined} sql
- * @param {(error: Error | null | undefined, rowCount?: number, rows?: any) => void} requestCallback
- */
-function execSql(done, sql, requestCallback) {
+function execSql(done: Mocha.Done, sql: string | undefined, requestCallback: (error: Error | null | undefined, rowCount?: number, rows?: any) => void) {
   const connection = new Connection(config);
 
   const request = new Request(sql, function(err) {
@@ -60,7 +51,7 @@ describe('Errors Test', function() {
 
     execSql(done, sql, function(err) {
       assert.ok(err instanceof RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 2627);
+      assert.strictEqual((err as RequestError).number, 2627);
     });
   });
 
@@ -73,7 +64,7 @@ describe('Errors Test', function() {
 
     execSql(done, sql, function(err) {
       assert.ok(err instanceof RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
+      assert.strictEqual((err as RequestError).number, 515);
     });
   });
 
@@ -84,7 +75,7 @@ describe('Errors Test', function() {
 
     execSql(done, sql, function(err) {
       assert.ok(err instanceof RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 3701);
+      assert.strictEqual((err as RequestError).number, 3701);
     });
   });
 
@@ -101,7 +92,7 @@ describe('Errors Test', function() {
         assert.fail('Expected `err` to not be undefined');
       }
 
-      const requestError = /** @type {RequestError} */(err);
+      const requestError = err as RequestError;
 
       assert.strictEqual(requestError.number, 50000);
       assert.strictEqual(requestError.state, 42);
@@ -112,7 +103,7 @@ describe('Errors Test', function() {
 
       // The procedure name will actually be padded to 128 chars with underscores and
       // some random hexadecimal digits.
-      assert.match(/** @type {string} */(requestError.procName), /^#testExtendedErrorInfo/);
+      assert.match(requestError.procName as string, /^#testExtendedErrorInfo/);
 
       assert.strictEqual(requestError.lineNumber, 1);
 
@@ -154,7 +145,7 @@ describe('Errors Test', function() {
       connection.on('debug', console.log);
     }
 
-    const request = new Request("select 42, 'hello world'", function(err, rowCount) {
+    const request = new Request("select 42, 'hello world'", function(err) {
       if (err) {
         assert.equal(err.message, 'Canceled.');
       }
@@ -208,25 +199,30 @@ describe('Errors Test', function() {
   });
 
   it.skip('should throw aggregate error with AAD token retrieve', function(done) {
-    config.server = 'help.kusto.windows.net';
-    config.authentication = {
-      type: 'azure-active-directory-password',
+    const testConfig: any = {
+      ...config,
+      server: 'help.kusto.windows.net',
+      authentication: {
+        type: 'azure-active-directory-password',
+        options: {
+          userName: 'username',
+          password: 'password',
+          // Lack of tenantId will generate a AAD token retrieve error
+          clientId: 'clientID',
+        }
+      },
       options: {
-        userName: 'username',
-        password: 'password',
-        // Lack of tenantId will generate a AAD token retrieve error
-        clientId: 'clientID',
+        ...config.options,
+        tdsVersion: '7_4'
       }
     };
-    config.options.tdsVersion = '7_4';
-    const connection = new Connection(config);
+    const connection = new Connection(testConfig);
 
     if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
     }
 
-    /** @type {Error | undefined} */
-    let connectionError;
+    let connectionError: Error | undefined;
     connection.connect((err) => {
       connectionError = err;
 

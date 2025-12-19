@@ -1,7 +1,5 @@
-// @ts-check
-
-const TYPES = require('../../src/data-type').typeByName;
-const assert = require('chai').assert;
+import { assert } from 'chai';
+import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
@@ -72,10 +70,7 @@ describe('Prepare Execute Statement', function() {
         return done(err);
       }
 
-      /**
-       * @type {{ parameterName: string, value: unknown, metadata: import('../../src/metadata-parser').Metadata }[]}
-       */
-      const returnValues = [];
+      const returnValues: { parameterName: string; value: unknown; metadata: import('../../src/metadata-parser').Metadata }[] = [];
 
       const request = new Request('select @param', function(err) {
         if (err) {
@@ -114,10 +109,7 @@ describe('Prepare Execute Statement', function() {
 
     let eventEmitterLeak = false;
 
-    /**
-     * @type {NodeJS.WarningListener}
-     */
-    const onWarning = (warning) => {
+    const onWarning: NodeJS.WarningListener = (warning) => {
       if (warning.name === 'MaxListenersExceededWarning') {
         eventEmitterLeak = true;
       }

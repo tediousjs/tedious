@@ -1,9 +1,9 @@
-const Connection = require('../../src/connection');
-const Request = require('../../src/request');
-const Transaction = require('../../src/transaction');
-const async = require('async');
-const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
-const assert = require('chai').assert;
+import Connection from '../../src/connection';
+import Request from '../../src/request';
+import Transaction from '../../src/transaction';
+import async from 'async';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { assert } from 'chai';
 
 import defaultConfig from '../config';
 
@@ -17,7 +17,10 @@ const config = {
 };
 
 class Tester {
-  constructor(done) {
+  done: Mocha.Done;
+  connection: Connection;
+
+  constructor(done: Mocha.Done) {
     this.createTable = this.createTable.bind(this);
     this.createProc = this.createProc.bind(this);
     this.execProc = this.execProc.bind(this);
@@ -48,19 +51,19 @@ class Tester {
     }
   }
 
-  createTable(callback) {
+  createTable(callback: (err?: Error | null) => void) {
     const request = new Request(
       'create table #temp (id int)',
-      function(err) {
+      (err) => {
         assert.ifError(err);
         callback(err);
-      }.bind(this)
+      }
     );
 
     this.connection.execSqlBatch(request);
   }
 
-  createProc(callback) {
+  createProc(callback: (err?: Error | null) => void) {
     const request = new Request(
       `\
 CREATE PROCEDURE #proc
@@ -71,47 +74,47 @@ AS
   insert into #temp (id) values(1)
   commit transaction
 GO`,
-      function(err) {
+      (err) => {
         assert.ifError(err);
         callback(err);
-      }.bind(this)
+      }
     );
 
     this.connection.execSqlBatch(request);
   }
 
-  execProc(callback) {
+  execProc(callback: (err?: Error | null) => void) {
     const request = new Request(
       'exec #proc',
-      function(err) {
+      (err) => {
         assert.ifError(err);
         callback(err);
-      }.bind(this)
+      }
     );
 
     this.connection.execSqlBatch(request);
   }
 
-  insert(callback) {
+  insert(callback: (err?: Error | null) => void) {
     const request = new Request(
       'insert into #temp (id) values(1)',
-      function(err) {
+      (err) => {
         assert.ifError(err);
         callback(err);
-      }.bind(this)
+      }
     );
 
     this.connection.execSqlBatch(request);
   }
 
-  select(callback, expectedRows) {
+  select(callback: (err?: Error | null) => void, expectedRows: number) {
     const request = new Request(
       'select id from #temp',
-      function(err, rowCount) {
+      (err, rowCount) => {
         assert.ifError(err);
         assert.strictEqual(rowCount, expectedRows);
         callback(err);
-      }.bind(this)
+      }
     );
 
     request.on('row', (columns) => {
@@ -121,15 +124,15 @@ GO`,
     this.connection.execSqlBatch(request);
   }
 
-  selectExpectZeroRows(callback) {
+  selectExpectZeroRows(callback: (err?: Error | null) => void) {
     this.select(callback, 0);
   }
 
-  selectExpectOneRow(callback) {
+  selectExpectOneRow(callback: (err?: Error | null) => void) {
     this.select(callback, 1);
   }
 
-  beginTransaction(callback, transactionName) {
+  beginTransaction(callback: (err?: Error | null) => void, transactionName?: string) {
     this.connection.beginTransaction((err, transactionDescriptor) => {
       assert.ifError(err);
       assert.ok(
@@ -140,15 +143,15 @@ GO`,
     }, transactionName);
   }
 
-  beginTransaction1(callback) {
+  beginTransaction1(callback: (err?: Error | null) => void) {
     this.beginTransaction(callback, 'one');
   }
 
-  beginTransaction2(callback) {
+  beginTransaction2(callback: (err?: Error | null) => void) {
     this.beginTransaction(callback, 'two');
   }
 
-  commitTransaction(callback) {
+  commitTransaction(callback: (err?: Error | null) => void) {
     this.connection.commitTransaction((err) => {
       assert.ifError(err);
 
@@ -156,7 +159,7 @@ GO`,
     });
   }
 
-  rollbackTransaction(callback) {
+  rollbackTransaction(callback: (err?: Error | null) => void) {
     this.connection.rollbackTransaction((err) => {
       assert.ifError(err);
 
@@ -164,11 +167,11 @@ GO`,
     });
   }
 
-  close(callback) {
+  close(callback?: (err?: Error | null) => void) {
     this.connection.close();
   }
 
-  run(actions) {
+  run(actions: Array<(callback: (err?: Error | null) => void) => void>) {
     this.connection.connect((err) => {
       async.series(actions);
     });
@@ -287,7 +290,7 @@ describe('Transactions Test', function() {
             });
 
             req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
-              assert.match(err.message, /^String or binary data would be truncated/);
+              assert.match((err as Error).message, /^String or binary data would be truncated/);
 
               connection.close();
             });
@@ -313,7 +316,7 @@ describe('Transactions Test', function() {
         connection.transaction(function(err, innerDone) {
           assert.ifError(err);
 
-          innerDone(null, outerDone, function(err) {
+          innerDone!(null, outerDone, function(err) {
             assert.ifError(err);
             connection.close();
           });
@@ -349,11 +352,11 @@ describe('Transactions Test', function() {
                 assert.ifError(err);
 
                 const expectedError = new Error('Something failed');
-                innerDone(expectedError, function(err) {
+                innerDone!(expectedError, function(err) {
                   assert.strictEqual(err, expectedError);
 
                   // Do not pass the error to the outer transaction continuation
-                  outerDone(null, function(err) {
+                  outerDone!(null, function(err) {
                     assert.ifError(err);
 
                     request = new Request('select * from #temp', function(err) {
@@ -407,7 +410,7 @@ describe('Transactions Test', function() {
                 assert.ifError(err);
 
                 const expectedError = new Error('Something failed');
-                innerDone(expectedError, outerDone, function(err) {
+                innerDone!(expectedError, outerDone, function(err) {
                   assert.strictEqual(err, expectedError);
 
                   request = new Request('select * from #temp', function(err) {
@@ -450,9 +453,9 @@ describe('Transactions Test', function() {
             assert.ifError(err);
 
             request = new Request('create table #temp (id int)', function(err) {
-              innerDone(err, outerDone, function(err) {
+              innerDone!(err, outerDone, function(err) {
                 assert.equal(
-                  err.message,
+                  (err as Error).message,
                   "There is already an object named '#temp' in the database."
                 );
 
@@ -487,15 +490,15 @@ describe('Transactions Test', function() {
           assert.ifError(err);
 
           const request = new Request('WAITFOR 00:00:30', function(err) {
-            assert.ok(~err.message.indexOf('socket error'));
+            assert.ok(~(err as Error).message.indexOf('socket error'));
 
-            innerDone(err, outerDone, function(err) {
-              assert.ok(~err.message.indexOf('socket error'));
+            innerDone!(err, outerDone, function(err) {
+              assert.ok(~(err as Error).message.indexOf('socket error'));
             });
           });
 
           connection.execSql(request);
-          connection.socket.emit('error', new Error('socket error'));
+          connection.socket!.emit('error', new Error('socket error'));
         });
       });
     });
@@ -524,7 +527,7 @@ describe('Transactions Test', function() {
                 function(err) {
                   assert.ifError(err);
 
-                  innerDone(null, outerDone, function(err) {
+                  innerDone!(null, outerDone, function(err) {
                     request = new Request(
                       'SELECT [transaction_isolation_level] FROM [sys].[dm_exec_sessions] WHERE [session_id] = @@SPID',
                       function(err) {
@@ -617,7 +620,7 @@ describe('Transactions Test', function() {
 
               assert.strictEqual(connection.inTransaction, true);
 
-              txDone(null, function(err) {
+              txDone!(null, function(err) {
                 assert.strictEqual(connection.inTransaction, true);
 
                 connection.commitTransaction(function(err) {

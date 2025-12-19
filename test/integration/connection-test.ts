@@ -1,8 +1,6 @@
-// @ts-check
-
-const async = require('async');
-const assert = require('chai').assert;
-const os = require('os');
+import async from 'async';
+import { assert } from 'chai';
+import os from 'os';
 
 import Connection from '../../src/connection';
 import { ConnectionError, RequestError } from '../../src/errors';
@@ -26,7 +24,7 @@ function getConfig() {
 }
 
 describe('Initiate Connect Test', function() {
-  it('should be bad server', function(done) {
+  it('should be bad server', function(done: Mocha.Done) {
     const config = getConfig();
     config.server = 'bad-server';
 
@@ -43,7 +41,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should be bad port', function(done) {
+  it('should be bad port', function(done: Mocha.Done) {
     const config = getConfig();
 
     assert.throws(function() {
@@ -60,7 +58,7 @@ describe('Initiate Connect Test', function() {
     done();
   });
 
-  it('should be bad credentials', function(done) {
+  it('should be bad credentials', function(done: Mocha.Done) {
     const config = getConfig();
 
     if (config.authentication && config.authentication.type !== 'default') {
@@ -103,7 +101,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should connect by port', function(done) {
+  it('should connect by port', function(done: Mocha.Done) {
     const config = getConfig();
 
     if ((config.options != null ? config.options.port : undefined) == null) {
@@ -138,7 +136,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should fail connecting by invalid instance name', function(done) {
+  it('should fail connecting by invalid instance name', function(done: Mocha.Done) {
     const config = getConfig();
 
     if (!config.options?.instanceName) {
@@ -174,7 +172,7 @@ describe('Initiate Connect Test', function() {
     }
   });
 
-  it('should allow connecting by calling `.connect` on the returned connection', function(done) {
+  it('should allow connecting by calling `.connect` on the returned connection', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection(config);
@@ -191,7 +189,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should not allow calling `.connect` on a connected connection', function(done) {
+  it('should not allow calling `.connect` on a connected connection', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection(config);
@@ -214,7 +212,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should allow calling `.connect` without a callback', function(done) {
+  it('should allow calling `.connect` without a callback', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection(config);
@@ -232,7 +230,7 @@ describe('Initiate Connect Test', function() {
     connection.connect();
   });
 
-  it('should fail if no cipher can be negotiated', function(done) {
+  it('should fail if no cipher can be negotiated', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection({
@@ -253,11 +251,11 @@ describe('Initiate Connect Test', function() {
 
     connection.connect(function(err) {
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual(/** @type {ConnectionError} */(err).code, 'ESOCKET');
+      assert.strictEqual((err as ConnectionError).code, 'ESOCKET');
 
-      assert.instanceOf(/** @type {ConnectionError} */(err).cause, Error);
-      console.log(/** @type {ConnectionError} */(err).cause);
-      assert.include(/** @type {Error} */(/** @type {ConnectionError} */(err).cause).message, 'no ciphers available');
+      assert.instanceOf((err as ConnectionError).cause, Error);
+      console.log((err as ConnectionError).cause);
+      assert.include(((err as ConnectionError).cause as Error).message, 'no ciphers available');
     });
 
     connection.on('end', function() {
@@ -265,7 +263,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should use the local hostname as the default workstation identifier', function(done) {
+  it('should use the local hostname as the default workstation identifier', function(done: Mocha.Done) {
     const config = getConfig();
 
     const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
@@ -280,7 +278,7 @@ describe('Initiate Connect Test', function() {
       assert.strictEqual(columns[0].value, os.hostname());
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
@@ -297,7 +295,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should allow specifying a custom workstation identifier', function(done) {
+  it('should allow specifying a custom workstation identifier', function(done: Mocha.Done) {
     const config = getConfig();
 
     const request = new Request('SELECT HOST_NAME()', function(err, rowCount) {
@@ -312,7 +310,7 @@ describe('Initiate Connect Test', function() {
       assert.strictEqual(columns[0].value, 'foo.bar.baz');
     });
 
-    let connection = new Connection({
+    let connection: Connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -335,7 +333,7 @@ describe('Initiate Connect Test', function() {
     });
   });
 
-  it('should not emit error after connect timeout', function(done) {
+  it('should not emit error after connect timeout', function(done: Mocha.Done) {
     const config = getConfig();
     const connection = new Connection({
       ...config,
@@ -353,7 +351,7 @@ describe('Initiate Connect Test', function() {
     setTimeout(() => { done(); }, 500);
   });
 
-  it('should not leave any dangling sockets after connection timeout', function(done) {
+  it('should not leave any dangling sockets after connection timeout', function(done: Mocha.Done) {
     // 192.0.2.0/24 is an IP address block reserved for documentation.
     //
     // Opening a connection to an address in that block should never be successfull
@@ -377,7 +375,7 @@ describe('Initiate Connect Test', function() {
       conn.close();
 
       assert.instanceOf(err, Error);
-      assert.strictEqual(/** @type {Error} */(err).message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+      assert.strictEqual((err as Error).message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
 
       done();
     });
@@ -386,22 +384,13 @@ describe('Initiate Connect Test', function() {
 
 
 describe('Ntlm Test', function() {
-  /**
-   * @enum {number}
-   */
-  const DomainCaseEnum = {
-    AsIs: 0,
-    Lower: 1,
-    Upper: 2,
-  };
+  enum DomainCaseEnum {
+    AsIs = 0,
+    Lower = 1,
+    Upper = 2,
+  }
 
-  /**
-   * @this {Mocha.Context}
-   * @param {Mocha.Done} done
-   * @param {DomainCaseEnum} domainCase
-   * @returns {void}
-   */
-  function runNtlmTest(done, domainCase) {
+  function runNtlmTest(this: Mocha.Context, done: Mocha.Done, domainCase: DomainCaseEnum): void {
     let config = getConfig();
 
     if (config.authentication?.type !== 'ntlm') {
@@ -418,7 +407,7 @@ describe('Ntlm Test', function() {
             ...config.authentication,
             options: {
               ...config.authentication.options,
-              domain: /** @type {string} */(config.authentication.options.domain).toLowerCase()
+              domain: (config.authentication.options.domain as string).toLowerCase()
             }
           }
         };
@@ -431,7 +420,7 @@ describe('Ntlm Test', function() {
             ...config.authentication,
             options: {
               ...config.authentication.options,
-              domain: /** @type {string} */(config.authentication.options.domain).toUpperCase()
+              domain: (config.authentication.options.domain as string).toUpperCase()
             }
           }
         };
@@ -482,25 +471,21 @@ describe('Ntlm Test', function() {
     }
   }
 
-  it('should ntlm', function(done) {
+  it('should ntlm', function(done: Mocha.Done) {
     runNtlmTest.call(this, done, DomainCaseEnum.AsIs);
   });
 
-  it('should ntlm lower', function(done) {
+  it('should ntlm lower', function(done: Mocha.Done) {
     runNtlmTest.call(this, done, DomainCaseEnum.Lower);
   });
 
-  it('should ntlm upper', function(done) {
+  it('should ntlm upper', function(done: Mocha.Done) {
     runNtlmTest.call(this, done, DomainCaseEnum.Upper);
   });
 });
 
 describe('Encrypt Test', function() {
-  /**
-   * @param {any} config
-   * @param {(err: Error | null, supportsTds8?: boolean) => void} callback
-   */
-  function supportsTds8(config, callback) {
+  function supportsTds8(config: any, callback: (err: Error | null, supportsTds8?: boolean) => void) {
     if (config.options.tdsVersion < '7_2') {
       return callback(null, false);
     }
@@ -516,10 +501,7 @@ describe('Encrypt Test', function() {
         return callback(err);
       }
 
-      /**
-       * @type {string | undefined}
-       */
-      let productMajorVersion;
+      let productMajorVersion: string | undefined;
       const request = new Request("SELECT SERVERPROPERTY('ProductMajorVersion')", (err) => {
         if (err) {
           connection.close();
@@ -563,12 +545,9 @@ describe('Encrypt Test', function() {
   }
 
   describe('with strict encryption enabled (TDS 8.0)', function() {
-    /**
-     * @type {Connection}
-     */
-    let connection;
+    let connection: Connection;
 
-    beforeEach(function(done) {
+    beforeEach(function(done: Mocha.Done) {
       const config = getConfig();
 
       supportsTds8(config, (err, supportsTds8) => {
@@ -598,7 +577,7 @@ describe('Encrypt Test', function() {
       connection && connection.close();
     });
 
-    it('opens an encrypted connection', function(done) {
+    it('opens an encrypted connection', function(done: Mocha.Done) {
       const request = new Request(`
         SELECT c.protocol_version, c.encrypt_option
         FROM sys.dm_exec_connections AS c
@@ -625,12 +604,9 @@ describe('Encrypt Test', function() {
   });
 
   describe('with encryption enabled', function() {
-    /**
-     * @type {Connection}
-     */
-    let connection;
+    let connection: Connection;
 
-    beforeEach(function(done) {
+    beforeEach(function(done: Mocha.Done) {
       const config = getConfig();
       connection = new Connection({
         ...config,
@@ -649,7 +625,7 @@ describe('Encrypt Test', function() {
       connection.close();
     });
 
-    it('opens an encrypted connection', function(done) {
+    it('opens an encrypted connection', function(done: Mocha.Done) {
       const request = new Request(`
         SELECT c.protocol_version, c.encrypt_option
         FROM sys.dm_exec_connections AS c
@@ -677,9 +653,8 @@ describe('Encrypt Test', function() {
 });
 
 describe('BeginTransaction Tests', function() {
-  /** @type {Connection} */
-  let connection;
-  beforeEach(function(done) {
+  let connection: Connection;
+  beforeEach(function(done: Mocha.Done) {
     const config = getConfig();
     connection = new Connection(config);
     if (process.env.TEDIOUS_DEBUG) {
@@ -688,7 +663,7 @@ describe('BeginTransaction Tests', function() {
     connection.connect(done);
   });
 
-  afterEach(function(done) {
+  afterEach(function(done: Mocha.Done) {
     if (!connection.closed) {
       connection.on('end', done);
       connection.close();
@@ -700,7 +675,7 @@ describe('BeginTransaction Tests', function() {
   it('should validate isolation level is a number', function() {
     assert.throws(() => {
       const callback = () => { assert.fail('callback should not be executed'); };
-      connection.beginTransaction(callback, 'test', /** @type {any} */('some string'));
+      connection.beginTransaction(callback, 'test', 'some string' as any);
     }, TypeError, 'The "isolationLevel" argument must be of type number. Received type string (some string)');
   });
 
@@ -720,7 +695,7 @@ describe('BeginTransaction Tests', function() {
 });
 
 describe('Insertion Tests', function() {
-  it('should execSql', function(done) {
+  it('should execSql', function(done: Mocha.Done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
@@ -744,7 +719,7 @@ describe('Insertion Tests', function() {
       assert.strictEqual(columns[0].value, 8);
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -764,7 +739,7 @@ describe('Insertion Tests', function() {
   });
 
   describe('when `useColumnNames` is `true`', function() {
-    it('should support numeric column names', function(done) {
+    it('should support numeric column names', function(done: Mocha.Done) {
       const config = getConfig();
 
       const connection = new Connection({
@@ -808,7 +783,7 @@ describe('Insertion Tests', function() {
       });
     });
 
-    it('supports duplicate column names', function(done) {
+    it('supports duplicate column names', function(done: Mocha.Done) {
       const config = getConfig();
 
       const connection = new Connection({
@@ -863,7 +838,7 @@ describe('Insertion Tests', function() {
         delete ({}).constructor.prototype.foo;
       });
 
-      it('should not have column metadata or rows be affected by the pollution', function(done) {
+      it('should not have column metadata or rows be affected by the pollution', function(done: Mocha.Done) {
         const config = getConfig();
 
         const connection = new Connection({
@@ -910,7 +885,7 @@ describe('Insertion Tests', function() {
     });
   });
 
-  it('should exec Sql multiple times', function(done) {
+  it('should exec Sql multiple times', function(done: Mocha.Done) {
     const timesToExec = 5;
     let sqlExecCount = 0;
     const config = getConfig();
@@ -946,7 +921,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     }
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       execSql();
@@ -965,7 +940,7 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should exec sql with order', function(done) {
+  it('should exec sql with order', function(done: Mocha.Done) {
     const config = getConfig();
 
     const sql =
@@ -996,7 +971,7 @@ describe('Insertion Tests', function() {
       assert.strictEqual(columns.length, 4);
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1019,7 +994,7 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should exec Bad Sql', function(done) {
+  it('should exec Bad Sql', function(done: Mocha.Done) {
     const config = getConfig();
 
     const request = new Request('bad syntax here', function(err) {
@@ -1028,7 +1003,7 @@ describe('Insertion Tests', function() {
       connection.close();
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1048,12 +1023,12 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should close connection request pending', function(done) {
+  it('should close connection request pending', function(done: Mocha.Done) {
     const config = getConfig();
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
       assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).code, 'ECLOSE');
+      assert.strictEqual((err as RequestError).code, 'ECLOSE');
     });
 
     const connection = new Connection(config);
@@ -1083,7 +1058,7 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should sql with multiple result sets', function(done) {
+  it('should sql with multiple result sets', function(done: Mocha.Done) {
     const config = getConfig();
     let row = 0;
 
@@ -1106,7 +1081,7 @@ describe('Insertion Tests', function() {
       assert.strictEqual(columns[0].value, ++row);
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1125,16 +1100,16 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should row count for update', function(done) {
+  it('should row count for update', function(done: Mocha.Done) {
     const config = getConfig();
 
     const setupSql = `\
-  create table #tab1 (id int, name nvarchar(10));
-  insert into #tab1 values(1, N'a1');
-  insert into #tab1 values(2, N'a2');
-  insert into #tab1 values(3, N'b1');
-  update #tab1 set name = 'a3' where name like 'a%'\
-  `;
+create table #tab1 (id int, name nvarchar(10));
+insert into #tab1 values(1, N'a1');
+insert into #tab1 values(2, N'a2');
+insert into #tab1 values(3, N'b1');
+update #tab1 set name = 'a3' where name like 'a%'\
+`;
 
     const request = new Request(setupSql, function(err, rowCount) {
       assert.ifError(err);
@@ -1142,7 +1117,7 @@ describe('Insertion Tests', function() {
       connection.close();
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1161,7 +1136,7 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should row collection on request completion', function(done) {
+  it('should row collection on request completion', function(done: Mocha.Done) {
 
     const request = new Request('select 1 as a; select 2 as b;', function(
       err,
@@ -1180,7 +1155,7 @@ describe('Insertion Tests', function() {
 
     const config = getConfig();
 
-    let connection = new Connection({
+    let connection: Connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -1205,7 +1180,7 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should row collection on Done', function(done) {
+  it('should row collection on Done', function(done: Mocha.Done) {
     let doneCount = 0;
 
     const request = new Request('select 1 as a; select 2 as b;', function(
@@ -1237,7 +1212,7 @@ describe('Insertion Tests', function() {
 
     const config = getConfig();
 
-    let connection = new Connection({
+    let connection: Connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -1262,7 +1237,7 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should exec proc as sql', function(done) {
+  it('should exec proc as sql', function(done: Mocha.Done) {
     const config = getConfig();
 
     const request = new Request('exec sp_help int', function(err, rowCount) {
@@ -1285,7 +1260,7 @@ describe('Insertion Tests', function() {
       assert.ok(true);
     });
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.connect(function(err) {
       connection.execSql(request);
@@ -1304,28 +1279,18 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should reset Connection', function(done) {
+  it('should reset Connection', function(done: Mocha.Done) {
     const config = getConfig();
 
-    /**
-     * @param {(err?: Error | null | undefined, result?: any) => void} callback
-     */
-    function testAnsiNullsOptionOn(callback) {
+    function testAnsiNullsOptionOn(callback: (err?: Error | null | undefined, result?: any) => void) {
       testAnsiNullsOption(true, callback);
     }
 
-    /**
-     * @param {(err?: Error | null | undefined, result?: any) => void} callback
-     */
-    function testAnsiNullsOptionOff(callback) {
+    function testAnsiNullsOptionOff(callback: (err?: Error | null | undefined, result?: any) => void) {
       testAnsiNullsOption(false, callback);
     }
 
-    /**
-     * @param {boolean} expectedOptionOn
-     * @param {(err?: Error | null | undefined, result?: any) => void} callback
-     */
-    function testAnsiNullsOption(expectedOptionOn, callback) {
+    function testAnsiNullsOption(expectedOptionOn: boolean, callback: (err?: Error | null | undefined, result?: any) => void) {
       const request = new Request('select @@options & 32', function(err, rowCount) {
         callback(err);
       });
@@ -1338,10 +1303,7 @@ describe('Insertion Tests', function() {
       connection.execSql(request);
     }
 
-    /**
-     * @param {(err?: Error | null | undefined, result?: any) => void} callback
-     */
-    function setAnsiNullsOptionOff(callback) {
+    function setAnsiNullsOptionOff(callback: (err?: Error | null | undefined, result?: any) => void) {
       const request = new Request('set ansi_nulls off', function(err, rowCount) {
         callback(err);
       });
@@ -1349,7 +1311,7 @@ describe('Insertion Tests', function() {
       connection.execSqlBatch(request);
     }
 
-    let connection = new Connection(config);
+    let connection: Connection = new Connection(config);
 
     connection.on('resetConnection', function() {
       assert.ok(true);
@@ -1391,15 +1353,14 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should support cancelling a request while it is processed on the server', function(done) {
+  it('should support cancelling a request while it is processed on the server', function(done: Mocha.Done) {
     const config = getConfig();
 
-    /** @type {[number, number]} */
-    let cancelledAt;
+    let cancelledAt: [number, number];
 
     const request = new Request("select 1 as C1; waitfor delay '00:00:05'; select 2 as C2", (err, rowCount, rows) => {
       assert.instanceOf(err, Error);
-      assert.strictEqual(/** @type {Error} */(err).message, 'Canceled.');
+      assert.strictEqual((err as Error).message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -1470,11 +1431,11 @@ describe('Insertion Tests', function() {
     }
   });
 
-  it('should request timeout', (done) => {
+  it('should request timeout', (done: Mocha.Done) => {
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
       function(err, rowCount, rows) {
-        assert.equal(/** @type {Error} */(err).message, 'Timeout: Request failed to complete in 1000ms');
+        assert.equal((err as Error).message, 'Timeout: Request failed to complete in 1000ms');
 
         connection.close();
       }
@@ -1502,7 +1463,7 @@ describe('Insertion Tests', function() {
 
     const config = getConfig();
 
-    let connection = new Connection({
+    let connection: Connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -1529,13 +1490,7 @@ describe('Insertion Tests', function() {
 });
 
 describe('Advanced Input Test', function() {
-  /**
-   * @param {Mocha.Done} done
-   * @param {import("../../src/connection").ConnectionConfiguration} config
-   * @param {string} sql
-   * @param {(error: Error | null | undefined, rowCount?: number) => void} requestCallback
-   */
-  function runSqlBatch(done, config, sql, requestCallback) {
+  function runSqlBatch(done: Mocha.Done, config: import("../../src/connection").ConnectionConfiguration, sql: string, requestCallback: (error: Error | null | undefined, rowCount?: number) => void) {
     const connection = new Connection(config);
 
     if (process.env.TEDIOUS_DEBUG) {
@@ -1559,7 +1514,7 @@ describe('Advanced Input Test', function() {
 
   // Test that the default behavior allows adding null values to a
   // temporary table where the nullability is not explicitly declared.
-  it('should test AnsiNullDefault', function(done) {
+  it('should test AnsiNullDefault', function(done: Mocha.Done) {
     const sql =
       'create table #testAnsiNullDefault (id int);\n' +
       'insert #testAnsiNullDefault values (null);\n' +
@@ -1572,26 +1527,22 @@ describe('Advanced Input Test', function() {
 
   // Test that the default behavior can be overridden (so that temporary
   // table columns are non-nullable by default).
-  it('should disable ansi null default', function(done) {
+  it('should disable ansi null default', function(done: Mocha.Done) {
     const sql =
       'create table #testAnsiNullDefaults (id int);\n' +
       'insert #testAnsiNullDefaults values (null);\n' +
       'drop table #testAnsiNullDefaults;';
 
     const config = getConfig();
-    runSqlBatch(done, { ...config, options: { ...config.options, enableAnsiNullDefault: false } }, sql, function(/** @type {Error | null | undefined} */err) {
+    runSqlBatch(done, { ...config, options: { ...config.options, enableAnsiNullDefault: false } }, sql, function(err: Error | null | undefined) {
       assert.instanceOf(err, RequestError);
-      assert.strictEqual(/** @type {RequestError} */(err).number, 515);
+      assert.strictEqual((err as RequestError).number, 515);
     }); // Cannot insert the value NULL
   });
 });
 
 describe('Date Insert Test', function() {
-  /**
-   * @param {Mocha.Done} done
-   * @param {number | undefined} datefirst
-   */
-  function testDateFirstImpl(done, datefirst) {
+  function testDateFirstImpl(done: Mocha.Done, datefirst: number | undefined) {
     datefirst = datefirst || 7;
 
     const config = getConfig();
@@ -1628,17 +1579,17 @@ describe('Date Insert Test', function() {
   }
 
   // Test that the default setting for DATEFIRST is 7
-  it('should test date first default', function(done) {
+  it('should test date first default', function(done: Mocha.Done) {
     testDateFirstImpl(done, undefined);
   });
 
   // Test that the DATEFIRST setting can be changed via an optional configuration
-  it('should test date first custom', function(done) {
+  it('should test date first custom', function(done: Mocha.Done) {
     testDateFirstImpl(done, 3);
   });
 
   // Test that an invalid DATEFIRST setting throws
-  it('should test bad date first', function(done) {
+  it('should test bad date first', function(done: Mocha.Done) {
     const config = getConfig();
 
     assert.throws(function() {
@@ -1655,11 +1606,7 @@ describe('Date Insert Test', function() {
 });
 
 describe('Language Insert Test', function() {
-  /**
-   * @param {Mocha.Done} done
-   * @param {string | undefined} language
-   */
-  function testLanguage(done, language) {
+  function testLanguage(done: Mocha.Done, language: string | undefined) {
     language = language || 'us_english';
     const config = getConfig();
 
@@ -1695,18 +1642,18 @@ describe('Language Insert Test', function() {
     });
   }
   // Test that the default setting for LANGUAGE is us_english
-  it('should test language default', function(done) {
+  it('should test language default', function(done: Mocha.Done) {
     testLanguage(done, undefined);
   });
 
   // Test that the LANGUAGE setting can be changed via an optional configuration
-  it('should test language custom', function(done) {
+  it('should test language custom', function(done: Mocha.Done) {
     testLanguage(done, 'Deutsch');
   });
 });
 
 describe('custom textsize value', function() {
-  it('should set the textsize to the given value', function(done) {
+  it('should set the textsize to the given value', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection({
@@ -1722,10 +1669,7 @@ describe('custom textsize value', function() {
     }
 
     connection.connect((err) => {
-      /**
-       * @type {number | undefined}
-       */
-      let textsize;
+      let textsize: number | undefined;
 
       const request = new Request('SELECT @@TEXTSIZE', () => {
         if (err) {
@@ -1783,20 +1727,20 @@ describe('custom textsize value', function() {
         ...config,
         options: {
           ...config.options,
-          textsize: /** @type {any} */('textSize')
+          textsize: 'textSize' as any
         }
       });
     }, TypeError, 'The "config.options.textsize" property must be of type number or null.');
   });
 
-  it('should default to 2147483647', function(done) {
+  it('should default to 2147483647', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection({
       ...config,
       options: {
         ...config.options,
-        textsize: /** @type {any} */(undefined)
+        textsize: undefined as any
       }
     });
 
@@ -1805,10 +1749,7 @@ describe('custom textsize value', function() {
     }
 
     connection.connect((err) => {
-      /**
-       * @type {number | undefined}
-       */
-      let textsize;
+      let textsize: number | undefined;
 
       const request = new Request('SELECT @@TEXTSIZE', () => {
         if (err) {
@@ -1830,7 +1771,7 @@ describe('custom textsize value', function() {
     });
   });
 
-  it('should allow setting it to -1', function(done) {
+  it('should allow setting it to -1', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection({
@@ -1846,10 +1787,7 @@ describe('custom textsize value', function() {
     }
 
     connection.connect((err) => {
-      /**
-       * @type {number | undefined}
-       */
-      let textsize;
+      let textsize: number | undefined;
 
       const request = new Request('SELECT @@TEXTSIZE', () => {
         if (err) {
@@ -1875,7 +1813,7 @@ describe('custom textsize value', function() {
     });
   });
 
-  it('should allow setting it to 0 and reset to server defaults', function(done) {
+  it('should allow setting it to 0 and reset to server defaults', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection({
@@ -1891,10 +1829,7 @@ describe('custom textsize value', function() {
     }
 
     connection.connect((err) => {
-      /**
-       * @type {number | undefined}
-       */
-      let textsize;
+      let textsize: number | undefined;
 
       const request = new Request('SELECT @@TEXTSIZE', () => {
         if (err) {
@@ -1916,7 +1851,7 @@ describe('custom textsize value', function() {
     });
   });
 
-  it('truncates floating point numbers', function(done) {
+  it('truncates floating point numbers', function(done: Mocha.Done) {
     const config = getConfig();
 
     const connection = new Connection({
@@ -1932,10 +1867,7 @@ describe('custom textsize value', function() {
     }
 
     connection.connect((err) => {
-      /**
-       * @type {number | undefined}
-       */
-      let textsize;
+      let textsize: number | undefined;
 
       const request = new Request('SELECT @@TEXTSIZE', () => {
         if (err) {
@@ -1959,11 +1891,7 @@ describe('custom textsize value', function() {
 });
 
 describe('should test date format', function() {
-  /**
-   * @param {Mocha.Done} done
-   * @param {string | undefined} dateFormat
-   */
-  function testDateFormat(done, dateFormat) {
+  function testDateFormat(done: Mocha.Done, dateFormat: string | undefined) {
     dateFormat = dateFormat || 'mdy';
     const config = getConfig();
 
@@ -2002,25 +1930,18 @@ describe('should test date format', function() {
     });
   }
   // Test that the default setting for DATEFORMAT is mdy
-  it('should test date format default', function(done) {
+  it('should test date format default', function(done: Mocha.Done) {
     testDateFormat(done, undefined);
   });
 
   // Test that the DATEFORMAT setting can be changed via an optional configuration
-  it('should test custom dateformat', function(done) {
+  it('should test custom dateformat', function(done: Mocha.Done) {
     testDateFormat(done, 'dmy');
   });
 });
 
 describe('Boolean Config Options Test', function() {
-  /**
-   * @param {Mocha.Done} done
-   * @param {string} optionName
-   * @param {boolean | undefined} optionValue
-   * @param {number} optionFlag
-   * @param {boolean} defaultOn
-   */
-  function testBooleanConfigOption(done, optionName, optionValue, optionFlag, defaultOn) {
+  function testBooleanConfigOption(done: Mocha.Done, optionName: string, optionValue: boolean | undefined, optionFlag: number, defaultOn: boolean) {
     const config = getConfig();
     const connection = new Connection({
       ...config,
@@ -2072,11 +1993,7 @@ describe('Boolean Config Options Test', function() {
     });
   }
 
-  /**
-   * @param {Mocha.Done} done
-   * @param {string} optionName
-   */
-  function testBadBooleanConfigOption(done, optionName) {
+  function testBadBooleanConfigOption(done: Mocha.Done, optionName: string) {
     const config = getConfig();
 
     assert.throws(function() {
@@ -2092,179 +2009,179 @@ describe('Boolean Config Options Test', function() {
     done();
   }
 
-  it('should test ansi null default', function(done) {
+  it('should test ansi null default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiNull', undefined, 32, true);
   });
 
-  it('should test ansi null on', function(done) {
+  it('should test ansi null on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiNull', true, 32, true);
   });
 
-  it('should test ansi null off', function(done) {
+  it('should test ansi null off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiNull', false, 32, true);
   });
 
-  it('should test bad ansi null', function(done) {
+  it('should test bad ansi null', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableAnsiNull');
   });
 
-  it('should test ansi null default default', function(done) {
+  it('should test ansi null default default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiNullDefault', undefined, 1024, true);
   });
 
-  it('should test ansi null default on', function(done) {
+  it('should test ansi null default on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiNullDefault', true, 1024, true);
   });
 
-  it('should test ansi null default off', function(done) {
+  it('should test ansi null default off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiNullDefault', false, 1024, true);
   });
 
-  it('should test bad ansi null default', function(done) {
+  it('should test bad ansi null default', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableAnsiNullDefault');
   });
 
-  it('should test ansi padding default', function(done) {
+  it('should test ansi padding default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiPadding', undefined, 16, true);
   });
 
-  it('should test ansi padding on', function(done) {
+  it('should test ansi padding on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiPadding', true, 16, true);
   });
 
-  it('should test ansi padding off', function(done) {
+  it('should test ansi padding off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiPadding', false, 16, true);
   });
 
-  it('should test bad ansi padding', function(done) {
+  it('should test bad ansi padding', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableAnsiPadding');
   });
 
-  it('should test ansi warnings default', function(done) {
+  it('should test ansi warnings default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiWarnings', undefined, 8, true);
   });
 
-  it('should test ansi warnings on', function(done) {
+  it('should test ansi warnings on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiWarnings', true, 8, true);
   });
 
-  it('should test ansi warnings off', function(done) {
+  it('should test ansi warnings off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableAnsiWarnings', false, 8, true);
   });
 
-  it('should test bad ansi warnings', function(done) {
+  it('should test bad ansi warnings', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableAnsiWarnings');
   });
 
-  it('should test arith abort default', function(done) {
+  it('should test arith abort default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableArithAbort', undefined, 64, true);
   });
 
-  it('should test arith abort on', function(done) {
+  it('should test arith abort on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableArithAbort', true, 64, false);
   });
 
-  it('should test arith abort off', function(done) {
+  it('should test arith abort off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableArithAbort', false, 64, false);
   });
 
-  it('should test bad arith abort', function(done) {
+  it('should test bad arith abort', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableArithAbort');
   });
 
-  it('should test concat null yield null default', function(done) {
+  it('should test concat null yield null default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableConcatNullYieldsNull', undefined, 4096, true);
   });
 
-  it('should test concat null yields null on', function(done) {
+  it('should test concat null yields null on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableConcatNullYieldsNull', true, 4096, true);
   });
 
-  it('should test ocncat null yields null off', function(done) {
+  it('should test ocncat null yields null off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableConcatNullYieldsNull', false, 4096, true);
   });
 
-  it('should test bad concat null yields null', function(done) {
+  it('should test bad concat null yields null', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableConcatNullYieldsNull');
   });
 
-  it('should test cursor close on commit default', function(done) {
+  it('should test cursor close on commit default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableCursorCloseOnCommit', undefined, 4, false);
   });
 
-  it('should test cursor close on commit on', function(done) {
+  it('should test cursor close on commit on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableCursorCloseOnCommit', true, 4, false);
   });
 
-  it('should test cursor close on commit off', function(done) {
+  it('should test cursor close on commit off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableCursorCloseOnCommit', false, 4, false);
   });
 
-  it('should test bad cursor close on commit', function(done) {
+  it('should test bad cursor close on commit', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableCursorCloseOnCommit');
   });
 
-  it('should test implicit transactions default', function(done) {
+  it('should test implicit transactions default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableImplicitTransactions', undefined, 2, false);
   });
 
-  it('should test implicit transactions on', function(done) {
+  it('should test implicit transactions on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableImplicitTransactions', true, 2, false);
   });
 
-  it('should test implicit transactions off', function(done) {
+  it('should test implicit transactions off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableImplicitTransactions', false, 2, false);
   });
 
-  it('should test bad implicit transactions', function(done) {
+  it('should test bad implicit transactions', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableImplicitTransactions');
   });
 
-  it('should test numeric round abort default', function(done) {
+  it('should test numeric round abort default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableNumericRoundabort', undefined, 8192, false);
   });
 
-  it('should test numeric round abort on', function(done) {
+  it('should test numeric round abort on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableNumericRoundabort', true, 8192, false);
   });
 
-  it('should test numeric round abort off', function(done) {
+  it('should test numeric round abort off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableNumericRoundabort', false, 8192, false);
   });
 
-  it('should test bad numeric round abort', function(done) {
+  it('should test bad numeric round abort', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableNumericRoundabort');
   });
 
-  it('should test quoted identifier default', function(done) {
+  it('should test quoted identifier default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableQuotedIdentifier', undefined, 256, true);
   });
 
-  it('should test quoted identifier on', function(done) {
+  it('should test quoted identifier on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableQuotedIdentifier', true, 256, true);
   });
 
-  it('should test quoted identifier off', function(done) {
+  it('should test quoted identifier off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'enableQuotedIdentifier', false, 256, true);
   });
 
-  it('should test bad quoted identifier', function(done) {
+  it('should test bad quoted identifier', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'enableQuotedIdentifier');
   });
 
-  it('should test abort transaction on error default', function(done) {
+  it('should test abort transaction on error default', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'abortTransactionOnError', undefined, 16384, false);
   });
 
-  it('should test abort transaction on error on', function(done) {
+  it('should test abort transaction on error on', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'abortTransactionOnError', true, 16384, false);
   });
 
-  it('should test abort transaction on error off', function(done) {
+  it('should test abort transaction on error off', function(done: Mocha.Done) {
     testBooleanConfigOption(done, 'abortTransactionOnError', false, 16384, false);
   });
 
-  it('should test bad abort transaction on error', function(done) {
+  it('should test bad abort transaction on error', function(done: Mocha.Done) {
     testBadBooleanConfigOption(done, 'abortTransactionOnError');
   });
 });

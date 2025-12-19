@@ -1,6 +1,5 @@
-// @ts-check
-
-const { assert } = require('chai');
+import { assert } from 'chai';
+import * as net from 'net';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
@@ -21,13 +20,8 @@ function getConfig() {
   return config;
 }
 
-/**
- * @typedef {import('net').Socket} Socket
- */
-
 describe('A `error` on the network socket', function() {
-  /** @type {Connection} */
-  let connection;
+  let connection: Connection;
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
@@ -57,7 +51,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      /** @type {Socket} */(connection.socket).emit('error', socketError);
+      (connection.socket as net.Socket).emit('error', socketError);
     });
   });
 
@@ -73,7 +67,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      /** @type {Socket} */(connection.socket).emit('error', socketError);
+      (connection.socket as net.Socket).emit('error', socketError);
     });
   });
 
@@ -97,7 +91,7 @@ describe('A `error` on the network socket', function() {
 
     connection.execSql(request);
     process.nextTick(() => {
-      /** @type {Socket} */(connection.socket).emit('error', socketError);
+      (connection.socket as net.Socket).emit('error', socketError);
     });
   });
 });

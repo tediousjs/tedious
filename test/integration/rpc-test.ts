@@ -1,7 +1,5 @@
-// @ts-check
-
-const TYPES = require('../../src/data-type').typeByName;
-const assert = require('chai').assert;
+import { assert } from 'chai';
+import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
@@ -22,13 +20,10 @@ function getConfig() {
   return config;
 }
 
-/**
- * @typedef {typeof import('../../src/data-type').typeByName} TYPES
- */
+type DataType = typeof TYPES[keyof typeof TYPES];
 
 describe('RPC test', function() {
-  /** @type {Connection} */
-  let connection;
+  let connection: Connection;
 
   beforeEach(function(done) {
     const config = getConfig();
@@ -57,12 +52,7 @@ describe('RPC test', function() {
     }
   });
 
-  /**
-   * @param {Connection} connection
-   * @param {string} sql
-   * @param {() => void} done
-   */
-  function execSqlBatch(connection, sql, done) {
+  function execSqlBatch(connection: Connection, sql: string, done: () => void) {
     const request = new Request(sql, function(err) {
       if (err) {
         console.log(err);
@@ -75,13 +65,7 @@ describe('RPC test', function() {
     connection.execSqlBatch(request);
   }
 
-  /**
-   * @param {Mocha.Done} done
-   * @param {TYPES[keyof TYPES]} type
-   * @param {string} typeAsString
-   * @param {unknown} value
-   */
-  function testProc(done, type, typeAsString, value) {
+  function testProc(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown) {
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
 
@@ -121,13 +105,7 @@ select @param\
     );
   }
 
-  /**
-   * @param {Mocha.Done} done
-   * @param {TYPES[keyof TYPES]} type
-   * @param {string} typeAsString
-   * @param {unknown} value
-   */
-  function testProcOutput(done, type, typeAsString, value) {
+  function testProcOutput(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown) {
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
 

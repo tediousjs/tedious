@@ -1,12 +1,10 @@
-// @ts-check
+import { assert } from 'chai';
 
-const assert = require('chai').assert;
-
-const { instanceLookup } = require('../../src/instance-lookup');
-
-var RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
+import { instanceLookup } from '../../src/instance-lookup';
 
 import defaultConfig from '../config';
+
+const RESERVED_IP_ADDRESS = '192.0.2.0'; // Can never be used, so guaranteed to fail.
 
 function getConfig() {
   return {
@@ -17,7 +15,7 @@ function getConfig() {
 
 describe('Instance Lookup Test', function() {
   it('should test good instance', async function() {
-    var config = getConfig();
+    const config = getConfig();
 
     if (!config.instanceName) {
       // Config says don't do this test (probably because SQL Server Browser is not available).
@@ -35,11 +33,11 @@ describe('Instance Lookup Test', function() {
   });
 
   it('should test bad Instance', async function() {
-    var config = getConfig();
+    const config = getConfig();
 
     const controller = new AbortController();
 
-    let error;
+    let error: Error | undefined;
     try {
       await instanceLookup({
         server: config.server,
@@ -49,7 +47,7 @@ describe('Instance Lookup Test', function() {
         signal: controller.signal
       });
     } catch (err) {
-      error = err;
+      error = err as Error;
     }
 
     assert.instanceOf(error, Error);
@@ -58,7 +56,7 @@ describe('Instance Lookup Test', function() {
   it('should test bad Server', async function() {
     const controller = new AbortController();
 
-    let error;
+    let error: Error | undefined;
     try {
       await instanceLookup({
         server: RESERVED_IP_ADDRESS,
@@ -68,7 +66,7 @@ describe('Instance Lookup Test', function() {
         signal: controller.signal
       });
     } catch (err) {
-      error = err;
+      error = err as Error;
     }
 
     assert.instanceOf(error, Error);

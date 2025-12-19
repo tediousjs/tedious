@@ -1,8 +1,6 @@
-// @ts-check
+import { TYPES } from '../../src/tedious';
 
-const TYPES = require('../../src/tedious').TYPES;
-
-const { assert } = require('chai');
+import { assert } from 'chai';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
@@ -25,11 +23,9 @@ function getConfig() {
 }
 
 describe('calling a procedure that takes and returns a TVP', function() {
-  /** @type {any} */
-  let config;
+  let config: ReturnType<typeof getConfig>;
 
-  /** @type {Connection} */
-  let connection;
+  let connection: Connection;
 
   beforeEach(function(done) {
     config = getConfig();
@@ -186,10 +182,10 @@ describe('calling a procedure that takes and returns a TVP', function() {
       assert.strictEqual(err?.message, 'Input parameter \'tvp\' could not be validated');
 
       assert.instanceOf(err?.cause, InputError);
-      assert.strictEqual(/** @type {InputError} */(err?.cause).message, 'TVP column \'b\' has invalid data at row index 0');
+      assert.strictEqual((err?.cause as InputError).message, 'TVP column \'b\' has invalid data at row index 0');
 
-      assert.instanceOf(/** @type {InputError} */(err?.cause).cause, TypeError);
-      assert.strictEqual(/** @type {TypeError} */(/** @type {InputError} */(err?.cause).cause).message, 'Value must be between 0 and 255, inclusive.');
+      assert.instanceOf((err?.cause as InputError).cause, TypeError);
+      assert.strictEqual(((err?.cause as InputError).cause as TypeError).message, 'Value must be between 0 and 255, inclusive.');
 
       const request = new Request('SELECT 1', done);
       connection.execSql(request);

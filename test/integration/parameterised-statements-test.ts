@@ -1,7 +1,5 @@
-// @ts-check
-
-const assert = require('chai').assert;
-const TYPES = require('../../src/data-type').typeByName;
+import { assert } from 'chai';
+import { typeByName as TYPES } from '../../src/data-type';
 
 import async from 'async';
 import Connection from '../../src/connection';
@@ -23,23 +21,20 @@ function getConfig() {
   return config;
 }
 
-/**
- * @typedef {typeof import('../../src/data-type').typeByName} TYPES
- */
+type DataType = typeof TYPES[keyof typeof TYPES];
+type TdsVersion = '7_0' | '7_1' | '7_2' | '7_3_A' | '7_4' | null | undefined;
 
-/**
- * @param {Mocha.Done} done
- * @param {TYPES[keyof TYPES]} type
- * @param {unknown} value
- * @param {'7_0' | '7_1' | '7_2' | '7_3_A' | '7_3_A' | '7_4' | null} [tdsVersion]
- * @param {import('../../src/request').ParameterOptions | null} [options]
- * @param {unknown} [expectedValue]
- * @param {boolean} [cast]
- * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
- * @returns {void}
- */
-function execSql(done, type, value, tdsVersion, options, expectedValue, cast, connectionOptions) {
-  var config = getConfig();
+function execSql(
+  done: Mocha.Done,
+  type: DataType,
+  value: unknown,
+  tdsVersion?: TdsVersion,
+  options?: import('../../src/request').ParameterOptions | null,
+  expectedValue?: unknown,
+  cast?: boolean,
+  connectionOptions?: import('../../src/connection').ConnectionOptions
+): void {
+  const config = getConfig();
   // config.options.packetSize = 32768
 
   if (tdsVersion && process.env.TEDIOUS_TDS_VERSION && tdsVersion > process.env.TEDIOUS_TDS_VERSION) {
@@ -47,7 +42,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
     return;
   }
 
-  var request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
+  const request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
     assert.ifError(err);
 
     connection.close();
@@ -83,7 +78,7 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
   });
 
   const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
-  var connection = new Connection(connectionConfig);
+  const connection = new Connection(connectionConfig);
 
   connection.connect(function(err) {
     assert.ifError(err);
@@ -103,18 +98,16 @@ function execSql(done, type, value, tdsVersion, options, expectedValue, cast, co
   }
 }
 
-/**
- * @param {Mocha.Done} done
- * @param {TYPES[keyof TYPES]} type
- * @param {unknown} value
- * @param {unknown} [expectedValue]
- * @param {import('../../src/connection').ConnectionOptions} [connectionOptions]
- * @returns {void}
- */
-function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
-  var config = getConfig();
+function execSqlOutput(
+  done: Mocha.Done,
+  type: DataType,
+  value: unknown,
+  expectedValue?: unknown,
+  connectionOptions?: import('../../src/connection').ConnectionOptions
+): void {
+  const config = getConfig();
 
-  var request = new Request('set @paramOut = @paramIn', function(err) {
+  const request = new Request('set @paramOut = @paramIn', function(err) {
     assert.ifError(err);
 
     connection.close();
@@ -149,7 +142,7 @@ function execSqlOutput(done, type, value, expectedValue, connectionOptions) {
   });
 
   const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
-  var connection = new Connection(connectionConfig);
+  const connection = new Connection(connectionConfig);
 
   connection.connect(function(err) {
     assert.ifError(err);
@@ -334,9 +327,9 @@ describe('Parameterised Statements Test', function() {
   });
 
   it('should test varchar max', function(done) {
-    var longString = '';
+    let longString = '';
     for (
-      var i = 1, end = 10 * 1000, asc = 1 <= end;
+      let i = 1, end = 10 * 1000, asc = 1 <= end;
       asc ? i <= end : i >= end;
       asc ? i++ : i--
     ) {
@@ -380,9 +373,9 @@ describe('Parameterised Statements Test', function() {
   });
 
   it('should test nvarchar max', function(done) {
-    var longString = '';
+    let longString = '';
     for (
-      var i = 1, end = 10 * 1000, asc = 1 <= end;
+      let i = 1, end = 10 * 1000, asc = 1 <= end;
       asc ? i <= end : i >= end;
       asc ? i++ : i--
     ) {
@@ -459,7 +452,7 @@ describe('Parameterised Statements Test', function() {
   });
 
   it('should test text large', function(done) {
-    var dBuf = Buffer.alloc(500000);
+    const dBuf = Buffer.alloc(500000);
     dBuf.fill('x');
     execSql(done, TYPES.Text, dBuf.toString());
   });
@@ -1001,7 +994,7 @@ describe('Parameterised Statements Test', function() {
       }
 
       async.series([
-        (next) => {
+        (next: (err?: Error | null) => void) => {
           connection.execSqlBatch(new Request(`
             BEGIN TRY
               DROP TYPE TediousTestType
@@ -1010,7 +1003,7 @@ describe('Parameterised Statements Test', function() {
             END CATCH
           `, next));
         },
-        (next) => {
+        (next: (err?: Error | null) => void) => {
           connection.execSqlBatch(new Request(`
             CREATE TYPE TediousTestType AS TABLE (
               a bit,
@@ -1135,9 +1128,9 @@ describe('Parameterised Statements Test', function() {
   // exports.outputDatePrecision_9_day_flip = (test) ->
   //  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
   it('should test multiple parameters', function(done) {
-    var config = getConfig();
+    const config = getConfig();
 
-    var request = new Request('select @param1, @param2', function(err) {
+    const request = new Request('select @param1, @param2', function(err) {
       assert.ifError(err);
 
       connection.close();
@@ -1157,7 +1150,7 @@ describe('Parameterised Statements Test', function() {
       assert.strictEqual(columns[1].value, 'qwerty');
     });
 
-    var connection = new Connection(config);
+    const connection = new Connection(config);
 
     connection.connect(function(err) {
       assert.ifError(err);
@@ -1174,9 +1167,9 @@ describe('Parameterised Statements Test', function() {
   });
 
   it('should call procedure with parameters', function(done) {
-    var config = getConfig();
+    const config = getConfig();
 
-    var setupSql = `\
+    const setupSql = `\
 exec('create procedure #__test5
   @in BINARY(4),
   @in2 BINARY(4) = NULL,
@@ -1201,7 +1194,7 @@ begin
 end')\
 `;
 
-    var request = new Request(setupSql, function(err) {
+    let request = new Request(setupSql, function(err) {
       assert.ifError(err);
 
       request = new Request('#__test5', function(err) {
@@ -1210,7 +1203,7 @@ end')\
         connection.close();
       });
 
-      var sample = Buffer.from([0x00, 0x01, 0xe2, 0x40]);
+      const sample = Buffer.from([0x00, 0x01, 0xe2, 0x40]);
 
       request.addParameter('in', TYPES.Binary, sample);
       request.addParameter('in2', TYPES.Binary, null);
@@ -1240,7 +1233,7 @@ end')\
       connection.callProcedure(request);
     });
 
-    var connection = new Connection(config);
+    const connection = new Connection(config);
 
     connection.connect(function(err) {
       assert.ifError(err);

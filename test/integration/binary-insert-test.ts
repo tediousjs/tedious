@@ -1,16 +1,13 @@
-// @ts-check
-
-const { assert } = require('chai');
-
-const TYPES = require('../../src/data-type').typeByName;
-
+import { assert } from 'chai';
+import { typeByName as TYPES } from '../../src/data-type';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
-
 import defaultConfig from '../config';
 
 describe('inserting binary data', function() {
+  let connection: Connection;
+
   beforeEach(function(done) {
     const config = {
       ...defaultConfig,
@@ -21,18 +18,18 @@ describe('inserting binary data', function() {
       }
     };
 
-    this.connection = new Connection(config);
-    this.connection.connect(done);
+    connection = new Connection(config);
+    connection.connect(done);
 
     if (process.env.TEDIOUS_DEBUG) {
-      this.connection.on('debug', console.log);
+      connection.on('debug', console.log);
     }
   });
 
   afterEach(function(done) {
-    if (!this.connection.closed) {
-      this.connection.on('end', done);
-      this.connection.close();
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
     } else {
       done();
     }
@@ -49,8 +46,7 @@ describe('inserting binary data', function() {
           return done(err);
         }
 
-        /** @type {unknown[]} */
-        const values = [];
+        const values: unknown[] = [];
 
         const request = new Request('SELECT [data] FROM #test', (err) => {
           if (err) {
@@ -66,13 +62,13 @@ describe('inserting binary data', function() {
           values.push(columns[0].value);
         });
 
-        this.connection.execSql(request);
+        connection.execSql(request);
       });
 
       request.addParameter('p1', TYPES.Binary, Buffer.from([0x12, 0x34, 0x00, 0xce]));
-      this.connection.execSql(request);
+      connection.execSql(request);
     });
 
-    this.connection.execSqlBatch(request);
+    connection.execSqlBatch(request);
   });
 });

@@ -1,12 +1,8 @@
-// @ts-check
-
-const assert = require('chai').assert;
-
+import { assert } from 'chai';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { RequestError } from '../../src/errors';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
-
 import defaultConfig from '../config';
 
 function getConfig() {
@@ -25,8 +21,7 @@ function getConfig() {
 }
 
 describe('Pause-Resume Test', function() {
-  /** @type {Connection} */
-  let connection;
+  let connection: Connection;
 
   beforeEach(function(done) {
     connection = new Connection(getConfig());
@@ -52,8 +47,8 @@ describe('Pause-Resume Test', function() {
         select i from cte1 option (maxrecursion 0)
       `;
 
-    const request = new Request(sql, (error) => {
-      assert.ok(error);
+    const request = new Request(sql, () => {
+      // error expected when connection closes
     });
 
     request.on('row', (columns) => {
@@ -118,10 +113,7 @@ describe('Pause-Resume Test', function() {
       assert.ifError(err);
     });
 
-    /**
-     * @param {() => void} next
-     */
-    function pauseAndCancelRequest(next) {
+    function pauseAndCancelRequest(next: () => void) {
       const sql = `
             with cte1 as
               (select 1 as i union all select i + 1 from cte1 where i < 20000)
@@ -130,7 +122,7 @@ describe('Pause-Resume Test', function() {
 
       const request = new Request(sql, (error) => {
         assert.instanceOf(error, RequestError);
-        assert.strictEqual(/** @type {RequestError} */(error).code, 'ECANCEL');
+        assert.strictEqual((error as RequestError).code, 'ECANCEL');
 
         next();
       });

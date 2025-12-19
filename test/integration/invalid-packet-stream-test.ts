@@ -1,21 +1,11 @@
-// @ts-check
-
-const { assert } = require('chai');
-const net = require('net');
-const { debugOptionsFromEnv } = require('../helpers/debug-options-from-env');
-const Connection = require('../../src/tedious').Connection;
-const ConnectionError = require('../../src/errors').ConnectionError;
+import { assert } from 'chai';
+import * as net from 'net';
+import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { Connection, ConnectionError } from '../../src/tedious';
 
 describe('Connecting to a server that sends invalid packet data', function() {
-  /**
-   * @type {net.Server}
-   */
-  let server;
-
-  /**
-   * @type {net.Socket[]}
-   */
-  let sockets;
+  let server: net.Server;
+  let sockets: net.Socket[];
 
   beforeEach(function(done) {
     sockets = [];
@@ -51,7 +41,7 @@ describe('Connecting to a server that sends invalid packet data', function() {
       socket.write(packet);
     });
 
-    const addressInfo = /** @type {net.AddressInfo} */(server.address());
+    const addressInfo = server.address() as net.AddressInfo;
     const connection = new Connection({
       server: addressInfo.address,
       options: {
@@ -66,7 +56,7 @@ describe('Connecting to a server that sends invalid packet data', function() {
 
     connection.connect((err) => {
       assert.instanceOf(err, ConnectionError);
-      assert.equal(/** @type {ConnectionError} */(err).message, 'Connection lost - Unable to process incoming packet');
+      assert.equal((err as ConnectionError).message, 'Connection lost - Unable to process incoming packet');
 
       done();
     });
