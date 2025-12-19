@@ -27,7 +27,7 @@ function getConfig() {
 describe('BulkLoad', function() {
   let connection: Connection;
 
-  beforeEach(function(done: Mocha.Done) {
+  beforeEach(function(done) {
     connection = new Connection(getConfig());
     connection.connect(done);
 
@@ -42,7 +42,7 @@ describe('BulkLoad', function() {
     }
   });
 
-  afterEach(function(done: Mocha.Done) {
+  afterEach(function(done) {
     if (!connection.closed) {
       connection.on('end', done);
       connection.close();
@@ -51,7 +51,7 @@ describe('BulkLoad', function() {
     }
   });
 
-  it('allows bulk loading multiple rows', function(done: Mocha.Done) {
+  it('allows bulk loading multiple rows', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         return done(err);
@@ -84,7 +84,7 @@ describe('BulkLoad', function() {
   });
 
   describe('.addColumn', function() {
-    it('throws an error if called after streaming bulk load has started', function(done: Mocha.Done) {
+    it('throws an error if called after streaming bulk load has started', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
         assert.isUndefined(err);
 
@@ -114,7 +114,7 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('fails if the column definition does not match the target table format', function(done: Mocha.Done) {
+  it('fails if the column definition does not match the target table format', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
       assert.instanceOf(err, RequestError, 'An error should have been thrown to indicate the incorrect table format.');
       assert.strictEqual((err as RequestError).message, 'An unknown error has occurred. This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.');
@@ -140,7 +140,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('checks constraints if the `checkConstraints` option is set to `true`', function(done: Mocha.Done) {
+  it('checks constraints if the `checkConstraints` option is set to `true`', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, (err, rowCount) => {
       assert.ok(err, 'An error should have been thrown to indicate the conflict with the CHECK constraint.');
 
@@ -269,7 +269,7 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('should not replace `null` values with column defaults if `keepNulls` is set to `true`', function(done: Mocha.Done) {
+  it('should not replace `null` values with column defaults if `keepNulls` is set to `true`', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
         return done(err);
@@ -306,7 +306,7 @@ describe('BulkLoad', function() {
   });
 
   describe('`order` option', function() {
-    it('allows specifying the order for bulk loaded data', function(done: Mocha.Done) {
+    it('allows specifying the order for bulk loaded data', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'id': 'ASC' } }, (err, rowCount) => {
         assert.isUndefined(err);
 
@@ -342,7 +342,7 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     });
 
-    it('is ignored if the value is `undefined`', function(done: Mocha.Done) {
+    it('is ignored if the value is `undefined`', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: undefined }, (err, rowCount) => {
         assert.isUndefined(err);
 
@@ -396,7 +396,7 @@ describe('BulkLoad', function() {
       }, 'The value of the "foo" key in the "options.order" object must be either "ASC" or "DESC".');
     });
 
-    it('aborts the bulk load if data is provided in a different order than specified', function(done: Mocha.Done) {
+    it('aborts the bulk load if data is provided in a different order than specified', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'id': 'ASC' } }, (err, rowCount) => {
         const expectedMessage = [
           'Cannot bulk load.',
@@ -439,7 +439,7 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     });
 
-    it('ignores the order if the target table does not have a clustered key', function(done: Mocha.Done) {
+    it('ignores the order if the target table does not have a clustered key', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'id': 'ASC' } }, (err, rowCount) => {
         assert.isUndefined(err);
 
@@ -474,7 +474,7 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     });
 
-    it("ignores the order if the target table's clustered key and the specified order don't match", function(done: Mocha.Done) {
+    it("ignores the order if the target table's clustered key and the specified order don't match", function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable', { order: { 'name': 'ASC' } }, (err, rowCount) => {
         assert.isUndefined(err);
 
@@ -512,7 +512,7 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done: Mocha.Done) {
+  it('does not insert any rows if `cancel` is called immediately after executing the bulk load', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.instanceOf(err, RequestError);
       assert.strictEqual((err as RequestError).message, 'Canceled.');
@@ -555,7 +555,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should not do anything if canceled after completion', function(done: Mocha.Done) {
+  it('should not do anything if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
         return done(err);
@@ -595,7 +595,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports streaming bulk load rows from a Stream', function(done: Mocha.Done) {
+  it('supports streaming bulk load rows from a Stream', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         done(err);
@@ -659,7 +659,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports streaming bulk load rows from an Array', function(done: Mocha.Done) {
+  it('supports streaming bulk load rows from an Array', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         done(err);
@@ -723,7 +723,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports streaming bulk load rows from an Iterable', function(done: Mocha.Done) {
+  it('supports streaming bulk load rows from an Iterable', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         done(err);
@@ -787,7 +787,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports streaming bulk load rows from an AsyncIterable', function(done: Mocha.Done) {
+  it('supports streaming bulk load rows from an AsyncIterable', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         done(err);
@@ -883,7 +883,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('correctly handles errors being throw inside an AsyncIterable', function(done: Mocha.Done) {
+  it('correctly handles errors being throw inside an AsyncIterable', function(done) {
     const expectedError = new Error('fail');
 
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
@@ -950,7 +950,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('should not close the connection due to cancelTimeout if canceled after completion', function(done: Mocha.Done) {
+  it('should not close the connection due to cancelTimeout if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
         return done(err);
@@ -982,7 +982,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(createTableRequest);
   });
 
-  it('supports streaming bulk load inserts', function(done: Mocha.Done) {
+  it('supports streaming bulk load inserts', function(done) {
     const totalRows = 20;
     const tableName = '#streamingBulkLoadTest';
 
@@ -1053,7 +1053,7 @@ describe('BulkLoad', function() {
     }
   });
 
-  it('allows using objects or arrays for streaming bulk loads', function(done: Mocha.Done) {
+  it('allows using objects or arrays for streaming bulk loads', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {
         done(err);
@@ -1119,7 +1119,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports cancelling a streaming bulk load', function(done: Mocha.Done) {
+  it('supports cancelling a streaming bulk load', function(done) {
     const totalRows = 20;
 
     startCreateTable();
@@ -1192,7 +1192,7 @@ describe('BulkLoad', function() {
     }
   });
 
-  it('should not close the connection due to cancelTimeout if streaming bulk load is cancelled', function(done: Mocha.Done) {
+  it('should not close the connection due to cancelTimeout if streaming bulk load is cancelled', function(done) {
     const totalRows = 20;
 
     const sql = 'create table #stream_test (i int not null primary key)';
@@ -1239,7 +1239,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('cancels any bulk load that takes longer than the given timeout', function(done: Mocha.Done) {
+  it('cancels any bulk load that takes longer than the given timeout', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.instanceOf(err, RequestError);
       assert.strictEqual((err as RequestError).message, 'Timeout: Request failed to complete in 10ms');
@@ -1269,7 +1269,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('does nothing if the timeout fires after the bulk load completes', function(done: Mocha.Done) {
+  it('does nothing if the timeout fires after the bulk load completes', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       assert.isUndefined(err);
 
@@ -1298,7 +1298,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('cancels any streaming bulk load that takes longer than the given timeout', function(done: Mocha.Done) {
+  it('cancels any streaming bulk load that takes longer than the given timeout', function(done) {
     startCreateTable();
 
     function startCreateTable() {
@@ -1344,7 +1344,7 @@ describe('BulkLoad', function() {
     }
   });
 
-  it('supports bulk loading into a `text` column', function(done: Mocha.Done) {
+  it('supports bulk loading into a `text` column', function(done) {
     const expectedRows = [
       { value: 'some text' },
       { value: null }
@@ -1394,7 +1394,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports bulk loading into a `ntext` column', function(done: Mocha.Done) {
+  it('supports bulk loading into a `ntext` column', function(done) {
     const expectedRows = [
       { value: 'some text 中文' },
       { value: null }
@@ -1444,7 +1444,7 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
-  it('supports bulk loading into a `image` column', function(done: Mocha.Done) {
+  it('supports bulk loading into a `image` column', function(done) {
     const expectedRows = [
       { value: Buffer.from([0xDE, 0xAD, 0xBE, 0xEF]) },
       { value: null }
@@ -1496,7 +1496,7 @@ describe('BulkLoad', function() {
   });
 
   describe('validation errors', function() {
-    beforeEach(function(done: Mocha.Done) {
+    beforeEach(function(done) {
       const request = new Request('create table #stream_test ([value] date)', (err) => {
         done(err);
       });
@@ -1504,7 +1504,7 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     });
 
-    it('should handle validation errors during streaming bulk loads', (done: Mocha.Done) => {
+    it('should handle validation errors during streaming bulk loads', (done) => {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
@@ -1522,7 +1522,7 @@ describe('BulkLoad', function() {
       }
     });
 
-    it('should allow reusing the connection after validation errors during streaming bulk loads', (done: Mocha.Done) => {
+    it('should allow reusing the connection after validation errors during streaming bulk loads', (done) => {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
@@ -1554,7 +1554,7 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('should not throw in _transform function', (done: Mocha.Done) => {
+  it('should not throw in _transform function', (done) => {
     const bulkLoad = connection.newBulkLoad(
       '#tmpTestTable',
       (err, rowCount) => {

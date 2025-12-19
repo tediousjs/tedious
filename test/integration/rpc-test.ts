@@ -65,7 +65,7 @@ describe('RPC test', function() {
     connection.execSqlBatch(request);
   }
 
-  function testProc(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown) {
+  function testProc(done, type: DataType, typeAsString: string, value: unknown) {
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
 
@@ -105,7 +105,7 @@ select @param\
     );
   }
 
-  function testProcOutput(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown) {
+  function testProcOutput(done, type: DataType, typeAsString: string, value: unknown) {
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
 

@@ -15,7 +15,7 @@ const config = {
   }
 };
 
-function execSql(done: Mocha.Done, sql: string | undefined, requestCallback: (error: Error | null | undefined, rowCount?: number, rows?: any) => void) {
+function execSql(done, sql: string | undefined, requestCallback: (error: Error | null | undefined, rowCount?: number, rows?: any) => void) {
   const connection = new Connection(config);
 
   const request = new Request(sql, function(err) {
