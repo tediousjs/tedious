@@ -1534,7 +1534,7 @@ describe('Advanced Input Test', function() {
       'drop table #testAnsiNullDefaults;';
 
     const config = getConfig();
-    runSqlBatch(done, { ...config, options: { ...config.options, enableAnsiNullDefault: false } }, sql, function(err: Error | null | undefined) {
+    runSqlBatch(done, { ...config, options: { ...config.options, enableAnsiNullDefault: false } }, sql, function(err) {
       assert.instanceOf(err, RequestError);
       assert.strictEqual((err as RequestError).number, 515);
     }); // Cannot insert the value NULL
