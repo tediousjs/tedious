@@ -1,4 +1,3 @@
-// @ts-expect-error - type definitions are incomplete (missing enable() and constructor)
 import Mitm from 'mitm';
 import sinon from 'sinon';
 import * as dns from 'dns';
@@ -66,8 +65,7 @@ describe('connectInSequence', function() {
   let mitm: ReturnType<typeof Mitm>;
 
   beforeEach(function() {
-    mitm = new Mitm();
-    mitm.enable();
+    mitm = Mitm();
   });
 
   afterEach(function() {
@@ -323,8 +321,7 @@ describe('connectInParallel', function() {
   let mitm: ReturnType<typeof Mitm>;
 
   beforeEach(function() {
-    mitm = new Mitm();
-    mitm.enable();
+    mitm = Mitm();
   });
 
   afterEach(function() {
