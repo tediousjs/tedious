@@ -19,7 +19,7 @@ describe('Packet Tests', function() {
 
     const debug = new Debug({ packet: true });
 
-    debug.on('debug', function(text: string) {
+    debug.on('debug', function(text) {
       emitCount++;
 
       switch (emitCount) {
@@ -38,7 +38,7 @@ describe('Packet Tests', function() {
 
   it('should enable payload', function(done) {
     const debug = new Debug({ payload: true });
-    debug.on('debug', function(text: string) {
+    debug.on('debug', function(text) {
       assert.strictEqual(text, payload);
 
       done();
@@ -62,7 +62,7 @@ describe('Packet Tests', function() {
 
   it('should enable data', function(done) {
     const debug = new Debug({ data: true });
-    debug.on('debug', function(text: string) {
+    debug.on('debug', function(text) {
       assert.strictEqual(text, 'data');
 
       done();
@@ -84,7 +84,7 @@ describe('Packet Tests', function() {
 
   it('should enable token', function(done) {
     const debug = new Debug({ token: true });
-    debug.on('debug', function(token: string) {
+    debug.on('debug', function(token) {
       assert.isOk(token.indexOf('test') !== 0);
 
       done();
