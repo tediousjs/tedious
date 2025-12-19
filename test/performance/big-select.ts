@@ -65,8 +65,8 @@ end\
   const config = getConfig();
   const connection = new Connection(config);
 
-  function createTable(callback: (err?: Error) => void): void {
-    const request = new Request(createTableSql, function(err: any) {
+  function createTable(callback: (err?: Error | null) => void): void {
+    const request = new Request(createTableSql, function(err) {
       callback(err);
     });
 
@@ -74,8 +74,8 @@ end\
     connection.execSqlBatch(request);
   }
 
-  function insertRows(callback: (err?: Error) => void): void {
-    const request = new Request(insertRowsSql, function(err: any) {
+  function insertRows(callback: (err?: Error | null) => void): void {
+    const request = new Request(insertRowsSql, function(err) {
       callback(err);
     });
 
@@ -83,9 +83,9 @@ end\
     connection.execSqlBatch(request);
   }
 
-  function select(callback: (err?: Error) => void): void {
+  function select(callback: (err?: Error | null) => void): void {
     const start = Date.now();
-    const request = new Request(selectSql, function(err: any, rowCount: any) {
+    const request = new Request(selectSql, function(err, rowCount) {
       test.strictEqual(rows, rowCount);
 
       const durationMillis = Date.now() - start;
@@ -98,7 +98,7 @@ end\
       callback(err);
     });
 
-    request.on('row', function(columns: any) {
+    request.on('row', function(columns) {
       // console.log(columns[0].value)
     });
 
@@ -106,7 +106,7 @@ end\
     connection.execSqlBatch(request);
   }
 
-  connection.connect(function(err: any) {
+  connection.connect(function(err) {
     test.ok(!err);
 
     async.series([
@@ -123,15 +123,15 @@ end\
     test.done();
   });
 
-  connection.on('infoMessage', function(info: any) {
+  connection.on('infoMessage', function(info) {
     // console.log("#{info.number} : #{info.message}")
   });
 
-  connection.on('errorMessage', function(error: any) {
+  connection.on('errorMessage', function(error) {
     // console.log("#{error.number} : #{error.message}")
   });
 
-  connection.on('debug', function(text: any) {
+  connection.on('debug', function(text) {
     // console.log(text)
   });
 }

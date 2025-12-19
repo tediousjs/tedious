@@ -310,7 +310,7 @@ describe('Initiate Connect Test', function() {
       assert.strictEqual(columns[0].value, 'foo.bar.baz');
     });
 
-    let connection: Connection = new Connection({
+    let connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -1155,7 +1155,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
 
     const config = getConfig();
 
-    let connection: Connection = new Connection({
+    let connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -1212,7 +1212,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
 
     const config = getConfig();
 
-    let connection: Connection = new Connection({
+    let connection = new Connection({
       ...config,
       options: {
         ...config.options,
@@ -1463,7 +1463,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
 
     const config = getConfig();
 
-    let connection: Connection = new Connection({
+    let connection = new Connection({
       ...config,
       options: {
         ...config.options,
