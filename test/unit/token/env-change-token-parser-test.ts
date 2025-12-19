@@ -1,0 +1,71 @@
+import StreamParser from '../../../src/token/stream-parser';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { assert } from 'chai';
+
+describe('Env Change Token Parser', () => {
+  it('should write to database', async () => {
+    const oldDb = 'old';
+    const newDb = 'new';
+
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0xe3);
+    buffer.writeUInt16LE(0); // Length written later
+    buffer.writeUInt8(0x01); // Database
+    buffer.writeBVarchar(newDb);
+    buffer.writeBVarchar(oldDb);
+
+    const data = buffer.data;
+    data.writeUInt16LE(data.length - 3, 1);
+
+    const parser = StreamParser.parseTokens([data], {} as any, {} as any);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+    assert.strictEqual((token as any).type, 'DATABASE');
+    assert.strictEqual((token as any).oldValue, 'old');
+    assert.strictEqual((token as any).newValue, 'new');
+  });
+
+  it('should write with correct packet size', async () => {
+    const oldSize = '1024';
+    const newSize = '2048';
+
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0xe3);
+    buffer.writeUInt16LE(0); // Length written later
+    buffer.writeUInt8(0x04); // Packet size
+    buffer.writeBVarchar(newSize);
+    buffer.writeBVarchar(oldSize);
+
+    const data = buffer.data;
+    data.writeUInt16LE(data.length - 3, 1);
+
+    const parser = StreamParser.parseTokens([data], {} as any, {} as any);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.strictEqual((token as any).type, 'PACKET_SIZE');
+    assert.strictEqual((token as any).oldValue, 1024);
+    assert.strictEqual((token as any).newValue, 2048);
+  });
+
+  it('should be of bad type', async () => {
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0xe3);
+    buffer.writeUInt16LE(0); // Length written later
+    buffer.writeUInt8(0xff); // Bad type
+
+    const data = buffer.data;
+    data.writeUInt16LE(data.length - 3, 1);
+
+    const parser = StreamParser.parseTokens([data], {} as any, {} as any);
+    const result = await parser.next();
+
+    assert.isTrue(result.done);
+    assert.isUndefined(result.value);
+  });
+});
