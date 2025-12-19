@@ -156,7 +156,7 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
-  it('should not persist error state between executions of prepared statement (GH#1712)', function(done) {
+  it('should not persist error state between executions of prepared statement (GH#1712)', async function() {
     const config = getConfig();
 
     const connection = new Connection(config);
@@ -164,78 +164,76 @@ describe('Prepare Execute Statement', function() {
       connection.on('debug', console.log);
     }
 
-    // Prepare a statement that can cause a divide by zero error depending on the parameter
-    const request = new Request('select 1 / @divisor as result', function(err) {
-      // This callback is called after each execute
+    // Connect to the database
+    await new Promise<void>((resolve, reject) => {
+      connection.connect((err) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve();
+      });
     });
+
+    // Prepare a statement that can cause a divide by zero error depending on the parameter
+    const request = new Request('select 1 / @divisor as result', () => {});
     request.addParameter('divisor', TYPES.Int);
 
-    let executionCount = 0;
     const results: (number | null)[] = [];
-    const errors: (Error | null)[] = [];
-
-    request.on('row', function(columns) {
+    request.on('row', (columns) => {
       results.push(columns[0].value);
     });
 
-    request.on('prepared', function() {
-      assert.ok(request.handle);
-
-      // First execution: should succeed with divisor = 1
-      request.once('requestCompleted', function() {
-        executionCount++;
-        errors.push(request.error ?? null);
-
-        // Second execution: should fail with divisor = 0 (divide by zero)
-        request.once('requestCompleted', function() {
-          executionCount++;
-          errors.push(request.error ?? null);
-
-          // Third execution: should succeed with divisor = 2
-          // Before the fix, this would report the error from the second execution
-          request.once('requestCompleted', function() {
-            executionCount++;
-            errors.push(request.error ?? null);
-
-            // Unprepare: should succeed
-            // Before the fix, this would also report the stale error
-            connection.unprepare(request);
-          });
-
-          connection.execute(request, { divisor: 2 });
-        });
-
-        connection.execute(request, { divisor: 0 });
+    // Prepare the statement
+    await new Promise<void>((resolve, reject) => {
+      request.once('prepared', () => {
+        assert.ok(request.handle);
+        resolve();
       });
-
-      connection.execute(request, { divisor: 1 });
-    });
-
-    connection.connect(function(err) {
-      if (err) {
-        return done(err);
-      }
-
       connection.prepare(request);
     });
 
-    connection.on('end', function() {
-      // Verify the behavior
-      assert.strictEqual(executionCount, 3, 'Should have completed 3 executions');
+    // First execution: should succeed with divisor = 1
+    const error1 = await new Promise<Error | undefined>((resolve) => {
+      request.once('requestCompleted', () => {
+        resolve(request.error);
+      });
+      connection.execute(request, { divisor: 1 });
+    });
 
-      // First execution succeeded
-      assert.isNull(errors[0], 'First execution should have no error');
-      assert.strictEqual(results[0], 1, 'First execution should return 1');
+    assert.isUndefined(error1, 'First execution should have no error');
+    assert.strictEqual(results[0], 1, 'First execution should return 1');
 
-      // Second execution failed with divide by zero
-      assert.isNotNull(errors[1], 'Second execution should have an error');
-      assert.include(errors[1]!.message, 'Divide by zero', 'Error should be divide by zero');
+    // Second execution: should fail with divisor = 0 (divide by zero)
+    const error2 = await new Promise<Error | undefined>((resolve) => {
+      request.once('requestCompleted', () => {
+        resolve(request.error);
+      });
+      connection.execute(request, { divisor: 0 });
+    });
 
-      // Third execution succeeded - this is the key assertion for GH#1712
-      assert.isNull(errors[2], 'Third execution should have no error (error state should be cleared)');
-      assert.strictEqual(results[1], 0, 'Third execution should return 0 (1/2 truncated to int)');
+    assert.isDefined(error2, 'Second execution should have an error');
+    assert.include(error2!.message, 'Divide by zero', 'Error should be divide by zero');
 
-      done();
+    // Third execution: should succeed with divisor = 2
+    // Before the fix, this would report the error from the second execution
+    const error3 = await new Promise<Error | undefined>((resolve) => {
+      request.once('requestCompleted', () => {
+        resolve(request.error);
+      });
+      connection.execute(request, { divisor: 2 });
+    });
+
+    // This is the key assertion for GH#1712
+    assert.isUndefined(error3, 'Third execution should have no error (error state should be cleared)');
+    assert.strictEqual(results[1], 0, 'Third execution should return 0 (1/2 truncated to int)');
+
+    // Unprepare and close
+    await new Promise<void>((resolve) => {
+      connection.on('end', () => {
+        resolve();
+      });
+      connection.unprepare(request);
+      connection.close();
     });
   });
 
