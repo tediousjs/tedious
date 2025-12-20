@@ -6,8 +6,8 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('Fedauth Info Parser', () => {
-  it('should contain fed auth info', async () => {
+describe('Fedauth Info Parser', function() {
+  it('should contain fed auth info', async function() {
     const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
     buffer.writeUInt8(0xEE);

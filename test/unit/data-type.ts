@@ -305,7 +305,7 @@ describe('DateTime2', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts dates during daylight savings period', () => {
+    it('correctly converts dates during daylight savings period', function() {
       for (const [value, expectedBuffer] of [
         [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('7f5101163a0b', 'hex')],
         [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('000000173a0b', 'hex')],
@@ -1279,7 +1279,7 @@ describe('Time', function() {
   });
   describe('.generateParameterData', function() {
     // Test rounding of nanosecondDelta
-    it('correctly converts `Date` values with a `nanosecondDelta` property', () => {
+    it('correctly converts `Date` values with a `nanosecondDelta` property', function() {
       const type = TYPES.Time;
       // Date with nanosecondDelta is an extended Date type used by the library for sub-millisecond precision
       interface DateWithNanosecondDelta extends Date {
@@ -1499,7 +1499,7 @@ describe('VarBinary', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts `null` values', () => {
+    it('correctly converts `null` values', function() {
       const testCases: Array<{ value: null, length: number, expected: Buffer }> = [
         { value: null, length: 1, expected: Buffer.from([]) },
         { value: null, length: 9000, expected: Buffer.from([]) }
@@ -1511,7 +1511,7 @@ describe('VarBinary', function() {
       }
     });
 
-    it('correctly converts `number` values', () => {
+    it('correctly converts `number` values', function() {
       const testCases: Array<{ value: number, length: number, expected: Buffer }> = [
         { value: 1, length: 1, expected: Buffer.from('3100', 'hex') },
       ];

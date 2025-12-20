@@ -6,8 +6,8 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('Order Token Parser', () => {
-  it('should have one column', async () => {
+describe('Order Token Parser', function() {
+  it('should have one column', async function() {
     const debug = new Debug();
     const numberOfColumns = 1;
     const length = numberOfColumns * 2;
@@ -30,7 +30,7 @@ describe('Order Token Parser', () => {
     assert.strictEqual(token.orderColumns[0], column);
   });
 
-  it('should have two columns', async () => {
+  it('should have two columns', async function() {
     const debug = new Debug();
     const numberOfColumns = 2;
     const length = numberOfColumns * 2;

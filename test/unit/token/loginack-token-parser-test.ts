@@ -6,8 +6,8 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('Loginack Token Parser', () => {
-  it('should have correct info', async () => {
+describe('Loginack Token Parser', function() {
+  it('should have correct info', async function() {
     const debug = new Debug();
     const interfaceType = 1;
     const version = 0x72090002;

@@ -7,7 +7,7 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('Colmetadata Token Parser', () => {
+describe('Colmetadata Token Parser', function() {
   describe('parsing the column metadata for a result with many columns', function() {
     it('should parse them correctly', async function() {
       const debug = new Debug();
@@ -48,7 +48,7 @@ describe('Colmetadata Token Parser', () => {
     });
   });
 
-  it('should int', async () => {
+  it('should int', async function() {
     const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
@@ -81,7 +81,7 @@ describe('Colmetadata Token Parser', () => {
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should varchar', async () => {
+  it('should varchar', async function() {
     const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;

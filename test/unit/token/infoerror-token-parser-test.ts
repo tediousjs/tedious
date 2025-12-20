@@ -6,8 +6,8 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('Infoerror token parser', () => {
-  it('should have correct info', async () => {
+describe('Infoerror token parser', function() {
+  it('should have correct info', async function() {
     const debug = new Debug();
     const number = 3;
     const state = 4;

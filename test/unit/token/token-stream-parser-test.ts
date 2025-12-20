@@ -35,8 +35,8 @@ class TestDatabaseChangeHandler extends TokenHandler {
   }
 }
 
-describe('Token Stream Parser', () => {
-  it('should envChange', (done) => {
+describe('Token Stream Parser', function() {
+  it('should envChange', function(done) {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
@@ -46,7 +46,7 @@ describe('Token Stream Parser', () => {
     parser.on('end', done);
   });
 
-  it('should split token across buffers', (done) => {
+  it('should split token across buffers', function(done) {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 

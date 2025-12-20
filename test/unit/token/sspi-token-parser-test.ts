@@ -6,8 +6,8 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('sspi token parser', () => {
-  it('should parse challenge', async () => {
+describe('sspi token parser', function() {
+  it('should parse challenge', async function() {
     const debug = new Debug();
     const source = new WriteBuffer(68);
     source.writeUInt8(0xed);

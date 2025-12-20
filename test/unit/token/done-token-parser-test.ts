@@ -23,8 +23,8 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   return parser;
 }
 
-describe('Done Token Parser', () => {
-  it('should done', async () => {
+describe('Done Token Parser', function() {
+  it('should done', async function() {
     const status = 0x0000;
     const curCmd = 1;
     const doneRowCount = 2;
@@ -40,7 +40,7 @@ describe('Done Token Parser', () => {
     assert.isUndefined(token.rowCount);
   });
 
-  it('should more', async () => {
+  it('should more', async function() {
     const status = 0x0001;
     const curCmd = 1;
     const doneRowCount = 2;
@@ -56,7 +56,7 @@ describe('Done Token Parser', () => {
     assert.isUndefined(token.rowCount);
   });
 
-  it('should done row count', async () => {
+  it('should done row count', async function() {
     const status = 0x0010;
     const curCmd = 1;
     const doneRowCount = 0x1200000034;

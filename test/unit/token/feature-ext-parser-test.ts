@@ -6,8 +6,8 @@ import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
-describe('Feature Ext Parser', () => {
-  it('should be fed authentication', async () => {
+describe('Feature Ext Parser', function() {
+  it('should be fed authentication', async function() {
     const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
@@ -39,7 +39,7 @@ describe('Feature Ext Parser', () => {
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should parse UTF-8 support token', async () => {
+  it('should parse UTF-8 support token', async function() {
     const debug = new Debug();
     const buffer = new WritableTrackingBuffer(8);
 

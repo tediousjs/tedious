@@ -13,15 +13,15 @@ function assertBuffer(actual: WritableTrackingBuffer, expected: number[]): void 
   }
 }
 
-describe('Wrtiable Tracking Buffer', () => {
-  it('should create', () => {
+describe('Wrtiable Tracking Buffer', function() {
+  it('should create', function() {
     const buffer = new WritableTrackingBuffer(2);
 
     assert.isDefined(buffer);
     assert.strictEqual(0, buffer.data.length);
   });
 
-  it('should write unsigned int', () => {
+  it('should write unsigned int', function() {
     const buffer = new WritableTrackingBuffer(20);
 
     buffer.writeUInt8(1);
@@ -56,7 +56,7 @@ describe('Wrtiable Tracking Buffer', () => {
     ]);
   });
 
-  it('should write signed int', () => {
+  it('should write signed int', function() {
     const buffer = new WritableTrackingBuffer(2);
 
     buffer.writeInt8(-1);
@@ -91,7 +91,7 @@ describe('Wrtiable Tracking Buffer', () => {
     ]);
   });
 
-  it('should write string', () => {
+  it('should write string', function() {
     const buffer = new WritableTrackingBuffer(2, 'ucs2');
 
     buffer.writeString('abc');
@@ -99,7 +99,7 @@ describe('Wrtiable Tracking Buffer', () => {
     assertBuffer(buffer, [0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
   });
 
-  it('should write BVarChar', () => {
+  it('should write BVarChar', function() {
     const buffer = new WritableTrackingBuffer(2, 'ucs2');
 
     buffer.writeBVarchar('abc');
@@ -107,7 +107,7 @@ describe('Wrtiable Tracking Buffer', () => {
     assertBuffer(buffer, [0x03, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
   });
 
-  it('should write UsVarChar', () => {
+  it('should write UsVarChar', function() {
     const buffer = new WritableTrackingBuffer(2, 'ucs2');
 
     buffer.writeUsVarchar('abc');
@@ -115,7 +115,7 @@ describe('Wrtiable Tracking Buffer', () => {
     assertBuffer(buffer, [0x03, 0x00, 0x61, 0x00, 0x62, 0x00, 0x63, 0x00]);
   });
 
-  it('should write 64-bit signed `BigInt`s', () => {
+  it('should write 64-bit signed `BigInt`s', function() {
     const buffer = new WritableTrackingBuffer(8);
 
     buffer.writeBigInt64LE(BigInt('0x0807060504030201'));
@@ -123,7 +123,7 @@ describe('Wrtiable Tracking Buffer', () => {
     assertBuffer(buffer, [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
   });
 
-  it('should write 64-bit unsigned `BigInt`s', () => {
+  it('should write 64-bit unsigned `BigInt`s', function() {
     const buffer = new WritableTrackingBuffer(8);
 
     buffer.writeBigUInt64LE(BigInt('0xdecafafecacefade'));
@@ -131,7 +131,7 @@ describe('Wrtiable Tracking Buffer', () => {
     assertBuffer(buffer, [0xde, 0xfa, 0xce, 0xca, 0xfe, 0xfa, 0xca, 0xde]);
   });
 
-  it('should copyFrom', () => {
+  it('should copyFrom', function() {
     const buffer = new WritableTrackingBuffer(10);
     const source = Buffer.from([0x01, 0x02, 0x03, 0x04]);
 
