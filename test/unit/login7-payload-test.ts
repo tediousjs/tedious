@@ -385,7 +385,7 @@ describe('Login7Payload', function() {
 
         // FeatureExt should start after all other variable data
         assert.isAtLeast(ibFeatureExtLong, variableDataEnd,
-          'FeatureExt (at ' + ibFeatureExtLong + ') should be after all variable data (ends at ' + variableDataEnd + ')');
+                         'FeatureExt (at ' + ibFeatureExtLong + ') should be after all variable data (ends at ' + variableDataEnd + ')');
 
         // Verify FeatureExt ends with terminator (0xFF)
         // Find the terminator by scanning from ibFeatureExtLong
@@ -395,7 +395,7 @@ describe('Login7Payload', function() {
           if (featureId === 0xFF) {
             // Found terminator, verify it's at the end of the packet
             assert.strictEqual(featureOffset, data.length - 1,
-              'FeatureExt terminator should be the last byte of the packet');
+                               'FeatureExt terminator should be the last byte of the packet');
             break;
           }
           // Skip past this feature: 1 byte ID + 4 bytes length + length bytes data
@@ -445,7 +445,7 @@ describe('Login7Payload', function() {
         // FeatureExt should be after SSPI data
         const sspiEnd = ibSSPI + cbSSPI;
         assert.isAtLeast(ibFeatureExtLong, sspiEnd,
-          'FeatureExt should be after SSPI data');
+                         'FeatureExt should be after SSPI data');
 
         // Verify first feature is valid
         const firstFeatureId = data.readUInt8(ibFeatureExtLong);
