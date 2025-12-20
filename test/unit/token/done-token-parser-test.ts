@@ -53,7 +53,7 @@ describe('Done Token Parser', () => {
     assert.instanceOf(token, DoneToken);
     assert.isOk(token.more);
     assert.strictEqual(token.curCmd, curCmd);
-    assert.isOk(!token.rowCount);
+    assert.strictEqual(token.rowCount, 0);
   });
 
   it('should done row count', async () => {
