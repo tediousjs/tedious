@@ -44,11 +44,12 @@ describe('Row Token Parser', () => {
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.strictEqual((token as RowToken).columns.length, 1024);
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 1024);
 
       for (let i = 0; i < 1024; i += 1) {
-        assert.strictEqual((token as RowToken).columns[i].value, i.toString());
-        assert.strictEqual((token as RowToken).columns[i].metadata, colMetadata[i]);
+        assert.strictEqual(token.columns[i].value, i.toString());
+        assert.strictEqual(token.columns[i].metadata, colMetadata[i]);
       }
 
       assert.isTrue((await parser.next()).done);
@@ -68,9 +69,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -91,9 +93,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 2);
-    assert.strictEqual('1', (token as RowToken).columns[0].value);
-    assert.strictEqual('9223372036854775807', (token as RowToken).columns[1].value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual('1', token.columns[0].value);
+    assert.strictEqual('9223372036854775807', token.columns[1].value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -110,10 +113,11 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -132,9 +136,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -170,13 +175,14 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 6);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[1].value, value);
-    assert.strictEqual((token as RowToken).columns[2].value, null);
-    assert.strictEqual((token as RowToken).columns[3].value, value);
-    assert.strictEqual((token as RowToken).columns[4].value, value);
-    assert.strictEqual((token as RowToken).columns[5].value, valueLarge);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 6);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[1].value, value);
+    assert.strictEqual(token.columns[2].value, null);
+    assert.strictEqual(token.columns[3].value, value);
+    assert.strictEqual(token.columns[4].value, value);
+    assert.strictEqual(token.columns[5].value, valueLarge);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -202,9 +208,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -230,9 +237,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -251,9 +259,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -272,10 +281,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.deepEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -294,10 +303,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.deepEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -324,9 +333,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -359,9 +369,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -393,9 +404,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -426,9 +438,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -488,9 +501,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -519,9 +533,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.deepEqual((token as RowToken).columns[0].value, value);
-    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -654,19 +669,20 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 12);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
-    assert.strictEqual('0', (token as RowToken).columns[1].value);
-    assert.strictEqual('1', (token as RowToken).columns[2].value);
-    assert.strictEqual('-1', (token as RowToken).columns[3].value);
-    assert.strictEqual('2', (token as RowToken).columns[4].value);
-    assert.strictEqual('-2', (token as RowToken).columns[5].value);
-    assert.strictEqual('9223372036854775807', (token as RowToken).columns[6].value);
-    assert.strictEqual('-9223372036854775808', (token as RowToken).columns[7].value);
-    assert.strictEqual('10', (token as RowToken).columns[8].value);
-    assert.strictEqual('100', (token as RowToken).columns[9].value);
-    assert.strictEqual('1000', (token as RowToken).columns[10].value);
-    assert.strictEqual('10000', (token as RowToken).columns[11].value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 12);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual('0', token.columns[1].value);
+    assert.strictEqual('1', token.columns[2].value);
+    assert.strictEqual('-1', token.columns[3].value);
+    assert.strictEqual('2', token.columns[4].value);
+    assert.strictEqual('-2', token.columns[5].value);
+    assert.strictEqual('9223372036854775807', token.columns[6].value);
+    assert.strictEqual('-9223372036854775808', token.columns[7].value);
+    assert.strictEqual('10', token.columns[8].value);
+    assert.strictEqual('100', token.columns[9].value);
+    assert.strictEqual('1000', token.columns[10].value);
+    assert.strictEqual('10000', token.columns[11].value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -708,11 +724,12 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 2);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
     assert.deepEqual(
       '67452301-AB89-EFCD-0123-456789ABCDEF',
-      (token as RowToken).columns[1].value
+      token.columns[1].value
     );
     assert.isTrue((await parser.next()).done);
 
@@ -754,11 +771,12 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 2);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
     assert.deepEqual(
       '67452301-ab89-efcd-0123-456789abcdef',
-      (token as RowToken).columns[1].value
+      token.columns[1].value
     );
     assert.isTrue((await parser.next()).done);
   });
@@ -798,10 +816,11 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 3);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
-    assert.strictEqual(9.5, (token as RowToken).columns[1].value);
-    assert.strictEqual(9.5, (token as RowToken).columns[2].value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 3);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(9.5, token.columns[1].value);
+    assert.strictEqual(9.5, token.columns[2].value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -825,9 +844,10 @@ describe('Row Token Parser', () => {
       assert.isFalse(result.done);
 
       const token = result.value;
-      assert.strictEqual((token as RowToken).columns.length, 1);
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 1);
       assert.strictEqual(
-        (token as RowToken).columns[0].value.getTime(),
+        token.columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45').getTime()
       );
 
@@ -843,9 +863,10 @@ describe('Row Token Parser', () => {
       assert.isFalse(result.done);
 
       const token = result.value;
-      assert.strictEqual((token as RowToken).columns.length, 1);
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 1);
       assert.strictEqual(
-        (token as RowToken).columns[0].value.getTime(),
+        token.columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45 GMT').getTime()
       );
 
@@ -869,9 +890,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -899,9 +921,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -929,8 +952,9 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -959,10 +983,10 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -993,8 +1017,9 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -1031,8 +1056,9 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -1056,8 +1082,9 @@ describe('Row Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as RowToken).columns.length, 1);
-    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
 });

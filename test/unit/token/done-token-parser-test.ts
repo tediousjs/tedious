@@ -34,9 +34,10 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as DoneToken).more);
-    assert.strictEqual((token as DoneToken).curCmd, curCmd);
-    assert.isOk(!(token as DoneToken).rowCount);
+    assert.instanceOf(token, DoneToken);
+    assert.isOk(!token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isOk(!token.rowCount);
   });
 
   it('should more', async () => {
@@ -49,9 +50,10 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk((token as DoneToken).more);
-    assert.strictEqual((token as DoneToken).curCmd, curCmd);
-    assert.isOk(!(token as DoneToken).rowCount);
+    assert.instanceOf(token, DoneToken);
+    assert.isOk(token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isOk(!token.rowCount);
   });
 
   it('should done row count', async () => {
@@ -64,8 +66,9 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as DoneToken).more);
-    assert.strictEqual((token as DoneToken).curCmd, 1);
-    assert.strictEqual((token as DoneToken).rowCount, doneRowCount);
+    assert.instanceOf(token, DoneToken);
+    assert.isOk(!token.more);
+    assert.strictEqual(token.curCmd, 1);
+    assert.strictEqual(token.rowCount, doneRowCount);
   });
 });

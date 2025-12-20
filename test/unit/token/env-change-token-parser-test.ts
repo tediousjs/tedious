@@ -1,5 +1,5 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
-import { type EnvChangeToken } from '../../../src/token/token';
+import { DatabaseEnvChangeToken, PacketSizeEnvChangeToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
@@ -27,9 +27,11 @@ describe('Env Change Token Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as EnvChangeToken).type, 'DATABASE');
-    assert.strictEqual((token as EnvChangeToken).oldValue, 'old');
-    assert.strictEqual((token as EnvChangeToken).newValue, 'new');
+
+    assert.instanceOf(token, DatabaseEnvChangeToken);
+    assert.strictEqual(token.type, 'DATABASE');
+    assert.strictEqual(token.oldValue, 'old');
+    assert.strictEqual(token.newValue, 'new');
   });
 
   it('should write with correct packet size', async () => {
@@ -52,9 +54,10 @@ describe('Env Change Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as EnvChangeToken).type, 'PACKET_SIZE');
-    assert.strictEqual((token as EnvChangeToken).oldValue, 1024);
-    assert.strictEqual((token as EnvChangeToken).newValue, 2048);
+    assert.instanceOf(token, PacketSizeEnvChangeToken);
+    assert.strictEqual(token.type, 'PACKET_SIZE');
+    assert.strictEqual(token.oldValue, 1024);
+    assert.strictEqual(token.newValue, 2048);
   });
 
   it('should be of bad type', async () => {

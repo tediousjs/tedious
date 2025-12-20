@@ -51,9 +51,11 @@ describe('sspi token parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.deepEqual((token as SSPIToken).ntlmpacket, expected);
+
+    assert.instanceOf(token, SSPIToken);
+    assert.deepEqual(token.ntlmpacket, expected);
     // Skip token (first byte) and length of VarByte (2 bytes).
-    assert.isOk((token as SSPIToken).ntlmpacketBuffer.equals(data.slice(3)));
+    assert.isOk(token.ntlmpacketBuffer.equals(data.slice(3)));
 
     assert.isTrue((await parser.next()).done);
   });

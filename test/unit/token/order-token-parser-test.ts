@@ -24,9 +24,10 @@ describe('Order Token Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as OrderToken).orderColumns.length, 1);
 
-    assert.strictEqual((token as OrderToken).orderColumns[0], column);
+    assert.instanceOf(token, OrderToken);
+    assert.strictEqual(token.orderColumns.length, 1);
+    assert.strictEqual(token.orderColumns[0], column);
   });
 
   it('should have two columns', async () => {
@@ -47,9 +48,11 @@ describe('Order Token Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as OrderToken).orderColumns.length, 2);
-    assert.strictEqual((token as OrderToken).orderColumns[0], column1);
-    assert.strictEqual((token as OrderToken).orderColumns[1], column2);
+
+    assert.instanceOf(token, OrderToken);
+    assert.strictEqual(token.orderColumns.length, 2);
+    assert.strictEqual(token.orderColumns[0], column1);
+    assert.strictEqual(token.orderColumns[1], column2);
 
     assert.isTrue((await parser.next()).done);
   });

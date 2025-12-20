@@ -40,10 +40,12 @@ describe('Loginack Token Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as LoginAckToken).interface, 'SQL_TSQL');
-    assert.strictEqual((token as LoginAckToken).tdsVersion, '7_2');
-    assert.strictEqual((token as LoginAckToken).progName, progName);
-    assert.deepEqual((token as LoginAckToken).progVersion, progVersion);
+
+    assert.instanceOf(token, LoginAckToken);
+    assert.strictEqual(token.interface, 'SQL_TSQL');
+    assert.strictEqual(token.tdsVersion, '7_2');
+    assert.strictEqual(token.progName, progName);
+    assert.deepEqual(token.progVersion, progVersion);
 
     assert.isTrue((await parser.next()).done);
   });

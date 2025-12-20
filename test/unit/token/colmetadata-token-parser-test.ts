@@ -34,15 +34,14 @@ describe('Colmetadata Token Parser', () => {
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.isOk(!(token as any).error);
-
-      assert.strictEqual((token as ColMetadataToken).columns.length, 1024);
+      assert.instanceOf(token, ColMetadataToken);
+      assert.strictEqual(token.columns.length, 1024);
 
       for (let i = 0; i < 1024; i++) {
-        assert.strictEqual((token as ColMetadataToken).columns[i].userType, 2);
-        assert.strictEqual((token as ColMetadataToken).columns[i].flags, 3);
-        assert.strictEqual((token as ColMetadataToken).columns[i].type.name, 'Int');
-        assert.strictEqual((token as ColMetadataToken).columns[i].colName, 'name');
+        assert.strictEqual(token.columns[i].userType, 2);
+        assert.strictEqual(token.columns[i].flags, 3);
+        assert.strictEqual(token.columns[i].type.name, 'Int');
+        assert.strictEqual(token.columns[i].colName, 'name');
       }
 
       assert.isTrue((await parser.next()).done);
@@ -71,12 +70,12 @@ describe('Colmetadata Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as any).error);
-    assert.strictEqual((token as ColMetadataToken).columns.length, 1);
-    assert.strictEqual((token as ColMetadataToken).columns[0].userType, 2);
-    assert.strictEqual((token as ColMetadataToken).columns[0].flags, 3);
-    assert.strictEqual((token as ColMetadataToken).columns[0].type.name, 'Int');
-    assert.strictEqual((token as ColMetadataToken).columns[0].colName, 'name');
+    assert.instanceOf(token, ColMetadataToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].userType, 2);
+    assert.strictEqual(token.columns[0].flags, 3);
+    assert.strictEqual(token.columns[0].type.name, 'Int');
+    assert.strictEqual(token.columns[0].colName, 'name');
 
     assert.isTrue((await parser.next()).done);
   });
@@ -106,17 +105,18 @@ describe('Colmetadata Token Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.isOk(!(token as any).error);
-    assert.strictEqual((token as ColMetadataToken).columns.length, 1);
-    assert.strictEqual((token as ColMetadataToken).columns[0].userType, 2);
-    assert.strictEqual((token as ColMetadataToken).columns[0].flags, 3);
-    assert.strictEqual((token as ColMetadataToken).columns[0].type.name, 'VarChar');
-    assert.strictEqual((token as ColMetadataToken).columns[0].collation.lcid, 0x0409);
-    assert.strictEqual((token as ColMetadataToken).columns[0].collation.codepage, 'CP1257');
-    assert.strictEqual((token as ColMetadataToken).columns[0].collation.flags, 0x85);
-    assert.strictEqual((token as ColMetadataToken).columns[0].collation.version, 0x7);
-    assert.strictEqual((token as ColMetadataToken).columns[0].collation.sortId, 0x9a);
-    assert.strictEqual((token as ColMetadataToken).columns[0].colName, 'name');
-    assert.strictEqual((token as ColMetadataToken).columns[0].dataLength, length);
+
+    assert.instanceOf(token, ColMetadataToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].userType, 2);
+    assert.strictEqual(token.columns[0].flags, 3);
+    assert.strictEqual(token.columns[0].type.name, 'VarChar');
+    assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
+    assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
+    assert.strictEqual(token.columns[0].collation.flags, 0x85);
+    assert.strictEqual(token.columns[0].collation.version, 0x7);
+    assert.strictEqual(token.columns[0].collation.sortId, 0x9a);
+    assert.strictEqual(token.columns[0].colName, 'name');
+    assert.strictEqual(token.columns[0].dataLength, length);
   });
 });

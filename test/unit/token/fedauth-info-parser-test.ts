@@ -26,8 +26,10 @@ describe('Fedauth Info Parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as FedAuthInfoToken).stsurl, 'stsurl');
-    assert.strictEqual((token as FedAuthInfoToken).spn, 'spn');
+
+    assert.instanceOf(token, FedAuthInfoToken);
+    assert.strictEqual(token.stsurl, 'stsurl');
+    assert.strictEqual(token.spn, 'spn');
 
     assert.isTrue((await parser.next()).done);
   });

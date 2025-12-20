@@ -38,11 +38,12 @@ describe('NBCRow Token Parser', function() {
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.strictEqual((token as NBCRowToken).columns.length, 1024);
+      assert.instanceOf(token, NBCRowToken);
+      assert.strictEqual(token.columns.length, 1024);
 
       for (let i = 0; i < 1024; i += 1) {
-        assert.strictEqual((token as NBCRowToken).columns[i].value, i.toString());
-        assert.strictEqual((token as NBCRowToken).columns[i].metadata, colMetadata[i]);
+        assert.strictEqual(token.columns[i].value, i.toString());
+        assert.strictEqual(token.columns[i].metadata, colMetadata[i]);
       }
 
       assert.isTrue((await parser.next()).done);

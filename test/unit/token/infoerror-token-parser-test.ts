@@ -36,13 +36,15 @@ describe('Infoerror token parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as InfoMessageToken).number, number);
-    assert.strictEqual((token as InfoMessageToken).state, state);
-    assert.strictEqual((token as InfoMessageToken).class, class_);
-    assert.strictEqual((token as InfoMessageToken).message, message);
-    assert.strictEqual((token as InfoMessageToken).serverName, serverName);
-    assert.strictEqual((token as InfoMessageToken).procName, procName);
-    assert.strictEqual((token as InfoMessageToken).lineNumber, lineNumber);
+
+    assert.instanceOf(token, InfoMessageToken);
+    assert.strictEqual(token.number, number);
+    assert.strictEqual(token.state, state);
+    assert.strictEqual(token.class, class_);
+    assert.strictEqual(token.message, message);
+    assert.strictEqual(token.serverName, serverName);
+    assert.strictEqual(token.procName, procName);
+    assert.strictEqual(token.lineNumber, lineNumber);
 
     assert.isTrue((await parser.next()).done);
   });
