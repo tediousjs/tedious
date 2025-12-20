@@ -529,7 +529,7 @@ describe('MessageIO', function() {
               // Use a cipher that causes an error immediately
               ciphers: 'NULL'
             }, 'localhost', true);
-          } catch (err: any) {
+          } catch (err) {
             hadError = true;
 
             assert.instanceOf(err, Error);

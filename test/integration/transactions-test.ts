@@ -135,9 +135,9 @@ GO`,
   beginTransaction(callback: (err?: Error | null) => void, transactionName?: string) {
     this.connection.beginTransaction((err, transactionDescriptor) => {
       assert.ifError(err);
-      assert.ok(
-        config.options.tdsVersion! < '7_2' ? true : transactionDescriptor
-      );
+      if (config.options.tdsVersion! >= '7_2') {
+        assert.isDefined(transactionDescriptor);
+      }
 
       callback(err);
     }, transactionName);
@@ -285,12 +285,12 @@ describe('Transactions Test', function() {
             assert.ifError(err);
 
             connection.on('rollbackTransaction' as any, function() {
-              // Ensure rollbackTransaction event is fired
-              assert.ok(true);
+              // rollbackTransaction event fired as expected
             });
 
             req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
-              assert.match((err as Error).message, /^String or binary data would be truncated/);
+              assert.instanceOf(err, Error);
+              assert.match(err.message, /^String or binary data would be truncated/);
 
               connection.close();
             });
@@ -453,9 +453,10 @@ describe('Transactions Test', function() {
             assert.ifError(err);
 
             request = new Request('create table #temp (id int)', function(err) {
-              innerDone!(err, outerDone, function(err: any) {
+              innerDone!(err, outerDone, function(err: unknown) {
+                assert.instanceOf(err, Error);
                 assert.equal(
-                  (err as Error).message,
+                  err.message,
                   "There is already an object named '#temp' in the database."
                 );
 
@@ -477,7 +478,7 @@ describe('Transactions Test', function() {
       done();
     });
     connection.on('error', function(err) {
-      assert.ok(~err.message.indexOf('socket error'));
+      assert.include(err.message, 'socket error');
     });
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
@@ -490,10 +491,12 @@ describe('Transactions Test', function() {
           assert.ifError(err);
 
           const request = new Request('WAITFOR 00:00:30', function(err) {
-            assert.ok(~(err as Error).message.indexOf('socket error'));
+            assert.instanceOf(err, Error);
+            assert.include(err.message, 'socket error');
 
-            innerDone!(err, outerDone, function(err: any) {
-              assert.ok(~(err as Error).message.indexOf('socket error'));
+            innerDone!(err, outerDone, function(err: unknown) {
+              assert.instanceOf(err, Error);
+              assert.include(err.message, 'socket error');
             });
           });
 

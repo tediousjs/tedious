@@ -42,6 +42,6 @@ describe('all headers test', function() {
     ]);
     writeAllHeaders(buffer, transactionDescriptor, 1);
 
-    assert.isOk(buffer.data.equals(expected));
+    assert.deepEqual(buffer.data, expected);
   });
 });

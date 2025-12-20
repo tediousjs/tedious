@@ -7,71 +7,119 @@ import FloatN from '../../../src/data-types/floatn';
 import DateTimeN from '../../../src/data-types/datetimen';
 import NumericN from '../../../src/data-types/numericn';
 
-import Parser from '../../../src/token/stream-parser';
+import Parser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { RowToken } from '../../../src/token/token';
+import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
+import { Collation } from '../../../src/collation';
 
 const options = {
   useUTC: false,
   tdsVersion: '7_2'
-} as any;
+} as ParserOptions;
 
-describe('Row Token Parser', () => {
+describe('Row Token Parser', function() {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
+      const debug = new Debug();
       const buffer = new WritableTrackingBuffer(0, 'ascii');
       buffer.writeUInt8(0xd1);
 
-      const colMetadata = [];
+      const colMetadata: ColumnMetadata[] = [];
       for (let i = 0; i < 1024; i += 1) {
         colMetadata.push({
+          colName: `col${i}`,
+          userType: 0,
+          flags: 0,
+          precision: undefined,
+          scale: undefined,
+          dataLength: undefined,
+          schema: undefined,
+          udtInfo: undefined,
           type: dataTypeByName.VarChar,
-          collation: {
-            codepage: undefined
-          }
+          collation: new Collation(1033, 0, 0, 52)
         });
         buffer.writeUsVarchar(i.toString());
       }
 
-      const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.strictEqual((token as any).columns.length, 1024);
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 1024);
 
       for (let i = 0; i < 1024; i += 1) {
-        assert.strictEqual((token as any).columns[i].value, i.toString());
-        assert.strictEqual((token as any).columns[i].metadata, colMetadata[i]);
+        assert.strictEqual(token.columns[i].value, i.toString());
+        assert.strictEqual(token.columns[i].metadata, colMetadata[i]);
       }
 
       assert.isTrue((await parser.next()).done);
     });
   });
 
-  it('should write int', async () => {
-    const colMetadata = [{ type: dataTypeByName.Int }];
+  it('should write int', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Int,
+      collation: undefined
+    }];
     const value = 3;
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write bigint', async () => {
-    const colMetadata = [
-      { type: dataTypeByName.BigInt },
-      { type: dataTypeByName.BigInt }
+  it('should write bigint', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
+      {
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.BigInt,
+        collation: undefined
+      },
+      {
+        colName: 'col1',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.BigInt,
+        collation: undefined
+      }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -80,39 +128,65 @@ describe('Row Token Parser', () => {
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 2);
-    assert.strictEqual('1', (token as any).columns[0].value);
-    assert.strictEqual('9223372036854775807', (token as any).columns[1].value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual('1', token.columns[0].value);
+    assert.strictEqual('9223372036854775807', token.columns[1].value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write real', async () => {
-    const colMetadata = [{ type: dataTypeByName.Real }];
+  it('should write real', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Real,
+      collation: undefined
+    }];
     const value = 9.5;
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write float', async () => {
-    const colMetadata = [{ type: dataTypeByName.Float }];
+  it('should write float', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Float,
+      collation: undefined
+    }];
     const value = 9.5;
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -121,25 +195,37 @@ describe('Row Token Parser', () => {
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write Money', async () => {
-    const colMetadata = [
-      { type: SmallMoney },
-      { type: Money },
-      { type: MoneyN },
-      { type: MoneyN },
-      { type: MoneyN },
-      { type: MoneyN }
+  it('should write Money', async function() {
+    const debug = new Debug();
+    const baseMetadata = {
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      collation: undefined
+    };
+    const colMetadata: ColumnMetadata[] = [
+      { ...baseMetadata, colName: 'col0', type: SmallMoney },
+      { ...baseMetadata, colName: 'col1', type: Money },
+      { ...baseMetadata, colName: 'col2', type: MoneyN },
+      { ...baseMetadata, colName: 'col3', type: MoneyN },
+      { ...baseMetadata, colName: 'col4', type: MoneyN },
+      { ...baseMetadata, colName: 'col5', type: MoneyN }
     ];
     const value = 123.456;
     const valueLarge = 123456789012345.11;
@@ -159,28 +245,36 @@ describe('Row Token Parser', () => {
       Buffer.from([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 6);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[1].value, value);
-    assert.strictEqual((token as any).columns[2].value, null);
-    assert.strictEqual((token as any).columns[3].value, value);
-    assert.strictEqual((token as any).columns[4].value, value);
-    assert.strictEqual((token as any).columns[5].value, valueLarge);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 6);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[1].value, value);
+    assert.strictEqual(token.columns[2].value, null);
+    assert.strictEqual(token.columns[3].value, value);
+    assert.strictEqual(token.columns[4].value, value);
+    assert.strictEqual(token.columns[5].value, valueLarge);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varchar without code page', async () => {
-    const colMetadata = [
+  it('should write varchar without code page', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
         type: dataTypeByName.VarChar,
-        collation: {
-          codepage: undefined
-        }
+        collation: new Collation(1033, 0, 0, 52)
       }
     ];
     const value = 'abcde';
@@ -191,24 +285,32 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varchar with code page', async () => {
-    const colMetadata = [
+  it('should write varchar with code page', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
         type: dataTypeByName.VarChar,
-        collation: {
-          codepage: 'WINDOWS-1252'
-        }
+        collation: Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xD0, 0x00, 0x34]))
       }
     ];
     const value = 'abcdé';
@@ -219,19 +321,32 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write nvarchar', async () => {
-    const colMetadata = [{ type: dataTypeByName.NVarChar }];
+  it('should write nvarchar', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.NVarChar,
+      collation: new Collation(1033, 0, 0, 52)
+    }];
     const value = 'abc';
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -240,19 +355,32 @@ describe('Row Token Parser', () => {
     buffer.writeString(value);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varBinary', async () => {
-    const colMetadata = [{ type: dataTypeByName.VarBinary }];
+  it('should write varBinary', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.VarBinary,
+      collation: undefined
+    }];
     const value = Buffer.from([0x12, 0x34]);
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -261,20 +389,32 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.deepEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write binary', async () => {
-    const colMetadata = [{ type: dataTypeByName.Binary }];
+  it('should write binary', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Binary,
+      collation: undefined
+    }];
     const value = Buffer.from([0x12, 0x34]);
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -283,26 +423,32 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.deepEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varcharMaxNull', async () => {
-    const colMetadata = [
+  it('should write varcharMaxNull', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: dataTypeByName.VarChar,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
         dataLength: 65535,
-        collation: {
-          codepage: undefined
-        }
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.VarChar,
+        collation: new Collation(1033, 0, 0, 52)
       }
     ];
 
@@ -313,25 +459,32 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varcharMaxUnkownLength', async () => {
-    const colMetadata = [
+  it('should write varcharMaxUnkownLength', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: dataTypeByName.VarChar,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
         dataLength: 65535,
-        collation: {
-          codepage: undefined
-        }
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.VarChar,
+        collation: new Collation(1033, 0, 0, 52)
       }
     ];
     const value = 'abcdef';
@@ -348,25 +501,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varcharMaxKnownLength', async () => {
-    const colMetadata = [
+  it('should write varcharMaxKnownLength', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: dataTypeByName.VarChar,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
         dataLength: 65535,
-        collation: {
-          codepage: undefined
-        }
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.VarChar,
+        collation: new Collation(1033, 0, 0, 52)
       }
     ];
     const value = 'abcdef';
@@ -382,25 +542,32 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varcharmaxWithCodePage', async () => {
-    const colMetadata = [
+  it('should write varcharmaxWithCodePage', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: dataTypeByName.VarChar,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
         dataLength: 65535,
-        collation: {
-          codepage: 'WINDOWS-1252'
-        }
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.VarChar,
+        collation: Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xD0, 0x00, 0x34]))
       }
     ];
     const value = 'abcdéf';
@@ -415,25 +582,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varcharMaxKnownLengthWrong', async () => {
-    const colMetadata = [
+  it('should write varcharMaxKnownLengthWrong', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: dataTypeByName.VarChar,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
         dataLength: 65535,
-        collation: {
-          codepage: 'WINDOWS-1252'
-        }
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.VarChar,
+        collation: Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xD0, 0x00, 0x34]))
       }
     ];
     const value = 'abcdef';
@@ -448,7 +622,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
 
     let error;
     try {
@@ -462,11 +636,20 @@ describe('Row Token Parser', () => {
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varBinaryMaxNull', async () => {
-    const colMetadata = [
+  it('should write varBinaryMaxNull', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: 65535,
+        schema: undefined,
+        udtInfo: undefined,
         type: dataTypeByName.VarBinary,
-        dataLength: 65535
+        collation: undefined
       }
     ];
 
@@ -477,22 +660,32 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write varBinaryMaxUnknownLength', async () => {
-    const colMetadata = [
+  it('should write varBinaryMaxUnknownLength', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: 65535,
+        schema: undefined,
+        udtInfo: undefined,
         type: dataTypeByName.VarBinary,
-        dataLength: 65535
+        collation: undefined
       }
     ];
     const value = Buffer.from([0x12, 0x34, 0x56, 0x78]);
@@ -508,31 +701,43 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value.slice(2, 4)));
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.deepEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write intN', async () => {
-    const colMetadata = [
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN },
-      { type: IntN }
+  it('should write intN', async function() {
+    const debug = new Debug();
+    const baseMetadata = {
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      collation: undefined
+    };
+    const colMetadata: ColumnMetadata[] = [
+      { ...baseMetadata, colName: 'col0', type: IntN },
+      { ...baseMetadata, colName: 'col1', type: IntN },
+      { ...baseMetadata, colName: 'col2', type: IntN },
+      { ...baseMetadata, colName: 'col3', type: IntN },
+      { ...baseMetadata, colName: 'col4', type: IntN },
+      { ...baseMetadata, colName: 'col5', type: IntN },
+      { ...baseMetadata, colName: 'col6', type: IntN },
+      { ...baseMetadata, colName: 'col7', type: IntN },
+      { ...baseMetadata, colName: 'col8', type: IntN },
+      { ...baseMetadata, colName: 'col9', type: IntN },
+      { ...baseMetadata, colName: 'col10', type: IntN },
+      { ...baseMetadata, colName: 'col11', type: IntN }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -643,31 +848,43 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 12);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual('0', (token as any).columns[1].value);
-    assert.strictEqual('1', (token as any).columns[2].value);
-    assert.strictEqual('-1', (token as any).columns[3].value);
-    assert.strictEqual('2', (token as any).columns[4].value);
-    assert.strictEqual('-2', (token as any).columns[5].value);
-    assert.strictEqual('9223372036854775807', (token as any).columns[6].value);
-    assert.strictEqual('-9223372036854775808', (token as any).columns[7].value);
-    assert.strictEqual('10', (token as any).columns[8].value);
-    assert.strictEqual('100', (token as any).columns[9].value);
-    assert.strictEqual('1000', (token as any).columns[10].value);
-    assert.strictEqual('10000', (token as any).columns[11].value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 12);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual('0', token.columns[1].value);
+    assert.strictEqual('1', token.columns[2].value);
+    assert.strictEqual('-1', token.columns[3].value);
+    assert.strictEqual('2', token.columns[4].value);
+    assert.strictEqual('-2', token.columns[5].value);
+    assert.strictEqual('9223372036854775807', token.columns[6].value);
+    assert.strictEqual('-9223372036854775808', token.columns[7].value);
+    assert.strictEqual('10', token.columns[8].value);
+    assert.strictEqual('100', token.columns[9].value);
+    assert.strictEqual('1000', token.columns[10].value);
+    assert.strictEqual('10000', token.columns[11].value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', async () => {
-    const colMetadata = [
-      { type: dataTypeByName.UniqueIdentifier },
-      { type: dataTypeByName.UniqueIdentifier }
+  it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', async function() {
+    const debug = new Debug();
+    const baseMetadata = {
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      collation: undefined
+    };
+    const colMetadata: ColumnMetadata[] = [
+      { ...baseMetadata, colName: 'col0', type: dataTypeByName.UniqueIdentifier },
+      { ...baseMetadata, colName: 'col1', type: dataTypeByName.UniqueIdentifier }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -697,25 +914,37 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], { lowerCaseGuids: false } as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: false }, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 2);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
     assert.deepEqual(
       '67452301-AB89-EFCD-0123-456789ABCDEF',
-      (token as any).columns[1].value
+      token.columns[1].value
     );
     assert.isTrue((await parser.next()).done);
 
   });
 
-  it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', async () => {
-    const colMetadata = [
-      { type: dataTypeByName.UniqueIdentifier },
-      { type: dataTypeByName.UniqueIdentifier }
+  it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', async function() {
+    const debug = new Debug();
+    const baseMetadata = {
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      collation: undefined
+    };
+    const colMetadata: ColumnMetadata[] = [
+      { ...baseMetadata, colName: 'col0', type: dataTypeByName.UniqueIdentifier },
+      { ...baseMetadata, colName: 'col1', type: dataTypeByName.UniqueIdentifier }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -743,25 +972,37 @@ describe('Row Token Parser', () => {
       ])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, { ...options, lowerCaseGuids: true }, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: true }, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 2);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, null);
     assert.deepEqual(
       '67452301-ab89-efcd-0123-456789abcdef',
-      (token as any).columns[1].value
+      token.columns[1].value
     );
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write floatN', async () => {
-    const colMetadata = [
-      { type: FloatN },
-      { type: FloatN },
-      { type: FloatN }
+  it('should write floatN', async function() {
+    const debug = new Debug();
+    const baseMetadata = {
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      collation: undefined
+    };
+    const colMetadata: ColumnMetadata[] = [
+      { ...baseMetadata, colName: 'col0', type: FloatN },
+      { ...baseMetadata, colName: 'col1', type: FloatN },
+      { ...baseMetadata, colName: 'col2', type: FloatN }
     ];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
@@ -787,20 +1028,33 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 3);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual(9.5, (token as any).columns[1].value);
-    assert.strictEqual(9.5, (token as any).columns[2].value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 3);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.strictEqual(9.5, token.columns[1].value);
+    assert.strictEqual(9.5, token.columns[2].value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write datetime', async () => {
-    const colMetadata = [{ type: dataTypeByName.DateTime }];
+  it('should write datetime', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.DateTime,
+      collation: undefined
+    }];
 
     const days = 2; // 3rd January 1900
     const threeHundredthsOfSecond = 45 * 300; // 45 seconds
@@ -813,15 +1067,16 @@ describe('Row Token Parser', () => {
     // console.log(buffer)
 
     {
-      const parser = Parser.parseTokens([buffer.data], {} as any, { ...options, useUTC: false }, colMetadata as any);
+      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: false }, colMetadata);
 
       let result = await parser.next();
       assert.isFalse(result.done);
 
       const token = result.value;
-      assert.strictEqual((token as any).columns.length, 1);
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 1);
       assert.strictEqual(
-        (token as any).columns[0].value.getTime(),
+        token.columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45').getTime()
       );
 
@@ -831,15 +1086,16 @@ describe('Row Token Parser', () => {
     }
 
     {
-      const parser = Parser.parseTokens([buffer.data], {} as any, { ...options, useUTC: true }, colMetadata as any);
+      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: true }, colMetadata);
 
       let result = await parser.next();
       assert.isFalse(result.done);
 
       const token = result.value;
-      assert.strictEqual((token as any).columns.length, 1);
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 1);
       assert.strictEqual(
-        (token as any).columns[0].value.getTime(),
+        token.columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45 GMT').getTime()
       );
 
@@ -849,8 +1105,20 @@ describe('Row Token Parser', () => {
     }
   });
 
-  it('should write datetimeN', async () => {
-    const colMetadata = [{ type: DateTimeN }];
+  it('should write datetimeN', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: DateTimeN,
+      collation: undefined
+    }];
 
     const buffer = new WritableTrackingBuffer(0, 'ucs2');
     buffer.writeUInt8(0xd1);
@@ -858,23 +1126,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write numeric4Bytes', async () => {
-    const colMetadata = [
+  it('should write numeric4Bytes', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: NumericN,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
         precision: 3,
-        scale: 1
+        scale: 1,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: NumericN,
+        collation: undefined
       }
     ];
 
@@ -888,23 +1165,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write numeric4BytesNegative', async () => {
-    const colMetadata = [
+  it('should write numeric4BytesNegative', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: NumericN,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
         precision: 3,
-        scale: 1
+        scale: 1,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: NumericN,
+        collation: undefined
       }
     ];
 
@@ -918,22 +1204,31 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write numeric8Bytes', async () => {
-    const colMetadata = [
+  it('should write numeric8Bytes', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: NumericN,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
         precision: 13,
-        scale: 1
+        scale: 1,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: NumericN,
+        collation: undefined
       }
     ];
 
@@ -948,24 +1243,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-
+    assert.instanceOf(token, RowToken);
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write numeric12Bytes', async () => {
-    const colMetadata = [
+  it('should write numeric12Bytes', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: NumericN,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
         precision: 23,
-        scale: 1
+        scale: 1,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: NumericN,
+        collation: undefined
       }
     ];
 
@@ -981,23 +1284,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write numeric16Bytes', async () => {
-    const colMetadata = [
+  it('should write numeric16Bytes', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: NumericN,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
         precision: 33,
-        scale: 1
+        scale: 1,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: NumericN,
+        collation: undefined
       }
     ];
 
@@ -1019,23 +1331,32 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should write numericNull', async () => {
-    const colMetadata = [
+  it('should write numericNull', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
       {
-        type: NumericN,
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
         precision: 3,
-        scale: 1
+        scale: 1,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined,
+        type: NumericN,
+        collation: undefined
       }
     ];
 
@@ -1044,14 +1365,15 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
 });

@@ -1,11 +1,16 @@
 import { typeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { ColMetadataToken } from '../../../src/token/token';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-describe('Colmetadata Token Parser', () => {
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
+
+describe('Colmetadata Token Parser', function() {
   describe('parsing the column metadata for a result with many columns', function() {
     it('should parse them correctly', async function() {
+      const debug = new Debug();
       const userType = 2;
       const flags = 3;
       const columnName = 'name';
@@ -23,28 +28,28 @@ describe('Colmetadata Token Parser', () => {
         buffer.writeBVarchar(columnName);
       }
 
-      const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
+      const parser = StreamParser.parseTokens([buffer.data], debug, options);
 
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.isOk(!(token as any).error);
-
-      assert.strictEqual((token as any).columns.length, 1024);
+      assert.instanceOf(token, ColMetadataToken);
+      assert.strictEqual(token.columns.length, 1024);
 
       for (let i = 0; i < 1024; i++) {
-        assert.strictEqual((token as any).columns[i].userType, 2);
-        assert.strictEqual((token as any).columns[i].flags, 3);
-        assert.strictEqual((token as any).columns[i].type.name, 'Int');
-        assert.strictEqual((token as any).columns[i].colName, 'name');
+        assert.strictEqual(token.columns[i].userType, 2);
+        assert.strictEqual(token.columns[i].flags, 3);
+        assert.strictEqual(token.columns[i].type.name, 'Int');
+        assert.strictEqual(token.columns[i].colName, 'name');
       }
 
       assert.isTrue((await parser.next()).done);
     });
   });
 
-  it('should int', async () => {
+  it('should int', async function() {
+    const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -60,23 +65,24 @@ describe('Colmetadata Token Parser', () => {
     buffer.writeBVarchar(columnName);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
 
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as any).error);
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].userType, 2);
-    assert.strictEqual((token as any).columns[0].flags, 3);
-    assert.strictEqual((token as any).columns[0].type.name, 'Int');
-    assert.strictEqual((token as any).columns[0].colName, 'name');
+    assert.instanceOf(token, ColMetadataToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].userType, 2);
+    assert.strictEqual(token.columns[0].flags, 3);
+    assert.strictEqual(token.columns[0].type.name, 'Int');
+    assert.strictEqual(token.columns[0].colName, 'name');
 
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should varchar', async () => {
+  it('should varchar', async function() {
+    const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -97,21 +103,23 @@ describe('Colmetadata Token Parser', () => {
     // console.log(buffer)
 
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.isOk(!(token as any).error);
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].userType, 2);
-    assert.strictEqual((token as any).columns[0].flags, 3);
-    assert.strictEqual((token as any).columns[0].type.name, 'VarChar');
-    assert.strictEqual((token as any).columns[0].collation.lcid, 0x0409);
-    assert.strictEqual((token as any).columns[0].collation.codepage, 'CP1257');
-    assert.strictEqual((token as any).columns[0].collation.flags, 0x85);
-    assert.strictEqual((token as any).columns[0].collation.version, 0x7);
-    assert.strictEqual((token as any).columns[0].collation.sortId, 0x9a);
-    assert.strictEqual((token as any).columns[0].colName, 'name');
-    assert.strictEqual((token as any).columns[0].dataLength, length);
+
+    assert.instanceOf(token, ColMetadataToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].userType, 2);
+    assert.strictEqual(token.columns[0].flags, 3);
+    assert.strictEqual(token.columns[0].type.name, 'VarChar');
+    assert.isDefined(token.columns[0].collation);
+    assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
+    assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
+    assert.strictEqual(token.columns[0].collation.flags, 0x85);
+    assert.strictEqual(token.columns[0].collation.version, 0x7);
+    assert.strictEqual(token.columns[0].collation.sortId, 0x9a);
+    assert.strictEqual(token.columns[0].colName, 'name');
+    assert.strictEqual(token.columns[0].dataLength, length);
   });
 });

@@ -23,8 +23,8 @@ describe('lookupAllAddresses', function() {
       // Ignore
     }
 
-    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-    assert.isOk(lookup.calledWithMatch('xn--tiq21tzznxb.ad'), 'Unexpected hostname passed to `lookup`');
+    assert.isTrue(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isTrue(lookup.calledWithMatch('xn--tiq21tzznxb.ad'), 'Unexpected hostname passed to `lookup`');
   });
 
   it('test ASCII Server name', async function() {
@@ -41,23 +41,24 @@ describe('lookupAllAddresses', function() {
       // Ignore
     }
 
-    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-    assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
+    assert.isTrue(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isTrue(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
   });
 
   it('test invalid ASCII Server name', async function() {
     const server = 'http:wrong';
     const controller = new AbortController();
 
-    let actualError: Error | undefined;
+    let actualError: unknown;
     try {
       await lookupAllAddresses(server, dns.lookup, controller.signal);
     } catch (err) {
-      actualError = err as Error;
+      actualError = err;
     }
 
+    assert.isDefined(actualError);
     assert.instanceOf(actualError, Error);
-    assert.strictEqual(actualError!.message, 'getaddrinfo ENOTFOUND http:wrong');
+    assert.strictEqual(actualError.message, 'getaddrinfo ENOTFOUND http:wrong');
   });
 });
 
@@ -189,7 +190,7 @@ describe('connectInSequence', function() {
       });
     });
 
-    let error: AggregateError | undefined;
+    let error: unknown;
     try {
       await connectInSequence(
         { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
@@ -203,21 +204,22 @@ describe('connectInSequence', function() {
         controller.signal,
       );
     } catch (err) {
-      error = err as AggregateError;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, AggregateError);
-    assert.equal(error!.message, 'Could not connect (sequence)');
-    assert.lengthOf(error!.errors, 3);
+    assert.equal(error.message, 'Could not connect (sequence)');
+    assert.lengthOf(error.errors, 3);
 
-    assert.instanceOf(error!.errors[0], Error);
-    assert.strictEqual(error!.errors[0].message, 'failed connection #1');
+    assert.instanceOf(error.errors[0], Error);
+    assert.strictEqual(error.errors[0].message, 'failed connection #1');
 
-    assert.instanceOf(error!.errors[1], Error);
-    assert.strictEqual(error!.errors[1].message, 'failed connection #2');
+    assert.instanceOf(error.errors[1], Error);
+    assert.strictEqual(error.errors[1].message, 'failed connection #2');
 
-    assert.instanceOf(error!.errors[2], Error);
-    assert.strictEqual(error!.errors[2].message, 'failed connection #3');
+    assert.instanceOf(error.errors[2], Error);
+    assert.strictEqual(error.errors[2].message, 'failed connection #3');
   });
 
   it('destroys all sockets except for the first succesfully connected socket', async function() {
@@ -246,9 +248,9 @@ describe('connectInSequence', function() {
       controller.signal,
     );
 
-    assert.isOk(attemptedSockets[0].destroyed);
-    assert.isOk(attemptedSockets[1].destroyed);
-    assert.isOk(!attemptedSockets[2].destroyed);
+    assert.isTrue(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[1].destroyed);
+    assert.isFalse(attemptedSockets[2].destroyed);
   });
 
   it('will immediately abort when called with an aborted signal', async function() {
@@ -259,7 +261,7 @@ describe('connectInSequence', function() {
       assert.fail('no connections expected');
     });
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await connectInSequence(
         { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
@@ -273,11 +275,12 @@ describe('connectInSequence', function() {
         controller.signal,
       );
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
   });
 
   it('can be aborted while trying to connect', async function() {
@@ -292,7 +295,7 @@ describe('connectInSequence', function() {
       });
     });
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await connectInSequence(
         { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
@@ -306,14 +309,15 @@ describe('connectInSequence', function() {
         controller.signal,
       );
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
 
     assert.lengthOf(attemptedSockets, 1);
-    assert.isOk(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[0].destroyed);
   });
 });
 
@@ -375,7 +379,7 @@ describe('connectInParallel', function() {
       });
     });
 
-    let error: AggregateError | undefined;
+    let error: unknown;
     try {
       await connectInParallel(
         { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
@@ -389,21 +393,22 @@ describe('connectInParallel', function() {
         controller.signal,
       );
     } catch (err) {
-      error = err as AggregateError;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, AggregateError);
-    assert.equal(error!.message, 'Could not connect (parallel)');
-    assert.lengthOf(error!.errors, 3);
+    assert.equal(error.message, 'Could not connect (parallel)');
+    assert.lengthOf(error.errors, 3);
 
-    assert.instanceOf(error!.errors[0], Error);
-    assert.strictEqual(error!.errors[0].message, 'failed connection #1');
+    assert.instanceOf(error.errors[0], Error);
+    assert.strictEqual(error.errors[0].message, 'failed connection #1');
 
-    assert.instanceOf(error!.errors[1], Error);
-    assert.strictEqual(error!.errors[1].message, 'failed connection #2');
+    assert.instanceOf(error.errors[1], Error);
+    assert.strictEqual(error.errors[1].message, 'failed connection #2');
 
-    assert.instanceOf(error!.errors[2], Error);
-    assert.strictEqual(error!.errors[2].message, 'failed connection #3');
+    assert.instanceOf(error.errors[2], Error);
+    assert.strictEqual(error.errors[2].message, 'failed connection #3');
   });
 
   it('passes the first succesfully connected socket to the callback', async function() {
@@ -454,9 +459,9 @@ describe('connectInParallel', function() {
       controller.signal,
     );
 
-    assert.isOk(!attemptedSockets[0].destroyed);
-    assert.isOk(attemptedSockets[1].destroyed);
-    assert.isOk(attemptedSockets[2].destroyed);
+    assert.isFalse(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[1].destroyed);
+    assert.isTrue(attemptedSockets[2].destroyed);
   });
 
   it('will immediately abort when called with an aborted signal', async function() {
@@ -467,7 +472,7 @@ describe('connectInParallel', function() {
       assert.fail('no connections expected');
     });
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await connectInParallel(
         { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
@@ -481,11 +486,12 @@ describe('connectInParallel', function() {
         controller.signal,
       );
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
   });
 
   it('can be aborted while trying to connect', async function() {
@@ -500,7 +506,7 @@ describe('connectInParallel', function() {
       });
     });
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await connectInParallel(
         { host: 'localhost', port: 12345, localAddress: '192.168.0.1' },
@@ -514,15 +520,16 @@ describe('connectInParallel', function() {
         controller.signal,
       );
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
 
     assert.lengthOf(attemptedSockets, 3);
-    assert.isOk(attemptedSockets[0].destroyed);
-    assert.isOk(attemptedSockets[1].destroyed);
-    assert.isOk(attemptedSockets[2].destroyed);
+    assert.isTrue(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[1].destroyed);
+    assert.isTrue(attemptedSockets[2].destroyed);
   });
 });
