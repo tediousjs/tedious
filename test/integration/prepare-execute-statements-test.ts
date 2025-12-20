@@ -195,9 +195,11 @@ describe('Prepare Execute Statement', function() {
             executionCount++;
             errors.push(request.error);
 
-            // Unprepare and close
+            // Unprepare the statement and wait for it to complete before closing
+            request.once('requestCompleted', function() {
+              connection.close();
+            });
             connection.unprepare(request);
-            connection.close();
           });
 
           connection.execute(request, { divisor: 2 });
