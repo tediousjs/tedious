@@ -4,11 +4,11 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Env Change Token Parser', () => {
   it('should write to database', async () => {
+    const debug = new Debug();
     const oldDb = 'old';
     const newDb = 'new';
 
@@ -35,6 +35,7 @@ describe('Env Change Token Parser', () => {
   });
 
   it('should write with correct packet size', async () => {
+    const debug = new Debug();
     const oldSize = '1024';
     const newSize = '2048';
 
@@ -61,6 +62,7 @@ describe('Env Change Token Parser', () => {
   });
 
   it('should be of bad type', async () => {
+    const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
     buffer.writeUInt8(0xe3);
