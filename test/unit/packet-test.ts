@@ -13,10 +13,10 @@ describe('packet type tests', function() {
 
   it('should be last', function() {
     let packet = new Packet(TYPE.PRELOGIN);
-    assert.isOk(!packet.isLast());
+    assert.isFalse(packet.isLast());
 
     packet = new Packet(TYPE.PRELOGIN);
-    assert.isOk(!packet.last());
+    assert.isFalse(packet.last());
     packet.last(true);
     assert.isOk(packet.last());
   });
@@ -147,7 +147,7 @@ describe('packet type tests', function() {
 
   it('should packet complete shorter than header', function() {
     const buffer = Buffer.alloc(7);
-    assert.isOk(!isPacketComplete(buffer));
+    assert.isFalse(isPacketComplete(buffer));
   });
 
   it('should packet complete with just header', function() {
@@ -170,7 +170,7 @@ describe('packet type tests', function() {
       0x00
     ]);
 
-    assert.isOk(!isPacketComplete(buffer));
+    assert.isFalse(isPacketComplete(buffer));
   });
 
   it('should packet complete long enough', function() {

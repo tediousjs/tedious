@@ -248,7 +248,7 @@ describe('connectInSequence', function() {
 
     assert.isOk(attemptedSockets[0].destroyed);
     assert.isOk(attemptedSockets[1].destroyed);
-    assert.isOk(!attemptedSockets[2].destroyed);
+    assert.isFalse(attemptedSockets[2].destroyed);
   });
 
   it('will immediately abort when called with an aborted signal', async function() {
@@ -454,7 +454,7 @@ describe('connectInParallel', function() {
       controller.signal,
     );
 
-    assert.isOk(!attemptedSockets[0].destroyed);
+    assert.isFalse(attemptedSockets[0].destroyed);
     assert.isOk(attemptedSockets[1].destroyed);
     assert.isOk(attemptedSockets[2].destroyed);
   });
