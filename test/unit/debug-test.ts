@@ -1,9 +1,12 @@
 import Debug from '../../src/debug';
+import { Packet } from '../../src/packet';
+import { Token } from '../../src/token/token';
 import { assert } from 'chai';
 
 const payload = 'payload';
 
-class Packet {
+// Mock Packet class that provides minimal implementation for debug tests
+class MockPacket {
   headerToString(): string {
     return 'header';
   }
@@ -24,16 +27,16 @@ describe('Packet Tests', function() {
 
       switch (emitCount) {
         case 2:
-          assert.isOk(/Sent/.test(text));
+          assert.match(text, /Sent/);
           break;
         case 3:
-          assert.isOk(/header/.test(text));
+          assert.match(text, /header/);
           done();
           break;
       }
     });
 
-    return debug.packet('Sent', new Packet() as any);
+    return debug.packet('Sent', new MockPacket() as Packet);
   });
 
   it('should enable payload', function(done) {
@@ -52,7 +55,7 @@ describe('Packet Tests', function() {
   it('should not enable payload', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
-      assert.isOk(false);
+      assert.fail('Expected no debug event to be emitted');
     });
 
     debug.payload(() => payload);
@@ -68,16 +71,16 @@ describe('Packet Tests', function() {
       done();
     });
 
-    debug.data(new Packet() as any);
+    debug.data(new MockPacket() as Packet);
   });
 
   it('should not enable data', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
-      assert.isOk(false);
+      assert.fail('Expected no debug event to be emitted');
     });
 
-    debug.data(new Packet() as any);
+    debug.data(new MockPacket() as Packet);
 
     done();
   });
@@ -85,21 +88,21 @@ describe('Packet Tests', function() {
   it('should enable token', function(done) {
     const debug = new Debug({ token: true });
     debug.on('debug', function(token) {
-      assert.isOk(token.indexOf('test') !== 0);
+      assert.isFalse(token.startsWith('test'));
 
       done();
     });
 
-    debug.token({ name: 'test' } as any);
+    debug.token({ name: 'test' } as Token);
   });
 
   it('should not enable payload', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
-      assert.isOk(false);
+      assert.fail('Expected no debug event to be emitted');
     });
 
-    debug.token({ name: 'test' } as any);
+    debug.token({ name: 'test' } as Token);
 
     done();
   });

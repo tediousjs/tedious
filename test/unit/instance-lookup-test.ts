@@ -8,31 +8,33 @@ import { instanceLookup, parseBrowserResponse } from '../../src/instance-lookup'
 
 describe('instanceLookup invalid args', function() {
   it('invalid server', async function() {
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({ server: 4 as any, instanceName: 'test', signal: new AbortController().signal });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.message, 'Invalid arguments: "server" must be a string');
+    assert.strictEqual(error.message, 'Invalid arguments: "server" must be a string');
   });
 
   it('invalid instanceName', async function() {
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({ server: 'serverName', instanceName: 4 as any, signal: new AbortController().signal });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.message, 'Invalid arguments: "instanceName" must be a string');
+    assert.strictEqual(error.message, 'Invalid arguments: "instanceName" must be a string');
   });
 
   it('invalid timeout', async function() {
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({
         server: 'server',
@@ -41,15 +43,16 @@ describe('instanceLookup invalid args', function() {
         signal: new AbortController().signal
       });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.message, 'Invalid arguments: "timeout" must be a number');
+    assert.strictEqual(error.message, 'Invalid arguments: "timeout" must be a number');
   });
 
   it('invalid retries', async function() {
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({
         server: 'server',
@@ -59,11 +62,12 @@ describe('instanceLookup invalid args', function() {
         signal: new AbortController().signal
       });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.message, 'Invalid arguments: "retries" must be a number');
+    assert.strictEqual(error.message, 'Invalid arguments: "retries" must be a number');
   });
 });
 
@@ -108,7 +112,7 @@ describe('InstanceLookup', function() {
     const controller = new AbortController();
     controller.abort();
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({
         server: (server.address() as AddressInfo).address,
@@ -119,11 +123,12 @@ describe('InstanceLookup', function() {
         signal: controller.signal
       });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
   });
 
   it('can be aborted after sending the first request', async function() {
@@ -137,7 +142,7 @@ describe('InstanceLookup', function() {
       controller.abort();
     });
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({
         server: (server.address() as AddressInfo).address,
@@ -148,11 +153,12 @@ describe('InstanceLookup', function() {
         signal: controller.signal
       });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
   });
 
   it('can be aborted after retrying to send a request', async function() {
@@ -168,7 +174,7 @@ describe('InstanceLookup', function() {
       });
     });
 
-    let error: Error | undefined;
+    let error: unknown;
     try {
       await instanceLookup({
         server: (server.address() as AddressInfo).address,
@@ -179,11 +185,12 @@ describe('InstanceLookup', function() {
         signal: controller.signal
       });
     } catch (err) {
-      error = err as Error;
+      error = err;
     }
 
+    assert.isDefined(error);
     assert.instanceOf(error, Error);
-    assert.strictEqual(error!.name, 'AbortError');
+    assert.strictEqual(error.name, 'AbortError');
   });
 
   describe('when not receiving a response', function() {
@@ -192,7 +199,7 @@ describe('InstanceLookup', function() {
 
       const timeBefore = process.hrtime();
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await instanceLookup({
           server: (server.address() as AddressInfo).address,
@@ -203,13 +210,14 @@ describe('InstanceLookup', function() {
           signal: controller.signal
         });
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
       const timeDiff = process.hrtime(timeBefore);
 
+      assert.isDefined(error);
       assert.instanceOf(error, Error);
-      assert.match(error!.message, /^Failed to get response from SQL Server Browser/);
+      assert.match(error.message, /^Failed to get response from SQL Server Browser/);
 
       assert.approximately(500000000, timeDiff[1], 100000000);
     });
@@ -256,7 +264,7 @@ describe('InstanceLookup', function() {
 
       const controller = new AbortController();
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await instanceLookup({
           server: (server.address() as AddressInfo).address,
@@ -267,11 +275,12 @@ describe('InstanceLookup', function() {
           signal: controller.signal
         });
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
+      assert.isDefined(error);
       assert.instanceOf(error, Error);
-      assert.match(error!.message, /^Port for other not found/);
+      assert.match(error.message, /^Port for other not found/);
     });
   });
 
@@ -283,7 +292,7 @@ describe('InstanceLookup', function() {
 
       const controller = new AbortController();
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await instanceLookup({
           server: (server.address() as AddressInfo).address,
@@ -294,24 +303,25 @@ describe('InstanceLookup', function() {
           signal: controller.signal
         });
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
+      assert.isDefined(error);
       assert.instanceOf(error, Error);
-      assert.match(error!.message, /^Port for other not found/);
+      assert.match(error.message, /^Port for other not found/);
     });
   });
 });
 
 describe('parseBrowserResponse', function() {
-  it('oneInstanceFound', () => {
+  it('oneInstanceFound', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
     assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
-  it('twoInstancesFoundInFirst', () => {
+  it('twoInstancesFoundInFirst', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;' +
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
@@ -319,7 +329,7 @@ describe('parseBrowserResponse', function() {
     assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
-  it('twoInstancesFoundInSecond', () => {
+  it('twoInstancesFoundInSecond', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
@@ -327,7 +337,7 @@ describe('parseBrowserResponse', function() {
     assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
-  it('twoInstancesNotFound', () => {
+  it('twoInstancesNotFound', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';

@@ -1,9 +1,14 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { SSPIToken } from '../../../src/token/token';
 import WriteBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-describe('sspi token parser', () => {
-  it('should parse challenge', async () => {
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
+
+describe('sspi token parser', function() {
+  it('should parse challenge', async function() {
+    const debug = new Debug();
     const source = new WriteBuffer(68);
     source.writeUInt8(0xed);
     source.writeUInt16LE(0);
@@ -24,7 +29,7 @@ describe('sspi token parser', () => {
 
     const data = source.data;
     data.writeUInt16LE(data.length - 3, 1);
-    const parser = StreamParser.parseTokens([data], {} as any, { tdsVersion: '7_2' } as any);
+    const parser = StreamParser.parseTokens([data], debug, options);
 
 
     const expected = {
@@ -46,9 +51,11 @@ describe('sspi token parser', () => {
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.deepEqual((token as any).ntlmpacket, expected);
+
+    assert.instanceOf(token, SSPIToken);
+    assert.deepEqual(token.ntlmpacket, expected);
     // Skip token (first byte) and length of VarByte (2 bytes).
-    assert.isOk((token as any).ntlmpacketBuffer.equals(data.slice(3)));
+    assert.deepEqual(token.ntlmpacketBuffer, data.slice(3));
 
     assert.isTrue((await parser.next()).done);
   });

@@ -1,10 +1,13 @@
 import Debug from '../../../src/debug';
 import { Parser } from '../../../src/token/token-stream-parser';
-import { TYPE } from '../../../src/token/token';
+import { TYPE, DatabaseEnvChangeToken } from '../../../src/token/token';
+import { type ParserOptions } from '../../../src/token/stream-parser';
+import { TokenHandler } from '../../../src/token/handler';
+import type Message from '../../../src/message';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { assert } from 'chai';
 
-const debug = new Debug({ token: true });
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 function createDbChangeBuffer() {
   const oldDb = 'old';
@@ -25,27 +28,30 @@ function createDbChangeBuffer() {
   return buffer.data;
 }
 
-describe('Token Stream Parser', () => {
-  it('should envChange', (done) => {
+// Test handler that only handles database change events
+class TestDatabaseChangeHandler extends TokenHandler {
+  onDatabaseChange(token: DatabaseEnvChangeToken) {
+    assert.isDefined(token);
+  }
+}
+
+describe('Token Stream Parser', function() {
+  it('should envChange', function(done) {
+    const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
-    const parser = new Parser([buffer] as any, debug, {
-      onDatabaseChange: function(token: any) {
-        assert.isOk(token);
-      }
-    } as any, {} as any);
+    // Cast to Message since tests use a simplified input instead of full Message
+    const parser = new Parser([buffer] as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
 
-  it('should split token across buffers', (done) => {
+  it('should split token across buffers', function(done) {
+    const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
-    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as any, debug, {
-      onDatabaseChange: function(token: any) {
-        assert.isOk(token);
-      }
-    } as any, {} as any);
+    // Cast to Message since tests use a simplified input instead of full Message
+    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });

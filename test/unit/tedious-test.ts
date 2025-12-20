@@ -3,21 +3,21 @@ import { assert } from 'chai';
 
 describe('tedious-test', function() {
 
-  it('types', () => {
-    assert.ok(TYPES);
-    assert.ok(TYPES.VarChar);
+  it('types', function() {
+    assert.isDefined(TYPES);
+    assert.isDefined(TYPES.VarChar);
   });
 
-  it('isolationLevel', () => {
-    assert.ok(ISOLATION_LEVEL);
-    assert.ok(ISOLATION_LEVEL.READ_UNCOMMITTED);
+  it('isolationLevel', function() {
+    assert.isDefined(ISOLATION_LEVEL);
+    assert.isDefined(ISOLATION_LEVEL.READ_UNCOMMITTED);
   });
 
-  it('connection', () => {
-    assert.ok(Connection);
+  it('connection', function() {
+    assert.isDefined(Connection);
   });
 
-  it('connectionDoesNotModifyPassedConfig', () => {
+  it('connectionDoesNotModifyPassedConfig', function() {
     const config = {
       server: 'localhost',
       userName: 'sa',

@@ -68,11 +68,11 @@ describe('sendMessage', function() {
 
       const controller = new AbortController();
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
       assert.strictEqual(error, expectedError);
@@ -117,15 +117,16 @@ describe('sendMessage', function() {
         server!.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
+      assert.isDefined(error);
       assert.instanceOf(error, Error);
-      assert.strictEqual(error!.name, 'AbortError');
+      assert.strictEqual(error.name, 'AbortError');
     });
 
     it('can be aborted after the DNS lookup', async function() {
@@ -145,15 +146,16 @@ describe('sendMessage', function() {
         server!.send(Buffer.from('response'), rinfo.port, rinfo.address);
       });
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
+      assert.isDefined(error);
       assert.instanceOf(error, Error);
-      assert.strictEqual(error!.name, 'AbortError');
+      assert.strictEqual(error.name, 'AbortError');
     });
 
     it('can be aborted before receiving a response', async function() {
@@ -164,15 +166,16 @@ describe('sendMessage', function() {
         controller.abort();
       });
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await sendMessage(address, port, dns.lookup, controller.signal, expectedRequest);
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
+      assert.isDefined(error);
       assert.instanceOf(error, Error);
-      assert.strictEqual(error!.name, 'AbortError');
+      assert.strictEqual(error.name, 'AbortError');
     });
   });
 
@@ -239,11 +242,11 @@ describe('sendMessage', function() {
 
       const controller = new AbortController();
 
-      let error: Error | undefined;
+      let error: unknown;
       try {
         await sendMessage('foo.bar.baz', port, lookup, controller.signal, Buffer.from([0x02]));
       } catch (err) {
-        error = err as Error;
+        error = err;
       }
 
       assert.strictEqual(error, expectedError);
