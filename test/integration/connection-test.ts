@@ -251,11 +251,11 @@ describe('Initiate Connect Test', function() {
 
     connection.connect(function(err) {
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual((err as ConnectionError).code, 'ESOCKET');
+      assert.strictEqual(err.code, 'ESOCKET');
 
-      assert.instanceOf((err as ConnectionError).cause, Error);
-      console.log((err as ConnectionError).cause);
-      assert.include(((err as ConnectionError).cause as Error).message, 'no ciphers available');
+      assert.instanceOf(err.cause, Error);
+      console.log(err.cause);
+      assert.include(err.cause.message, 'no ciphers available');
     });
 
     connection.on('end', function() {
@@ -375,7 +375,7 @@ describe('Initiate Connect Test', function() {
       conn.close();
 
       assert.instanceOf(err, Error);
-      assert.strictEqual((err as Error).message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
+      assert.strictEqual(err.message, 'Failed to connect to 192.0.2.1:1433 in 3000ms');
 
       done();
     });
@@ -1028,7 +1028,7 @@ describe('Insertion Tests', function() {
 
     const request = new Request('select 8 as C1', function(err, rowCount) {
       assert.instanceOf(err, RequestError);
-      assert.strictEqual((err as RequestError).code, 'ECLOSE');
+      assert.strictEqual(err.code, 'ECLOSE');
     });
 
     const connection = new Connection(config);
@@ -1357,7 +1357,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
 
     const request = new Request("select 1 as C1; waitfor delay '00:00:05'; select 2 as C2", (err, rowCount, rows) => {
       assert.instanceOf(err, Error);
-      assert.strictEqual((err as Error).message, 'Canceled.');
+      assert.strictEqual(err.message, 'Canceled.');
 
       assert.isUndefined(rowCount);
 
@@ -1432,7 +1432,8 @@ update #tab1 set name = 'a3' where name like 'a%'\
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
       function(err, rowCount, rows) {
-        assert.equal((err as Error).message, 'Timeout: Request failed to complete in 1000ms');
+        assert.instanceOf(err, Error);
+        assert.equal(err.message, 'Timeout: Request failed to complete in 1000ms');
 
         connection.close();
       }
@@ -1533,7 +1534,7 @@ describe('Advanced Input Test', function() {
     const config = getConfig();
     runSqlBatch(done, { ...config, options: { ...config.options, enableAnsiNullDefault: false } }, sql, function(err) {
       assert.instanceOf(err, RequestError);
-      assert.strictEqual((err as RequestError).number, 515);
+      assert.strictEqual(err.number, 515);
     }); // Cannot insert the value NULL
   });
 });

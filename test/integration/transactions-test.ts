@@ -289,7 +289,8 @@ describe('Transactions Test', function() {
             });
 
             req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
-              assert.match((err as Error).message, /^String or binary data would be truncated/);
+              assert.instanceOf(err, Error);
+              assert.match(err.message, /^String or binary data would be truncated/);
 
               connection.close();
             });
@@ -452,9 +453,10 @@ describe('Transactions Test', function() {
             assert.ifError(err);
 
             request = new Request('create table #temp (id int)', function(err) {
-              innerDone!(err, outerDone, function(err: any) {
+              innerDone!(err, outerDone, function(err: unknown) {
+                assert.instanceOf(err, Error);
                 assert.equal(
-                  (err as Error).message,
+                  err.message,
                   "There is already an object named '#temp' in the database."
                 );
 
@@ -489,10 +491,12 @@ describe('Transactions Test', function() {
           assert.ifError(err);
 
           const request = new Request('WAITFOR 00:00:30', function(err) {
-            assert.include((err as Error).message, 'socket error');
+            assert.instanceOf(err, Error);
+            assert.include(err.message, 'socket error');
 
-            innerDone!(err, outerDone, function(err: any) {
-              assert.include((err as Error).message, 'socket error');
+            innerDone!(err, outerDone, function(err: unknown) {
+              assert.instanceOf(err, Error);
+              assert.include(err.message, 'socket error');
             });
           });
 

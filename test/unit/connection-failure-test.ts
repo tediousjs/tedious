@@ -82,10 +82,10 @@ describe('Connection failure handling', function() {
       connection.close();
 
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual('Connection lost - socket hang up', err!.message);
+      assert.strictEqual('Connection lost - socket hang up', err.message);
 
-      assert.instanceOf((err as ConnectionError).cause, Error);
-      assert.strictEqual('socket hang up', ((err as ConnectionError).cause as Error).message);
+      assert.instanceOf(err.cause, Error);
+      assert.strictEqual('socket hang up', err.cause.message);
 
       done();
     });
@@ -201,10 +201,10 @@ describe('Connection failure handling', function() {
       connection.close();
 
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual('Connection lost - socket hang up', err!.message);
+      assert.strictEqual('Connection lost - socket hang up', err.message);
 
-      assert.instanceOf((err as ConnectionError).cause, Error);
-      assert.strictEqual('socket hang up', ((err as ConnectionError).cause as Error).message);
+      assert.instanceOf(err.cause, Error);
+      assert.strictEqual('socket hang up', err.cause.message);
 
       done();
     });
@@ -350,10 +350,10 @@ describe('Connection failure handling', function() {
       connection.close();
 
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual('Connection lost - socket hang up', err!.message);
+      assert.strictEqual('Connection lost - socket hang up', err.message);
 
-      assert.instanceOf((err as ConnectionError).cause, Error);
-      assert.strictEqual('socket hang up', ((err as ConnectionError).cause as Error).message);
+      assert.instanceOf(err.cause, Error);
+      assert.strictEqual('socket hang up', err.cause.message);
 
       done();
     });
