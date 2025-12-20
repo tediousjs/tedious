@@ -7,7 +7,6 @@ import type Message from '../../../src/message';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { assert } from 'chai';
 
-const debug = new Debug({ token: true });
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 function createDbChangeBuffer() {
@@ -38,6 +37,7 @@ class TestDatabaseChangeHandler extends TokenHandler {
 
 describe('Token Stream Parser', () => {
   it('should envChange', (done) => {
+    const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
     // Cast to Message since tests use a simplified input instead of full Message
@@ -47,6 +47,7 @@ describe('Token Stream Parser', () => {
   });
 
   it('should split token across buffers', (done) => {
+    const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
     // Cast to Message since tests use a simplified input instead of full Message

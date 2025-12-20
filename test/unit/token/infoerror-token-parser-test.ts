@@ -4,11 +4,11 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Infoerror token parser', () => {
   it('should have correct info', async () => {
+    const debug = new Debug();
     const number = 3;
     const state = 4;
     const class_ = 5;

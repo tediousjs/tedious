@@ -4,7 +4,6 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 function parse(status: number, curCmd: number, doneRowCount: number) {
@@ -19,6 +18,7 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
+  const debug = new Debug();
   const parser = StreamParser.parseTokens([buffer.data], debug, options);
   return parser;
 }

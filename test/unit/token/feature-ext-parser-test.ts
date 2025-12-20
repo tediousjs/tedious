@@ -4,11 +4,11 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Feature Ext Parser', () => {
   it('should be fed authentication', async () => {
+    const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
@@ -40,6 +40,7 @@ describe('Feature Ext Parser', () => {
   });
 
   it('should parse UTF-8 support token', async () => {
+    const debug = new Debug();
     const buffer = new WritableTrackingBuffer(8);
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header

@@ -20,12 +20,10 @@ const options = {
   tdsVersion: '7_2'
 } as ParserOptions;
 
-// Debug instance for tests - no options needed for unit tests
-const debug = new Debug();
-
 describe('Row Token Parser', () => {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
+      const debug = new Debug();
       const buffer = new WritableTrackingBuffer(0, 'ascii');
       buffer.writeUInt8(0xd1);
 
@@ -64,6 +62,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write int', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -95,6 +94,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write bigint', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -141,6 +141,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write real', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -173,6 +174,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write float', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -206,6 +208,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write Money', async () => {
+    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -259,6 +262,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varchar without code page', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -294,6 +298,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varchar with code page', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -329,6 +334,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write nvarchar', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -362,6 +368,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varBinary', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -395,6 +402,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write binary', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -428,6 +436,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varcharMaxNull', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -463,6 +472,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varcharMaxUnkownLength', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -504,6 +514,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varcharMaxKnownLength', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -544,6 +555,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varcharmaxWithCodePage', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -583,6 +595,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varcharMaxKnownLengthWrong', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -624,6 +637,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varBinaryMaxNull', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -659,6 +673,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write varBinaryMaxUnknownLength', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -699,6 +714,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write intN', async () => {
+    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -855,6 +871,7 @@ describe('Row Token Parser', () => {
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', async () => {
+    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -914,6 +931,7 @@ describe('Row Token Parser', () => {
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', async () => {
+    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -970,6 +988,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write floatN', async () => {
+    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -1023,6 +1042,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write datetime', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -1086,6 +1106,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write datetimeN', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -1118,6 +1139,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write numeric4Bytes', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1156,6 +1178,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write numeric4BytesNegative', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1193,6 +1216,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write numeric8Bytes', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1232,6 +1256,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write numeric12Bytes', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1272,6 +1297,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write numeric16Bytes', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1318,6 +1344,7 @@ describe('Row Token Parser', () => {
   });
 
   it('should write numericNull', async () => {
+    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',

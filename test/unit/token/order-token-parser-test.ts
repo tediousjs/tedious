@@ -4,11 +4,11 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Order Token Parser', () => {
   it('should have one column', async () => {
+    const debug = new Debug();
     const numberOfColumns = 1;
     const length = numberOfColumns * 2;
     const column = 3;
@@ -31,6 +31,7 @@ describe('Order Token Parser', () => {
   });
 
   it('should have two columns', async () => {
+    const debug = new Debug();
     const numberOfColumns = 2;
     const length = numberOfColumns * 2;
     const column1 = 3;

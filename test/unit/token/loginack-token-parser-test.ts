@@ -4,11 +4,11 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Loginack Token Parser', () => {
   it('should have correct info', async () => {
+    const debug = new Debug();
     const interfaceType = 1;
     const version = 0x72090002;
     const progName = 'prog';

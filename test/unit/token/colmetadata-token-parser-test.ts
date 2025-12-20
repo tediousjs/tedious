@@ -5,12 +5,12 @@ import { ColMetadataToken } from '../../../src/token/token';
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Colmetadata Token Parser', () => {
   describe('parsing the column metadata for a result with many columns', function() {
     it('should parse them correctly', async function() {
+      const debug = new Debug();
       const userType = 2;
       const flags = 3;
       const columnName = 'name';
@@ -49,6 +49,7 @@ describe('Colmetadata Token Parser', () => {
   });
 
   it('should int', async () => {
+    const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -81,6 +82,7 @@ describe('Colmetadata Token Parser', () => {
   });
 
   it('should varchar', async () => {
+    const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;

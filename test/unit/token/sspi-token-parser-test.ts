@@ -4,11 +4,11 @@ import WriteBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-const debug = new Debug();
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('sspi token parser', () => {
   it('should parse challenge', async () => {
+    const debug = new Debug();
     const source = new WriteBuffer(68);
     source.writeUInt8(0xed);
     source.writeUInt16LE(0);

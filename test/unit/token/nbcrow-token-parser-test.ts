@@ -8,7 +8,6 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 import { Collation } from '../../../src/collation';
 
-const debug = new Debug();
 const options = {
   useUTC: false,
   tdsVersion: '7_2'
@@ -17,6 +16,7 @@ const options = {
 describe('NBCRow Token Parser', function() {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
+      const debug = new Debug();
       const buffer = new WritableTrackingBuffer(0, 'ascii');
       buffer.writeUInt8(0xd2);
 
