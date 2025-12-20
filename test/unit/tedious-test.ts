@@ -1,23 +1,23 @@
 import { Connection, ISOLATION_LEVEL, TYPES } from '../../src/tedious';
 import { assert } from 'chai';
 
-describe('tedious-test', function() {
+describe('Tedious', function() {
 
-  it('types', function() {
-    assert.isDefined(TYPES);
-    assert.isDefined(TYPES.VarChar);
+  it('should export TYPES', () => {
+    assert.ok(TYPES);
+    assert.ok(TYPES.VarChar);
   });
 
-  it('isolationLevel', function() {
-    assert.isDefined(ISOLATION_LEVEL);
-    assert.isDefined(ISOLATION_LEVEL.READ_UNCOMMITTED);
+  it('should export ISOLATION_LEVEL', () => {
+    assert.ok(ISOLATION_LEVEL);
+    assert.ok(ISOLATION_LEVEL.READ_UNCOMMITTED);
   });
 
-  it('connection', function() {
-    assert.isDefined(Connection);
+  it('should export Connection', () => {
+    assert.ok(Connection);
   });
 
-  it('connectionDoesNotModifyPassedConfig', function() {
+  it('should not modify the passed config object', () => {
     const config = {
       server: 'localhost',
       userName: 'sa',

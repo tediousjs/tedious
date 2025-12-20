@@ -13,8 +13,8 @@ function assertBuffer(actual: WritableTrackingBuffer, expected: number[]): void 
   }
 }
 
-describe('Wrtiable Tracking Buffer', function() {
-  it('should create', function() {
+describe('Writable Tracking Buffer', () => {
+  it('should create', () => {
     const buffer = new WritableTrackingBuffer(2);
 
     assert.isDefined(buffer);

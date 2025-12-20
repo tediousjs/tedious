@@ -16,8 +16,8 @@ class MockPacket {
   }
 }
 
-describe('Packet Tests', function() {
-  it('Create new packet', function(done) {
+describe('Debug', function() {
+  it('should emit debug events when sending a packet', function(done) {
     let emitCount = 0;
 
     const debug = new Debug({ packet: true });
@@ -96,7 +96,7 @@ describe('Packet Tests', function() {
     debug.token({ name: 'test' } as Token);
   });
 
-  it('should not enable payload', function(done) {
+  it('should not emit token debug events when disabled', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
       assert.fail('Expected no debug event to be emitted');

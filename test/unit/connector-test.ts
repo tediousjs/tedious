@@ -125,7 +125,7 @@ describe('connectInSequence', function() {
     assert.strictEqual(attemptedConnections[2].localAddress, '192.168.0.1');
   });
 
-  it('passes the first succesfully connected socket to the callback', async function() {
+  it('passes the first successfully connected socket to the callback', async function() {
     const controller = new AbortController();
 
     let expectedSocket: any;
@@ -222,7 +222,7 @@ describe('connectInSequence', function() {
     assert.strictEqual(error.errors[2].message, 'failed connection #3');
   });
 
-  it('destroys all sockets except for the first succesfully connected socket', async function() {
+  it('destroys all sockets except for the first successfully connected socket', async function() {
     const controller = new AbortController();
     const attemptedSockets: any[] = [];
 
@@ -411,7 +411,7 @@ describe('connectInParallel', function() {
     assert.strictEqual(error.errors[2].message, 'failed connection #3');
   });
 
-  it('passes the first succesfully connected socket to the callback', async function() {
+  it('passes the first successfully connected socket to the callback', async function() {
     const controller = new AbortController();
 
     let expectedSocket: any;
@@ -439,7 +439,7 @@ describe('connectInParallel', function() {
     assert.strictEqual(expectedSocket, socket);
   });
 
-  it('destroys all sockets except for the first succesfully connected socket', async function() {
+  it('destroys all sockets except for the first successfully connected socket', async function() {
     const controller = new AbortController();
     const attemptedSockets: any[] = [];
 
