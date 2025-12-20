@@ -6,6 +6,7 @@ import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import Debug from '../../../src/debug';
+import { Collation } from '../../../src/collation';
 
 const debug = new Debug();
 const options = {
@@ -22,18 +23,24 @@ describe('NBCRow Token Parser', function() {
       // Write the null bitmap
       buffer.writeBuffer(Buffer.alloc(1024 / 8, 0));
 
-      const colMetadata = [];
+      const colMetadata: ColumnMetadata[] = [];
       for (let i = 0; i < 1024; i += 1) {
         colMetadata.push({
+          colName: `col${i}`,
+          userType: 0,
+          flags: 0,
+          precision: undefined,
+          scale: undefined,
+          dataLength: undefined,
+          schema: undefined,
+          udtInfo: undefined,
           type: dataTypeByName.VarChar,
-          collation: {
-            codepage: undefined
-          }
+          collation: new Collation(1033, 0, 0, 52)
         });
         buffer.writeUsVarchar(i.toString());
       }
 
-      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
+      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
