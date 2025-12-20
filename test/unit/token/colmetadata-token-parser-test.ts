@@ -111,7 +111,7 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].userType, 2);
     assert.strictEqual(token.columns[0].flags, 3);
     assert.strictEqual(token.columns[0].type.name, 'VarChar');
-    assert.ok(token.columns[0].collation);
+    assert.isDefined(token.columns[0].collation);
     assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
     assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
     assert.strictEqual(token.columns[0].collation.flags, 0x85);

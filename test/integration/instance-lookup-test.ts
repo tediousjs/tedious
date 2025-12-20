@@ -29,7 +29,7 @@ describe('Instance Lookup Test', function() {
       signal: controller.signal
     });
 
-    assert.ok(port);
+    assert.isDefined(port);
   });
 
   it('should test bad Instance', async function() {

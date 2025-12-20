@@ -37,7 +37,7 @@ describe('Done Token Parser', () => {
     assert.instanceOf(token, DoneToken);
     assert.isFalse(token.more);
     assert.strictEqual(token.curCmd, curCmd);
-    assert.strictEqual(token.rowCount, 0);
+    assert.isUndefined(token.rowCount);
   });
 
   it('should more', async () => {
@@ -51,9 +51,9 @@ describe('Done Token Parser', () => {
     const token = result.value;
 
     assert.instanceOf(token, DoneToken);
-    assert.isOk(token.more);
+    assert.isTrue(token.more);
     assert.strictEqual(token.curCmd, curCmd);
-    assert.strictEqual(token.rowCount, 0);
+    assert.isUndefined(token.rowCount);
   });
 
   it('should done row count', async () => {

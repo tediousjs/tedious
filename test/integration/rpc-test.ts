@@ -56,7 +56,7 @@ describe('RPC test', function() {
     const request = new Request(sql, function(err) {
       if (err) {
         console.log(err);
-        assert.ok(false);
+        assert.fail('SQL batch execution failed');
       }
 
       done();
@@ -75,12 +75,12 @@ describe('RPC test', function() {
     request.addParameter('param', type, value);
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
-      assert.ok(!more);
+      assert.isFalse(more);
       assert.strictEqual(returnStatus, 0);
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
     });
 
     request.on('row', function(columns) {
@@ -116,12 +116,12 @@ select @param\
     request.addOutputParameter('paramOut', type);
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
-      assert.ok(!more);
+      assert.isFalse(more);
       assert.strictEqual(returnStatus, 0);
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
     });
 
     request.on('returnValue', function(name, returnValue, metadata) {
@@ -131,7 +131,7 @@ select @param\
       } else {
         assert.strictEqual(returnValue, value);
       }
-      assert.ok(metadata);
+      assert.isDefined(metadata);
     });
 
     execSqlBatch(
@@ -297,21 +297,21 @@ set @paramOut = @paramIn\
     const config = getConfig();
 
     const request = new Request('bad_proc_name', function(err) {
-      assert.ok(err);
+      assert.isDefined(err);
 
       connection.close();
     });
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
-      assert.ok(!more);
+      assert.isFalse(more);
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
     });
 
     request.on('row', function(columns) {
-      assert.ok(false);
+      assert.fail('Expected no rows');
     });
 
     let connection = new Connection(config);
@@ -332,7 +332,7 @@ set @paramOut = @paramIn\
 
     connection.on('errorMessage', function(error) {
       // console.log("#{error.number} : #{error.message}")
-      assert.ok(error);
+      assert.isDefined(error);
     });
 
     if (process.env.TEDIOUS_DEBUG) {
@@ -348,12 +348,12 @@ set @paramOut = @paramIn\
     });
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
-      assert.ok(!more);
+      assert.isFalse(more);
       assert.strictEqual(returnStatus, -1); // Non-zero indicates a failure.
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
     });
 
     let connection = new Connection(config);
@@ -384,7 +384,7 @@ set @paramOut = @paramIn\
 
     connection.on('errorMessage', function(error) {
       // console.log("#{error.number} : #{error.message}")
-      assert.ok(error);
+      assert.isDefined(error);
     });
 
     if (process.env.TEDIOUS_DEBUG) {

@@ -27,10 +27,10 @@ describe('Packet Tests', function() {
 
       switch (emitCount) {
         case 2:
-          assert.isOk(/Sent/.test(text));
+          assert.match(text, /Sent/);
           break;
         case 3:
-          assert.isOk(/header/.test(text));
+          assert.match(text, /header/);
           done();
           break;
       }
@@ -55,7 +55,7 @@ describe('Packet Tests', function() {
   it('should not enable payload', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
-      assert.isOk(false);
+      assert.fail('Expected no debug event to be emitted');
     });
 
     debug.payload(() => payload);
@@ -77,7 +77,7 @@ describe('Packet Tests', function() {
   it('should not enable data', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
-      assert.isOk(false);
+      assert.fail('Expected no debug event to be emitted');
     });
 
     debug.data(new MockPacket() as Packet);
@@ -88,7 +88,7 @@ describe('Packet Tests', function() {
   it('should enable token', function(done) {
     const debug = new Debug({ token: true });
     debug.on('debug', function(token) {
-      assert.isOk(token.indexOf('test') !== 0);
+      assert.isFalse(token.startsWith('test'));
 
       done();
     });
@@ -99,7 +99,7 @@ describe('Packet Tests', function() {
   it('should not enable payload', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
-      assert.isOk(false);
+      assert.fail('Expected no debug event to be emitted');
     });
 
     debug.token({ name: 'test' } as Token);

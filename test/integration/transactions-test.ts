@@ -135,9 +135,9 @@ GO`,
   beginTransaction(callback: (err?: Error | null) => void, transactionName?: string) {
     this.connection.beginTransaction((err, transactionDescriptor) => {
       assert.ifError(err);
-      assert.ok(
-        config.options.tdsVersion! < '7_2' ? true : transactionDescriptor
-      );
+      if (config.options.tdsVersion! >= '7_2') {
+        assert.isDefined(transactionDescriptor);
+      }
 
       callback(err);
     }, transactionName);
@@ -285,8 +285,7 @@ describe('Transactions Test', function() {
             assert.ifError(err);
 
             connection.on('rollbackTransaction' as any, function() {
-              // Ensure rollbackTransaction event is fired
-              assert.ok(true);
+              // rollbackTransaction event fired as expected
             });
 
             req = new Request("insert into #temp values ('asdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasdfasd')", function(err) {
@@ -477,7 +476,7 @@ describe('Transactions Test', function() {
       done();
     });
     connection.on('error', function(err) {
-      assert.ok(~err.message.indexOf('socket error'));
+      assert.include(err.message, 'socket error');
     });
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))
     //  connection.on('debug', (message) => console.log(message) if (debug))
@@ -490,10 +489,10 @@ describe('Transactions Test', function() {
           assert.ifError(err);
 
           const request = new Request('WAITFOR 00:00:30', function(err) {
-            assert.ok(~(err as Error).message.indexOf('socket error'));
+            assert.include((err as Error).message, 'socket error');
 
             innerDone!(err, outerDone, function(err: any) {
-              assert.ok(~(err as Error).message.indexOf('socket error'));
+              assert.include((err as Error).message, 'socket error');
             });
           });
 

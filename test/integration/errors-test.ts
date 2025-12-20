@@ -50,7 +50,7 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
+      assert.instanceOf(err, RequestError);
       assert.strictEqual((err as RequestError).number, 2627);
     });
   });
@@ -63,7 +63,7 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
+      assert.instanceOf(err, RequestError);
       assert.strictEqual((err as RequestError).number, 515);
     });
   });
@@ -74,7 +74,7 @@ describe('Errors Test', function() {
   ';
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
+      assert.instanceOf(err, RequestError);
       assert.strictEqual((err as RequestError).number, 3701);
     });
   });

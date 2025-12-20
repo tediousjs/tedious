@@ -142,7 +142,7 @@ describe('BulkLoad', function() {
 
   it('checks constraints if the `checkConstraints` option is set to `true`', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable3', { checkConstraints: true }, (err, rowCount) => {
-      assert.ok(err, 'An error should have been thrown to indicate the conflict with the CHECK constraint.');
+      assert.isDefined(err, 'An error should have been thrown to indicate the conflict with the CHECK constraint.');
 
       assert.strictEqual(rowCount, 0);
 

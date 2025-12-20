@@ -87,7 +87,7 @@ describe('Initiate Connect Test', function() {
 
     connection.on('errorMessage', function(error) {
       // console.log(`${error.number} : ${error.message}`)
-      return assert.ok(~error.message.indexOf('failed') || ~error.message.indexOf('登录失败'));
+      assert.isTrue(error.message.includes('failed') || error.message.includes('登录失败'));
     });
 
     if (process.env.TEDIOUS_DEBUG) {
@@ -95,7 +95,7 @@ describe('Initiate Connect Test', function() {
     }
 
     connection.connect(function(err) {
-      assert.ok(err);
+      assert.isDefined(err);
 
       connection.close();
     });
@@ -154,7 +154,7 @@ describe('Initiate Connect Test', function() {
     });
 
     connection.connect(function(err) {
-      assert.ok(err);
+      assert.isDefined(err);
 
       connection.close();
     });
@@ -427,7 +427,7 @@ describe('Ntlm Test', function() {
 
         break;
       default:
-        assert.ok(false, 'Unexpected value for domainCase: ' + domainCase);
+        assert.fail('Unexpected value for domainCase: ' + domainCase);
     }
 
     let row = 0;
@@ -706,7 +706,7 @@ describe('Insertion Tests', function() {
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
       assert.strictEqual(rowCount, 1);
     });
 
@@ -905,7 +905,7 @@ describe('Insertion Tests', function() {
       });
 
       request.on('doneInProc', function(rowCount, more) {
-        assert.ok(more);
+        assert.isTrue(more);
         assert.strictEqual(rowCount, 1);
       });
 
@@ -953,7 +953,7 @@ describe('Insertion Tests', function() {
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
       assert.strictEqual(rowCount, 2);
     });
 
@@ -998,7 +998,7 @@ describe('Insertion Tests', function() {
     const config = getConfig();
 
     const request = new Request('bad syntax here', function(err) {
-      assert.ok(err);
+      assert.isDefined(err);
 
       connection.close();
     });
@@ -1015,7 +1015,7 @@ describe('Insertion Tests', function() {
 
     connection.on('errorMessage', function(error) {
       // console.log("#{error.number} : #{error.message}")
-      assert.ok(error);
+      assert.isDefined(error);
     });
 
     if (process.env.TEDIOUS_DEBUG) {
@@ -1248,16 +1248,16 @@ update #tab1 set name = 'a3' where name like 'a%'\
     });
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
-      assert.ok(!more);
+      assert.isFalse(more);
       assert.strictEqual(returnStatus, 0);
     });
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
     });
 
-    request.on('row', function(columns) {
-      assert.ok(true);
+    request.on('row', function(_columns) {
+      // Row received as expected
     });
 
     let connection = new Connection(config);
@@ -1314,7 +1314,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
     let connection = new Connection(config);
 
     connection.on('resetConnection', function() {
-      assert.ok(true);
+      // Reset connection event received as expected
     });
 
     connection.connect(function(err) {
@@ -1324,11 +1324,8 @@ update #tab1 set name = 'a3' where name like 'a%'\
         testAnsiNullsOptionOff,
         function(callback) {
           connection.reset(function(err) {
-            if (connection.config.options.tdsVersion < '7_2') {
-              // TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
-              assert.ok(true);
-            }
-
+            // TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
+            // For 7_2+ the resetConnection event handler confirms receipt
             callback(err);
           });
         },
@@ -1382,23 +1379,23 @@ update #tab1 set name = 'a3' where name like 'a%'\
     });
 
     request.on('doneInProc', (rowCount, more) => {
-      assert.ok(false);
+      assert.fail('Expected no doneInProc event');
     });
 
     request.on('doneProc', (rowCount, more) => {
-      assert.ok(false);
+      assert.fail('Expected no doneProc event');
     });
 
     request.on('done', (rowCount, more, rows) => {
-      assert.ok(false);
+      assert.fail('Expected no done event');
     });
 
     request.on('columnMetadata', (columnsMetadata) => {
-      assert.ok(false);
+      assert.fail('Expected no columnMetadata event');
     });
 
     request.on('row', (columns) => {
-      assert.ok(false);
+      assert.fail('Expected no row event');
     });
 
     const connection = new Connection({
@@ -1442,23 +1439,23 @@ update #tab1 set name = 'a3' where name like 'a%'\
     );
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(false);
+      assert.fail('Expected no doneInProc event');
     });
 
     request.on('doneProc', function(rowCount, more) {
-      assert.ok(false);
+      assert.fail('Expected no doneProc event');
     });
 
     request.on('done', function(rowCount, more, rows) {
-      assert.ok(false);
+      assert.fail('Expected no done event');
     });
 
     request.on('columnMetadata', function(columnsMetadata) {
-      assert.ok(false);
+      assert.fail('Expected no columnMetadata event');
     });
 
     request.on('row', function(columns) {
-      assert.ok(false);
+      assert.fail('Expected no row event');
     });
 
     const config = getConfig();

@@ -23,8 +23,8 @@ describe('lookupAllAddresses', function() {
       // Ignore
     }
 
-    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-    assert.isOk(lookup.calledWithMatch('xn--tiq21tzznxb.ad'), 'Unexpected hostname passed to `lookup`');
+    assert.isTrue(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isTrue(lookup.calledWithMatch('xn--tiq21tzznxb.ad'), 'Unexpected hostname passed to `lookup`');
   });
 
   it('test ASCII Server name', async function() {
@@ -41,8 +41,8 @@ describe('lookupAllAddresses', function() {
       // Ignore
     }
 
-    assert.isOk(lookup.called, 'Failed to call `lookup` function for hostname');
-    assert.isOk(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
+    assert.isTrue(lookup.called, 'Failed to call `lookup` function for hostname');
+    assert.isTrue(lookup.calledWithMatch(server), 'Unexpected hostname passed to `lookup`');
   });
 
   it('test invalid ASCII Server name', async function() {
@@ -246,8 +246,8 @@ describe('connectInSequence', function() {
       controller.signal,
     );
 
-    assert.isOk(attemptedSockets[0].destroyed);
-    assert.isOk(attemptedSockets[1].destroyed);
+    assert.isTrue(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[1].destroyed);
     assert.isFalse(attemptedSockets[2].destroyed);
   });
 
@@ -313,7 +313,7 @@ describe('connectInSequence', function() {
     assert.strictEqual(error!.name, 'AbortError');
 
     assert.lengthOf(attemptedSockets, 1);
-    assert.isOk(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[0].destroyed);
   });
 });
 
@@ -455,8 +455,8 @@ describe('connectInParallel', function() {
     );
 
     assert.isFalse(attemptedSockets[0].destroyed);
-    assert.isOk(attemptedSockets[1].destroyed);
-    assert.isOk(attemptedSockets[2].destroyed);
+    assert.isTrue(attemptedSockets[1].destroyed);
+    assert.isTrue(attemptedSockets[2].destroyed);
   });
 
   it('will immediately abort when called with an aborted signal', async function() {
@@ -521,8 +521,8 @@ describe('connectInParallel', function() {
     assert.strictEqual(error!.name, 'AbortError');
 
     assert.lengthOf(attemptedSockets, 3);
-    assert.isOk(attemptedSockets[0].destroyed);
-    assert.isOk(attemptedSockets[1].destroyed);
-    assert.isOk(attemptedSockets[2].destroyed);
+    assert.isTrue(attemptedSockets[0].destroyed);
+    assert.isTrue(attemptedSockets[1].destroyed);
+    assert.isTrue(attemptedSockets[2].destroyed);
   });
 });

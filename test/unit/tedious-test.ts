@@ -4,17 +4,17 @@ import { assert } from 'chai';
 describe('tedious-test', function() {
 
   it('types', () => {
-    assert.ok(TYPES);
-    assert.ok(TYPES.VarChar);
+    assert.isDefined(TYPES);
+    assert.isDefined(TYPES.VarChar);
   });
 
   it('isolationLevel', () => {
-    assert.ok(ISOLATION_LEVEL);
-    assert.ok(ISOLATION_LEVEL.READ_UNCOMMITTED);
+    assert.isDefined(ISOLATION_LEVEL);
+    assert.isDefined(ISOLATION_LEVEL.READ_UNCOMMITTED);
   });
 
   it('connection', () => {
-    assert.ok(Connection);
+    assert.isDefined(Connection);
   });
 
   it('connectionDoesNotModifyPassedConfig', () => {

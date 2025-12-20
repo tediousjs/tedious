@@ -88,7 +88,7 @@ describe('Pause-Resume Test', function() {
     });
 
     request.on('row', (columns) => {
-      assert.ok(!paused);
+      assert.isFalse(paused);
 
       rowsReceived++;
 
@@ -135,7 +135,7 @@ describe('Pause-Resume Test', function() {
             connection.cancel();
           }, 200);
         } else if (columns[0].value > 1000) {
-          assert.ok(false, 'Received rows after pause');
+          assert.fail('Received rows after pause');
         }
       });
 
@@ -170,7 +170,7 @@ describe('Pause-Resume Test', function() {
     request.pause();
 
     request.on('row', (columns) => {
-      assert.ok(!paused);
+      assert.isFalse(paused);
 
       assert.strictEqual(columns[0].value, 1);
     });

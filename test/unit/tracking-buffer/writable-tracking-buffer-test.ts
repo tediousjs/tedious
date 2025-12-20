@@ -9,7 +9,7 @@ function assertBuffer(actual: WritableTrackingBuffer, expected: number[]): void 
   if (!comparisonResult) {
     console.log('actual  ', actualData);
     console.log('expected', expectedBuffer);
-    assert.isOk(false);
+    assert.fail('Buffer comparison failed');
   }
 }
 
@@ -17,7 +17,7 @@ describe('Wrtiable Tracking Buffer', () => {
   it('should create', () => {
     const buffer = new WritableTrackingBuffer(2);
 
-    assert.isOk(buffer);
+    assert.isDefined(buffer);
     assert.strictEqual(0, buffer.data.length);
   });
 

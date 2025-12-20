@@ -32,7 +32,7 @@ function createDbChangeBuffer() {
 // Test handler that only handles database change events
 class TestDatabaseChangeHandler extends TokenHandler {
   onDatabaseChange(token: DatabaseEnvChangeToken) {
-    assert.isOk(token);
+    assert.isDefined(token);
   }
 }
 

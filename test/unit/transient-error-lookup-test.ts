@@ -7,12 +7,12 @@ import { assert } from 'chai';
 describe('Connection configuration validation', () => {
   it('transient errors', () => {
     const transientErrorLookup = new TransientErrorLookup();
-    assert.ok(transientErrorLookup.isTransientError(4060));
-    assert.ok(transientErrorLookup.isTransientError(10928));
-    assert.ok(transientErrorLookup.isTransientError(10929));
-    assert.ok(transientErrorLookup.isTransientError(40197));
-    assert.ok(transientErrorLookup.isTransientError(40501));
-    assert.ok(transientErrorLookup.isTransientError(40613));
+    assert.isTrue(transientErrorLookup.isTransientError(4060));
+    assert.isTrue(transientErrorLookup.isTransientError(10928));
+    assert.isTrue(transientErrorLookup.isTransientError(10929));
+    assert.isTrue(transientErrorLookup.isTransientError(40197));
+    assert.isTrue(transientErrorLookup.isTransientError(40501));
+    assert.isTrue(transientErrorLookup.isTransientError(40613));
   });
 
   it('not transient error', () => {
