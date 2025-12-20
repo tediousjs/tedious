@@ -5,7 +5,7 @@ import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const debug = new Debug();
-const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Loginack Token Parser', () => {
   it('should have correct info', async () => {

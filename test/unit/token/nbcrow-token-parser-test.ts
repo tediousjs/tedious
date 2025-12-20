@@ -8,10 +8,10 @@ import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracki
 import Debug from '../../../src/debug';
 
 const debug = new Debug();
-const options: ParserOptions = {
+const options = {
   useUTC: false,
   tdsVersion: '7_2'
-};
+} as ParserOptions;
 
 describe('NBCRow Token Parser', function() {
   describe('parsing a row with many columns', function() {
@@ -33,7 +33,7 @@ describe('NBCRow Token Parser', function() {
         buffer.writeUsVarchar(i.toString());
       }
 
-      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;

@@ -6,7 +6,7 @@ import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const debug = new Debug();
-const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Colmetadata Token Parser', () => {
   describe('parsing the column metadata for a result with many columns', function() {
@@ -111,11 +111,11 @@ describe('Colmetadata Token Parser', () => {
     assert.strictEqual(token.columns[0].userType, 2);
     assert.strictEqual(token.columns[0].flags, 3);
     assert.strictEqual(token.columns[0].type.name, 'VarChar');
-    assert.strictEqual(token.columns[0].collation.lcid, 0x0409);
-    assert.strictEqual(token.columns[0].collation.codepage, 'CP1257');
-    assert.strictEqual(token.columns[0].collation.flags, 0x85);
-    assert.strictEqual(token.columns[0].collation.version, 0x7);
-    assert.strictEqual(token.columns[0].collation.sortId, 0x9a);
+    assert.strictEqual(token.columns[0].collation!.lcid, 0x0409);
+    assert.strictEqual(token.columns[0].collation!.codepage, 'CP1257');
+    assert.strictEqual(token.columns[0].collation!.flags, 0x85);
+    assert.strictEqual(token.columns[0].collation!.version, 0x7);
+    assert.strictEqual(token.columns[0].collation!.sortId, 0x9a);
     assert.strictEqual(token.columns[0].colName, 'name');
     assert.strictEqual(token.columns[0].dataLength, length);
   });

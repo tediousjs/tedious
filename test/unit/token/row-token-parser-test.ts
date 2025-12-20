@@ -14,10 +14,10 @@ import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import Debug from '../../../src/debug';
 
-const options: ParserOptions = {
+const options = {
   useUTC: false,
   tdsVersion: '7_2'
-};
+} as ParserOptions;
 
 // Debug instance for tests - no options needed for unit tests
 const debug = new Debug();
@@ -39,7 +39,7 @@ describe('Row Token Parser', () => {
         buffer.writeUsVarchar(i.toString());
       }
 
-      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
@@ -64,7 +64,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -88,7 +88,7 @@ describe('Row Token Parser', () => {
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -108,7 +108,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -131,7 +131,7 @@ describe('Row Token Parser', () => {
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -170,7 +170,7 @@ describe('Row Token Parser', () => {
       Buffer.from([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -203,7 +203,7 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -232,7 +232,7 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -254,7 +254,7 @@ describe('Row Token Parser', () => {
     buffer.writeString(value);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -276,7 +276,7 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -298,7 +298,7 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -328,7 +328,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -364,7 +364,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -399,7 +399,7 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -433,7 +433,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -467,7 +467,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
 
     let error;
     try {
@@ -496,7 +496,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -528,7 +528,7 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value.slice(2, 4)));
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -664,7 +664,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -719,7 +719,7 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: false }, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: false }, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -766,7 +766,7 @@ describe('Row Token Parser', () => {
       ])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: true }, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: true }, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -811,7 +811,7 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -838,7 +838,7 @@ describe('Row Token Parser', () => {
     // console.log(buffer)
 
     {
-      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: false }, colMetadata as ColumnMetadata[]);
+      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: false }, colMetadata as unknown as ColumnMetadata[]);
 
       let result = await parser.next();
       assert.isFalse(result.done);
@@ -857,7 +857,7 @@ describe('Row Token Parser', () => {
     }
 
     {
-      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: true }, colMetadata as ColumnMetadata[]);
+      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: true }, colMetadata as unknown as ColumnMetadata[]);
 
       let result = await parser.next();
       assert.isFalse(result.done);
@@ -885,7 +885,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -916,7 +916,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -947,7 +947,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -978,7 +978,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1011,7 +1011,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
@@ -1050,7 +1050,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
@@ -1076,7 +1076,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as unknown as ColumnMetadata[]);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);

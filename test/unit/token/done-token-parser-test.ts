@@ -5,7 +5,7 @@ import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const debug = new Debug();
-const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 function parse(status: number, curCmd: number, doneRowCount: number) {
   const doneRowCountLow = doneRowCount % 0x100000000;

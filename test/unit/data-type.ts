@@ -1,4 +1,4 @@
-import { typeByName as TYPES, type ParameterData } from '../../src/data-type';
+import { typeByName as TYPES } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 import { assert } from 'chai';
@@ -1500,7 +1500,7 @@ describe('VarBinary', function() {
 
   describe('.generateParameterData', function() {
     it('correctly converts `null` values', () => {
-      const testCases: Array<{ value: null; length: number; expected: Buffer }> = [
+      const testCases: Array<{ value: null, length: number, expected: Buffer }> = [
         { value: null, length: 1, expected: Buffer.from([]) },
         { value: null, length: 9000, expected: Buffer.from([]) }
       ];
@@ -1512,7 +1512,7 @@ describe('VarBinary', function() {
     });
 
     it('correctly converts `number` values', () => {
-      const testCases: Array<{ value: number; length: number; expected: Buffer }> = [
+      const testCases: Array<{ value: number, length: number, expected: Buffer }> = [
         { value: 1, length: 1, expected: Buffer.from('3100', 'hex') },
       ];
       for (const { value, length, expected } of testCases) {

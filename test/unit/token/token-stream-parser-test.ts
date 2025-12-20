@@ -3,11 +3,12 @@ import { Parser } from '../../../src/token/token-stream-parser';
 import { TYPE, DatabaseEnvChangeToken } from '../../../src/token/token';
 import { type ParserOptions } from '../../../src/token/stream-parser';
 import { TokenHandler } from '../../../src/token/handler';
+import type Message from '../../../src/message';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { assert } from 'chai';
 
 const debug = new Debug({ token: true });
-const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 function createDbChangeBuffer() {
   const oldDb = 'old';
@@ -39,8 +40,8 @@ describe('Token Stream Parser', () => {
   it('should envChange', (done) => {
     const buffer = createDbChangeBuffer();
 
-    // Cast to Iterable<Buffer> since tests use a simplified input instead of full Message
-    const parser = new Parser([buffer] as Iterable<Buffer>, debug, new TestDatabaseChangeHandler(), options);
+    // Cast to Message since tests use a simplified input instead of full Message
+    const parser = new Parser([buffer] as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
@@ -48,8 +49,8 @@ describe('Token Stream Parser', () => {
   it('should split token across buffers', (done) => {
     const buffer = createDbChangeBuffer();
 
-    // Cast to Iterable<Buffer> since tests use a simplified input instead of full Message
-    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as Iterable<Buffer>, debug, new TestDatabaseChangeHandler(), options);
+    // Cast to Message since tests use a simplified input instead of full Message
+    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
