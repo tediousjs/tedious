@@ -346,17 +346,39 @@ describe('Login7Payload', function() {
         // 86-89: ibChangePassword/cchChangePassword, 90-93: cbSSPILong
         const ibHostName = data.readUInt16LE(36);
         const cchHostName = data.readUInt16LE(38);
+        const ibUserName = data.readUInt16LE(40);
+        const cchUserName = data.readUInt16LE(42);
+        const ibPassword = data.readUInt16LE(44);
+        const cchPassword = data.readUInt16LE(46);
+        const ibAppName = data.readUInt16LE(48);
+        const cchAppName = data.readUInt16LE(50);
+        const ibServerName = data.readUInt16LE(52);
+        const cchServerName = data.readUInt16LE(54);
+        const ibCltIntName = data.readUInt16LE(60);
+        const cchCltIntName = data.readUInt16LE(62);
+        const ibLanguage = data.readUInt16LE(64);
+        const cchLanguage = data.readUInt16LE(66);
         const ibDatabase = data.readUInt16LE(68);
         const cchDatabase = data.readUInt16LE(70);
+        const ibSSPI = data.readUInt16LE(78);
+        const cbSSPI = data.readUInt16LE(80);
         const ibAttachDBFile = data.readUInt16LE(82);
         const cchAttachDBFile = data.readUInt16LE(84);
         const ibChangePassword = data.readUInt16LE(86);
         const cchChangePassword = data.readUInt16LE(88);
 
         // Calculate the end of all regular variable data (excluding FeatureExt)
+        // Include all variable-length fields to ensure complete coverage
         const variableDataEnd = Math.max(
           ibHostName + cchHostName * 2,
+          ibUserName + cchUserName * 2,
+          ibPassword + cchPassword * 2,
+          ibAppName + cchAppName * 2,
+          ibServerName + cchServerName * 2,
+          ibCltIntName + cchCltIntName * 2,
+          ibLanguage + cchLanguage * 2,
           ibDatabase + cchDatabase * 2,
+          ibSSPI + cbSSPI,
           ibAttachDBFile + cchAttachDBFile * 2,
           ibChangePassword + cchChangePassword * 2
         );

@@ -256,13 +256,14 @@ class Login7Payload {
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // (cchUnused / cbExtension): 2-byte
-    // For TDS 7.4+, this is the size of the extension block (just the 4-byte offset pointer).
+    // For TDS 7.4+, this is the size of the ibFeatureExtLong offset pointer (4 bytes).
+    // The actual FeatureExt data is appended at the end of the packet, not here.
     // We'll store the FeatureExt data to append at the end after all other variable data.
     let featureExtData: Buffer | undefined;
     let extensionOffsetBuffer: Buffer | undefined;
     if (this.tdsVersion >= versions['7_4']) {
       featureExtData = this.buildFeatureExt();
-      // cbExtension = 4 (just the ibFeatureExtLong pointer size)
+      // cbExtension = 4 (size of the ibFeatureExtLong pointer, not the FeatureExt data)
       offset = fixedData.writeUInt16LE(4, offset);
       // Reserve space for the 4-byte offset pointer; we'll fill in the actual offset later
       extensionOffsetBuffer = Buffer.alloc(4);
