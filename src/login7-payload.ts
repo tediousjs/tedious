@@ -336,6 +336,7 @@ class Login7Payload {
       }
 
       buffers.push(this.sspi);
+      dataOffset += this.sspi.length;
     } else {
       offset = fixedData.writeUInt16LE(0, offset);
     }
