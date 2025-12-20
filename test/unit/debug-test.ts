@@ -52,7 +52,7 @@ describe('Debug', function() {
     });
   });
 
-  it('should not enable payload', function(done) {
+  it('should not emit payload debug events when disabled', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
       assert.fail('Expected no debug event to be emitted');
@@ -74,7 +74,7 @@ describe('Debug', function() {
     debug.data(new MockPacket() as Packet);
   });
 
-  it('should not enable data', function(done) {
+  it('should not emit data debug events when disabled', function(done) {
     const debug = new Debug();
     debug.on('debug', function() {
       assert.fail('Expected no debug event to be emitted');
