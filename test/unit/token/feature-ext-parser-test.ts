@@ -34,7 +34,7 @@ describe('Feature Ext Parser', () => {
 
     assert.instanceOf(token, FeatureExtAckToken);
     assert.ok(token.fedAuth);
-    assert.isOk(token.fedAuth.equals(Buffer.from('bc')));
+    assert.deepEqual(token.fedAuth, Buffer.from('bc'));
     assert.isUndefined(token.utf8Support); // feature ext ack for UTF8_SUPPORT was not received
     assert.isTrue((await parser.next()).done);
   });
