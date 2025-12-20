@@ -234,7 +234,7 @@ export const TYPE = {
  *
  * <tbody>
  *   <tr class="group-heading">
- *     <th colspan="4">Date and Time</th>
+ *     <th colspan="5">Date and Time</th>
  *   </tr>
  *   <tr>
  *     <td><code>smalldatetime</code></td>
@@ -282,7 +282,7 @@ export const TYPE = {
  *
  * <tbody>
  *   <tr class="group-heading">
- *     <th colspan="4">Character Strings</th>
+ *     <th colspan="5">Character Strings</th>
  *   </tr>
  *   <tr>
  *     <td><code>char</code></td>
@@ -309,7 +309,7 @@ export const TYPE = {
  *
  * <tbody>
  *   <tr class="group-heading">
- *     <th colspan="4">Unicode Strings</th>
+ *     <th colspan="5">Unicode Strings</th>
  *   </tr>
  *   <tr>
  *     <td><code>nchar</code></td>

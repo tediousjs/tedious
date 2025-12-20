@@ -201,10 +201,10 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
   options: {
     /**
-     * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` associate to their created identity.
+     * If you want to connect to an Azure app service using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieve token from azure web app service
+     * This is optional for retrieving a token from Azure web app service.
      */
     clientId?: string;
   };
@@ -214,10 +214,10 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
-     * If you want to connect using a specific client account
-     * they need to provide `clientId` associated to their created identity.
+     * If you want to connect using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieve a token
+     * This is optional for retrieving a token.
      */
     clientId?: string;
   };
@@ -227,10 +227,10 @@ interface AzureActiveDirectoryDefaultAuthentication {
   type: 'azure-active-directory-default';
   options: {
     /**
-     * If you want to connect using a specific client account
-     * they need to provide `clientId` associated to their created identity.
+     * If you want to connect using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieving a token
+     * This is optional for retrieving a token.
      */
     clientId?: string;
   };
@@ -241,8 +241,8 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
-     * A user need to provide `token` which they retrieved else where
-     * to forming the connection.
+     * A user needs to provide a `token` which they retrieved elsewhere
+     * to form the connection.
      */
     token: string;
   };
@@ -252,12 +252,12 @@ interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
-     * A user need to provide `userName` associate to their account.
+     * A user needs to provide a `userName` associated with their account.
      */
     userName: string;
 
     /**
-     * A user need to provide `password` associate to their account.
+     * A user needs to provide a `password` associated with their account.
      */
     password: string;
 
@@ -573,13 +573,13 @@ export interface ConnectionOptions {
    * * `SERIALIZABLE`
    * * `SNAPSHOT`
    *
-   * (default: `READ_COMMITED`).
+   * (default: `READ_COMMITTED`).
    */
   connectionIsolationLevel?: number;
 
   /**
    * When encryption is used, an object may be supplied that will be used
-   * for the first argument when calling [`tls.createSecurePair`](http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized)
+   * for the first argument when calling [`tls.createSecureContext`](https://nodejs.org/docs/latest/api/tls.html#tlscreatesecurecontextoptions).
    *
    * (default: `{}`)
    */
@@ -667,7 +667,7 @@ export interface ConnectionOptions {
   enableImplicitTransactions?: boolean;
 
   /**
-   * If false, error is not generated during loss of precession.
+   * If false, error is not generated during loss of precision.
    *
    * (default: `false`)
    */
@@ -718,7 +718,7 @@ export interface ConnectionOptions {
    * * `SERIALIZABLE`
    * * `SNAPSHOT`
    *
-   * (default: `READ_COMMITED`).
+   * (default: `READ_COMMITTED`).
    */
   isolationLevel?: number;
 
@@ -742,7 +742,7 @@ export interface ConnectionOptions {
   lowerCaseGuids?: boolean;
 
   /**
-   * The maximum number of connection retries for transient errors.、
+   * The maximum number of connection retries for transient errors.
    *
    * (default: `3`).
    */
@@ -2626,10 +2626,10 @@ class Connection extends EventEmitter {
 
   /**
    * Execute the SQL batch represented by [[Request]].
-   * There is no param support, and unlike [[Request.execSql]],
+   * There is no param support, and unlike [[execSql]],
    * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
    *
-   * In almost all cases, [[Request.execSql]] will be a better choice.
+   * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
    */
