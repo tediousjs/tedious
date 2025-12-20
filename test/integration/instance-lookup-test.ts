@@ -37,7 +37,7 @@ describe('Instance Lookup Test', function() {
 
     const controller = new AbortController();
 
-    let error: unknown;
+    let error;
     try {
       await instanceLookup({
         server: config.server,
@@ -50,14 +50,13 @@ describe('Instance Lookup Test', function() {
       error = err;
     }
 
-    assert.isDefined(error);
     assert.instanceOf(error, Error);
   });
 
   it('should test bad Server', async function() {
     const controller = new AbortController();
 
-    let error: unknown;
+    let error;
     try {
       await instanceLookup({
         server: RESERVED_IP_ADDRESS,
@@ -70,7 +69,6 @@ describe('Instance Lookup Test', function() {
       error = err;
     }
 
-    assert.isDefined(error);
     assert.instanceOf(error, Error);
   });
 });
