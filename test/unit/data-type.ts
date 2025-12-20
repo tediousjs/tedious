@@ -1,12 +1,19 @@
-import { typeByName as TYPES } from '../../src/data-type';
+import { typeByName as TYPES, type ParameterData } from '../../src/data-type';
+import { type InternalConnectionOptions } from '../../src/connection';
 
 import { assert } from 'chai';
+
+// Test options - using type assertion since tests only exercise code paths
+// that use a subset of the full InternalConnectionOptions
+const options: InternalConnectionOptions = {} as InternalConnectionOptions;
+const optionsWithUTCFalse: InternalConnectionOptions = { useUTC: false } as InternalConnectionOptions;
+const optionsWithUTCTrue: InternalConnectionOptions = { useUTC: true } as InternalConnectionOptions;
 
 describe('BigInt', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.BigInt.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.BigInt.generateParameterLength({ value: 123 }, { } as any), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.BigInt.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.BigInt.generateParameterLength({ value: 123 }, options), Buffer.from([0x08]));
     });
   });
 
@@ -16,7 +23,7 @@ describe('BigInt', function() {
       const expected = Buffer.from('15cd5b0700000000', 'hex');
 
       const parameterValue = { value, length: 4 };
-      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse)]);
 
       assert.deepEqual(buffer, expected);
     });
@@ -26,7 +33,7 @@ describe('BigInt', function() {
       const expected = Buffer.from('15cd5b0700000000', 'hex');
 
       const parameterValue = { value, length: 4 };
-      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse)]);
 
       assert.deepEqual(buffer, expected);
     });
@@ -37,7 +44,7 @@ describe('BigInt', function() {
 
       const parameterValue = { value, length: 4 };
 
-      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse)]);
 
       assert.deepEqual(buffer, expected);
     });
@@ -47,7 +54,7 @@ describe('BigInt', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0x26, 8]);
 
-      const result = TYPES.BigInt.generateTypeInfo({ } as any, { } as any);
+      const result = TYPES.BigInt.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -56,9 +63,9 @@ describe('BigInt', function() {
 describe('Binary', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Binary.generateParameterLength({ value: null, length: 10 }, { } as any), Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(TYPES.Binary.generateParameterLength({ value: Buffer.alloc(0), length: 0 }, { } as any), Buffer.from([0x00, 0x00]));
-      assert.deepEqual(TYPES.Binary.generateParameterLength({ value: Buffer.alloc(100), length: 100 }, { } as any), Buffer.from([0x64, 0x00]));
+      assert.deepEqual(TYPES.Binary.generateParameterLength({ value: null, length: 10 }, options), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.Binary.generateParameterLength({ value: Buffer.alloc(0), length: 0 }, options), Buffer.from([0x00, 0x00]));
+      assert.deepEqual(TYPES.Binary.generateParameterLength({ value: Buffer.alloc(100), length: 100 }, options), Buffer.from([0x64, 0x00]));
     });
   });
 
@@ -68,7 +75,7 @@ describe('Binary', function() {
       const expected = Buffer.from('12340000', 'hex');
       const parameterValue = { value, length: 4 };
 
-      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -77,7 +84,7 @@ describe('Binary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length: 4 };
 
-      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -85,11 +92,11 @@ describe('Binary', function() {
   describe('.generateTypeInfo', function() {
     it('returns the correct type information', function() {
       const type = TYPES.Binary;
-      const parameter = { length: 1 };
+      const parameter = { value: null, length: 1 };
 
       const expected = Buffer.from([0xAD, 1, 0]);
 
-      const result = type.generateTypeInfo(parameter as any, { } as any);
+      const result = type.generateTypeInfo(parameter, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -98,9 +105,9 @@ describe('Binary', function() {
 describe('Bit', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Bit.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Bit.generateParameterLength({ value: true }, { } as any), Buffer.from([0x01]));
-      assert.deepEqual(TYPES.Bit.generateParameterLength({ value: false }, { } as any), Buffer.from([0x01]));
+      assert.deepEqual(TYPES.Bit.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Bit.generateParameterLength({ value: true }, options), Buffer.from([0x01]));
+      assert.deepEqual(TYPES.Bit.generateParameterLength({ value: false }, options), Buffer.from([0x01]));
     });
   });
 
@@ -110,7 +117,7 @@ describe('Bit', function() {
       const expected = Buffer.from([0x01]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -119,7 +126,7 @@ describe('Bit', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -128,7 +135,7 @@ describe('Bit', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -137,7 +144,7 @@ describe('Bit', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0x68, 1]);
 
-      const result = TYPES.Bit.generateTypeInfo({ } as any, { } as any);
+      const result = TYPES.Bit.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -146,8 +153,8 @@ describe('Bit', function() {
 describe('Char', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Char.generateParameterLength({ value: null }, { } as any), Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(TYPES.Char.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]) }, { } as any), Buffer.from([0x04, 0x00]));
+      assert.deepEqual(TYPES.Char.generateParameterLength({ value: null }, options), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.Char.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]) }, options), Buffer.from([0x04, 0x00]));
     });
   });
 
@@ -156,7 +163,7 @@ describe('Char', function() {
       const value = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, value);
     });
 
@@ -165,7 +172,7 @@ describe('Char', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -174,7 +181,7 @@ describe('Char', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0xAF, 1, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-      const result = TYPES.Char.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = TYPES.Char.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -183,8 +190,8 @@ describe('Char', function() {
 describe('Date', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Date.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Date.generateParameterLength({ value: new Date() }, { } as any), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Date.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Date.generateParameterLength({ value: new Date() }, options), Buffer.from([0x03]));
     });
   });
 
@@ -196,7 +203,7 @@ describe('Date', function() {
         [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('173a0b', 'hex')],
         [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('183a0b', 'hex')]
       ]) {
-        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: value }, { useUTC: false } as any)]);
+        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: value }, optionsWithUTCFalse)]);
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -207,7 +214,7 @@ describe('Date', function() {
       const type = TYPES.Date;
       const expected = Buffer.from([0x28]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -230,8 +237,8 @@ describe('Date', function() {
 describe('DateTime', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: new Date() }, { } as any), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: new Date() }, options), Buffer.from([0x08]));
     });
   });
 
@@ -245,7 +252,7 @@ describe('DateTime', function() {
       ]) {
         const parameter = { value: testSet[0] };
         const expectedNoOfDays = testSet[1];
-        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData(parameter, { useUTC: false } as any)]);
+        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData(parameter, optionsWithUTCFalse)]);
         assert.strictEqual(buffer.readInt32LE(0), expectedNoOfDays);
       }
     });
@@ -256,7 +263,7 @@ describe('DateTime', function() {
       const type = TYPES.DateTime;
       const expected = Buffer.from([0x6F, 8]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -277,23 +284,23 @@ describe('DateTime', function() {
 describe('DateTime2', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 0 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 1 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 2 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 3 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 4 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 5 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 6 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 7 }, { } as any), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 0 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 1 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 2 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 3 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 4 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 5 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 6 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: null, scale: 7 }, options), Buffer.from([0x00]));
 
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 0 }, { } as any), Buffer.from([0x06]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 1 }, { } as any), Buffer.from([0x06]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 2 }, { } as any), Buffer.from([0x06]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 3 }, { } as any), Buffer.from([0x07]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 4 }, { } as any), Buffer.from([0x07]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 5 }, { } as any), Buffer.from([0x08]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 6 }, { } as any), Buffer.from([0x08]));
-      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 7 }, { } as any), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 0 }, options), Buffer.from([0x06]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 1 }, options), Buffer.from([0x06]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 2 }, options), Buffer.from([0x06]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 3 }, options), Buffer.from([0x07]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 4 }, options), Buffer.from([0x07]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 5 }, options), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 6 }, options), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTime2.generateParameterLength({ value: new Date(), scale: 7 }, options), Buffer.from([0x08]));
     });
   });
 
@@ -305,7 +312,7 @@ describe('DateTime2', function() {
         [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('7f5101173a0b', 'hex')],
         [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('000000183a0b', 'hex')]
       ]) {
-        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: value, scale: 0 }, { useUTC: false } as any)]);
+        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: value, scale: 0 }, optionsWithUTCFalse)]);
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -315,7 +322,7 @@ describe('DateTime2', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0x2A, 1]);
 
-      const buffer = TYPES.DateTime2.generateTypeInfo({ scale: 1 } as any, { } as any);
+      const buffer = TYPES.DateTime2.generateTypeInfo({ value: null, scale: 1 }, options);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -337,23 +344,23 @@ describe('DateTime2', function() {
 describe('DateTimeOffset', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 0 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 1 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 2 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 3 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 4 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 5 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 6 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 7 }, { } as any), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 0 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 1 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 2 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 3 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 4 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 5 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 6 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: null, scale: 7 }, options), Buffer.from([0x00]));
 
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 0 }, { } as any), Buffer.from([0x08]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 1 }, { } as any), Buffer.from([0x08]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 2 }, { } as any), Buffer.from([0x08]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 3 }, { } as any), Buffer.from([0x09]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 4 }, { } as any), Buffer.from([0x09]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 5 }, { } as any), Buffer.from([0x0A]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 6 }, { } as any), Buffer.from([0x0A]));
-      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 7 }, { } as any), Buffer.from([0x0A]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 0 }, options), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 1 }, options), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 2 }, options), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 3 }, options), Buffer.from([0x09]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 4 }, options), Buffer.from([0x09]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 5 }, options), Buffer.from([0x0A]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 6 }, options), Buffer.from([0x0A]));
+      assert.deepEqual(TYPES.DateTimeOffset.generateParameterLength({ value: new Date(), scale: 7 }, options), Buffer.from([0x0A]));
     });
   });
 
@@ -363,7 +370,7 @@ describe('DateTimeOffset', function() {
       const expected = Buffer.from('20fd002d380b', 'hex');
       const parameterValue = { value, scale: 0 };
 
-      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, { useUTC: true } as any)]);
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue)]);
       assert.deepEqual(buffer.slice(0, 6), expected);
     });
 
@@ -372,7 +379,7 @@ describe('DateTimeOffset', function() {
       const expected = Buffer.from([]);
 
       const parameterValue = { value, scale: 0 };
-      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, { useUTC: true } as any)]);
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -381,7 +388,7 @@ describe('DateTimeOffset', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0x2B, 1]);
 
-      const buffer = TYPES.DateTimeOffset.generateTypeInfo({ scale: 1 } as any, { } as any);
+      const buffer = TYPES.DateTimeOffset.generateTypeInfo({ value: null, scale: 1 }, options);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -405,23 +412,23 @@ describe('Decimal', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
       for (let i = 1; i <= 38; i++) {
-        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: null, precision: i }, { } as any), Buffer.from([0x00]));
+        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: null, precision: i }, options), Buffer.from([0x00]));
       }
 
       for (let i = 1; i <= 9; i++) {
-        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x05]));
+        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x05]));
       }
 
       for (let i = 10; i <= 19; i++) {
-        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x09]));
+        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x09]));
       }
 
       for (let i = 20; i <= 28; i++) {
-        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x0D]));
+        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x0D]));
       }
 
       for (let i = 29; i <= 38; i++) {
-        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x11]));
+        assert.deepEqual(TYPES.Decimal.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x11]));
       }
     });
   });
@@ -435,7 +442,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -447,7 +454,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -459,7 +466,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -471,7 +478,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -482,23 +489,23 @@ describe('Decimal', function() {
 
       // Precision <= 9
       const expected1 = Buffer.from([0x6A, 5, 1, 1]);
-      const result = type.generateTypeInfo({ precision: 1, scale: 1 } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null, precision: 1, scale: 1 }, options);
       assert.deepEqual(result, expected1);
 
       // Precision <= 19
       const expected2 = Buffer.from([0x6A, 9, 15, 1]);
-      const result2 = type.generateTypeInfo({ precision: 15, scale: 1 } as any, { } as any);
+      const result2 = type.generateTypeInfo({ value: null, precision: 15, scale: 1 }, options);
       assert.deepEqual(result2, expected2);
 
 
       // Precision <= 28
       const expected3 = Buffer.from([0x6A, 13, 20, 1]);
-      const result3 = type.generateTypeInfo({ precision: 20, scale: 1 } as any, { } as any);
+      const result3 = type.generateTypeInfo({ value: null, precision: 20, scale: 1 }, options);
       assert.deepEqual(result3, expected3);
 
       // Precision > 28
       const expected4 = Buffer.from([0x6A, 17, 30, 1]);
-      const result4 = type.generateTypeInfo({ precision: 30, scale: 1 } as any, { } as any);
+      const result4 = type.generateTypeInfo({ value: null, precision: 30, scale: 1 }, options);
       assert.deepEqual(result4, expected4);
     });
   });
@@ -535,8 +542,8 @@ describe('Decimal', function() {
 describe('Float', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Float.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Float.generateParameterLength({ value: 1.2345 }, { } as any), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.Float.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Float.generateParameterLength({ value: 1.2345 }, options), Buffer.from([0x08]));
     });
   });
 
@@ -548,7 +555,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -559,7 +566,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -569,7 +576,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const expected = Buffer.from([0x6D, 8]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -606,8 +613,8 @@ describe('Float', function() {
 describe('Image', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Image.generateParameterLength({ value: null, length: -1 }, { } as any), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]));
-      assert.deepEqual(TYPES.Image.generateParameterLength({ value: Buffer.alloc(10), length: 10 }, { } as any), Buffer.from([0x0A, 0x00, 0x00, 0x00]));
+      assert.deepEqual(TYPES.Image.generateParameterLength({ value: null, length: -1 }, options), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.Image.generateParameterLength({ value: Buffer.alloc(10), length: 10 }, options), Buffer.from([0x0A, 0x00, 0x00, 0x00]));
     });
   });
 
@@ -618,7 +625,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const parameterValue = { value, length: 100 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, value);
     });
 
@@ -629,7 +636,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const parameterValue = { value, length: -1 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -639,7 +646,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const expected = Buffer.from([0x22, 1, 0, 0, 0]);
 
-      const result = type.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -648,8 +655,8 @@ describe('Image', function() {
 describe('Int', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Int.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Int.generateParameterLength({ value: 123 }, { } as any), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.Int.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Int.generateParameterLength({ value: 123 }, options), Buffer.from([0x04]));
     });
   });
 
@@ -661,7 +668,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -672,7 +679,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -682,7 +689,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const expected = Buffer.from([0x26, 4]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -709,8 +716,8 @@ describe('Int', function() {
 describe('Money', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Money.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Money.generateParameterLength({ value: 123 }, { } as any), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.Money.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Money.generateParameterLength({ value: 123 }, options), Buffer.from([0x08]));
     });
   });
 
@@ -722,7 +729,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -733,7 +740,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -743,7 +750,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const expected = Buffer.from([0x6E, 8]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -771,8 +778,8 @@ describe('Money', function() {
 describe('NChar', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.NChar.generateParameterLength({ value: null }, { } as any), Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(TYPES.NChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]) }, { } as any), Buffer.from([0x04, 0x00]));
+      assert.deepEqual(TYPES.NChar.generateParameterLength({ value: null }, options), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.NChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]) }, options), Buffer.from([0x04, 0x00]));
     });
   });
 
@@ -783,7 +790,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, value);
     });
 
@@ -794,7 +801,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -804,7 +811,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const expected = Buffer.from([0xEF, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-      const result = type.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -814,23 +821,23 @@ describe('Numeric', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
       for (let i = 1; i <= 38; i++) {
-        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: null, precision: i }, { } as any), Buffer.from([0x00]));
+        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: null, precision: i }, options), Buffer.from([0x00]));
       }
 
       for (let i = 1; i <= 9; i++) {
-        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x05]));
+        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x05]));
       }
 
       for (let i = 10; i <= 19; i++) {
-        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x09]));
+        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x09]));
       }
 
       for (let i = 20; i <= 28; i++) {
-        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x0D]));
+        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x0D]));
       }
 
       for (let i = 29; i <= 38; i++) {
-        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, { } as any), Buffer.from([0x11]));
+        assert.deepEqual(TYPES.Numeric.generateParameterLength({ value: 1.23, precision: i }, options), Buffer.from([0x11]));
       }
     });
   });
@@ -844,7 +851,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -856,7 +863,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -868,7 +875,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -880,7 +887,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -891,22 +898,22 @@ describe('Numeric', function() {
 
       // Precision <= 9
       const expected1 = Buffer.from([0x6C, 5, 1, 1]);
-      const result = type.generateTypeInfo({ precision: 1, scale: 1 } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null, precision: 1, scale: 1 }, options);
       assert.deepEqual(result, expected1);
 
       // Precision <= 19
       const expected2 = Buffer.from([0x6C, 9, 15, 1]);
-      const result2 = type.generateTypeInfo({ precision: 15, scale: 1 } as any, { } as any);
+      const result2 = type.generateTypeInfo({ value: null, precision: 15, scale: 1 }, options);
       assert.deepEqual(result2, expected2);
 
       // Precision <= 28
       const expected3 = Buffer.from([0x6C, 13, 20, 1]);
-      const result3 = type.generateTypeInfo({ precision: 20, scale: 1 } as any, { } as any);
+      const result3 = type.generateTypeInfo({ value: null, precision: 20, scale: 1 }, options);
       assert.deepEqual(result3, expected3);
 
       // Precision > 28
       const expected4 = Buffer.from([0x6C, 17, 30, 1]);
-      const result4 = type.generateTypeInfo({ precision: 30, scale: 1 } as any, { } as any);
+      const result4 = type.generateTypeInfo({ value: null, precision: 30, scale: 1 }, options);
       assert.deepEqual(result4, expected4);
     });
   });
@@ -915,11 +922,11 @@ describe('Numeric', function() {
 describe('NVarChar', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: null, length: 10 }, { } as any), Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, { } as any), Buffer.from([0x04, 0x00]));
+      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: null, length: 10 }, options), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, options), Buffer.from([0x04, 0x00]));
 
-      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: null, length: 10000 }, { } as any), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
-      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, { } as any), Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: null, length: 10000 }, options), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.NVarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, options), Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
     });
   });
 
@@ -932,7 +939,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -944,7 +951,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -956,7 +963,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -968,7 +975,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -979,13 +986,13 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const expected = Buffer.from([0xE7, 2, 0, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-      const result = type.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
 
       // Length > Maximum Length
       const expected1 = Buffer.from([0xE7, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-      const result2 = type.generateTypeInfo({ length: 4100 } as any, { } as any);
+      const result2 = type.generateTypeInfo({ value: null, length: 4100 }, options);
       assert.deepEqual(result2, expected1);
     });
   });
@@ -994,8 +1001,8 @@ describe('NVarChar', function() {
 describe('Real', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Real.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Real.generateParameterLength({ value: 123.123 }, { } as any), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.Real.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Real.generateParameterLength({ value: 123.123 }, options), Buffer.from([0x04]));
     });
   });
 
@@ -1007,7 +1014,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1018,7 +1025,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1028,7 +1035,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const expected = Buffer.from([0x6D, 4]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1037,8 +1044,8 @@ describe('Real', function() {
 describe('SmallDateTime', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: new Date() }, { } as any), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: new Date() }, options), Buffer.from([0x04]));
     });
   });
 
@@ -1050,7 +1057,7 @@ describe('SmallDateTime', function() {
         [new Date(2015, 5, 19, 23, 59, 59), 42172],
         [new Date(2015, 5, 20, 0, 0, 0), 42173]
       ]) {
-        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value }, { useUTC: false } as any)]);
+        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value }, optionsWithUTCFalse)]);
 
         assert.strictEqual(buffer.readUInt16LE(0), expectedNoOfDays);
       }
@@ -1060,7 +1067,7 @@ describe('SmallDateTime', function() {
   describe('.generateTypeInfo', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0x6F, 0x04]);
-      const result = TYPES.SmallDateTime.generateTypeInfo({ } as any, { } as any);
+      const result = TYPES.SmallDateTime.generateTypeInfo({ value: null }, options);
 
       assert.deepEqual(result, expected);
     });
@@ -1086,8 +1093,8 @@ describe('SmallDateTime', function() {
 describe('SmallInt', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.SmallInt.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.SmallInt.generateParameterLength({ value: 123 }, { } as any), Buffer.from([0x02]));
+      assert.deepEqual(TYPES.SmallInt.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.SmallInt.generateParameterLength({ value: 123 }, options), Buffer.from([0x02]));
     });
   });
 
@@ -1099,7 +1106,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1110,7 +1117,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1120,7 +1127,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const expected = Buffer.from([0x26, 2]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1147,8 +1154,8 @@ describe('SmallInt', function() {
 describe('SmallMoney', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.SmallMoney.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.SmallMoney.generateParameterLength({ value: 123 }, { } as any), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.SmallMoney.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.SmallMoney.generateParameterLength({ value: 123 }, options), Buffer.from([0x04]));
     });
   });
 
@@ -1160,7 +1167,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1171,7 +1178,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1199,7 +1206,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const expected = Buffer.from([0x6E, 4]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1208,8 +1215,8 @@ describe('SmallMoney', function() {
 describe('Text', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Text.generateParameterLength({ value: null, length: -1 }, { } as any), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]));
-      assert.deepEqual(TYPES.Text.generateParameterLength({ value: Buffer.from('Hello World', 'ascii'), length: 11 }, { } as any), Buffer.from([0x0B, 0x00, 0x00, 0x00]));
+      assert.deepEqual(TYPES.Text.generateParameterLength({ value: null, length: -1 }, options), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.Text.generateParameterLength({ value: Buffer.from('Hello World', 'ascii'), length: 11 }, options), Buffer.from([0x0B, 0x00, 0x00, 0x00]));
     });
   });
 
@@ -1221,7 +1228,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const parameterValue = { value, length: 15 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1232,7 +1239,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const parameterValue = { value, length: -1 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1242,7 +1249,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const expected = Buffer.from([0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-      const result = type.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1251,38 +1258,54 @@ describe('Text', function() {
 describe('Time', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 0 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 1 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 2 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 3 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 4 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 5 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 6 }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 7 }, { } as any), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 0 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 1 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 2 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 3 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 4 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 5 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 6 }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 7 }, options), Buffer.from([0x00]));
 
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 0 }, { } as any), Buffer.from([0x03]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 1 }, { } as any), Buffer.from([0x03]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 2 }, { } as any), Buffer.from([0x03]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 3 }, { } as any), Buffer.from([0x04]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 4 }, { } as any), Buffer.from([0x04]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 5 }, { } as any), Buffer.from([0x05]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 6 }, { } as any), Buffer.from([0x05]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 7 }, { } as any), Buffer.from([0x05]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 0 }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 1 }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 2 }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 3 }, options), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 4 }, options), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 5 }, options), Buffer.from([0x05]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 6 }, options), Buffer.from([0x05]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 7 }, options), Buffer.from([0x05]));
     });
   });
   describe('.generateParameterData', function() {
     // Test rounding of nanosecondDelta
     it('correctly converts `Date` values with a `nanosecondDelta` property', () => {
       const type = TYPES.Time;
-      for (const [value, nanosecondDelta, scale, expectedBuffer] of [
-        [new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264, 7, Buffer.from('68fc624b91', 'hex')],
-        [new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612, 7, Buffer.from('c422ceb80c', 'hex')],
-        [new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118, 7, Buffer.from('1e94c8e96b', 'hex')]
-      ]) {
-        const parameter = { value: value, scale: scale };
-        (parameter.value as any).nanosecondDelta = nanosecondDelta;
+      // Date with nanosecondDelta is an extended Date type used by the library for sub-millisecond precision
+      interface DateWithNanosecondDelta extends Date {
+        nanosecondDelta: number;
+      }
+      interface TimeTestCase {
+        value: DateWithNanosecondDelta;
+        scale: number;
+        expectedBuffer: Buffer;
+      }
 
-        const buffer = Buffer.concat([...type.generateParameterData(parameter as any, { useUTC: false } as any)]);
+      const createTestDate = (date: Date, nanosecondDelta: number): DateWithNanosecondDelta => {
+        const d = date as DateWithNanosecondDelta;
+        d.nanosecondDelta = nanosecondDelta;
+        return d;
+      };
+
+      const testCases: TimeTestCase[] = [
+        { value: createTestDate(new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264), scale: 7, expectedBuffer: Buffer.from('68fc624b91', 'hex') },
+        { value: createTestDate(new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612), scale: 7, expectedBuffer: Buffer.from('c422ceb80c', 'hex') },
+        { value: createTestDate(new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118), scale: 7, expectedBuffer: Buffer.from('1e94c8e96b', 'hex') }
+      ];
+
+      for (const { value, scale, expectedBuffer } of testCases) {
+        const parameter = { value, scale };
+        const buffer = Buffer.concat([...type.generateParameterData(parameter, optionsWithUTCFalse)]);
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -1293,7 +1316,7 @@ describe('Time', function() {
       const type = TYPES.Time;
       const expected = Buffer.from([0x29, 1]);
 
-      const reuslt = type.generateTypeInfo({ scale: 1 } as any, { } as any);
+      const reuslt = type.generateTypeInfo({ value: null, scale: 1 }, options);
       assert.deepEqual(reuslt, expected);
     });
   });
@@ -1302,8 +1325,8 @@ describe('Time', function() {
 describe('TinyInt', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.TinyInt.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.TinyInt.generateParameterLength({ value: 4 }, { } as any), Buffer.from([0x01]));
+      assert.deepEqual(TYPES.TinyInt.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.TinyInt.generateParameterLength({ value: 4 }, options), Buffer.from([0x01]));
     });
   });
 
@@ -1315,7 +1338,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1326,7 +1349,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1336,7 +1359,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const expected = Buffer.from([0x26, 1]);
 
-      const result = type.generateTypeInfo({ } as any, { } as any);
+      const result = type.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1363,14 +1386,14 @@ describe('TinyInt', function() {
 describe('TVP', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.TVP.generateParameterLength({ value: null }, { } as any), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.TVP.generateParameterLength({ value: null }, options), Buffer.from([0xFF, 0xFF]));
       assert.deepEqual(
         TYPES.TVP.generateParameterLength({
           value: {
             columns: [{ name: 'user_id', type: TYPES.Int }],
             rows: [[ 15 ], [ 16 ]]
           }
-        }, { } as any),
+        }, options),
         Buffer.from([0x01, 0x00])
       );
     });
@@ -1385,7 +1408,7 @@ describe('TVP', function() {
       const expected = Buffer.from('0000000000002604000001040f00000000', 'hex');
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1395,7 +1418,7 @@ describe('TVP', function() {
       const expected = Buffer.from([0x00, 0x00]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1404,7 +1427,7 @@ describe('TVP', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0xF3, 0x00, 0x00, 0x00]);
 
-      const result = TYPES.TVP.generateTypeInfo({ value: null } as any, { } as any);
+      const result = TYPES.TVP.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1413,8 +1436,8 @@ describe('TVP', function() {
 describe('UniqueIdentifier', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.UniqueIdentifier.generateParameterLength({ value: null }, { } as any), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.UniqueIdentifier.generateParameterLength({ value: 'e062ae34-6de5-47f3-8ba3-29d25f77e71a' }, { } as any), Buffer.from([0x10]));
+      assert.deepEqual(TYPES.UniqueIdentifier.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
+      assert.deepEqual(TYPES.UniqueIdentifier.generateParameterLength({ value: 'e062ae34-6de5-47f3-8ba3-29d25f77e71a' }, options), Buffer.from([0x10]));
     });
   });
 
@@ -1425,7 +1448,7 @@ describe('UniqueIdentifier', function() {
       const expected = Buffer.from('34ae62e0e56df3478ba329d25f77e71a', 'hex');
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1435,7 +1458,7 @@ describe('UniqueIdentifier', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1444,7 +1467,7 @@ describe('UniqueIdentifier', function() {
     it('returns the correct type information', function() {
       const expected = Buffer.from([0x24, 0x10]);
 
-      const result = TYPES.UniqueIdentifier.generateTypeInfo({ } as any, { } as any);
+      const result = TYPES.UniqueIdentifier.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, expected);
     });
   });
@@ -1467,32 +1490,34 @@ describe('UniqueIdentifier', function() {
 describe('VarBinary', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: null, length: 10 }, { } as any), Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, { } as any), Buffer.from([0x04, 0x00]));
+      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: null, length: 10 }, options), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, options), Buffer.from([0x04, 0x00]));
 
-      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: null, length: 10000 }, { } as any), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
-      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, { } as any), Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: null, length: 10000 }, options), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.VarBinary.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, options), Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
     });
   });
 
   describe('.generateParameterData', function() {
     it('correctly converts `null` values', () => {
-      for (const [value, length, expected] of [
-        [null, 1, Buffer.from([])],
-        [null, 9000, Buffer.from([])]
-      ]) {
+      const testCases: Array<{ value: null; length: number; expected: Buffer }> = [
+        { value: null, length: 1, expected: Buffer.from([]) },
+        { value: null, length: 9000, expected: Buffer.from([]) }
+      ];
+      for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
-        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue as any, { useUTC: false } as any)]);
+        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
         assert.deepEqual(buffer, expected);
       }
     });
 
     it('correctly converts `number` values', () => {
-      for (const [value, length, expected] of [
-        [1, 1, Buffer.from('3100', 'hex')],
-      ]) {
+      const testCases: Array<{ value: number; length: number; expected: Buffer }> = [
+        { value: 1, length: 1, expected: Buffer.from('3100', 'hex') },
+      ];
+      for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
-        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue as any, { useUTC: false } as any)]);
+        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
         assert.deepEqual(buffer, expected);
       }
     });
@@ -1503,7 +1528,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('3100', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1513,7 +1538,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('02000000310000000000', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1523,7 +1548,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1533,7 +1558,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1543,13 +1568,13 @@ describe('VarBinary', function() {
       // Length <= Maximum Length
       const expected = Buffer.from([0xA5, 0x01, 0x00]);
 
-      const result = TYPES.VarBinary.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = TYPES.VarBinary.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
 
       // Length > Maximum Length
       const expected1 = Buffer.from([0xA5, 0xFF, 0xFF]);
 
-      const result1 = TYPES.VarBinary.generateTypeInfo({ length: 8500 } as any, { } as any);
+      const result1 = TYPES.VarBinary.generateTypeInfo({ value: null, length: 8500 }, options);
       assert.deepEqual(result1, expected1);
     });
   });
@@ -1558,11 +1583,11 @@ describe('VarBinary', function() {
 describe('VarChar', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: null, length: 10 }, { } as any), Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, { } as any), Buffer.from([0x04, 0x00]));
+      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: null, length: 10 }, options), Buffer.from([0xFF, 0xFF]));
+      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, options), Buffer.from([0x04, 0x00]));
 
-      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: null, length: 10000 }, { } as any), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
-      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, { } as any), Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: null, length: 10000 }, options), Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(TYPES.VarChar.generateParameterLength({ value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, options), Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
     });
   });
 
@@ -1573,7 +1598,7 @@ describe('VarChar', function() {
       const expected = Buffer.from('68656c6c6f20776f726c64', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1583,7 +1608,7 @@ describe('VarChar', function() {
       const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1593,7 +1618,7 @@ describe('VarChar', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1603,7 +1628,7 @@ describe('VarChar', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, { useUTC: false } as any)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1613,13 +1638,13 @@ describe('VarChar', function() {
       // Length <= Maximum Length
       const expected = Buffer.from('a7010000000000000', 'hex');
 
-      const result = TYPES.VarChar.generateTypeInfo({ length: 1 } as any, { } as any);
+      const result = TYPES.VarChar.generateTypeInfo({ value: null, length: 1 }, options);
       assert.deepEqual(result, expected);
 
       // Length > Maximum Length
       const expected1 = Buffer.from('a7ffff0000000000', 'hex');
 
-      const result2 = TYPES.VarChar.generateTypeInfo({ length: 8500 } as any, { } as any);
+      const result2 = TYPES.VarChar.generateTypeInfo({ value: null, length: 8500 }, options);
       assert.deepEqual(result2, expected1);
     });
   });

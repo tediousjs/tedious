@@ -1,6 +1,11 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { DoneToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
+
+const debug = new Debug();
+const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
 
 function parse(status: number, curCmd: number, doneRowCount: number) {
   const doneRowCountLow = doneRowCount % 0x100000000;
@@ -14,7 +19,7 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
+  const parser = StreamParser.parseTokens([buffer.data], debug, options);
   return parser;
 }
 
@@ -29,9 +34,9 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as any).more);
-    assert.strictEqual((token as any).curCmd, curCmd);
-    assert.isOk(!(token as any).rowCount);
+    assert.isOk(!(token as DoneToken).more);
+    assert.strictEqual((token as DoneToken).curCmd, curCmd);
+    assert.isOk(!(token as DoneToken).rowCount);
   });
 
   it('should more', async () => {
@@ -44,9 +49,9 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk((token as any).more);
-    assert.strictEqual((token as any).curCmd, curCmd);
-    assert.isOk(!(token as any).rowCount);
+    assert.isOk((token as DoneToken).more);
+    assert.strictEqual((token as DoneToken).curCmd, curCmd);
+    assert.isOk(!(token as DoneToken).rowCount);
   });
 
   it('should done row count', async () => {
@@ -59,8 +64,8 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as any).more);
-    assert.strictEqual((token as any).curCmd, 1);
-    assert.strictEqual((token as any).rowCount, doneRowCount);
+    assert.isOk(!(token as DoneToken).more);
+    assert.strictEqual((token as DoneToken).curCmd, 1);
+    assert.strictEqual((token as DoneToken).rowCount, doneRowCount);
   });
 });

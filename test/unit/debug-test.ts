@@ -1,9 +1,12 @@
 import Debug from '../../src/debug';
+import { Packet } from '../../src/packet';
+import { Token } from '../../src/token/token';
 import { assert } from 'chai';
 
 const payload = 'payload';
 
-class Packet {
+// Mock Packet class that provides minimal implementation for debug tests
+class MockPacket {
   headerToString(): string {
     return 'header';
   }
@@ -33,7 +36,7 @@ describe('Packet Tests', function() {
       }
     });
 
-    return debug.packet('Sent', new Packet() as any);
+    return debug.packet('Sent', new MockPacket() as Packet);
   });
 
   it('should enable payload', function(done) {
@@ -68,7 +71,7 @@ describe('Packet Tests', function() {
       done();
     });
 
-    debug.data(new Packet() as any);
+    debug.data(new MockPacket() as Packet);
   });
 
   it('should not enable data', function(done) {
@@ -77,7 +80,7 @@ describe('Packet Tests', function() {
       assert.isOk(false);
     });
 
-    debug.data(new Packet() as any);
+    debug.data(new MockPacket() as Packet);
 
     done();
   });
@@ -90,7 +93,7 @@ describe('Packet Tests', function() {
       done();
     });
 
-    debug.token({ name: 'test' } as any);
+    debug.token({ name: 'test' } as Token);
   });
 
   it('should not enable payload', function(done) {
@@ -99,7 +102,7 @@ describe('Packet Tests', function() {
       assert.isOk(false);
     });
 
-    debug.token({ name: 'test' } as any);
+    debug.token({ name: 'test' } as Token);
 
     done();
   });

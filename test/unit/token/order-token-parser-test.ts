@@ -1,6 +1,11 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { OrderToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
+
+const debug = new Debug();
+const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
 
 describe('Order Token Parser', () => {
   it('should have one column', async () => {
@@ -15,13 +20,13 @@ describe('Order Token Parser', () => {
     buffer.writeUInt16LE(column);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).orderColumns.length, 1);
+    assert.strictEqual((token as OrderToken).orderColumns.length, 1);
 
-    assert.strictEqual((token as any).orderColumns[0], column);
+    assert.strictEqual((token as OrderToken).orderColumns[0], column);
   });
 
   it('should have two columns', async () => {
@@ -38,13 +43,13 @@ describe('Order Token Parser', () => {
     buffer.writeUInt16LE(column2);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).orderColumns.length, 2);
-    assert.strictEqual((token as any).orderColumns[0], column1);
-    assert.strictEqual((token as any).orderColumns[1], column2);
+    assert.strictEqual((token as OrderToken).orderColumns.length, 2);
+    assert.strictEqual((token as OrderToken).orderColumns[0], column1);
+    assert.strictEqual((token as OrderToken).orderColumns[1], column2);
 
     assert.isTrue((await parser.next()).done);
   });

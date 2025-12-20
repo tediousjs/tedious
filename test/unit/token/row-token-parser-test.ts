@@ -7,14 +7,20 @@ import FloatN from '../../../src/data-types/floatn';
 import DateTimeN from '../../../src/data-types/datetimen';
 import NumericN from '../../../src/data-types/numericn';
 
-import Parser from '../../../src/token/stream-parser';
+import Parser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { RowToken } from '../../../src/token/token';
+import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 
-const options = {
+const options: ParserOptions = {
   useUTC: false,
   tdsVersion: '7_2'
-} as any;
+};
+
+// Debug instance for tests - no options needed for unit tests
+const debug = new Debug();
 
 describe('Row Token Parser', () => {
   describe('parsing a row with many columns', function() {
@@ -33,16 +39,16 @@ describe('Row Token Parser', () => {
         buffer.writeUsVarchar(i.toString());
       }
 
-      const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
 
-      assert.strictEqual((token as any).columns.length, 1024);
+      assert.strictEqual((token as RowToken).columns.length, 1024);
 
       for (let i = 0; i < 1024; i += 1) {
-        assert.strictEqual((token as any).columns[i].value, i.toString());
-        assert.strictEqual((token as any).columns[i].metadata, colMetadata[i]);
+        assert.strictEqual((token as RowToken).columns[i].value, i.toString());
+        assert.strictEqual((token as RowToken).columns[i].metadata, colMetadata[i]);
       }
 
       assert.isTrue((await parser.next()).done);
@@ -57,14 +63,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -80,14 +86,14 @@ describe('Row Token Parser', () => {
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 2);
-    assert.strictEqual('1', (token as any).columns[0].value);
-    assert.strictEqual('9223372036854775807', (token as any).columns[1].value);
+    assert.strictEqual((token as RowToken).columns.length, 2);
+    assert.strictEqual('1', (token as RowToken).columns[0].value);
+    assert.strictEqual('9223372036854775807', (token as RowToken).columns[1].value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -99,15 +105,15 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -121,14 +127,14 @@ describe('Row Token Parser', () => {
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -159,18 +165,18 @@ describe('Row Token Parser', () => {
       Buffer.from([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 6);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[1].value, value);
-    assert.strictEqual((token as any).columns[2].value, null);
-    assert.strictEqual((token as any).columns[3].value, value);
-    assert.strictEqual((token as any).columns[4].value, value);
-    assert.strictEqual((token as any).columns[5].value, valueLarge);
+    assert.strictEqual((token as RowToken).columns.length, 6);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[1].value, value);
+    assert.strictEqual((token as RowToken).columns[2].value, null);
+    assert.strictEqual((token as RowToken).columns[3].value, value);
+    assert.strictEqual((token as RowToken).columns[4].value, value);
+    assert.strictEqual((token as RowToken).columns[5].value, valueLarge);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -191,14 +197,14 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -219,14 +225,14 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -240,14 +246,14 @@ describe('Row Token Parser', () => {
     buffer.writeString(value);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -261,15 +267,15 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.deepEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.deepEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -283,15 +289,15 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.deepEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.deepEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -313,14 +319,14 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -348,14 +354,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -382,14 +388,14 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -415,14 +421,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -448,7 +454,7 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
 
     let error;
     try {
@@ -477,14 +483,14 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -508,14 +514,14 @@ describe('Row Token Parser', () => {
     buffer.writeBuffer(Buffer.from(value.slice(2, 4)));
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.deepEqual((token as any).columns[0].value, value);
-    assert.strictEqual((token as any).columns[0].metadata, colMetadata[0]);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.deepEqual((token as RowToken).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -643,24 +649,24 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 12);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual('0', (token as any).columns[1].value);
-    assert.strictEqual('1', (token as any).columns[2].value);
-    assert.strictEqual('-1', (token as any).columns[3].value);
-    assert.strictEqual('2', (token as any).columns[4].value);
-    assert.strictEqual('-2', (token as any).columns[5].value);
-    assert.strictEqual('9223372036854775807', (token as any).columns[6].value);
-    assert.strictEqual('-9223372036854775808', (token as any).columns[7].value);
-    assert.strictEqual('10', (token as any).columns[8].value);
-    assert.strictEqual('100', (token as any).columns[9].value);
-    assert.strictEqual('1000', (token as any).columns[10].value);
-    assert.strictEqual('10000', (token as any).columns[11].value);
+    assert.strictEqual((token as RowToken).columns.length, 12);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.strictEqual('0', (token as RowToken).columns[1].value);
+    assert.strictEqual('1', (token as RowToken).columns[2].value);
+    assert.strictEqual('-1', (token as RowToken).columns[3].value);
+    assert.strictEqual('2', (token as RowToken).columns[4].value);
+    assert.strictEqual('-2', (token as RowToken).columns[5].value);
+    assert.strictEqual('9223372036854775807', (token as RowToken).columns[6].value);
+    assert.strictEqual('-9223372036854775808', (token as RowToken).columns[7].value);
+    assert.strictEqual('10', (token as RowToken).columns[8].value);
+    assert.strictEqual('100', (token as RowToken).columns[9].value);
+    assert.strictEqual('1000', (token as RowToken).columns[10].value);
+    assert.strictEqual('10000', (token as RowToken).columns[11].value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -697,16 +703,16 @@ describe('Row Token Parser', () => {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], { lowerCaseGuids: false } as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: false }, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 2);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.strictEqual((token as RowToken).columns.length, 2);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
     assert.deepEqual(
       '67452301-AB89-EFCD-0123-456789ABCDEF',
-      (token as any).columns[1].value
+      (token as RowToken).columns[1].value
     );
     assert.isTrue((await parser.next()).done);
 
@@ -743,16 +749,16 @@ describe('Row Token Parser', () => {
       ])
     );
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, { ...options, lowerCaseGuids: true }, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: true }, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 2);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.strictEqual((token as RowToken).columns.length, 2);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
     assert.deepEqual(
       '67452301-ab89-efcd-0123-456789abcdef',
-      (token as any).columns[1].value
+      (token as RowToken).columns[1].value
     );
     assert.isTrue((await parser.next()).done);
   });
@@ -787,15 +793,15 @@ describe('Row Token Parser', () => {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 3);
-    assert.strictEqual((token as any).columns[0].value, null);
-    assert.strictEqual(9.5, (token as any).columns[1].value);
-    assert.strictEqual(9.5, (token as any).columns[2].value);
+    assert.strictEqual((token as RowToken).columns.length, 3);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
+    assert.strictEqual(9.5, (token as RowToken).columns[1].value);
+    assert.strictEqual(9.5, (token as RowToken).columns[2].value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -813,15 +819,15 @@ describe('Row Token Parser', () => {
     // console.log(buffer)
 
     {
-      const parser = Parser.parseTokens([buffer.data], {} as any, { ...options, useUTC: false }, colMetadata as any);
+      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: false }, colMetadata as ColumnMetadata[]);
 
       let result = await parser.next();
       assert.isFalse(result.done);
 
       const token = result.value;
-      assert.strictEqual((token as any).columns.length, 1);
+      assert.strictEqual((token as RowToken).columns.length, 1);
       assert.strictEqual(
-        (token as any).columns[0].value.getTime(),
+        (token as RowToken).columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45').getTime()
       );
 
@@ -831,15 +837,15 @@ describe('Row Token Parser', () => {
     }
 
     {
-      const parser = Parser.parseTokens([buffer.data], {} as any, { ...options, useUTC: true }, colMetadata as any);
+      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: true }, colMetadata as ColumnMetadata[]);
 
       let result = await parser.next();
       assert.isFalse(result.done);
 
       const token = result.value;
-      assert.strictEqual((token as any).columns.length, 1);
+      assert.strictEqual((token as RowToken).columns.length, 1);
       assert.strictEqual(
-        (token as any).columns[0].value.getTime(),
+        (token as RowToken).columns[0].value.getTime(),
         new Date('January 3, 1900 00:00:45 GMT').getTime()
       );
 
@@ -858,14 +864,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -888,14 +894,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -918,13 +924,13 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -948,15 +954,15 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
 
     // console.log(token)
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -981,14 +987,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -1019,14 +1025,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, value);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, value);
     assert.isTrue((await parser.next()).done);
   });
 
@@ -1044,14 +1050,14 @@ describe('Row Token Parser', () => {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], {} as any, options, colMetadata as any);
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata as ColumnMetadata[]);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).columns.length, 1);
-    assert.strictEqual((token as any).columns[0].value, null);
+    assert.strictEqual((token as RowToken).columns.length, 1);
+    assert.strictEqual((token as RowToken).columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
 });

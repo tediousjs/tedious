@@ -1,6 +1,11 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { FeatureExtAckToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
+
+const debug = new Debug();
+const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
 
 describe('Feature Ext Parser', () => {
   it('should be fed authentication', async () => {
@@ -22,12 +27,12 @@ describe('Feature Ext Parser', () => {
 
     buffer.writeUInt8(0xFF); // terminator
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.isOk((token as any).fedAuth.equals(Buffer.from('bc')));
-    assert.isUndefined((token as any).utf8Support); // feature ext ack for UTF8_SUPPORT was not received
+    assert.isOk((token as FeatureExtAckToken).fedAuth.equals(Buffer.from('bc')));
+    assert.isUndefined((token as FeatureExtAckToken).utf8Support); // feature ext ack for UTF8_SUPPORT was not received
     assert.isTrue((await parser.next()).done);
   });
 
@@ -41,13 +46,13 @@ describe('Feature Ext Parser', () => {
 
     buffer.writeUInt8(0xFF); // TERMINATOR
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
 
     const token = result.value;
-    assert.strictEqual((token as any).utf8Support, true); // feature ext ack for UTF8_SUPPORT was positive
-    assert.isUndefined((token as any).fedAuth); // fed auth not ack'd
+    assert.strictEqual((token as FeatureExtAckToken).utf8Support, true); // feature ext ack for UTF8_SUPPORT was positive
+    assert.isUndefined((token as FeatureExtAckToken).fedAuth); // fed auth not ack'd
 
     assert.isTrue((await parser.next()).done);
   });

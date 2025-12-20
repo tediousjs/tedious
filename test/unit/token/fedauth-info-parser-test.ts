@@ -1,6 +1,11 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { FedAuthInfoToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
+
+const debug = new Debug();
+const options: ParserOptions = { tdsVersion: '7_2', useUTC: false };
 
 describe('Fedauth Info Parser', () => {
   it('should contain fed auth info', async () => {
@@ -17,12 +22,12 @@ describe('Fedauth Info Parser', () => {
     buffer.writeString('spn');
     buffer.writeString('stsurl');
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).stsurl, 'stsurl');
-    assert.strictEqual((token as any).spn, 'spn');
+    assert.strictEqual((token as FedAuthInfoToken).stsurl, 'stsurl');
+    assert.strictEqual((token as FedAuthInfoToken).spn, 'spn');
 
     assert.isTrue((await parser.next()).done);
   });
