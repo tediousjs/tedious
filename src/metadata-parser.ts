@@ -122,8 +122,7 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
  *
  * Structure per MS-TDS spec:
  * - Ordinal (USHORT): index into CekTable
- * - UserType (ULONG in TDS 7.2+, USHORT in earlier versions)
- * - BaseTypeInfo (TYPE_INFO): the actual underlying data type
+ * - BaseTypeInfo (TYPE_INFO): the actual underlying data type (includes UserType, Flags, TypeId, etc.)
  * - EncryptionAlgo (BYTE): 0=custom, 2=AEAD_AES_256_CBC_HMAC_SHA256
  * - [AlgoName] (B_VARCHAR): only if EncryptionAlgo=0
  * - EncryptionAlgoType (BYTE): 1=deterministic, 2=randomized
@@ -139,11 +138,7 @@ function readCryptoMetadata(
   let ordinal: number;
   ({ offset, value: ordinal } = readUInt16LE(buf, offset));
 
-  // UserType (ULONG in TDS 7.2+)
-  let baseUserType: number;
-  ({ offset, value: baseUserType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
-
-  // BaseTypeInfo - the actual underlying data type (recursive call without cekTable to avoid infinite recursion)
+  // BaseTypeInfo - the actual underlying data type (TYPE_INFO includes UserType, Flags, TypeId, etc.)
   let baseTypeInfo: BaseMetadata;
   ({ offset, value: baseTypeInfo } = readBaseMetadata(buf, offset, options));
 

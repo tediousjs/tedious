@@ -176,8 +176,7 @@ describe('Colmetadata Token Parser', () => {
 
       // CryptoMetadata
       buffer.writeUInt16LE(0); // Ordinal (index into CekTable)
-      buffer.writeUInt32LE(0); // UserType for CryptoMetadata
-      // BaseTypeInfo (TYPE_INFO structure parsed by readBaseMetadata)
+      // BaseTypeInfo (TYPE_INFO structure: UserType + Flags + TypeId + type-specific data)
       buffer.writeUInt32LE(0); // UserType for base type
       buffer.writeUInt16LE(0); // Flags for base type
       buffer.writeUInt8(dataTypeByName.Int.id); // Type number - actual type is Int
@@ -258,7 +257,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(8000);
       // CryptoMetadata
       buffer.writeUInt16LE(0); // Ordinal = 0
-      buffer.writeUInt32LE(0); // UserType for CryptoMetadata
+      // BaseTypeInfo (TYPE_INFO structure)
       buffer.writeUInt32LE(0); // UserType for base type
       buffer.writeUInt16LE(0); // Flags for base type
       buffer.writeUInt8(dataTypeByName.NVarChar.id);
@@ -276,7 +275,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(8000);
       // CryptoMetadata
       buffer.writeUInt16LE(1); // Ordinal = 1
-      buffer.writeUInt32LE(0); // UserType for CryptoMetadata
+      // BaseTypeInfo (TYPE_INFO structure)
       buffer.writeUInt32LE(0); // UserType for base type
       buffer.writeUInt16LE(0); // Flags for base type
       buffer.writeUInt8(dataTypeByName.DateTime2.id);
@@ -337,7 +336,7 @@ describe('Colmetadata Token Parser', () => {
 
       // CryptoMetadata with custom algorithm
       buffer.writeUInt16LE(0); // Ordinal
-      buffer.writeUInt32LE(0); // UserType for CryptoMetadata
+      // BaseTypeInfo (TYPE_INFO structure)
       buffer.writeUInt32LE(0); // UserType for base type
       buffer.writeUInt16LE(0); // Flags for base type
       buffer.writeUInt8(dataTypeByName.Int.id);
@@ -414,7 +413,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(8000);
       // CryptoMetadata
       buffer.writeUInt16LE(0); // Ordinal
-      buffer.writeUInt32LE(0); // UserType for CryptoMetadata
+      // BaseTypeInfo (TYPE_INFO structure)
       buffer.writeUInt32LE(0); // UserType for base type
       buffer.writeUInt16LE(0); // Flags for base type
       buffer.writeUInt8(dataTypeByName.Int.id);
