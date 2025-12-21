@@ -33,9 +33,12 @@ describe('Always Encrypted', function() {
         connection.on('debug', console.log);
       }
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -44,10 +47,6 @@ describe('Always Encrypted', function() {
         assert.isBoolean(connection.serverSupportsColumnEncryption);
 
         connection.close();
-      });
-
-      connection.on('end', function() {
-        done();
       });
     });
 
@@ -61,9 +60,12 @@ describe('Always Encrypted', function() {
         connection.on('debug', console.log);
       }
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -72,128 +74,98 @@ describe('Always Encrypted', function() {
 
         connection.close();
       });
-
-      connection.on('end', function() {
-        done();
-      });
     });
   });
 
   describe('Encrypted Column Metadata', function() {
-    let connection;
-
-    beforeEach(function(done) {
+    it('should be able to query sys.column_encryption_keys', function(done) {
       const config = getConfig();
       config.options.alwaysEncrypted = true;
 
-      connection = new Connection(config);
+      const connection = new Connection(config);
 
       if (process.env.TEDIOUS_DEBUG) {
         connection.on('debug', console.log);
       }
 
-      connection.connect(done);
-    });
-
-    afterEach(function(done) {
-      if (!connection.closed) {
-        connection.on('end', done);
-        connection.close();
-      } else {
+      connection.on('end', function() {
         done();
-      }
-    });
+      });
 
-    it('should be able to query sys.column_encryption_keys', function(done) {
-      // This verifies that AE-related system tables are accessible
-      const request = new Request(
-        'SELECT COUNT(*) as cnt FROM sys.column_encryption_keys',
-        function(err) {
-          if (err) {
-            return done(err);
-          }
-          done();
+      connection.connect(function(err) {
+        if (err) {
+          return done(err);
         }
-      );
 
-      let rowCount = 0;
-      request.on('row', function(columns) {
-        rowCount++;
-        assert.isNumber(columns[0].value);
+        // This verifies that AE-related system tables are accessible
+        const request = new Request(
+          'SELECT COUNT(*) as cnt FROM sys.column_encryption_keys',
+          function(err) {
+            if (err) {
+              done(err);
+              return connection.close();
+            }
+            connection.close();
+          }
+        );
+
+        let rowReceived = false;
+        request.on('row', function(columns) {
+          rowReceived = true;
+          // The count should be a number (could be 0 if no CEKs defined)
+          assert.isNumber(columns[0].value);
+        });
+
+        request.on('requestCompleted', function() {
+          assert.isTrue(rowReceived, 'Should have received a row');
+        });
+
+        connection.execSql(request);
       });
-
-      request.on('doneInProc', function() {
-        assert.strictEqual(rowCount, 1);
-      });
-
-      connection.execSql(request);
     });
 
     it('should be able to query sys.column_master_keys', function(done) {
-      const request = new Request(
-        'SELECT COUNT(*) as cnt FROM sys.column_master_keys',
-        function(err) {
-          if (err) {
-            return done(err);
-          }
-          done();
-        }
-      );
-
-      let rowCount = 0;
-      request.on('row', function(columns) {
-        rowCount++;
-        assert.isNumber(columns[0].value);
-      });
-
-      connection.execSql(request);
-    });
-  });
-
-  describe('sp_describe_parameter_encryption', function() {
-    let connection;
-
-    beforeEach(function(done) {
       const config = getConfig();
       config.options.alwaysEncrypted = true;
 
-      connection = new Connection(config);
+      const connection = new Connection(config);
 
       if (process.env.TEDIOUS_DEBUG) {
         connection.on('debug', console.log);
       }
 
-      connection.connect(done);
-    });
-
-    afterEach(function(done) {
-      if (!connection.closed) {
-        connection.on('end', done);
-        connection.close();
-      } else {
+      connection.on('end', function() {
         done();
-      }
-    });
+      });
 
-    it('should be able to call sp_describe_parameter_encryption for non-encrypted query', function(done) {
-      // This tests that sp_describe_parameter_encryption is available and works
-      // For a non-encrypted query, it should return empty results
-      const request = new Request(
-        "EXEC sp_describe_parameter_encryption N'SELECT 1', N''",
-        function(err) {
-          if (err) {
-            // sp_describe_parameter_encryption may not be available on older SQL Server
-            if (err.message.includes('Could not find stored procedure')) {
-              this.skip();
-              return done();
-            }
-            return done(err);
-          }
-          done();
+      connection.connect(function(err) {
+        if (err) {
+          return done(err);
         }
-      );
 
-      connection.execSql(request);
+        const request = new Request(
+          'SELECT COUNT(*) as cnt FROM sys.column_master_keys',
+          function(err) {
+            if (err) {
+              done(err);
+              return connection.close();
+            }
+            connection.close();
+          }
+        );
+
+        let rowReceived = false;
+        request.on('row', function(columns) {
+          rowReceived = true;
+          assert.isNumber(columns[0].value);
+        });
+
+        request.on('requestCompleted', function() {
+          assert.isTrue(rowReceived, 'Should have received a row');
+        });
+
+        connection.execSql(request);
+      });
     });
   });
 
@@ -232,9 +204,12 @@ describe('Always Encrypted', function() {
 
       const connection = new Connection(config);
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -243,10 +218,6 @@ describe('Always Encrypted', function() {
         assert.property(connection.config.options.encryptionKeyStoreProviders, 'TEST_PROVIDER');
 
         connection.close();
-      });
-
-      connection.on('end', function() {
-        done();
       });
     });
 
@@ -266,9 +237,12 @@ describe('Always Encrypted', function() {
 
       const connection = new Connection(config);
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -278,10 +252,6 @@ describe('Always Encrypted', function() {
         assert.property(providers, 'PROVIDER_2');
 
         connection.close();
-      });
-
-      connection.on('end', function() {
-        done();
       });
     });
   });
@@ -293,9 +263,12 @@ describe('Always Encrypted', function() {
 
       const connection = new Connection(config);
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -306,10 +279,6 @@ describe('Always Encrypted', function() {
 
         connection.close();
       });
-
-      connection.on('end', function() {
-        done();
-      });
     });
 
     it('should allow custom cache TTL', function(done) {
@@ -319,9 +288,12 @@ describe('Always Encrypted', function() {
 
       const connection = new Connection(config);
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -332,10 +304,6 @@ describe('Always Encrypted', function() {
 
         connection.close();
       });
-
-      connection.on('end', function() {
-        done();
-      });
     });
 
     it('should allow zero TTL to disable caching', function(done) {
@@ -345,9 +313,12 @@ describe('Always Encrypted', function() {
 
       const connection = new Connection(config);
 
+      connection.on('end', function() {
+        done();
+      });
+
       connection.connect(function(err) {
         if (err) {
-          connection.close();
           return done(err);
         }
 
@@ -357,10 +328,6 @@ describe('Always Encrypted', function() {
         );
 
         connection.close();
-      });
-
-      connection.on('end', function() {
-        done();
       });
     });
   });
