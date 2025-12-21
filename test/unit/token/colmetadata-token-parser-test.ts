@@ -48,7 +48,7 @@ describe('Colmetadata Token Parser', function() {
     });
   });
 
-  it('should parse Int column metadata', async () => {
+  it('should parse Int column metadata', async function() {
     const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
@@ -81,7 +81,7 @@ describe('Colmetadata Token Parser', function() {
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should parse VarChar column metadata', async () => {
+  it('should parse VarChar column metadata', async function() {
     const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;

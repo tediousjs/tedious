@@ -7,7 +7,7 @@ import { assert } from 'chai';
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Feature Ext Parser', () => {
-  it('should parse federated authentication token', async () => {
+  it('should parse federated authentication token', async function() {
     const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 

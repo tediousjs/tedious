@@ -5,7 +5,7 @@ import { assert } from 'chai';
 // from the list of transient errors is intentional.
 
 describe('TransientErrorLookup', () => {
-  it('should identify known transient SQL errors', () => {
+  it('should identify known transient SQL errors', function() {
     const transientErrorLookup = new TransientErrorLookup();
     assert.isTrue(transientErrorLookup.isTransientError(4060));
     assert.isTrue(transientErrorLookup.isTransientError(10928));
@@ -15,7 +15,7 @@ describe('TransientErrorLookup', () => {
     assert.isTrue(transientErrorLookup.isTransientError(40613));
   });
 
-  it('should identify non-transient SQL errors', () => {
+  it('should identify non-transient SQL errors', function() {
     const transientErrorLookup = new TransientErrorLookup();
     assert.strictEqual(transientErrorLookup.isTransientError(18456), false);
   });

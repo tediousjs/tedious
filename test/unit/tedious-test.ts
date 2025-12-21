@@ -3,21 +3,21 @@ import { assert } from 'chai';
 
 describe('Tedious', function() {
 
-  it('should export TYPES', () => {
+  it('should export TYPES', function() {
     assert.ok(TYPES);
     assert.ok(TYPES.VarChar);
   });
 
-  it('should export ISOLATION_LEVEL', () => {
+  it('should export ISOLATION_LEVEL', function() {
     assert.ok(ISOLATION_LEVEL);
     assert.ok(ISOLATION_LEVEL.READ_UNCOMMITTED);
   });
 
-  it('should export Connection', () => {
+  it('should export Connection', function() {
     assert.ok(Connection);
   });
 
-  it('should not modify the passed config object', () => {
+  it('should not modify the passed config object', function() {
     const config = {
       server: 'localhost',
       userName: 'sa',

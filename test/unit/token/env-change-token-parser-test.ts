@@ -7,7 +7,7 @@ import { assert } from 'chai';
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Env Change Token Parser', () => {
-  it('should parse database change', async () => {
+  it('should parse database change', async function() {
     const debug = new Debug();
     const oldDb = 'old';
     const newDb = 'new';
@@ -34,7 +34,7 @@ describe('Env Change Token Parser', () => {
     assert.strictEqual(token.newValue, 'new');
   });
 
-  it('should parse packet size change', async () => {
+  it('should parse packet size change', async function() {
     const debug = new Debug();
     const oldSize = '1024';
     const newSize = '2048';
@@ -61,7 +61,7 @@ describe('Env Change Token Parser', () => {
     assert.strictEqual(token.newValue, 2048);
   });
 
-  it('should skip unknown env change types', async () => {
+  it('should skip unknown env change types', async function() {
     const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
