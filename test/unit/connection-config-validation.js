@@ -130,4 +130,132 @@ describe('Connection configuration validation', function() {
     assert.strictEqual(connection.config.options.encrypt, 'strict');
     ensureConnectionIsClosed(connection, () => {});
   });
+
+  // Always Encrypted configuration tests
+  describe('Always Encrypted options', function() {
+    it('default alwaysEncrypted value is false', () => {
+      const connection = new Connection(config);
+      assert.strictEqual(connection.config.options.alwaysEncrypted, false);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('good alwaysEncrypted value (true)', () => {
+      config.options.alwaysEncrypted = true;
+      const connection = new Connection(config);
+      assert.strictEqual(connection.config.options.alwaysEncrypted, true);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('good alwaysEncrypted value (false)', () => {
+      config.options.alwaysEncrypted = false;
+      const connection = new Connection(config);
+      assert.strictEqual(connection.config.options.alwaysEncrypted, false);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('bad alwaysEncrypted value (non-boolean)', () => {
+      config.options.alwaysEncrypted = 'true';
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError);
+    });
+
+    it('default columnEncryptionKeyCacheTTL value', () => {
+      const connection = new Connection(config);
+      assert.strictEqual(connection.config.options.columnEncryptionKeyCacheTTL, 2 * 60 * 60 * 1000);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('good columnEncryptionKeyCacheTTL value', () => {
+      config.options.columnEncryptionKeyCacheTTL = 3600000;
+      const connection = new Connection(config);
+      assert.strictEqual(connection.config.options.columnEncryptionKeyCacheTTL, 3600000);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('good columnEncryptionKeyCacheTTL value (zero disables caching)', () => {
+      config.options.columnEncryptionKeyCacheTTL = 0;
+      const connection = new Connection(config);
+      assert.strictEqual(connection.config.options.columnEncryptionKeyCacheTTL, 0);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('bad columnEncryptionKeyCacheTTL value (non-number)', () => {
+      config.options.columnEncryptionKeyCacheTTL = '3600000';
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError);
+    });
+
+    it('bad columnEncryptionKeyCacheTTL value (negative)', () => {
+      config.options.columnEncryptionKeyCacheTTL = -1000;
+      assert.throws(() => {
+        new Connection(config);
+      }, RangeError);
+    });
+
+    it('good encryptionKeyStoreProviders (valid provider array)', () => {
+      const mockProvider = {
+        name: 'MOCK_PROVIDER',
+        decryptColumnEncryptionKey: async () => Buffer.alloc(32)
+      };
+      config.options.encryptionKeyStoreProviders = [mockProvider];
+      const connection = new Connection(config);
+      assert.deepEqual(
+        Object.keys(connection.config.options.encryptionKeyStoreProviders),
+        ['MOCK_PROVIDER']
+      );
+      assert.strictEqual(
+        connection.config.options.encryptionKeyStoreProviders['MOCK_PROVIDER'],
+        mockProvider
+      );
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('good encryptionKeyStoreProviders (multiple providers)', () => {
+      const provider1 = {
+        name: 'PROVIDER_1',
+        decryptColumnEncryptionKey: async () => Buffer.alloc(32)
+      };
+      const provider2 = {
+        name: 'PROVIDER_2',
+        decryptColumnEncryptionKey: async () => Buffer.alloc(32)
+      };
+      config.options.encryptionKeyStoreProviders = [provider1, provider2];
+      const connection = new Connection(config);
+      assert.deepEqual(
+        Object.keys(connection.config.options.encryptionKeyStoreProviders).sort(),
+        ['PROVIDER_1', 'PROVIDER_2']
+      );
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('bad encryptionKeyStoreProviders (not an array)', () => {
+      config.options.encryptionKeyStoreProviders = {
+        name: 'MOCK_PROVIDER',
+        decryptColumnEncryptionKey: async () => Buffer.alloc(32)
+      };
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError);
+    });
+
+    it('bad encryptionKeyStoreProviders (provider missing name)', () => {
+      config.options.encryptionKeyStoreProviders = [{
+        decryptColumnEncryptionKey: async () => Buffer.alloc(32)
+      }];
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError);
+    });
+
+    it('bad encryptionKeyStoreProviders (provider missing decryptColumnEncryptionKey)', () => {
+      config.options.encryptionKeyStoreProviders = [{
+        name: 'MOCK_PROVIDER'
+      }];
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError);
+    });
+  });
 });
