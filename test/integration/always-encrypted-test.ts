@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { type ColumnMetadata } from '../../src/token/colmetadata-token-parser';
 import { type KeyStoreProvider } from '../../src/always-encrypted/keystore-provider';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
@@ -616,15 +617,18 @@ describe('Always Encrypted', function() {
         // Verify we have 3 columns
         assert.strictEqual(columns.length, 3);
 
+        // Cast to array for indexing
+        const cols = columns as ColumnMetadata[];
+
         // First column (Id) should not be encrypted
-        assert.isUndefined(columns[0].cryptoMetadata);
+        assert.isUndefined(cols[0].cryptoMetadata);
 
         // Second column (PlainText) should not be encrypted
-        assert.isUndefined(columns[1].cryptoMetadata);
+        assert.isUndefined(cols[1].cryptoMetadata);
 
         // Third column (EncryptedText) should be encrypted
-        assert.isDefined(columns[2].cryptoMetadata, 'EncryptedText should have cryptoMetadata');
-        assert.strictEqual(columns[2].cryptoMetadata!.encryptionType, 1, 'Should be deterministic');
+        assert.isDefined(cols[2].cryptoMetadata, 'EncryptedText should have cryptoMetadata');
+        assert.strictEqual(cols[2].cryptoMetadata!.encryptionType, 1, 'Should be deterministic');
       });
 
       connection.execSql(request);

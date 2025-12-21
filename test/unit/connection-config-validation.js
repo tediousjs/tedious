@@ -206,7 +206,7 @@ describe('Connection configuration validation', function() {
         ['MOCK_PROVIDER']
       );
       assert.strictEqual(
-        connection.config.options.encryptionKeyStoreProviders['MOCK_PROVIDER'],
+        connection.config.options.encryptionKeyStoreProviders.MOCK_PROVIDER,
         mockProvider
       );
       ensureConnectionIsClosed(connection, () => {});

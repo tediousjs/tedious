@@ -1,10 +1,9 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { type Parameter, type ParameterData, type DataType } from '../data-type';
+import { type Parameter, type ParameterData } from '../data-type';
 import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
 import { encryptWithKey } from './key-crypto';
-import { type CryptoMetadata } from './types';
 
 /**
  * Serializes a parameter value to bytes according to its data type.

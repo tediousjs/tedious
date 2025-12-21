@@ -39,7 +39,6 @@ import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
-import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import { type KeyStoreProvider, type KeyStoreProviderMap } from './always-encrypted/keystore-provider';
 import { shouldHonorAE } from './always-encrypted/utils';
 import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
