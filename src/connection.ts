@@ -396,7 +396,6 @@ export interface InternalConnectionOptions {
   rowCollectionOnDone: boolean;
   rowCollectionOnRequestCompletion: boolean;
   serverName: undefined | string;
-  serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
   textsize: number;
   trustedServerNameAE: string | undefined;
@@ -1046,6 +1045,13 @@ class Connection extends EventEmitter {
   declare databaseCollation: Collation | undefined;
 
   /**
+   * Indicates whether the server supports Always Encrypted (column encryption).
+   * Set to true when the server acknowledges the COLUMNENCRYPTION feature during login.
+   * @private
+   */
+  declare serverSupportsColumnEncryption: boolean;
+
+  /**
    * @private
    */
   declare _onSocketClose: (hadError: boolean) => void;
@@ -1315,7 +1321,6 @@ class Connection extends EventEmitter {
         rowCollectionOnDone: false,
         rowCollectionOnRequestCompletion: false,
         serverName: undefined,
-        serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
         trustedServerNameAE: undefined,
@@ -1773,6 +1778,7 @@ class Connection extends EventEmitter {
     this.transactionDepth = 0;
     this.isSqlBatch = false;
     this.closed = false;
+    this.serverSupportsColumnEncryption = false;
     this.messageBuffer = Buffer.alloc(0);
 
     this.curTransientRetryCount = 0;

@@ -317,7 +317,7 @@ export class Login7TokenHandler extends TokenHandler {
 
     // Track server's column encryption support
     if (token.columnEncryption !== undefined) {
-      this.connection.config.options.serverSupportsColumnEncryption = token.columnEncryption;
+      this.connection.serverSupportsColumnEncryption = token.columnEncryption;
     }
   }
 
