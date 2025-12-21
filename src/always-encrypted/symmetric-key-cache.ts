@@ -1,14 +1,13 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { type EncryptionKeyInfo } from './types';
+import { type EncryptionKeyInfo, type EncryptionOptions } from './types';
 import SymmetricKey from './symmetric-key';
-import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
 import LRU from 'lru-cache';
 
 const cache = new LRU<string, SymmetricKey>(0);
 
-export const getKey = async (keyInfo: EncryptionKeyInfo, options: ConnectionOptions): Promise<SymmetricKey> => {
+export const getKey = async (keyInfo: EncryptionKeyInfo, options: EncryptionOptions): Promise<SymmetricKey> => {
   if (!options.trustedServerNameAE) {
     throw new Error('Server name should not be null in getKey');
   }

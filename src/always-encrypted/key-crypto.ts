@@ -1,8 +1,7 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { type CryptoMetadata, type EncryptionKeyInfo } from './types';
-import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
+import { type CryptoMetadata, type EncryptionKeyInfo, type EncryptionOptions } from './types';
 import SymmetricKey from './symmetric-key';
 import { getKey } from './symmetric-key-cache';
 import { AeadAes256CbcHmac256Algorithm, algorithmName } from './aead-aes-256-cbc-hmac-algorithm';
@@ -16,7 +15,7 @@ export const validateAndGetEncryptionAlgorithmName = (cipherAlgorithmId: number,
   return algorithmName;
 };
 
-export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, options: ConnectionOptions): Promise<Buffer> => {
+export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, options: EncryptionOptions): Promise<Buffer> => {
   if (!options.trustedServerNameAE) {
     throw new Error('Server name should not be null in EncryptWithKey');
   }
@@ -38,7 +37,7 @@ export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, opti
   return cipherText;
 };
 
-export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: ConnectionOptions): Buffer => {
+export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: EncryptionOptions): Buffer => {
   if (!options.trustedServerNameAE) {
     throw new Error('Server name should not be null in DecryptWithKey');
   }
@@ -60,7 +59,7 @@ export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: 
   return plainText;
 };
 
-export const decryptSymmetricKey = async (md: CryptoMetadata, options: ConnectionOptions): Promise<void> => {
+export const decryptSymmetricKey = async (md: CryptoMetadata, options: EncryptionOptions): Promise<void> => {
   if (!md) {
     throw new Error('md should not be null in DecryptSymmetricKey.');
   }

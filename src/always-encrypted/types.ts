@@ -90,3 +90,27 @@ export enum SQLServerStatementColumnEncryptionSetting {
    */
   Disabled,
 }
+
+import { type KeyStoreProviderMap } from './keystore-provider';
+
+/**
+ * Options required for column encryption/decryption operations.
+ * This interface is a subset of connection options needed by the encryption layer.
+ */
+export interface EncryptionOptions {
+  /**
+   * The trusted server name for Always Encrypted operations.
+   * Used as part of the cache key for symmetric keys.
+   */
+  trustedServerNameAE: string | undefined;
+
+  /**
+   * Map of registered key store providers.
+   */
+  encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
+
+  /**
+   * TTL for cached column encryption keys in milliseconds.
+   */
+  columnEncryptionKeyCacheTTL: number;
+}
