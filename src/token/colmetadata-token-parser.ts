@@ -176,9 +176,10 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
 }
 
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  // Parse CekTable if Always Encrypted is enabled
+  // Parse CekTable only if the server acknowledged column encryption support.
+  // The CekTable is only present in COLMETADATA when COLUMNENCRYPTION feature was negotiated.
   let cekTable: CEKEntry[] = [];
-  if (parser.options.alwaysEncrypted) {
+  if (parser.options.serverSupportsColumnEncryption) {
     while (true) {
       try {
         const result = readCekTable(parser.buffer, parser.position);

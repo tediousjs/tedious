@@ -155,14 +155,22 @@ describe('Always Encrypted', function() {
       ];
 
       const connection = new Connection(config);
+      let isDone = false;
 
       connection.on('end', function() {
-        done();
+        if (!isDone) {
+          isDone = true;
+          done();
+        }
       });
 
       connection.connect(function(err) {
         if (err) {
-          return done(err);
+          if (!isDone) {
+            isDone = true;
+            return done(err);
+          }
+          return;
         }
 
         assert.isObject(connection.config.options.encryptionKeyStoreProviders);
@@ -187,14 +195,22 @@ describe('Always Encrypted', function() {
       ];
 
       const connection = new Connection(config);
+      let isDone = false;
 
       connection.on('end', function() {
-        done();
+        if (!isDone) {
+          isDone = true;
+          done();
+        }
       });
 
       connection.connect(function(err) {
         if (err) {
-          return done(err);
+          if (!isDone) {
+            isDone = true;
+            return done(err);
+          }
+          return;
         }
 
         const providers = connection.config.options.encryptionKeyStoreProviders;
@@ -212,14 +228,22 @@ describe('Always Encrypted', function() {
       config.options.alwaysEncrypted = true;
 
       const connection = new Connection(config);
+      let isDone = false;
 
       connection.on('end', function() {
-        done();
+        if (!isDone) {
+          isDone = true;
+          done();
+        }
       });
 
       connection.connect(function(err) {
         if (err) {
-          return done(err);
+          if (!isDone) {
+            isDone = true;
+            return done(err);
+          }
+          return;
         }
 
         assert.strictEqual(
@@ -237,14 +261,22 @@ describe('Always Encrypted', function() {
       config.options.columnEncryptionKeyCacheTTL = 3600000;
 
       const connection = new Connection(config);
+      let isDone = false;
 
       connection.on('end', function() {
-        done();
+        if (!isDone) {
+          isDone = true;
+          done();
+        }
       });
 
       connection.connect(function(err) {
         if (err) {
-          return done(err);
+          if (!isDone) {
+            isDone = true;
+            return done(err);
+          }
+          return;
         }
 
         assert.strictEqual(
@@ -262,14 +294,22 @@ describe('Always Encrypted', function() {
       config.options.columnEncryptionKeyCacheTTL = 0;
 
       const connection = new Connection(config);
+      let isDone = false;
 
       connection.on('end', function() {
-        done();
+        if (!isDone) {
+          isDone = true;
+          done();
+        }
       });
 
       connection.connect(function(err) {
         if (err) {
-          return done(err);
+          if (!isDone) {
+            isDone = true;
+            return done(err);
+          }
+          return;
         }
 
         assert.strictEqual(

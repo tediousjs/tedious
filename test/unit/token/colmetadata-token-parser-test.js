@@ -118,7 +118,7 @@ describe('Colmetadata Token Parser', () => {
   describe('Always Encrypted', () => {
     const FLAG_ENCRYPTED = 0x0800;
 
-    it('should parse empty CekTable when alwaysEncrypted is enabled', async () => {
+    it('should parse empty CekTable when server supports column encryption', async () => {
       const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
       buffer.writeUInt8(0x81); // COLMETADATA token
@@ -131,7 +131,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt8(dataTypeByName.Int.id);
       buffer.writeBVarchar('col1');
 
-      const parser = StreamParser.parseTokens([buffer.data], {}, { alwaysEncrypted: true });
+      const parser = StreamParser.parseTokens([buffer.data], {}, { serverSupportsColumnEncryption: true });
       const result = await parser.next();
       assert.isFalse(result.done);
 
@@ -188,7 +188,7 @@ describe('Colmetadata Token Parser', () => {
 
       buffer.writeBVarchar('encrypted_col');
 
-      const parser = StreamParser.parseTokens([buffer.data], {}, { alwaysEncrypted: true });
+      const parser = StreamParser.parseTokens([buffer.data], {}, { serverSupportsColumnEncryption: true });
       const result = await parser.next();
       assert.isFalse(result.done);
 
@@ -286,7 +286,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt8(1);
       buffer.writeBVarchar('dob');
 
-      const parser = StreamParser.parseTokens([buffer.data], {}, { alwaysEncrypted: true });
+      const parser = StreamParser.parseTokens([buffer.data], {}, { serverSupportsColumnEncryption: true });
       const result = await parser.next();
       assert.isFalse(result.done);
 
@@ -348,7 +348,7 @@ describe('Colmetadata Token Parser', () => {
 
       buffer.writeBVarchar('custom_col');
 
-      const parser = StreamParser.parseTokens([buffer.data], {}, { alwaysEncrypted: true });
+      const parser = StreamParser.parseTokens([buffer.data], {}, { serverSupportsColumnEncryption: true });
       const result = await parser.next();
       assert.isFalse(result.done);
 
@@ -358,11 +358,11 @@ describe('Colmetadata Token Parser', () => {
       assert.strictEqual(token.columns[0].cryptoMetadata.cipherAlgorithmName, 'MY_CUSTOM_CIPHER');
     });
 
-    it('should not parse CekTable when alwaysEncrypted is disabled', async () => {
+    it('should not parse CekTable when server does not support column encryption', async () => {
       const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
       buffer.writeUInt8(0x81); // COLMETADATA token
-      buffer.writeUInt16LE(1); // Column count (no CekTable when AE is disabled)
+      buffer.writeUInt16LE(1); // Column count (no CekTable when server doesn't support AE)
 
       // Column metadata (non-encrypted)
       buffer.writeUInt32LE(0);
@@ -370,7 +370,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt8(dataTypeByName.Int.id);
       buffer.writeBVarchar('col1');
 
-      const parser = StreamParser.parseTokens([buffer.data], {}, { alwaysEncrypted: false });
+      const parser = StreamParser.parseTokens([buffer.data], {}, { serverSupportsColumnEncryption: false });
       const result = await parser.next();
       assert.isFalse(result.done);
 
@@ -431,7 +431,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeBuffer(Buffer.from([0x09, 0x04, 0x00, 0x00, 0x00])); // Collation
       buffer.writeBVarchar('name');
 
-      const parser = StreamParser.parseTokens([buffer.data], {}, { alwaysEncrypted: true });
+      const parser = StreamParser.parseTokens([buffer.data], {}, { serverSupportsColumnEncryption: true });
       const result = await parser.next();
       assert.isFalse(result.done);
 

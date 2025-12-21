@@ -2263,7 +2263,10 @@ class Connection extends EventEmitter {
    * @private
    */
   createTokenStreamParser(message: Message, handler: TokenHandler) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options);
+    return new TokenStreamParser(message, this.debug, handler, {
+      ...this.config.options,
+      serverSupportsColumnEncryption: this.serverSupportsColumnEncryption
+    });
   }
 
   async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
