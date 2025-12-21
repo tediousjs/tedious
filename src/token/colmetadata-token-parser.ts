@@ -176,22 +176,48 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
 }
 
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  // Parse CekTable only if the server acknowledged column encryption support.
-  // The CekTable is only present in COLMETADATA when COLUMNENCRYPTION feature was negotiated.
+  // Parse CekTable only if the server acknowledged column encryption support AND
+  // the CekTable is actually present in the response.
+  //
+  // Per MS-TDS spec: "CEKTable MUST be sent when at least one encrypted column is present"
+  // This means CekTable is NOT sent when there are no encrypted columns, even if
+  // COLUMNENCRYPTION was negotiated.
+  //
+  // We use a heuristic to detect if CekTable is present:
+  // - CekTable starts with tableSize (2 bytes), then DatabaseId (4 bytes) if tableSize > 0
+  // - Column metadata starts with columnCount (2 bytes), then UserType (4 bytes)
+  // - If first 2 bytes > 0 but next 4 bytes are 0, it's likely column metadata (UserType=0 is common)
+  // - If first 2 bytes > 0 and next 4 bytes > 0, it's likely CekTable (DatabaseId > 0)
   let cekTable: CEKEntry[] = [];
   if (parser.options.serverSupportsColumnEncryption) {
-    while (true) {
-      try {
-        const result = readCekTable(parser.buffer, parser.position);
-        cekTable = result.value;
-        parser.position = result.offset;
-        break;
-      } catch (err) {
-        if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
-          continue;
+    // Wait for enough data to peek (2 bytes for size + 4 bytes to distinguish)
+    while (parser.buffer.length < parser.position + 6) {
+      await parser.waitForChunk();
+    }
+
+    const potentialTableSize = parser.buffer.readUInt16LE(parser.position);
+    const nextFourBytes = parser.buffer.readUInt32LE(parser.position + 2);
+
+    // Heuristic: CekTable is present if:
+    // - tableSize is 0 (empty CekTable, though rare per spec)
+    // - OR tableSize > 0 AND next 4 bytes (DatabaseId) is non-zero
+    // If tableSize > 0 but next 4 bytes are 0, it's likely column metadata with UserType=0
+    const cekTablePresent = potentialTableSize === 0 || nextFourBytes !== 0;
+
+    if (cekTablePresent) {
+      while (true) {
+        try {
+          const result = readCekTable(parser.buffer, parser.position);
+          cekTable = result.value;
+          parser.position = result.offset;
+          break;
+        } catch (err) {
+          if (err instanceof NotEnoughDataError) {
+            await parser.waitForChunk();
+            continue;
+          }
+          throw err;
         }
-        throw err;
       }
     }
   }
