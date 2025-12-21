@@ -165,7 +165,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(encryptedKey.length); // Encrypted key length
       buffer.writeBuffer(encryptedKey);
       buffer.writeBVarchar('AZURE_KEY_VAULT'); // KeyStoreName
-      buffer.writeBVarchar('https://vault.azure.net/keys/mykey/version'); // KeyPath
+      buffer.writeUsVarchar('https://vault.azure.net/keys/mykey/version'); // KeyPath (US_VARCHAR)
       buffer.writeBVarchar('RSA_OAEP'); // AlgorithmName
 
       // Column metadata (encrypted)
@@ -235,7 +235,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(4);
       buffer.writeBuffer(Buffer.from([0x11, 0x22, 0x33, 0x44]));
       buffer.writeBVarchar('MSSQL_CERTIFICATE_STORE');
-      buffer.writeBVarchar('CurrentUser/My/Cert1');
+      buffer.writeUsVarchar('CurrentUser/My/Cert1'); // KeyPath (US_VARCHAR)
       buffer.writeBVarchar('RSA_OAEP');
 
       // CEK Entry 1
@@ -247,7 +247,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(4);
       buffer.writeBuffer(Buffer.from([0x55, 0x66, 0x77, 0x88]));
       buffer.writeBVarchar('AZURE_KEY_VAULT');
-      buffer.writeBVarchar('https://vault.azure.net/keys/key2');
+      buffer.writeUsVarchar('https://vault.azure.net/keys/key2'); // KeyPath (US_VARCHAR)
       buffer.writeBVarchar('RSA_OAEP');
 
       // Column 0 - encrypted with CEK 0
@@ -323,7 +323,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(4);
       buffer.writeBuffer(Buffer.from([0x01, 0x02, 0x03, 0x04]));
       buffer.writeBVarchar('CUSTOM_STORE');
-      buffer.writeBVarchar('/path/to/key');
+      buffer.writeUsVarchar('/path/to/key'); // KeyPath (US_VARCHAR)
       buffer.writeBVarchar('CUSTOM_ALGO');
 
       // Encrypted column
@@ -394,7 +394,7 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(4);
       buffer.writeBuffer(Buffer.from([0x01, 0x02, 0x03, 0x04]));
       buffer.writeBVarchar('STORE');
-      buffer.writeBVarchar('/key');
+      buffer.writeUsVarchar('/key'); // KeyPath (US_VARCHAR)
       buffer.writeBVarchar('RSA');
 
       // Column 0 - non-encrypted Int

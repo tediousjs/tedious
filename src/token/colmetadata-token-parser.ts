@@ -35,7 +35,7 @@ export interface ColumnMetadata extends Metadata {
  *   - For each EncryptionKeyValue:
  *     - EncryptedKey (USHORTLEN bytes)
  *     - KeyStoreName (B_VARCHAR)
- *     - KeyPath (B_VARCHAR)
+ *     - KeyPath (US_VARCHAR)
  *     - AsymmetricAlgo (B_VARCHAR)
  */
 function readCekTable(buf: Buffer, offset: number): Result<CEKEntry[]> {
@@ -79,9 +79,9 @@ function readCekTable(buf: Buffer, offset: number): Result<CEKEntry[]> {
       let keyStoreName: string;
       ({ offset, value: keyStoreName } = readBVarChar(buf, offset));
 
-      // KeyPath (B_VARCHAR)
+      // KeyPath (US_VARCHAR)
       let keyPath: string;
-      ({ offset, value: keyPath } = readBVarChar(buf, offset));
+      ({ offset, value: keyPath } = readUsVarChar(buf, offset));
 
       // AsymmetricAlgo (B_VARCHAR)
       let algorithmName: string;
