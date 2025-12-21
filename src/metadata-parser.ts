@@ -1,11 +1,15 @@
 import { Collation } from './collation';
 import Parser, { type ParserOptions } from './token/stream-parser';
 import { TYPE, type DataType } from './data-type';
-import { type CryptoMetadata } from './always-encrypted/types';
+import { type CryptoMetadata, SQLServerEncryptionType } from './always-encrypted/types';
+import { type CEKEntry } from './always-encrypted/cek-entry';
 
 import { sprintf } from 'sprintf-js';
 
 import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
+
+// Flag indicating the column is encrypted (bit 11 of the 2-byte flags field)
+const FLAG_ENCRYPTED = 0x0800;
 
 interface XmlSchema {
   dbname: string;
@@ -113,7 +117,79 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
   }, offset);
 }
 
-function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<Metadata> {
+/**
+ * Reads CryptoMetadata for an encrypted column.
+ *
+ * Structure per MS-TDS spec:
+ * - Ordinal (USHORT): index into CekTable
+ * - UserType (ULONG in TDS 7.2+, USHORT in earlier versions)
+ * - BaseTypeInfo (TYPE_INFO): the actual underlying data type
+ * - EncryptionAlgo (BYTE): 0=custom, 2=AEAD_AES_256_CBC_HMAC_SHA256
+ * - [AlgoName] (B_VARCHAR): only if EncryptionAlgo=0
+ * - EncryptionAlgoType (BYTE): 1=deterministic, 2=randomized
+ * - NormVersion (BYTE): normalization version
+ */
+function readCryptoMetadata(
+  buf: Buffer,
+  offset: number,
+  options: ParserOptions,
+  cekTable: CEKEntry[]
+): Result<CryptoMetadata> {
+  // Ordinal - index into CekTable
+  let ordinal: number;
+  ({ offset, value: ordinal } = readUInt16LE(buf, offset));
+
+  // UserType (ULONG in TDS 7.2+)
+  let baseUserType: number;
+  ({ offset, value: baseUserType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
+
+  // BaseTypeInfo - the actual underlying data type (recursive call without cekTable to avoid infinite recursion)
+  let baseTypeInfo: BaseMetadata;
+  ({ offset, value: baseTypeInfo } = readBaseMetadata(buf, offset, options));
+
+  // EncryptionAlgo (BYTE): 0=custom, 2=AEAD_AES_256_CBC_HMAC_SHA256
+  let cipherAlgorithmId: number;
+  ({ offset, value: cipherAlgorithmId } = readUInt8(buf, offset));
+
+  // AlgoName (B_VARCHAR) - only present if cipherAlgorithmId is 0 (custom)
+  let cipherAlgorithmName: string | undefined;
+  if (cipherAlgorithmId === 0) {
+    ({ offset, value: cipherAlgorithmName } = readBVarChar(buf, offset));
+  }
+
+  // EncryptionType (BYTE): 1=deterministic, 2=randomized
+  let encryptionType: number;
+  ({ offset, value: encryptionType } = readUInt8(buf, offset));
+
+  // NormalizationRuleVersion (BYTE)
+  let normalizationRuleVersion: number;
+  ({ offset, value: normalizationRuleVersion } = readUInt8(buf, offset));
+
+  // Look up the CEK entry
+  const cekEntry = cekTable[ordinal];
+
+  const cryptoMetadata: CryptoMetadata = {
+    cekEntry: cekEntry,
+    cipherAlgorithmId: cipherAlgorithmId,
+    normalizationRuleVersion: Buffer.from([normalizationRuleVersion]),
+    ordinal: ordinal,
+    encryptionType: encryptionType as SQLServerEncryptionType,
+    baseTypeInfo: baseTypeInfo
+  };
+
+  // Only add cipherAlgorithmName if it's defined (custom algorithm)
+  if (cipherAlgorithmName !== undefined) {
+    cryptoMetadata.cipherAlgorithmName = cipherAlgorithmName;
+  }
+
+  return new Result(cryptoMetadata, offset);
+}
+
+/**
+ * Reads base metadata (TYPE_INFO) without crypto metadata.
+ * Used for parsing the underlying type of encrypted columns.
+ */
+function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<BaseMetadata> {
   let userType;
   ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
 
@@ -352,6 +428,38 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
     default:
       throw new Error(sprintf('Unrecognised type %s', type.name));
   }
+}
+
+/**
+ * Reads column metadata, including crypto metadata for encrypted columns.
+ *
+ * For encrypted columns (FLAG_ENCRYPTED is set):
+ * - The base metadata will have type VarBinary (encrypted data is sent as binary)
+ * - CryptoMetadata follows, containing the actual underlying type
+ *
+ * @param cekTable - Column Encryption Key table (required when alwaysEncrypted is enabled)
+ */
+function readMetadata(buf: Buffer, offset: number, options: ParserOptions, cekTable: CEKEntry[] = []): Result<Metadata> {
+  // Read the base metadata (TYPE_INFO)
+  let baseMetadata: BaseMetadata;
+  ({ offset, value: baseMetadata } = readBaseMetadata(buf, offset, options));
+
+  // Check if the column is encrypted
+  const isEncrypted = (baseMetadata.flags & FLAG_ENCRYPTED) === FLAG_ENCRYPTED;
+
+  if (isEncrypted && cekTable.length > 0) {
+    // Read crypto metadata for encrypted column
+    let cryptoMetadata: CryptoMetadata;
+    ({ offset, value: cryptoMetadata } = readCryptoMetadata(buf, offset, options, cekTable));
+
+    return new Result<Metadata>({
+      ...baseMetadata,
+      cryptoMetadata: cryptoMetadata
+    }, offset);
+  }
+
+  // Return without cryptoMetadata for non-encrypted columns
+  return new Result<Metadata>(baseMetadata, offset);
 }
 
 function metadataParse(parser: Parser, options: ParserOptions, callback: (metadata: Metadata) => void) {

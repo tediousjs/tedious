@@ -18,7 +18,7 @@ import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 import { NotEnoughDataError } from './helpers';
 
-export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
+export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns' | 'alwaysEncrypted'>;
 
 class Parser {
   debug: Debug;

@@ -1,16 +1,108 @@
 import { readMetadata, type Metadata } from '../metadata-parser';
+import { type CryptoMetadata } from '../always-encrypted/types';
+import { CEKEntry } from '../always-encrypted/cek-entry';
 
 import Parser, { type ParserOptions } from './stream-parser';
 import { ColMetadataToken } from './token';
-import { NotEnoughDataError, Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
+import { NotEnoughDataError, Result, readBVarChar, readUInt16LE, readUInt32LE, readUInt8, readUsVarChar, readUsVarByte } from './helpers';
 
 export interface ColumnMetadata extends Metadata {
   /**
-   * The column's name。
+   * The column's name.
    */
   colName: string;
 
   tableName?: string | string[] | undefined;
+
+  /**
+   * The column's encryption metadata, if the column is encrypted.
+   */
+  cryptoMetadata?: CryptoMetadata;
+}
+
+/**
+ * Reads the CekTable (Column Encryption Key Table) from the COLMETADATA token.
+ * This table contains encryption key information used by encrypted columns.
+ *
+ * Structure per MS-TDS spec:
+ * - EkValueCount (USHORT): Number of CEK entries
+ * - For each CEK entry (EK_INFO):
+ *   - DatabaseId (ULONG)
+ *   - CekId (ULONG)
+ *   - CekVersion (ULONG)
+ *   - CekMdVersion (8 bytes)
+ *   - Count (BYTE): Number of encrypted key values
+ *   - For each EncryptionKeyValue:
+ *     - EncryptedKey (USHORTLEN bytes)
+ *     - KeyStoreName (B_VARCHAR)
+ *     - KeyPath (B_VARCHAR)
+ *     - AsymmetricAlgo (B_VARCHAR)
+ */
+function readCekTable(buf: Buffer, offset: number): Result<CEKEntry[]> {
+  const cekTable: CEKEntry[] = [];
+
+  let tableSize: number;
+  ({ offset, value: tableSize } = readUInt16LE(buf, offset));
+
+  for (let i = 0; i < tableSize; i++) {
+    const cekEntry = new CEKEntry(i);
+
+    // DatabaseId (4 bytes)
+    let databaseId: number;
+    ({ offset, value: databaseId } = readUInt32LE(buf, offset));
+
+    // CekId (4 bytes)
+    let cekId: number;
+    ({ offset, value: cekId } = readUInt32LE(buf, offset));
+
+    // CekVersion (4 bytes)
+    let cekVersion: number;
+    ({ offset, value: cekVersion } = readUInt32LE(buf, offset));
+
+    // CekMdVersion (8 bytes)
+    if (buf.length < offset + 8) {
+      throw new NotEnoughDataError(offset + 8);
+    }
+    const cekMdVersion = buf.slice(offset, offset + 8);
+    offset += 8;
+
+    // Count of EncryptionKeyValue entries
+    let ekValueCount: number;
+    ({ offset, value: ekValueCount } = readUInt8(buf, offset));
+
+    for (let j = 0; j < ekValueCount; j++) {
+      // EncryptedKey (USHORTLEN bytes)
+      let encryptedKey: Buffer;
+      ({ offset, value: encryptedKey } = readUsVarByte(buf, offset));
+
+      // KeyStoreName (B_VARCHAR)
+      let keyStoreName: string;
+      ({ offset, value: keyStoreName } = readBVarChar(buf, offset));
+
+      // KeyPath (B_VARCHAR)
+      let keyPath: string;
+      ({ offset, value: keyPath } = readBVarChar(buf, offset));
+
+      // AsymmetricAlgo (B_VARCHAR)
+      let algorithmName: string;
+      ({ offset, value: algorithmName } = readBVarChar(buf, offset));
+
+      cekEntry.add(
+        encryptedKey,
+        databaseId,
+        cekId,
+        cekVersion,
+        cekMdVersion,
+        keyPath,
+        keyStoreName,
+        algorithmName
+      );
+    }
+
+    cekTable.push(cekEntry);
+  }
+
+  return new Result(cekTable, offset);
 }
 
 function readTableName(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<string | string[] | undefined> {
@@ -51,9 +143,9 @@ function readColumnName(buf: Buffer, offset: number, index: number, metadata: Me
   }
 }
 
-function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: number) {
+function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: number, cekTable: CEKEntry[]) {
   let metadata;
-  ({ offset, value: metadata } = readMetadata(buf, offset, options));
+  ({ offset, value: metadata } = readMetadata(buf, offset, options, cekTable));
 
   let tableName;
   ({ offset, value: tableName } = readTableName(buf, offset, metadata, options));
@@ -61,7 +153,7 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
   let colName;
   ({ offset, value: colName } = readColumnName(buf, offset, index, metadata, options));
 
-  return new Result({
+  const columnMetadata: ColumnMetadata = {
     userType: metadata.userType,
     flags: metadata.flags,
     type: metadata.type,
@@ -73,12 +165,38 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
     schema: metadata.schema,
     colName: colName,
     tableName: tableName
-  }, offset);
+  };
+
+  // Only add cryptoMetadata if present (for encrypted columns)
+  if (metadata.cryptoMetadata) {
+    columnMetadata.cryptoMetadata = metadata.cryptoMetadata;
+  }
+
+  return new Result<ColumnMetadata>(columnMetadata, offset);
 }
 
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  let columnCount;
+  // Parse CekTable if Always Encrypted is enabled
+  let cekTable: CEKEntry[] = [];
+  if (parser.options.alwaysEncrypted) {
+    while (true) {
+      try {
+        const result = readCekTable(parser.buffer, parser.position);
+        cekTable = result.value;
+        parser.position = result.offset;
+        break;
+      } catch (err) {
+        if (err instanceof NotEnoughDataError) {
+          await parser.waitForChunk();
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
 
+  // Parse column count
+  let columnCount;
   while (true) {
     let offset;
 
@@ -97,6 +215,7 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
     break;
   }
 
+  // Parse each column
   const columns: ColumnMetadata[] = [];
   for (let i = 0; i < columnCount; i++) {
     while (true) {
@@ -104,7 +223,7 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
       let offset;
 
       try {
-        ({ offset, value: column } = readColumn(parser.buffer, parser.position, parser.options, i));
+        ({ offset, value: column } = readColumn(parser.buffer, parser.position, parser.options, i, cekTable));
       } catch (err: any) {
         if (err instanceof NotEnoughDataError) {
           await parser.waitForChunk();
