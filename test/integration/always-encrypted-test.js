@@ -486,7 +486,7 @@ describe('Always Encrypted', function() {
                   ENCRYPTED WITH (
                     COLUMN_ENCRYPTION_KEY = [${cekName}],
                     ENCRYPTION_TYPE = DETERMINISTIC,
-                    ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA256'
+                    ALGORITHM = 'AEAD_AES_256_CBC_HMAC_SHA_256'
                   )
               );
             `;
