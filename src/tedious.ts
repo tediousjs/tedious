@@ -9,6 +9,10 @@ import { TYPES } from './data-type';
 import { ISOLATION_LEVEL } from './transaction';
 import { versions as TDS_VERSION } from './tds-versions';
 
+// Always Encrypted exports
+import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { type KeyStoreProvider, type KeyStoreProviderMap } from './always-encrypted/keystore-provider';
+
 const library = { name: name };
 
 export function connect(config: ConnectionConfiguration, connectListener?: (err?: Error) => void) {
@@ -26,11 +30,16 @@ export {
   RequestError,
   TYPES,
   ISOLATION_LEVEL,
-  TDS_VERSION
+  TDS_VERSION,
+  // Always Encrypted
+  ColumnEncryptionAzureKeyVaultProvider
 };
 
 export type {
   ConnectionAuthentication,
   ConnectionConfiguration,
-  ConnectionOptions
+  ConnectionOptions,
+  // Always Encrypted
+  KeyStoreProvider,
+  KeyStoreProviderMap
 };

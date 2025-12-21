@@ -6,13 +6,37 @@ import { CryptographyClient, type KeyWrapAlgorithm, KeyClient, type KeyVaultKey 
 import { createHash } from 'crypto';
 import { parse } from 'url';
 
+import { type KeyStoreProvider } from './keystore-provider';
+
 interface ParsedKeyPath {
   vaultUrl: string;
   name: string;
   version?: string | undefined;
 }
 
-export class ColumnEncryptionAzureKeyVaultProvider {
+/**
+ * Key store provider implementation for Azure Key Vault.
+ *
+ * This provider enables Always Encrypted to use column master keys stored in Azure Key Vault.
+ * It uses Azure AD service principal authentication with client credentials.
+ *
+ * @example
+ * ```typescript
+ * const keyVaultProvider = new ColumnEncryptionAzureKeyVaultProvider(
+ *   'client-id',
+ *   'client-secret',
+ *   'tenant-id'
+ * );
+ *
+ * const connection = new Connection({
+ *   // ... other options
+ *   options: {
+ *     encryptionKeyStoreProviders: [keyVaultProvider]
+ *   }
+ * });
+ * ```
+ */
+export class ColumnEncryptionAzureKeyVaultProvider implements KeyStoreProvider {
   declare public readonly name: string;
   declare private url: undefined | string;
   declare private readonly rsaEncryptionAlgorithmWithOAEPForAKV: string;

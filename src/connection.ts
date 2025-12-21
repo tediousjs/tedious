@@ -40,6 +40,7 @@ import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { type KeyStoreProviderMap } from './always-encrypted/keystore-provider';
 import { shouldHonorAE } from './always-encrypted/utils';
 import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 import { encryptParameters } from './always-encrypted/encrypt-parameters';
@@ -407,10 +408,6 @@ export interface InternalConnectionOptions {
   useUTC: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
-}
-
-interface KeyStoreProviderMap {
-  [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
 /**
