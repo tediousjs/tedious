@@ -8,13 +8,9 @@ import LRU from 'lru-cache';
 const cache = new LRU<string, SymmetricKey>(0);
 
 export const getKey = async (keyInfo: EncryptionKeyInfo, options: EncryptionOptions): Promise<SymmetricKey> => {
-  if (!options.trustedServerNameAE) {
-    throw new Error('Server name should not be null in getKey');
-  }
-
-  const serverName: string = options.trustedServerNameAE;
-
-  const keyLookupValue = `${serverName}:${Buffer.from(keyInfo.encryptedKey).toString('base64')}:${keyInfo.keyStoreName}`;
+  // Use the encrypted key value as the cache key - it's cryptographically unique per CEK
+  // and already bound to the specific CMK that encrypted it
+  const keyLookupValue = `${Buffer.from(keyInfo.encryptedKey).toString('base64')}:${keyInfo.keyStoreName}`;
 
   if (cache.has(keyLookupValue)) {
     return cache.get(keyLookupValue) as SymmetricKey;

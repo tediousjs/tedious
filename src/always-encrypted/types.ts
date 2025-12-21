@@ -99,12 +99,6 @@ import { type KeyStoreProviderMap } from './keystore-provider';
  */
 export interface EncryptionOptions {
   /**
-   * The trusted server name for Always Encrypted operations.
-   * Used as part of the cache key for symmetric keys.
-   */
-  trustedServerNameAE: string | undefined;
-
-  /**
    * Map of registered key store providers.
    */
   encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;

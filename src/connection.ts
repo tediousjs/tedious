@@ -401,7 +401,6 @@ export interface InternalConnectionOptions {
   serverName: undefined | string;
   tdsVersion: string;
   textsize: number;
-  trustedServerNameAE: string | undefined;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
@@ -1370,7 +1369,6 @@ class Connection extends EventEmitter {
         serverName: undefined,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
-        trustedServerNameAE: undefined,
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,

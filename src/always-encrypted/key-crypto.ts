@@ -16,10 +16,6 @@ export const validateAndGetEncryptionAlgorithmName = (cipherAlgorithmId: number,
 };
 
 export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, options: EncryptionOptions): Promise<Buffer> => {
-  if (!options.trustedServerNameAE) {
-    throw new Error('Server name should not be null in EncryptWithKey');
-  }
-
   if (!md.cipherAlgorithm) {
     await decryptSymmetricKey(md, options);
   }
@@ -38,10 +34,6 @@ export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, opti
 };
 
 export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: EncryptionOptions): Buffer => {
-  if (!options.trustedServerNameAE) {
-    throw new Error('Server name should not be null in DecryptWithKey');
-  }
-
   // if (!md.cipherAlgorithm) {
   //   await decryptSymmetricKey(md, options);
   // }
