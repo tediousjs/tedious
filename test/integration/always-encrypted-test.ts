@@ -1,10 +1,9 @@
-// @ts-check
-
-const assert = require('chai').assert;
-const crypto = require('crypto');
+import { assert } from 'chai';
+import * as crypto from 'crypto';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { type KeyStoreProvider } from '../../src/always-encrypted/keystore-provider';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
@@ -32,7 +31,7 @@ const TEST_CEK = crypto.randomBytes(32); // 32 bytes for AES-256
  * Creates an encrypted CEK value that can be stored in SQL Server.
  * The format is: version (1) + iv (16) + encrypted_cek (48 with padding)
  */
-function encryptCekForTest(cek) {
+function encryptCekForTest(cek: Buffer): Buffer {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-128-cbc', TEST_MASTER_KEY, iv);
   const encrypted = Buffer.concat([cipher.update(cek), cipher.final()]);
@@ -43,7 +42,7 @@ function encryptCekForTest(cek) {
 /**
  * Decrypts a CEK that was encrypted with our test format.
  */
-function decryptCekForTest(encryptedCek) {
+function decryptCekForTest(encryptedCek: Buffer): Buffer {
   // Skip version byte
   const iv = encryptedCek.slice(1, 17);
   const encrypted = encryptedCek.slice(17);
@@ -57,12 +56,14 @@ const ENCRYPTED_CEK_VALUE = encryptCekForTest(TEST_CEK);
 /**
  * Test keystore provider that decrypts CEKs using our test encryption scheme.
  */
-class TestKeyStoreProvider {
-  constructor() {
-    this.name = 'TEST_KEYSTORE';
-  }
+class TestKeyStoreProvider implements KeyStoreProvider {
+  readonly name = 'TEST_KEYSTORE';
 
-  async decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedCek) {
+  async decryptColumnEncryptionKey(
+    masterKeyPath: string,
+    encryptionAlgorithm: string,
+    encryptedCek: Buffer
+  ): Promise<Buffer> {
     // Validate the master key path
     if (masterKeyPath !== 'test-cmk-path') {
       throw new Error(`Unknown master key path: ${masterKeyPath}`);
@@ -72,7 +73,11 @@ class TestKeyStoreProvider {
     return decryptCekForTest(encryptedCek);
   }
 
-  async encryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, cek) {
+  async encryptColumnEncryptionKey(
+    masterKeyPath: string,
+    encryptionAlgorithm: string,
+    cek: Buffer
+  ): Promise<Buffer> {
     if (masterKeyPath !== 'test-cmk-path') {
       throw new Error(`Unknown master key path: ${masterKeyPath}`);
     }
@@ -200,7 +205,7 @@ describe('Always Encrypted', function() {
     it('should validate encryptionKeyStoreProviders is an array', function() {
       const config = getConfig();
       config.options.alwaysEncrypted = true;
-      config.options.encryptionKeyStoreProviders = 'not-an-array';
+      (config.options as any).encryptionKeyStoreProviders = 'not-an-array';
 
       assert.throws(() => {
         new Connection(config);
@@ -210,7 +215,7 @@ describe('Always Encrypted', function() {
     it('should validate provider has required properties', function() {
       const config = getConfig();
       config.options.alwaysEncrypted = true;
-      config.options.encryptionKeyStoreProviders = [
+      (config.options as any).encryptionKeyStoreProviders = [
         { name: 'TEST_PROVIDER' } // missing decryptColumnEncryptionKey
       ];
 
@@ -249,7 +254,7 @@ describe('Always Encrypted', function() {
         }
 
         assert.isObject(connection.config.options.encryptionKeyStoreProviders);
-        assert.property(connection.config.options.encryptionKeyStoreProviders, 'TEST_PROVIDER');
+        assert.property(connection.config.options.encryptionKeyStoreProviders!, 'TEST_PROVIDER');
 
         connection.close();
       });
@@ -400,9 +405,9 @@ describe('Always Encrypted', function() {
   describe('Encrypted Data Flow', function() {
     // These tests require SQL Server 2016+ with Always Encrypted support
     // Skip if not available or if running against older versions
-    let connection;
+    let connection: Connection;
     let supportsAE = false;
-    let setupError = null;
+    let setupError: Error | null = null;
 
     const tableName = 'TestAETable_' + Date.now();
     const cmkName = 'TestCMK_' + Date.now();
@@ -619,7 +624,7 @@ describe('Always Encrypted', function() {
 
         // Third column (EncryptedText) should be encrypted
         assert.isDefined(columns[2].cryptoMetadata, 'EncryptedText should have cryptoMetadata');
-        assert.strictEqual(columns[2].cryptoMetadata.encryptionType, 1, 'Should be deterministic');
+        assert.strictEqual(columns[2].cryptoMetadata!.encryptionType, 1, 'Should be deterministic');
       });
 
       connection.execSql(request);
@@ -699,7 +704,7 @@ describe('Always Encrypted', function() {
           ENCRYPTED_CEK_VALUE
         );
         assert.fail('Should have thrown an error');
-      } catch (err) {
+      } catch (err: any) {
         assert.include(err.message, 'Unknown master key path');
       }
     });
