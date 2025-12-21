@@ -51,8 +51,8 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
           const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
           const cekEntry: CEKEntry = cekList[cekOrdinal];
 
-          if (cekEntry && cekList.length < cekOrdinal) {
-            return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length}".`));
+          if (!cekEntry) {
+            return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length - 1}".`));
           }
 
           const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;

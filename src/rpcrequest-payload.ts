@@ -14,7 +14,8 @@ import VarBinary from './data-types/varbinary';
 
 const STATUS = {
   BY_REF_VALUE: 0x01,
-  DEFAULT_VALUE: 0x02
+  DEFAULT_VALUE: 0x02,
+  ENCRYPTED: 0x08  // fEncrypted flag for Always Encrypted parameters
 };
 
 /*
@@ -81,12 +82,16 @@ class RpcRequestPayload implements Iterable<Buffer> {
     if (parameter.output) {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
+    // Set fEncrypted flag if parameter is encrypted
+    if (parameter.encryptedVal !== undefined && parameter.cryptoMetadata) {
+      statusFlags |= STATUS.ENCRYPTED;
+    }
     buffer.writeUInt8(statusFlags);
 
     yield buffer.data;
 
     // Handle encrypted parameters
-    if (parameter.encryptedVal !== undefined) {
+    if (parameter.encryptedVal !== undefined && parameter.cryptoMetadata) {
       yield * this.generateEncryptedParameterData(parameter);
       return;
     }
@@ -130,25 +135,110 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
   /**
    * Generates parameter data for an encrypted parameter.
-   * Encrypted parameters are sent as varbinary containing the ciphertext.
+   *
+   * Per MS-TDS spec, encrypted parameters are sent as:
+   * 1. VarBinary type info (the ciphertext container type)
+   * 2. VarBinary length and data (the encrypted value)
+   * 3. ParamCipherInfo structure:
+   *    - TYPE_INFO: Original parameter type info
+   *    - EncryptionAlgo: BYTE (algorithm id, 2 = AEAD_AES_256_CBC_HMAC_SHA_256)
+   *    - AlgoName: B_VARCHAR (only if EncryptionAlgo = 0)
+   *    - EncryptionType: BYTE (1 = deterministic, 2 = randomized)
+   *    - DatabaseId: ULONG (4 bytes)
+   *    - CekId: ULONG (4 bytes)
+   *    - CekVersion: ULONG (4 bytes)
+   *    - CekMDVersion: ULONGLONG (8 bytes)
+   *    - NormVersion: BYTE (must be 1)
    */
   * generateEncryptedParameterData(parameter: Parameter) {
     const encryptedValue = parameter.encryptedVal!;
+    const cryptoMetadata = parameter.cryptoMetadata!;
+    const cekEntry = cryptoMetadata.cekEntry!;
 
-    // Create ParameterData for the encrypted value
-    const param: ParameterData = {
+    // 1. Create ParameterData for the encrypted value (as VarBinary)
+    const encryptedParam: ParameterData = {
       value: encryptedValue,
       length: encryptedValue.length
     };
 
-    // Use VarBinary type for encrypted parameters
-    yield VarBinary.generateTypeInfo(param, this.options);
-    yield VarBinary.generateParameterLength(param, this.options);
+    // Send VarBinary type info, length, and data for the ciphertext
+    yield VarBinary.generateTypeInfo(encryptedParam, this.options);
+    yield VarBinary.generateParameterLength(encryptedParam, this.options);
     try {
-      yield * VarBinary.generateParameterData(param, this.options);
+      yield * VarBinary.generateParameterData(encryptedParam, this.options);
     } catch (error) {
       throw new InputError(`Encrypted parameter '${parameter.name}' could not be validated`, { cause: error });
     }
+
+    // 2. Build ParamCipherInfo structure
+    const cipherInfoBuffer = new WritableTrackingBuffer(50);
+
+    // TYPE_INFO: Original parameter type info
+    const originalType = parameter.type;
+    const originalParam: ParameterData = { value: parameter.value };
+
+    if ((originalType.id & 0x30) === 0x20) {
+      if (parameter.length) {
+        originalParam.length = parameter.length;
+      } else if (originalType.resolveLength) {
+        originalParam.length = originalType.resolveLength(parameter);
+      }
+    }
+
+    if (parameter.precision) {
+      originalParam.precision = parameter.precision;
+    } else if (originalType.resolvePrecision) {
+      originalParam.precision = originalType.resolvePrecision(parameter);
+    }
+
+    if (parameter.scale) {
+      originalParam.scale = parameter.scale;
+    } else if (originalType.resolveScale) {
+      originalParam.scale = originalType.resolveScale(parameter);
+    }
+
+    if (this.collation) {
+      originalParam.collation = this.collation;
+    }
+
+    yield originalType.generateTypeInfo(originalParam, this.options);
+
+    // EncryptionAlgo: BYTE
+    // 2 = AEAD_AES_256_CBC_HMAC_SHA_256 (the standard algorithm)
+    cipherInfoBuffer.writeUInt8(cryptoMetadata.cipherAlgorithmId);
+
+    // AlgoName: B_VARCHAR - only sent if EncryptionAlgo = 0 (custom algorithm)
+    if (cryptoMetadata.cipherAlgorithmId === 0 && cryptoMetadata.cipherAlgorithmName) {
+      cipherInfoBuffer.writeBVarchar(cryptoMetadata.cipherAlgorithmName);
+    }
+
+    // EncryptionType: BYTE (1 = deterministic, 2 = randomized)
+    cipherInfoBuffer.writeUInt8(cryptoMetadata.encryptionType);
+
+    // DatabaseId: ULONG (4 bytes)
+    cipherInfoBuffer.writeUInt32LE(cekEntry.databaseId);
+
+    // CekId: ULONG (4 bytes)
+    cipherInfoBuffer.writeUInt32LE(cekEntry.cekId);
+
+    // CekVersion: ULONG (4 bytes)
+    cipherInfoBuffer.writeUInt32LE(cekEntry.cekVersion);
+
+    // CekMDVersion: ULONGLONG (8 bytes)
+    // cekMdVersion is stored as a Buffer, should be 8 bytes
+    if (cekEntry.cekMdVersion.length >= 8) {
+      cipherInfoBuffer.writeBuffer(cekEntry.cekMdVersion.slice(0, 8));
+    } else {
+      // Pad with zeros if shorter
+      const padded = Buffer.alloc(8);
+      cekEntry.cekMdVersion.copy(padded);
+      cipherInfoBuffer.writeBuffer(padded);
+    }
+
+    // NormVersion: BYTE (must be 1)
+    cipherInfoBuffer.writeUInt8(cryptoMetadata.normalizationRuleVersion[0] || 1);
+
+    yield cipherInfoBuffer.data;
   }
 }
 
