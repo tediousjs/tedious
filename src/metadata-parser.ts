@@ -118,11 +118,28 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
 }
 
 /**
+ * Type info structure returned by readTypeInfo, containing the parsed type information
+ * without UserType and Flags (as those are separate fields in CryptoMetadata).
+ */
+interface TypeInfoResult {
+  type: DataType;
+  collation: Collation | undefined;
+  precision: number | undefined;
+  scale: number | undefined;
+  dataLength: number | undefined;
+  schema: XmlSchema | undefined;
+  udtInfo: UdtInfo | undefined;
+}
+
+/**
  * Reads CryptoMetadata for an encrypted column.
  *
- * Structure per MS-TDS spec:
+ * Structure per MS-TDS spec (section 2.2.7.4):
+ * CryptoMetaData = Ordinal UserType BaseTypeInfo EncryptionAlgo [AlgoName] EncryptionAlgoType NormVersion
+ *
  * - Ordinal (USHORT): index into CekTable
- * - BaseTypeInfo (TYPE_INFO): the actual underlying data type (includes UserType, Flags, TypeId, etc.)
+ * - UserType (ULONG in TDS 7.2+): user type for the underlying data type
+ * - BaseTypeInfo (TYPE_INFO): just TypeId + type-specific data, NOT including UserType/Flags
  * - EncryptionAlgo (BYTE): 0=custom, 2=AEAD_AES_256_CBC_HMAC_SHA256
  * - [AlgoName] (B_VARCHAR): only if EncryptionAlgo=0
  * - EncryptionAlgoType (BYTE): 1=deterministic, 2=randomized
@@ -138,9 +155,13 @@ function readCryptoMetadata(
   let ordinal: number;
   ({ offset, value: ordinal } = readUInt16LE(buf, offset));
 
-  // BaseTypeInfo - the actual underlying data type (TYPE_INFO includes UserType, Flags, TypeId, etc.)
-  let baseTypeInfo: BaseMetadata;
-  ({ offset, value: baseTypeInfo } = readBaseMetadata(buf, offset, options));
+  // UserType - separate field in CryptoMetadata (not part of BaseTypeInfo)
+  let userType: number;
+  ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
+
+  // BaseTypeInfo - TYPE_INFO structure (TypeId + type-specific data, WITHOUT UserType and Flags)
+  let typeInfo: TypeInfoResult;
+  ({ offset, value: typeInfo } = readTypeInfo(buf, offset, options));
 
   // EncryptionAlgo (BYTE): 0=custom, 2=AEAD_AES_256_CBC_HMAC_SHA256
   let cipherAlgorithmId: number;
@@ -163,6 +184,20 @@ function readCryptoMetadata(
   // Look up the CEK entry
   const cekEntry = cekTable[ordinal];
 
+  // Construct BaseMetadata from userType and typeInfo
+  // Note: CryptoMetadata doesn't have Flags, so we set it to 0
+  const baseTypeInfo: BaseMetadata = {
+    userType: userType,
+    flags: 0,
+    type: typeInfo.type,
+    collation: typeInfo.collation,
+    precision: typeInfo.precision,
+    scale: typeInfo.scale,
+    dataLength: typeInfo.dataLength,
+    schema: typeInfo.schema,
+    udtInfo: typeInfo.udtInfo
+  };
+
   const cryptoMetadata: CryptoMetadata = {
     cekEntry: cekEntry,
     cipherAlgorithmId: cipherAlgorithmId,
@@ -181,16 +216,13 @@ function readCryptoMetadata(
 }
 
 /**
- * Reads base metadata (TYPE_INFO) without crypto metadata.
- * Used for parsing the underlying type of encrypted columns.
+ * Reads TYPE_INFO structure (TypeId + type-specific data) without UserType and Flags.
+ * Per MS-TDS spec, TYPE_INFO is just the type and its associated data.
+ *
+ * This is used when parsing CryptoMetadata's BaseTypeInfo, which doesn't include
+ * UserType and Flags (those are separate fields in CryptoMetadata).
  */
-function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<BaseMetadata> {
-  let userType;
-  ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
-
-  let flags;
-  ({ offset, value: flags } = readUInt16LE(buf, offset));
-
+function readTypeInfo(buf: Buffer, offset: number, options: ParserOptions): Result<TypeInfoResult> {
   let typeNumber;
   ({ offset, value: typeNumber } = readUInt8(buf, offset));
 
@@ -214,8 +246,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
     case 'DateTime':
     case 'Date':
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -235,8 +265,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: dataLength } = readUInt8(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -252,8 +280,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -275,8 +301,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: collation } = readCollation(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: collation,
         precision: undefined,
@@ -296,8 +320,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: collation } = readCollation(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: collation,
         precision: undefined,
@@ -314,8 +336,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: dataLength } = readUInt16LE(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -331,8 +351,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -348,8 +366,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: schema } = readSchema(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -367,8 +383,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: scale } = readUInt8(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -391,8 +405,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: scale } = readUInt8(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: precision,
@@ -408,8 +420,6 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
       ({ offset, value: udtInfo } = readUDTInfo(buf, offset));
 
       return new Result({
-        userType: userType,
-        flags: flags,
         type: type,
         collation: undefined,
         precision: undefined,
@@ -423,6 +433,33 @@ function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): 
     default:
       throw new Error(sprintf('Unrecognised type %s', type.name));
   }
+}
+
+/**
+ * Reads base metadata (UserType + Flags + TYPE_INFO).
+ * This is the full column metadata structure used in COLMETADATA for columns.
+ */
+function readBaseMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<BaseMetadata> {
+  let userType;
+  ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
+
+  let flags;
+  ({ offset, value: flags } = readUInt16LE(buf, offset));
+
+  let typeInfo;
+  ({ offset, value: typeInfo } = readTypeInfo(buf, offset, options));
+
+  return new Result<BaseMetadata>({
+    userType: userType,
+    flags: flags,
+    type: typeInfo.type,
+    collation: typeInfo.collation,
+    precision: typeInfo.precision,
+    scale: typeInfo.scale,
+    dataLength: typeInfo.dataLength,
+    schema: typeInfo.schema,
+    udtInfo: typeInfo.udtInfo
+  }, offset);
 }
 
 /**

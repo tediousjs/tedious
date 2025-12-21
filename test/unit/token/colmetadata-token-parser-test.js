@@ -174,11 +174,11 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt8(dataTypeByName.VarBinary.id); // Encrypted columns appear as VarBinary
       buffer.writeUInt16LE(8000); // dataLength
 
-      // CryptoMetadata
+      // CryptoMetadata per MS-TDS spec:
+      // CryptoMetaData = Ordinal UserType BaseTypeInfo EncryptionAlgo [AlgoName] EncryptionType NormVersion
       buffer.writeUInt16LE(0); // Ordinal (index into CekTable)
-      // BaseTypeInfo (TYPE_INFO structure: UserType + Flags + TypeId + type-specific data)
-      buffer.writeUInt32LE(0); // UserType for base type
-      buffer.writeUInt16LE(0); // Flags for base type
+      buffer.writeUInt32LE(0); // UserType for base type (separate field, NOT part of BaseTypeInfo)
+      // BaseTypeInfo (TYPE_INFO structure: just TypeId + type-specific data, NO UserType/Flags)
       buffer.writeUInt8(dataTypeByName.Int.id); // Type number - actual type is Int
       // Int is fixed-size, no additional type data needed
       buffer.writeUInt8(2); // EncryptionAlgo = AEAD_AES_256_CBC_HMAC_SHA256
@@ -255,11 +255,10 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(FLAG_ENCRYPTED);
       buffer.writeUInt8(dataTypeByName.VarBinary.id);
       buffer.writeUInt16LE(8000);
-      // CryptoMetadata
+      // CryptoMetadata per MS-TDS spec: Ordinal UserType BaseTypeInfo EncryptionAlgo [AlgoName] EncryptionType NormVersion
       buffer.writeUInt16LE(0); // Ordinal = 0
-      // BaseTypeInfo (TYPE_INFO structure)
-      buffer.writeUInt32LE(0); // UserType for base type
-      buffer.writeUInt16LE(0); // Flags for base type
+      buffer.writeUInt32LE(0); // UserType for base type (separate field)
+      // BaseTypeInfo (TYPE_INFO: just TypeId + type-specific data, NO UserType/Flags)
       buffer.writeUInt8(dataTypeByName.NVarChar.id);
       buffer.writeUInt16LE(100); // dataLength for NVarChar
       buffer.writeBuffer(Buffer.from([0x09, 0x04, 0x00, 0x00, 0x00])); // Collation
@@ -273,11 +272,10 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(FLAG_ENCRYPTED);
       buffer.writeUInt8(dataTypeByName.VarBinary.id);
       buffer.writeUInt16LE(8000);
-      // CryptoMetadata
+      // CryptoMetadata per MS-TDS spec: Ordinal UserType BaseTypeInfo EncryptionAlgo [AlgoName] EncryptionType NormVersion
       buffer.writeUInt16LE(1); // Ordinal = 1
-      // BaseTypeInfo (TYPE_INFO structure)
-      buffer.writeUInt32LE(0); // UserType for base type
-      buffer.writeUInt16LE(0); // Flags for base type
+      buffer.writeUInt32LE(0); // UserType for base type (separate field)
+      // BaseTypeInfo (TYPE_INFO: just TypeId + type-specific data, NO UserType/Flags)
       buffer.writeUInt8(dataTypeByName.DateTime2.id);
       buffer.writeUInt8(7); // scale for DateTime2
       buffer.writeUInt8(2); // AEAD_AES_256_CBC_HMAC_SHA256
@@ -334,11 +332,10 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt8(dataTypeByName.VarBinary.id);
       buffer.writeUInt16LE(8000);
 
-      // CryptoMetadata with custom algorithm
+      // CryptoMetadata with custom algorithm per MS-TDS spec: Ordinal UserType BaseTypeInfo EncryptionAlgo [AlgoName] EncryptionType NormVersion
       buffer.writeUInt16LE(0); // Ordinal
-      // BaseTypeInfo (TYPE_INFO structure)
-      buffer.writeUInt32LE(0); // UserType for base type
-      buffer.writeUInt16LE(0); // Flags for base type
+      buffer.writeUInt32LE(0); // UserType for base type (separate field)
+      // BaseTypeInfo (TYPE_INFO: just TypeId + type-specific data, NO UserType/Flags)
       buffer.writeUInt8(dataTypeByName.Int.id);
       buffer.writeUInt8(0); // Custom algorithm (0)
       buffer.writeBVarchar('MY_CUSTOM_CIPHER'); // Algorithm name only when cipherAlgorithmId = 0
@@ -411,11 +408,10 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeUInt16LE(FLAG_ENCRYPTED);
       buffer.writeUInt8(dataTypeByName.VarBinary.id);
       buffer.writeUInt16LE(8000);
-      // CryptoMetadata
+      // CryptoMetadata per MS-TDS spec: Ordinal UserType BaseTypeInfo EncryptionAlgo [AlgoName] EncryptionType NormVersion
       buffer.writeUInt16LE(0); // Ordinal
-      // BaseTypeInfo (TYPE_INFO structure)
-      buffer.writeUInt32LE(0); // UserType for base type
-      buffer.writeUInt16LE(0); // Flags for base type
+      buffer.writeUInt32LE(0); // UserType for base type (separate field)
+      // BaseTypeInfo (TYPE_INFO: just TypeId + type-specific data, NO UserType/Flags)
       buffer.writeUInt8(dataTypeByName.Int.id);
       buffer.writeUInt8(2); // AEAD_AES_256_CBC_HMAC_SHA256
       buffer.writeUInt8(2); // Randomized
