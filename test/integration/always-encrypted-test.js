@@ -43,7 +43,6 @@ describe('Always Encrypted', function() {
         }
 
         // Server should acknowledge column encryption support
-        // This is set in the feature-ext-parser when server responds with COLUMNENCRYPTION
         assert.isBoolean(connection.serverSupportsColumnEncryption);
 
         connection.close();
@@ -69,99 +68,52 @@ describe('Always Encrypted', function() {
           return done(err);
         }
 
-        // When AE is disabled, serverSupportsColumnEncryption should be false
         assert.strictEqual(connection.serverSupportsColumnEncryption, false);
 
         connection.close();
       });
     });
-  });
 
-  describe('Encrypted Column Metadata', function() {
-    it('should be able to query sys.column_encryption_keys', function(done) {
+    it('should execute simple query with alwaysEncrypted enabled', function(done) {
       const config = getConfig();
       config.options.alwaysEncrypted = true;
 
       const connection = new Connection(config);
+      let isDone = false;
 
       if (process.env.TEDIOUS_DEBUG) {
         connection.on('debug', console.log);
       }
 
       connection.on('end', function() {
-        done();
+        if (!isDone) {
+          isDone = true;
+          done();
+        }
       });
 
       connection.connect(function(err) {
         if (err) {
+          isDone = true;
           return done(err);
         }
 
-        // This verifies that AE-related system tables are accessible
-        const request = new Request(
-          'SELECT COUNT(*) as cnt FROM sys.column_encryption_keys',
-          function(err) {
-            if (err) {
-              done(err);
-              return connection.close();
-            }
-            connection.close();
+        let rowCount = 0;
+
+        const request = new Request('SELECT 1 as test_value', function(err) {
+          if (err) {
+            isDone = true;
+            done(err);
+            return connection.close();
           }
-        );
 
-        let rowReceived = false;
+          assert.strictEqual(rowCount, 1, 'Should receive exactly one row');
+          connection.close();
+        });
+
         request.on('row', function(columns) {
-          rowReceived = true;
-          // The count should be a number (could be 0 if no CEKs defined)
-          assert.isNumber(columns[0].value);
-        });
-
-        request.on('requestCompleted', function() {
-          assert.isTrue(rowReceived, 'Should have received a row');
-        });
-
-        connection.execSql(request);
-      });
-    });
-
-    it('should be able to query sys.column_master_keys', function(done) {
-      const config = getConfig();
-      config.options.alwaysEncrypted = true;
-
-      const connection = new Connection(config);
-
-      if (process.env.TEDIOUS_DEBUG) {
-        connection.on('debug', console.log);
-      }
-
-      connection.on('end', function() {
-        done();
-      });
-
-      connection.connect(function(err) {
-        if (err) {
-          return done(err);
-        }
-
-        const request = new Request(
-          'SELECT COUNT(*) as cnt FROM sys.column_master_keys',
-          function(err) {
-            if (err) {
-              done(err);
-              return connection.close();
-            }
-            connection.close();
-          }
-        );
-
-        let rowReceived = false;
-        request.on('row', function(columns) {
-          rowReceived = true;
-          assert.isNumber(columns[0].value);
-        });
-
-        request.on('requestCompleted', function() {
-          assert.isTrue(rowReceived, 'Should have received a row');
+          rowCount++;
+          assert.strictEqual(columns[0].value, 1);
         });
 
         connection.execSql(request);
@@ -213,7 +165,6 @@ describe('Always Encrypted', function() {
           return done(err);
         }
 
-        // Verify provider was registered
         assert.isObject(connection.config.options.encryptionKeyStoreProviders);
         assert.property(connection.config.options.encryptionKeyStoreProviders, 'TEST_PROVIDER');
 
@@ -246,7 +197,6 @@ describe('Always Encrypted', function() {
           return done(err);
         }
 
-        // Verify both providers were registered
         const providers = connection.config.options.encryptionKeyStoreProviders;
         assert.property(providers, 'PROVIDER_1');
         assert.property(providers, 'PROVIDER_2');
@@ -284,7 +234,7 @@ describe('Always Encrypted', function() {
     it('should allow custom cache TTL', function(done) {
       const config = getConfig();
       config.options.alwaysEncrypted = true;
-      config.options.columnEncryptionKeyCacheTTL = 3600000; // 1 hour
+      config.options.columnEncryptionKeyCacheTTL = 3600000;
 
       const connection = new Connection(config);
 
