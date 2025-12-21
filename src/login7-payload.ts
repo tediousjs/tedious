@@ -79,7 +79,7 @@ interface Options {
   connectionId: number;
   clientTimeZone: number;
   clientLcid: number;
-  columnEncryptionSetting?: boolean;
+  alwaysEncrypted?: boolean;
 }
 
 /*
@@ -111,9 +111,9 @@ class Login7Payload {
   declare changePassword: string | undefined;
 
   declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
-  declare columnEncryptionSetting: boolean;
+  declare alwaysEncrypted: boolean;
 
-  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid, columnEncryptionSetting }: Options) {
+  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid, alwaysEncrypted }: Options) {
     this.tdsVersion = tdsVersion;
     this.packetSize = packetSize;
     this.clientProgVer = clientProgVer;
@@ -126,7 +126,7 @@ class Login7Payload {
     this.initDbFatal = false;
 
     this.fedAuth = undefined;
-    this.columnEncryptionSetting = columnEncryptionSetting ?? false;
+    this.alwaysEncrypted = alwaysEncrypted ?? false;
 
     this.userName = undefined;
     this.password = undefined;
@@ -428,8 +428,8 @@ class Login7Payload {
     }
 
     // Column Encryption feature (Always Encrypted) - Feature ID 0x04
-    // Only send when column encryption is enabled in connection options
-    if (this.columnEncryptionSetting) {
+    // Only send when Always Encrypted is enabled in connection options
+    if (this.alwaysEncrypted) {
       const columnEncryptionBuf = Buffer.alloc(6);
       columnEncryptionBuf.writeUInt8(COLUMN_ENCRYPTION_OPTIONS.FEATURE_ID, 0);
       columnEncryptionBuf.writeUInt32LE(1, 1); // Feature data length = 1 byte

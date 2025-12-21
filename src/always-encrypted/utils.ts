@@ -3,7 +3,7 @@
 
 import { SQLServerStatementColumnEncryptionSetting } from './types';
 
-export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting, columnEncryptionSetting: boolean): boolean => {
+export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting, alwaysEncrypted: boolean): boolean => {
   switch (stmtColumnEncryptionSetting) {
     case SQLServerStatementColumnEncryptionSetting.Disabled:
     case SQLServerStatementColumnEncryptionSetting.ResultSetOnly:
@@ -11,6 +11,6 @@ export const shouldHonorAE = (stmtColumnEncryptionSetting: SQLServerStatementCol
     case SQLServerStatementColumnEncryptionSetting.Enabled:
       return true;
     default:
-      return columnEncryptionSetting;
+      return alwaysEncrypted;
   }
 };

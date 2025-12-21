@@ -354,7 +354,7 @@ export interface InternalConnectionOptions {
   camelCaseColumns: boolean;
   cancelTimeout: number;
   columnEncryptionKeyCacheTTL: number;
-  columnEncryptionSetting: boolean;
+  alwaysEncrypted: boolean;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
   connector: undefined | (() => Promise<net.Socket>);
@@ -1279,7 +1279,7 @@ class Connection extends EventEmitter {
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
         columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: milliseconds
-        columnEncryptionSetting: false,
+        alwaysEncrypted: false,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
@@ -2449,7 +2449,7 @@ class Connection extends EventEmitter {
       connectionId: 0,
       clientTimeZone: new Date().getTimezoneOffset(),
       clientLcid: 0x00000409,
-      columnEncryptionSetting: this.config.options.columnEncryptionSetting
+      alwaysEncrypted: this.config.options.alwaysEncrypted
     });
 
     const { authentication } = this.config;
