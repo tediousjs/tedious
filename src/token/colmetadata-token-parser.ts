@@ -176,34 +176,7 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
 }
 
 async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  // Parse CekTable when server supports column encryption.
-  //
-  // Per MS-TDS spec and mssql-jdbc implementation:
-  // "CEK table will be sent if AE is enabled. If none of the columns are encrypted,
-  // the CEK table size would be zero."
-  //
-  // This means when COLUMNENCRYPTION is negotiated, the CekTable structure (starting with
-  // the 2-byte tableSize) is ALWAYS present in COLMETADATA - it's just that tableSize = 0
-  // when there are no encrypted columns.
-  let cekTable: CEKEntry[] = [];
-  if (parser.options.serverSupportsColumnEncryption) {
-    while (true) {
-      try {
-        const result = readCekTable(parser.buffer, parser.position);
-        cekTable = result.value;
-        parser.position = result.offset;
-        break;
-      } catch (err) {
-        if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
-          continue;
-        }
-        throw err;
-      }
-    }
-  }
-
-  // Parse column count
+  // Parse column count first (per MS-TDS spec, Count comes before CekTable)
   let columnCount;
   while (true) {
     let offset;
@@ -221,6 +194,35 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
 
     parser.position = offset;
     break;
+  }
+
+  let cekTable: CEKEntry[] = [];
+  if (columnCount > 0) {
+    // Parse CekTable when server supports column encryption.
+    //
+    // Per MS-TDS spec and mssql-jdbc implementation:
+    // "CEK table will be sent if AE is enabled. If none of the columns are encrypted,
+    // the CEK table size would be zero."
+    //
+    // This means when COLUMNENCRYPTION is negotiated, the CekTable structure (starting with
+    // the 2-byte tableSize) is ALWAYS present in COLMETADATA - it's just that tableSize = 0
+    // when there are no encrypted columns.
+    if (parser.options.serverSupportsColumnEncryption) {
+      while (true) {
+        try {
+          const result = readCekTable(parser.buffer, parser.position);
+          cekTable = result.value;
+          parser.position = result.offset;
+          break;
+        } catch (err) {
+          if (err instanceof NotEnoughDataError) {
+            await parser.waitForChunk();
+            continue;
+          }
+          throw err;
+        }
+      }
+    }
   }
 
   // Parse each column

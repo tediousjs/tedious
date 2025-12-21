@@ -122,8 +122,8 @@ describe('Colmetadata Token Parser', () => {
       const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
       buffer.writeUInt8(0x81); // COLMETADATA token
+      buffer.writeUInt16LE(1); // Column count = 1 (comes before CekTable per MS-TDS spec)
       buffer.writeUInt16LE(0); // CekTable size = 0 (empty)
-      buffer.writeUInt16LE(1); // Column count = 1
 
       // Column metadata (non-encrypted)
       buffer.writeUInt32LE(0); // userType
@@ -147,6 +147,9 @@ describe('Colmetadata Token Parser', () => {
 
       buffer.writeUInt8(0x81); // COLMETADATA token
 
+      // Column count (comes before CekTable per MS-TDS spec)
+      buffer.writeUInt16LE(1);
+
       // CekTable
       buffer.writeUInt16LE(1); // CekTable size = 1
 
@@ -164,9 +167,6 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeBVarchar('AZURE_KEY_VAULT'); // KeyStoreName
       buffer.writeBVarchar('https://vault.azure.net/keys/mykey/version'); // KeyPath
       buffer.writeBVarchar('RSA_OAEP'); // AlgorithmName
-
-      // Column count
-      buffer.writeUInt16LE(1);
 
       // Column metadata (encrypted)
       buffer.writeUInt32LE(0); // userType
@@ -221,6 +221,9 @@ describe('Colmetadata Token Parser', () => {
 
       buffer.writeUInt8(0x81); // COLMETADATA token
 
+      // Column count = 2 (comes before CekTable per MS-TDS spec)
+      buffer.writeUInt16LE(2);
+
       // CekTable with 2 entries
       buffer.writeUInt16LE(2);
 
@@ -247,9 +250,6 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeBVarchar('AZURE_KEY_VAULT');
       buffer.writeBVarchar('https://vault.azure.net/keys/key2');
       buffer.writeBVarchar('RSA_OAEP');
-
-      // Column count = 2
-      buffer.writeUInt16LE(2);
 
       // Column 0 - encrypted with CEK 0
       buffer.writeUInt32LE(0);
@@ -313,6 +313,9 @@ describe('Colmetadata Token Parser', () => {
 
       buffer.writeUInt8(0x81); // COLMETADATA token
 
+      // Column count (comes before CekTable per MS-TDS spec)
+      buffer.writeUInt16LE(1);
+
       // CekTable
       buffer.writeUInt16LE(1);
       buffer.writeUInt32LE(1);
@@ -325,9 +328,6 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeBVarchar('CUSTOM_STORE');
       buffer.writeBVarchar('/path/to/key');
       buffer.writeBVarchar('CUSTOM_ALGO');
-
-      // Column count
-      buffer.writeUInt16LE(1);
 
       // Encrypted column
       buffer.writeUInt32LE(0);
@@ -385,6 +385,9 @@ describe('Colmetadata Token Parser', () => {
 
       buffer.writeUInt8(0x81); // COLMETADATA token
 
+      // Column count = 3 (comes before CekTable per MS-TDS spec)
+      buffer.writeUInt16LE(3);
+
       // CekTable with 1 entry
       buffer.writeUInt16LE(1);
       buffer.writeUInt32LE(1);
@@ -397,9 +400,6 @@ describe('Colmetadata Token Parser', () => {
       buffer.writeBVarchar('STORE');
       buffer.writeBVarchar('/key');
       buffer.writeBVarchar('RSA');
-
-      // Column count = 3
-      buffer.writeUInt16LE(3);
 
       // Column 0 - non-encrypted Int
       buffer.writeUInt32LE(0);
