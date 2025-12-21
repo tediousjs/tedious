@@ -51,4 +51,79 @@ describe('Feature Ext Parser', () => {
 
     assert.isTrue((await parser.next()).done);
   });
+
+  it('should parse COLUMNENCRYPTION acknowledgment', async () => {
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen = 1
+    buffer.writeUInt8(0x01); // version 1
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+
+    const token = result.value;
+    assert.strictEqual(token.columnEncryption, true); // COLUMNENCRYPTION was acknowledged
+    assert.isUndefined(token.fedAuth);
+    assert.isUndefined(token.utf8Support);
+
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse COLUMNENCRYPTION with zero-length data as false', async () => {
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(0x00_00_00_00); // datalen = 0 (not supported)
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+
+    const token = result.value;
+    assert.strictEqual(token.columnEncryption, false); // COLUMNENCRYPTION not supported
+
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse multiple features including COLUMNENCRYPTION', async () => {
+    const buffer = new WritableTrackingBuffer(32);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+
+    // COLUMNENCRYPTION feature
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen = 1
+    buffer.writeUInt8(0x01); // version 1
+
+    // UTF8_SUPPORT feature
+    buffer.writeUInt8(0x0A); // UTF8_SUPPORT feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen = 1
+    buffer.writeUInt8(0x01); // supported
+
+    // FEDAUTH feature
+    buffer.writeUInt8(0x02); // FEDAUTH
+    buffer.writeUInt32LE(2);
+    buffer.writeBuffer(Buffer.from('ab'));
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], {}, {});
+    const result = await parser.next();
+    assert.isFalse(result.done);
+
+    const token = result.value;
+    assert.strictEqual(token.columnEncryption, true);
+    assert.strictEqual(token.utf8Support, true);
+    assert.isOk(token.fedAuth.equals(Buffer.from('ab')));
+
+    assert.isTrue((await parser.next()).done);
+  });
 });

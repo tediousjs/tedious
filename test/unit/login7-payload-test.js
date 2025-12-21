@@ -288,5 +288,88 @@ describe('Login7Payload', function() {
         assert.lengthOf(data, expectedLength);
       });
     });
+
+    describe('for a login payload with Always Encrypted enabled', function() {
+      it('generates COLUMNENCRYPTION feature in feature extensions', function() {
+        const payload = new Login7Payload({
+          tdsVersion: 0x74000004,
+          packetSize: 1024,
+          clientProgVer: 0,
+          clientPid: 12345,
+          connectionId: 0,
+          clientTimeZone: 120,
+          clientLcid: 0x00000409
+        });
+
+        payload.hostname = 'example.com';
+        payload.userName = 'user';
+        payload.password = 'pw';
+        payload.appName = 'app';
+        payload.serverName = 'server';
+        payload.language = 'lang';
+        payload.database = 'db';
+        payload.libraryName = 'Tedious';
+        payload.alwaysEncrypted = true;
+
+        const data = payload.toBuffer();
+
+        // Find and verify the COLUMNENCRYPTION feature in the buffer
+        // Look for feature ID 0x04 (COLUMNENCRYPTION)
+        let foundColumnEncryption = false;
+        for (let i = 0; i < data.length - 5; i++) {
+          if (data[i] === 0x04) { // COLUMNENCRYPTION feature ID
+            const featureDataLen = data.readUInt32LE(i + 1);
+            if (featureDataLen === 1) {
+              const version = data[i + 5];
+              if (version === 0x01) { // Version 1
+                foundColumnEncryption = true;
+                break;
+              }
+            }
+          }
+        }
+
+        assert.isTrue(foundColumnEncryption, 'COLUMNENCRYPTION feature should be present in the buffer');
+      });
+
+      it('does not include COLUMNENCRYPTION feature when alwaysEncrypted is false', function() {
+        const payload = new Login7Payload({
+          tdsVersion: 0x74000004,
+          packetSize: 1024,
+          clientProgVer: 0,
+          clientPid: 12345,
+          connectionId: 0,
+          clientTimeZone: 120,
+          clientLcid: 0x00000409
+        });
+
+        payload.hostname = 'example.com';
+        payload.userName = 'user';
+        payload.password = 'pw';
+        payload.appName = 'app';
+        payload.serverName = 'server';
+        payload.language = 'lang';
+        payload.database = 'db';
+        payload.libraryName = 'Tedious';
+        payload.alwaysEncrypted = false;
+
+        const data = payload.toBuffer();
+
+        // Verify COLUMNENCRYPTION feature is NOT present
+        // Search for feature ID 0x04 followed by length 1 and version 1
+        let foundColumnEncryption = false;
+        for (let i = 0; i < data.length - 5; i++) {
+          if (data[i] === 0x04) {
+            const featureDataLen = data.readUInt32LE(i + 1);
+            if (featureDataLen === 1 && data[i + 5] === 0x01) {
+              foundColumnEncryption = true;
+              break;
+            }
+          }
+        }
+
+        assert.isFalse(foundColumnEncryption, 'COLUMNENCRYPTION feature should NOT be present when alwaysEncrypted is false');
+      });
+    });
   });
 });
