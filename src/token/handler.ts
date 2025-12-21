@@ -309,10 +309,15 @@ export class Login7TokenHandler extends TokenHandler {
       } else if (token.fedAuth.length !== 0) {
         this.connection.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
       }
-    } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
+    } else if (token.fedAuth === undefined && token.utf8Support === undefined && token.columnEncryption === undefined) {
       this.connection.loginError = new ConnectionError('Received acknowledgement for unknown feature');
     } else if (token.fedAuth) {
       this.connection.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+    }
+
+    // Track server's column encryption support
+    if (token.columnEncryption !== undefined) {
+      this.connection.config.options.serverSupportsColumnEncryption = token.columnEncryption;
     }
   }
 

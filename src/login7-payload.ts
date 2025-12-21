@@ -64,6 +64,13 @@ const FEDAUTH_OPTIONS = {
 
 const FEATURE_EXT_TERMINATOR = 0xFF;
 
+const COLUMN_ENCRYPTION_OPTIONS = {
+  FEATURE_ID: 0x04,
+  // Version 1: Basic Always Encrypted
+  // Version 2: Always Encrypted with secure enclaves
+  VERSION: 0x01
+};
+
 interface Options {
   tdsVersion: number;
   packetSize: number;
@@ -72,6 +79,7 @@ interface Options {
   connectionId: number;
   clientTimeZone: number;
   clientLcid: number;
+  columnEncryptionSetting?: boolean;
 }
 
 /*
@@ -103,8 +111,9 @@ class Login7Payload {
   declare changePassword: string | undefined;
 
   declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
+  declare columnEncryptionSetting: boolean;
 
-  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
+  constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid, columnEncryptionSetting }: Options) {
     this.tdsVersion = tdsVersion;
     this.packetSize = packetSize;
     this.clientProgVer = clientProgVer;
@@ -117,6 +126,7 @@ class Login7Payload {
     this.initDbFatal = false;
 
     this.fedAuth = undefined;
+    this.columnEncryptionSetting = columnEncryptionSetting ?? false;
 
     this.userName = undefined;
     this.password = undefined;
@@ -415,6 +425,16 @@ class Login7Payload {
 
           break;
       }
+    }
+
+    // Column Encryption feature (Always Encrypted) - Feature ID 0x04
+    // Only send when column encryption is enabled in connection options
+    if (this.columnEncryptionSetting) {
+      const columnEncryptionBuf = Buffer.alloc(6);
+      columnEncryptionBuf.writeUInt8(COLUMN_ENCRYPTION_OPTIONS.FEATURE_ID, 0);
+      columnEncryptionBuf.writeUInt32LE(1, 1); // Feature data length = 1 byte
+      columnEncryptionBuf.writeUInt8(COLUMN_ENCRYPTION_OPTIONS.VERSION, 5); // Version byte
+      buffers.push(columnEncryptionBuf);
     }
 
     // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.

@@ -332,11 +332,18 @@ export class FeatureExtAckToken extends Token {
    * undefined when UTF8_SUPPORT not included in token. */
   declare utf8Support: boolean | undefined;
 
-  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined) {
+  /** Value of COLUMNENCRYPTION acknowledgement.
+   *
+   * undefined when COLUMNENCRYPTION not included in token.
+   * When present, indicates the server supports Always Encrypted. */
+  declare columnEncryption: boolean | undefined;
+
+  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined, columnEncryption: boolean | undefined) {
     super('FEATUREEXTACK', 'onFeatureExtAck');
 
     this.fedAuth = fedAuth;
     this.utf8Support = utf8Support;
+    this.columnEncryption = columnEncryption;
   }
 }
 

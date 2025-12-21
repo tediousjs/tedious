@@ -2442,7 +2442,8 @@ class Connection extends EventEmitter {
       clientPid: process.pid,
       connectionId: 0,
       clientTimeZone: new Date().getTimezoneOffset(),
-      clientLcid: 0x00000409
+      clientLcid: 0x00000409,
+      columnEncryptionSetting: this.config.options.columnEncryptionSetting
     });
 
     const { authentication } = this.config;
