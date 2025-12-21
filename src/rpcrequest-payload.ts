@@ -4,6 +4,7 @@ import { type Parameter, type ParameterData } from './data-type';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import { InputError } from './errors';
+import VarBinary from './data-types/varbinary';
 
 // const OPTION = {
 //   WITH_RECOMPILE: 0x01,
@@ -84,6 +85,12 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     yield buffer.data;
 
+    // Handle encrypted parameters
+    if (parameter.encryptedVal !== undefined) {
+      yield * this.generateEncryptedParameterData(parameter);
+      return;
+    }
+
     const param: ParameterData = { value: parameter.value };
 
     const type = parameter.type;
@@ -118,6 +125,29 @@ class RpcRequestPayload implements Iterable<Buffer> {
       yield * type.generateParameterData(param, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+    }
+  }
+
+  /**
+   * Generates parameter data for an encrypted parameter.
+   * Encrypted parameters are sent as varbinary containing the ciphertext.
+   */
+  * generateEncryptedParameterData(parameter: Parameter) {
+    const encryptedValue = parameter.encryptedVal!;
+
+    // Create ParameterData for the encrypted value
+    const param: ParameterData = {
+      value: encryptedValue,
+      length: encryptedValue.length
+    };
+
+    // Use VarBinary type for encrypted parameters
+    yield VarBinary.generateTypeInfo(param, this.options);
+    yield VarBinary.generateParameterLength(param, this.options);
+    try {
+      yield * VarBinary.generateParameterData(param, this.options);
+    } catch (error) {
+      throw new InputError(`Encrypted parameter '${parameter.name}' could not be validated`, { cause: error });
     }
   }
 }

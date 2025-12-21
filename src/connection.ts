@@ -40,6 +40,9 @@ import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { shouldHonorAE } from './always-encrypted/utils';
+import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
+import { encryptParameters } from './always-encrypted/encrypt-parameters';
 
 import { type Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
@@ -2673,6 +2676,42 @@ class Connection extends EventEmitter {
       return;
     }
 
+    // Check if Always Encrypted should be used for this request
+    const shouldEncrypt = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.alwaysEncrypted);
+
+    if (shouldEncrypt && request.parameters.length > 0) {
+      // Get encryption metadata and encrypt parameters before making the request
+      getParameterEncryptionMetadata(this, request, (error) => {
+        if (error) {
+          request.error = error;
+          process.nextTick(() => {
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+
+        // Encrypt parameters that have cryptoMetadata
+        encryptParameters(request.parameters, this.config.options).then(() => {
+          this.execSqlAfterEncryption(request);
+        }).catch((error) => {
+          request.error = error;
+          process.nextTick(() => {
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+        });
+      });
+    } else {
+      this.execSqlAfterEncryption(request);
+    }
+  }
+
+  /**
+   * @private
+   * Internal method to execute SQL after parameter encryption is done.
+   */
+  private execSqlAfterEncryption(request: Request) {
     const parameters: Parameter[] = [];
 
     parameters.push({
@@ -2968,6 +3007,42 @@ class Connection extends EventEmitter {
       return;
     }
 
+    // Check if Always Encrypted should be used for this request
+    const shouldEncrypt = shouldHonorAE(request.statementColumnEncryptionSetting, this.config.options.alwaysEncrypted);
+
+    if (shouldEncrypt && request.parameters.length > 0) {
+      // Get encryption metadata and encrypt parameters before making the request
+      getParameterEncryptionMetadata(this, request, (error) => {
+        if (error) {
+          request.error = error;
+          process.nextTick(() => {
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+          return;
+        }
+
+        // Encrypt parameters that have cryptoMetadata
+        encryptParameters(request.parameters, this.config.options).then(() => {
+          this.callProcedureAfterEncryption(request);
+        }).catch((error) => {
+          request.error = error;
+          process.nextTick(() => {
+            this.debug.log(error.message);
+            request.callback(error);
+          });
+        });
+      });
+    } else {
+      this.callProcedureAfterEncryption(request);
+    }
+  }
+
+  /**
+   * @private
+   * Internal method to call stored procedure after parameter encryption is done.
+   */
+  private callProcedureAfterEncryption(request: Request) {
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
   }
 
