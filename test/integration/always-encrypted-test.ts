@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { TYPES } from '../../src/data-type';
 import { type ColumnMetadata } from '../../src/token/colmetadata-token-parser';
 import { type KeyStoreProvider } from '../../src/always-encrypted/keystore-provider';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
@@ -656,6 +657,275 @@ describe('Always Encrypted', function() {
 
       request.on('row', function() {
         rowCount++;
+      });
+
+      connection.execSql(request);
+    });
+
+    it('should insert data into encrypted column using parameterized query', function(done) {
+      if (!supportsAE) {
+        if (setupError) {
+          console.log('      Skipping: ' + setupError.message);
+        }
+        this.skip();
+        return;
+      }
+
+      const plainTextValue = 'Hello World';
+      const encryptedTextValue = 'Secret Data 123';
+
+      const insertQuery = `INSERT INTO [${tableName}] (PlainText, EncryptedText) VALUES (@plainText, @encryptedText)`;
+
+      const request = new Request(insertQuery, function(err) {
+        if (err) {
+          return done(err);
+        }
+        done();
+      });
+
+      request.addParameter('plainText', TYPES.NVarChar, plainTextValue);
+      request.addParameter('encryptedText', TYPES.NVarChar, encryptedTextValue);
+
+      connection.execSql(request);
+    });
+
+    it('should read decrypted data from encrypted column', function(done) {
+      if (!supportsAE) {
+        if (setupError) {
+          console.log('      Skipping: ' + setupError.message);
+        }
+        this.skip();
+        return;
+      }
+
+      const expectedPlainText = 'Hello World';
+      const expectedEncryptedText = 'Secret Data 123';
+
+      const query = `SELECT PlainText, EncryptedText FROM [${tableName}] WHERE PlainText = @plainText`;
+      let rowCount = 0;
+      let receivedPlainText: string | null = null;
+      let receivedEncryptedText: string | null = null;
+
+      const request = new Request(query, function(err) {
+        if (err) {
+          return done(err);
+        }
+        assert.strictEqual(rowCount, 1, 'Should have exactly one row');
+        assert.strictEqual(receivedPlainText, expectedPlainText, 'PlainText should match');
+        assert.strictEqual(receivedEncryptedText, expectedEncryptedText, 'EncryptedText should be decrypted and match');
+        done();
+      });
+
+      request.addParameter('plainText', TYPES.NVarChar, expectedPlainText);
+
+      request.on('row', function(columns) {
+        rowCount++;
+        receivedPlainText = columns[0].value;
+        receivedEncryptedText = columns[1].value;
+      });
+
+      connection.execSql(request);
+    });
+
+    it('should insert and read multiple rows with encrypted data', function(done) {
+      if (!supportsAE) {
+        if (setupError) {
+          console.log('      Skipping: ' + setupError.message);
+        }
+        this.skip();
+        return;
+      }
+
+      const testData = [
+        { plain: 'Row 2', encrypted: 'Encrypted Value 2' },
+        { plain: 'Row 3', encrypted: 'Encrypted Value 3' },
+        { plain: 'Row 4', encrypted: 'Encrypted Value 4' }
+      ];
+
+      let insertIndex = 0;
+
+      function insertNext() {
+        if (insertIndex >= testData.length) {
+          // All inserts done, now verify
+          verifyData();
+          return;
+        }
+
+        const data = testData[insertIndex];
+        const insertQuery = `INSERT INTO [${tableName}] (PlainText, EncryptedText) VALUES (@plainText, @encryptedText)`;
+
+        const request = new Request(insertQuery, function(err) {
+          if (err) {
+            return done(err);
+          }
+          insertIndex++;
+          insertNext();
+        });
+
+        request.addParameter('plainText', TYPES.NVarChar, data.plain);
+        request.addParameter('encryptedText', TYPES.NVarChar, data.encrypted);
+
+        connection.execSql(request);
+      }
+
+      function verifyData() {
+        const query = `SELECT PlainText, EncryptedText FROM [${tableName}] ORDER BY Id`;
+        const rows: Array<{ plain: string, encrypted: string }> = [];
+
+        const request = new Request(query, function(err) {
+          if (err) {
+            return done(err);
+          }
+
+          // We have 4 rows total (1 from previous test + 3 new)
+          assert.strictEqual(rows.length, 4, 'Should have 4 rows');
+
+          // Verify the new rows
+          assert.strictEqual(rows[1].plain, 'Row 2');
+          assert.strictEqual(rows[1].encrypted, 'Encrypted Value 2');
+          assert.strictEqual(rows[2].plain, 'Row 3');
+          assert.strictEqual(rows[2].encrypted, 'Encrypted Value 3');
+          assert.strictEqual(rows[3].plain, 'Row 4');
+          assert.strictEqual(rows[3].encrypted, 'Encrypted Value 4');
+
+          done();
+        });
+
+        request.on('row', function(columns) {
+          rows.push({
+            plain: columns[0].value,
+            encrypted: columns[1].value
+          });
+        });
+
+        connection.execSql(request);
+      }
+
+      insertNext();
+    });
+
+    it('should handle NULL values in encrypted columns', function(done) {
+      if (!supportsAE) {
+        if (setupError) {
+          console.log('      Skipping: ' + setupError.message);
+        }
+        this.skip();
+        return;
+      }
+
+      const plainTextValue = 'Row with NULL encrypted';
+
+      // Insert row with NULL encrypted value
+      const insertQuery = `INSERT INTO [${tableName}] (PlainText, EncryptedText) VALUES (@plainText, @encryptedText)`;
+
+      const insertRequest = new Request(insertQuery, function(err) {
+        if (err) {
+          return done(err);
+        }
+
+        // Read it back
+        const selectQuery = `SELECT PlainText, EncryptedText FROM [${tableName}] WHERE PlainText = @plainText`;
+        let receivedEncryptedText: string | null = null;
+
+        const selectRequest = new Request(selectQuery, function(err) {
+          if (err) {
+            return done(err);
+          }
+          assert.isNull(receivedEncryptedText, 'EncryptedText should be NULL');
+          done();
+        });
+
+        selectRequest.addParameter('plainText', TYPES.NVarChar, plainTextValue);
+
+        selectRequest.on('row', function(columns) {
+          receivedEncryptedText = columns[1].value;
+        });
+
+        connection.execSql(selectRequest);
+      });
+
+      insertRequest.addParameter('plainText', TYPES.NVarChar, plainTextValue);
+      insertRequest.addParameter('encryptedText', TYPES.NVarChar, null);
+
+      connection.execSql(insertRequest);
+    });
+
+    it('should handle special characters in encrypted data', function(done) {
+      if (!supportsAE) {
+        if (setupError) {
+          console.log('      Skipping: ' + setupError.message);
+        }
+        this.skip();
+        return;
+      }
+
+      const plainTextValue = 'Special chars test';
+      const encryptedTextValue = '日本語 中文 한국어 émojis: 🔐🔑 & < > " \' \\ / \n \t';
+
+      const insertQuery = `INSERT INTO [${tableName}] (PlainText, EncryptedText) VALUES (@plainText, @encryptedText)`;
+
+      const insertRequest = new Request(insertQuery, function(err) {
+        if (err) {
+          return done(err);
+        }
+
+        // Read it back
+        const selectQuery = `SELECT EncryptedText FROM [${tableName}] WHERE PlainText = @plainText`;
+        let receivedValue: string | null = null;
+
+        const selectRequest = new Request(selectQuery, function(err) {
+          if (err) {
+            return done(err);
+          }
+          assert.strictEqual(receivedValue, encryptedTextValue, 'Special characters should be preserved');
+          done();
+        });
+
+        selectRequest.addParameter('plainText', TYPES.NVarChar, plainTextValue);
+
+        selectRequest.on('row', function(columns) {
+          receivedValue = columns[0].value;
+        });
+
+        connection.execSql(selectRequest);
+      });
+
+      insertRequest.addParameter('plainText', TYPES.NVarChar, plainTextValue);
+      insertRequest.addParameter('encryptedText', TYPES.NVarChar, encryptedTextValue);
+
+      connection.execSql(insertRequest);
+    });
+
+    it('should query with encrypted column in WHERE clause (deterministic)', function(done) {
+      if (!supportsAE) {
+        if (setupError) {
+          console.log('      Skipping: ' + setupError.message);
+        }
+        this.skip();
+        return;
+      }
+
+      // Since EncryptedText is deterministic, we can use it in WHERE clause
+      const searchValue = 'Secret Data 123';
+
+      const query = `SELECT PlainText, EncryptedText FROM [${tableName}] WHERE EncryptedText = @encryptedText`;
+      let rowCount = 0;
+      let foundPlainText: string | null = null;
+
+      const request = new Request(query, function(err) {
+        if (err) {
+          return done(err);
+        }
+        assert.strictEqual(rowCount, 1, 'Should find exactly one row');
+        assert.strictEqual(foundPlainText, 'Hello World', 'Should find the correct row');
+        done();
+      });
+
+      request.addParameter('encryptedText', TYPES.NVarChar, searchValue);
+
+      request.on('row', function(columns) {
+        rowCount++;
+        foundPlainText = columns[0].value;
       });
 
       connection.execSql(request);
