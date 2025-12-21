@@ -40,7 +40,7 @@ import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
-import { type KeyStoreProviderMap } from './always-encrypted/keystore-provider';
+import { type KeyStoreProvider, type KeyStoreProviderMap } from './always-encrypted/keystore-provider';
 import { shouldHonorAE } from './always-encrypted/utils';
 import { getParameterEncryptionMetadata } from './always-encrypted/get-parameter-encryption-metadata';
 import { encryptParameters } from './always-encrypted/encrypt-parameters';
@@ -867,6 +867,54 @@ export interface ConnectionOptions {
    * The value is reported by the TSQL function HOST_NAME().
    */
   workstationId?: string | undefined;
+
+  // Always Encrypted options
+
+  /**
+   * A boolean that enables Always Encrypted functionality for the connection.
+   * When enabled, the driver will automatically encrypt and decrypt data
+   * for columns configured with Always Encrypted in SQL Server.
+   *
+   * Requires SQL Server 2016 or later with Always Encrypted configured.
+   *
+   * (default: `false`)
+   */
+  alwaysEncrypted?: boolean;
+
+  /**
+   * An array of key store provider instances for Always Encrypted.
+   * Key store providers are responsible for decrypting column encryption keys
+   * using the column master keys stored in external key stores.
+   *
+   * Common providers include:
+   * - `ColumnEncryptionAzureKeyVaultProvider` for Azure Key Vault
+   *
+   * @example
+   * ```typescript
+   * const keyVaultProvider = new ColumnEncryptionAzureKeyVaultProvider(
+   *   clientId, clientSecret, tenantId
+   * );
+   * const connection = new Connection({
+   *   server: 'localhost',
+   *   options: {
+   *     alwaysEncrypted: true,
+   *     encryptionKeyStoreProviders: [keyVaultProvider]
+   *   }
+   * });
+   * ```
+   */
+  encryptionKeyStoreProviders?: KeyStoreProvider[];
+
+  /**
+   * The time-to-live (in milliseconds) for cached column encryption keys.
+   * Decrypted column encryption keys are cached to avoid repeated calls
+   * to the key store provider for the same key.
+   *
+   * Set to 0 to disable caching.
+   *
+   * (default: `7200000` - 2 hours)
+   */
+  columnEncryptionKeyCacheTTL?: number;
 }
 
 interface RoutingData {
@@ -1749,6 +1797,47 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
+      }
+
+      // Always Encrypted options
+      if (config.options.alwaysEncrypted !== undefined) {
+        if (typeof config.options.alwaysEncrypted !== 'boolean') {
+          throw new TypeError('The "config.options.alwaysEncrypted" property must be of type boolean.');
+        }
+
+        this.config.options.alwaysEncrypted = config.options.alwaysEncrypted;
+      }
+
+      if (config.options.encryptionKeyStoreProviders !== undefined) {
+        if (!Array.isArray(config.options.encryptionKeyStoreProviders)) {
+          throw new TypeError('The "config.options.encryptionKeyStoreProviders" property must be an array.');
+        }
+
+        // Convert array of providers to a map keyed by provider name
+        const providerMap: KeyStoreProviderMap = {};
+        for (const provider of config.options.encryptionKeyStoreProviders) {
+          if (!provider.name || typeof provider.name !== 'string') {
+            throw new TypeError('Each key store provider must have a "name" property of type string.');
+          }
+          if (typeof provider.decryptColumnEncryptionKey !== 'function') {
+            throw new TypeError('Each key store provider must have a "decryptColumnEncryptionKey" method.');
+          }
+          providerMap[provider.name] = provider;
+        }
+
+        this.config.options.encryptionKeyStoreProviders = providerMap;
+      }
+
+      if (config.options.columnEncryptionKeyCacheTTL !== undefined) {
+        if (typeof config.options.columnEncryptionKeyCacheTTL !== 'number') {
+          throw new TypeError('The "config.options.columnEncryptionKeyCacheTTL" property must be of type number.');
+        }
+
+        if (config.options.columnEncryptionKeyCacheTTL < 0) {
+          throw new RangeError('The "config.options.columnEncryptionKeyCacheTTL" property must be >= 0.');
+        }
+
+        this.config.options.columnEncryptionKeyCacheTTL = config.options.columnEncryptionKeyCacheTTL;
       }
     }
 
