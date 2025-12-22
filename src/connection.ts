@@ -1924,6 +1924,10 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
+  emit(event: 'databaseMirroringPartner', partnerInstanceName: string): boolean
+  /**
+   * @private
+   */
   emit(event: 'debug', messageText: string): boolean
   /**
    * @private
