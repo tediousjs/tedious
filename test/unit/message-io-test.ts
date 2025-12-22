@@ -529,12 +529,12 @@ describe('MessageIO', function() {
               // Use a cipher that causes an error immediately
               ciphers: 'NULL'
             }, 'localhost', true);
-          } catch (err: any) {
+          } catch (err) {
             hadError = true;
 
             assert.instanceOf(err, Error);
-            assert.strictEqual(err.code, 'ERR_SSL_NO_CIPHERS_AVAILABLE');
-            assert.strictEqual(err.reason, 'no ciphers available');
+            assert.strictEqual((err as Error & { code?: string }).code, 'ERR_SSL_NO_CIPHERS_AVAILABLE');
+            assert.strictEqual((err as Error & { reason?: string }).reason, 'no ciphers available');
           }
 
           assert(hadError);
@@ -563,8 +563,15 @@ describe('MessageIO', function() {
             hadError = true;
 
             assert.instanceOf(err, Error);
-            assert.strictEqual(err.code, 'ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE');
-            assert.strictEqual(err.reason, 'sslv3 alert handshake failure');
+            // Node.js >= 22 uses 'ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE', older versions use 'ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE'
+            assert.include(
+              ['ERR_SSL_SSLV3_ALERT_HANDSHAKE_FAILURE', 'ERR_SSL_SSL/TLS_ALERT_HANDSHAKE_FAILURE'],
+              (err as Error & { code?: string }).code
+            );
+            assert.include(
+              ['sslv3 alert handshake failure', 'ssl/tls alert handshake failure'],
+              (err as Error & { reason?: string }).reason
+            );
           }
 
           assert(hadError);
