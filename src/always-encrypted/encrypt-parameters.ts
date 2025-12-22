@@ -1,14 +1,23 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
+import iconv from 'iconv-lite';
 import { type Parameter, type ParameterData } from '../data-type';
 import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
 import { encryptWithKey } from './key-crypto';
 import { SQLServerEncryptionType } from './types';
 
+// Maximum lengths for non-MAX types
+const NVARCHAR_MAX_LENGTH = 4000;
+const VARCHAR_MAX_LENGTH = 8000;
+const VARBINARY_MAX_LENGTH = 8000;
+
 /**
- * Serializes a parameter value to bytes according to its data type.
- * This is similar to generateParameterData but returns a single Buffer.
+ * Serializes a parameter value to raw bytes for encryption.
+ *
+ * IMPORTANT: For Always Encrypted, we must serialize just the raw value bytes,
+ * NOT the TDS wire format. This is different from generateParameterData which
+ * includes PLP format elements (chunk lengths, terminators) for MAX types.
  *
  * @param parameter - The parameter containing value and type info
  * @param options - Connection options
@@ -20,6 +29,42 @@ function serializeParameterValue(parameter: Parameter, options: ConnectionOption
   }
 
   const type = parameter.type;
+  const value = parameter.value;
+
+  // Handle MAX types specially - serialize raw bytes only, no PLP format
+  if (type.name === 'NVarChar') {
+    const length = parameter.length ?? (type.resolveLength ? type.resolveLength(parameter) : 0);
+    if (length > NVARCHAR_MAX_LENGTH) {
+      // MAX type - just return raw UTF-16LE bytes
+      if (Buffer.isBuffer(value)) {
+        return value;
+      }
+      return Buffer.from(value.toString(), 'ucs2');
+    }
+  } else if (type.name === 'VarChar') {
+    const length = parameter.length ?? (type.resolveLength ? type.resolveLength(parameter) : 0);
+    if (length > VARCHAR_MAX_LENGTH) {
+      // MAX type - just return raw encoded bytes
+      if (Buffer.isBuffer(value)) {
+        return value;
+      }
+      // Get codepage from cryptoMetadata.baseTypeInfo (set during encryption metadata lookup)
+      const codepage = parameter.cryptoMetadata?.baseTypeInfo?.collation?.codepage ?? 'utf8';
+      return iconv.encode(value.toString(), codepage);
+    }
+  } else if (type.name === 'VarBinary') {
+    const length = parameter.length ?? (type.resolveLength ? type.resolveLength(parameter) : 0);
+    if (length > VARBINARY_MAX_LENGTH) {
+      // MAX type - just return raw bytes
+      if (Buffer.isBuffer(value)) {
+        return value;
+      }
+      // For non-Buffer values, convert to string first then to Buffer
+      return Buffer.from(String(value));
+    }
+  }
+
+  // For non-MAX types, use the standard serialization
   const param: ParameterData = { value: parameter.value };
 
   // Resolve length, precision, scale as needed

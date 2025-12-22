@@ -30,10 +30,9 @@ interface Column {
 function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: ParserOptions): unknown {
   const type = metadata.type;
 
-  // Handle null/empty
-  if (buffer.length === 0) {
-    return null;
-  }
+  // Note: Empty buffer handling is type-specific.
+  // For strings and binary, empty buffer means empty value (not null).
+  // For fixed-size types, empty buffer would be an error handled in their cases.
 
   switch (type.name) {
     case 'Null':
@@ -63,6 +62,21 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
       }
       return buffer.readBigInt64LE(0).toString();
 
+    // IntN is a nullable integer that can be 1, 2, 4, or 8 bytes
+    case 'IntN':
+      switch (buffer.length) {
+        case 1:
+          return buffer.readUInt8(0);
+        case 2:
+          return buffer.readInt16LE(0);
+        case 4:
+          return buffer.readInt32LE(0);
+        case 8:
+          return buffer.readBigInt64LE(0).toString();
+        default:
+          throw new Error(`Invalid decrypted IntN: unexpected length ${buffer.length}`);
+      }
+
     case 'Real':
       if (buffer.length !== 4) {
         throw new Error(`Invalid decrypted Real: expected 4 bytes, got ${buffer.length}`);
@@ -74,6 +88,17 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
         throw new Error(`Invalid decrypted Float: expected 8 bytes, got ${buffer.length}`);
       }
       return buffer.readDoubleLE(0);
+
+    // FloatN is a nullable float that can be 4 or 8 bytes
+    case 'FloatN':
+      switch (buffer.length) {
+        case 4:
+          return buffer.readFloatLE(0);
+        case 8:
+          return buffer.readDoubleLE(0);
+        default:
+          throw new Error(`Invalid decrypted FloatN: unexpected length ${buffer.length}`);
+      }
 
     case 'SmallMoney': {
       if (buffer.length !== 4) {
@@ -87,15 +112,41 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
       if (buffer.length !== 8) {
         throw new Error(`Invalid decrypted Money: expected 8 bytes, got ${buffer.length}`);
       }
-      const high = buffer.readInt32LE(4);
-      const low = buffer.readUInt32LE(0);
-      const value = (BigInt(high) << 32n) + BigInt(low);
-      return Number(value) / 10000;
+      // Money is stored as: high (bytes 0-3), low (bytes 4-7)
+      const high = buffer.readInt32LE(0);
+      const low = buffer.readUInt32LE(4);
+      return (low + (0x100000000 * high)) / 10000;
+    }
+
+    // MoneyN is a nullable money that can be 4 or 8 bytes
+    case 'MoneyN': {
+      switch (buffer.length) {
+        case 4: {
+          // SmallMoney format
+          const value = buffer.readInt32LE(0);
+          return value / 10000;
+        }
+        case 8: {
+          // Money format: high (bytes 0-3), low (bytes 4-7)
+          const high = buffer.readInt32LE(0);
+          const low = buffer.readUInt32LE(4);
+          return (low + (0x100000000 * high)) / 10000;
+        }
+        default:
+          throw new Error(`Invalid decrypted MoneyN: unexpected length ${buffer.length}`);
+      }
     }
 
     case 'Bit':
       if (buffer.length !== 1) {
         throw new Error(`Invalid decrypted Bit: expected 1 byte, got ${buffer.length}`);
+      }
+      return buffer.readUInt8(0) === 1;
+
+    // BitN is a nullable bit (1 byte)
+    case 'BitN':
+      if (buffer.length !== 1) {
+        throw new Error(`Invalid decrypted BitN: expected 1 byte, got ${buffer.length}`);
       }
       return buffer.readUInt8(0) === 1;
 
@@ -123,6 +174,32 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
       return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
     }
 
+    // DateTimeN is a nullable datetime that can be 4 (SmallDateTime) or 8 (DateTime) bytes
+    case 'DateTimeN': {
+      switch (buffer.length) {
+        case 4: {
+          // SmallDateTime format
+          const days = buffer.readUInt16LE(0);
+          const minutes = buffer.readUInt16LE(2);
+          const date = new Date(Date.UTC(1900, 0, 1));
+          date.setUTCDate(date.getUTCDate() + days);
+          date.setUTCMinutes(date.getUTCMinutes() + minutes);
+          return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
+        }
+        case 8: {
+          // DateTime format
+          const days = buffer.readInt32LE(0);
+          const threeHundredthsOfSecond = buffer.readUInt32LE(4);
+          const date = new Date(Date.UTC(1900, 0, 1));
+          date.setUTCDate(date.getUTCDate() + days);
+          date.setUTCMilliseconds(date.getUTCMilliseconds() + threeHundredthsOfSecond * 10 / 3);
+          return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
+        }
+        default:
+          throw new Error(`Invalid decrypted DateTimeN: unexpected length ${buffer.length}`);
+      }
+    }
+
     case 'Date': {
       if (buffer.length !== 3) {
         throw new Error(`Invalid decrypted Date: expected 3 bytes, got ${buffer.length}`);
@@ -134,7 +211,8 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
       return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
     }
 
-    case 'UniqueIdentifier': {
+    case 'UniqueIdentifier':
+    case 'UniqueIdentifierN': {
       if (buffer.length !== 16) {
         throw new Error(`Invalid decrypted UniqueIdentifier: expected 16 bytes, got ${buffer.length}`);
       }
@@ -197,17 +275,19 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
     }
 
     case 'Numeric':
-    case 'Decimal': {
+    case 'Decimal':
+    case 'NumericN':
+    case 'DecimalN': {
       // Validate minimum size (1 byte sign + at least some value bytes)
       if (buffer.length < 1) {
         throw new Error(`Invalid decrypted Numeric: buffer too small (${buffer.length})`);
       }
-      // First byte is sign (0=positive, 1=negative)
+      // First byte is sign (1=positive, 0=negative) - same as TDS protocol
       const signByte = buffer.readUInt8(0);
       if (signByte !== 0 && signByte !== 1) {
         throw new Error(`Invalid decrypted Numeric: invalid sign byte (${signByte})`);
       }
-      const sign = signByte === 0 ? 1 : -1;
+      const sign = signByte === 1 ? 1 : -1;
       // Remaining bytes are the value in little-endian
       let value = 0n;
       for (let i = buffer.length - 1; i >= 1; i--) {
@@ -224,12 +304,153 @@ function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: Pa
       return sign * Number(`${intPart}.${fracStr}`);
     }
 
-    case 'Time':
-    case 'DateTime2':
-    case 'DateTimeOffset':
-      // These have complex formats - for now fall through to error
-      // TODO: Implement proper parsing
-      throw new Error(`Decryption of ${type.name} type is not yet implemented`);
+    case 'Time': {
+      // Time is stored as a scaled integer representing time since midnight
+      // Scale 0-2: 3 bytes, scale 3-4: 4 bytes, scale 5-7: 5 bytes
+      const scale = metadata.scale ?? 7;
+      let timeValue: number;
+      switch (buffer.length) {
+        case 3:
+          timeValue = buffer.readUIntLE(0, 3);
+          break;
+        case 4:
+          timeValue = buffer.readUInt32LE(0);
+          break;
+        case 5:
+          timeValue = buffer.readUIntLE(0, 5);
+          break;
+        default:
+          throw new Error(`Invalid decrypted Time: unexpected length ${buffer.length}`);
+      }
+
+      // Scale up to scale 7 (100 nanosecond units)
+      if (scale < 7) {
+        for (let i = scale; i < 7; i++) {
+          timeValue *= 10;
+        }
+      }
+
+      // Convert to milliseconds (100ns units / 10000 = ms)
+      const ms = Math.floor(timeValue / 10000);
+      const date = new Date(0);
+      if (options.useUTC === false) {
+        date.setHours(Math.floor(ms / 3600000));
+        date.setMinutes(Math.floor((ms % 3600000) / 60000));
+        date.setSeconds(Math.floor((ms % 60000) / 1000));
+        date.setMilliseconds(ms % 1000);
+      } else {
+        date.setUTCHours(Math.floor(ms / 3600000));
+        date.setUTCMinutes(Math.floor((ms % 3600000) / 60000));
+        date.setUTCSeconds(Math.floor((ms % 60000) / 1000));
+        date.setUTCMilliseconds(ms % 1000);
+      }
+      return date;
+    }
+
+    case 'DateTime2': {
+      // DateTime2 is time (3-5 bytes) + date (3 bytes)
+      const scale = metadata.scale ?? 7;
+      let timeLength: number;
+      if (scale <= 2) {
+        timeLength = 3;
+      } else if (scale <= 4) {
+        timeLength = 4;
+      } else {
+        timeLength = 5;
+      }
+
+      if (buffer.length !== timeLength + 3) {
+        throw new Error(`Invalid decrypted DateTime2: expected ${timeLength + 3} bytes, got ${buffer.length}`);
+      }
+
+      // Read time portion
+      let timeValue: number;
+      switch (timeLength) {
+        case 3:
+          timeValue = buffer.readUIntLE(0, 3);
+          break;
+        case 4:
+          timeValue = buffer.readUInt32LE(0);
+          break;
+        case 5:
+          timeValue = buffer.readUIntLE(0, 5);
+          break;
+        default:
+          throw new Error('unreachable');
+      }
+
+      // Scale up to scale 7
+      if (scale < 7) {
+        for (let i = scale; i < 7; i++) {
+          timeValue *= 10;
+        }
+      }
+
+      // Read date portion (3 bytes, days since 0001-01-01)
+      const days = buffer.readUIntLE(timeLength, 3);
+
+      // Convert time to milliseconds
+      const ms = Math.floor(timeValue / 10000);
+
+      // Create date: days since 0001-01-01 + time
+      const date = new Date(Date.UTC(2000, 0, days - 730118));
+      date.setUTCMilliseconds(ms);
+      return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
+    }
+
+    case 'DateTimeOffset': {
+      // DateTimeOffset is time (3-5 bytes) + date (3 bytes) + offset (2 bytes)
+      const scale = metadata.scale ?? 7;
+      let timeLength: number;
+      if (scale <= 2) {
+        timeLength = 3;
+      } else if (scale <= 4) {
+        timeLength = 4;
+      } else {
+        timeLength = 5;
+      }
+
+      if (buffer.length !== timeLength + 5) {
+        throw new Error(`Invalid decrypted DateTimeOffset: expected ${timeLength + 5} bytes, got ${buffer.length}`);
+      }
+
+      // Read time portion
+      let timeValue: number;
+      switch (timeLength) {
+        case 3:
+          timeValue = buffer.readUIntLE(0, 3);
+          break;
+        case 4:
+          timeValue = buffer.readUInt32LE(0);
+          break;
+        case 5:
+          timeValue = buffer.readUIntLE(0, 5);
+          break;
+        default:
+          throw new Error('unreachable');
+      }
+
+      // Scale up to scale 7
+      if (scale < 7) {
+        for (let i = scale; i < 7; i++) {
+          timeValue *= 10;
+        }
+      }
+
+      // Read date portion (3 bytes)
+      const days = buffer.readUIntLE(timeLength, 3);
+
+      // Read offset (2 bytes) - offset in minutes
+      // const offsetMinutes = buffer.readInt16LE(timeLength + 3);
+
+      // Convert time to milliseconds
+      const ms = Math.floor(timeValue / 10000);
+
+      // Create date in UTC
+      const date = new Date(Date.UTC(2000, 0, days - 730118));
+      date.setUTCMilliseconds(ms);
+      return date;
+    }
 
     default:
       throw new Error(`Unsupported decrypted type: ${type.name}`);
