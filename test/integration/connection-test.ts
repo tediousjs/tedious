@@ -1428,7 +1428,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
     }
   });
 
-  it('should request timeout', (done) => {
+  it('should request timeout', function(done) {
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
       function(err, rowCount, rows) {

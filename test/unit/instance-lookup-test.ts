@@ -314,14 +314,14 @@ describe('InstanceLookup', function() {
 });
 
 describe('parseBrowserResponse', function() {
-  it('oneInstanceFound', function() {
+  it('should find port when one instance matches', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
 
     assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
-  it('twoInstancesFoundInFirst', function() {
+  it('should find port in first instance when two instances exist', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;' +
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;';
@@ -329,7 +329,7 @@ describe('parseBrowserResponse', function() {
     assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
-  it('twoInstancesFoundInSecond', function() {
+  it('should find port in second instance when two instances exist', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;SQLEXPRESS;IsClustered;No;Version;10.50.2500.0;tcp;1433;;';
@@ -337,7 +337,7 @@ describe('parseBrowserResponse', function() {
     assert.strictEqual(parseBrowserResponse(response, 'sqlexpress'), 1433);
   });
 
-  it('twoInstancesNotFound', function() {
+  it('should return undefined when no instance matches', function() {
     const response =
       'ServerName;WINDOWS2;InstanceName;XXXXXXXXXX;IsClustered;No;Version;10.50.2500.0;tcp;0;;' +
       'ServerName;WINDOWS2;InstanceName;YYYYYYYYYY;IsClustered;No;Version;10.50.2500.0;tcp;0;;';

@@ -2,7 +2,7 @@ import { assert } from 'chai';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer as writeAllHeaders } from '../../src/all-headers';
 
-describe('all headers test', function() {
+describe('All Headers', function() {
   it('should write headers', function() {
     const expected = Buffer.from([
       0x16,

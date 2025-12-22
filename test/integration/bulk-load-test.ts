@@ -1504,7 +1504,7 @@ describe('BulkLoad', function() {
       connection.execSqlBatch(request);
     });
 
-    it('should handle validation errors during streaming bulk loads', (done) => {
+    it('should handle validation errors during streaming bulk loads', function(done) {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
@@ -1522,7 +1522,7 @@ describe('BulkLoad', function() {
       }
     });
 
-    it('should allow reusing the connection after validation errors during streaming bulk loads', (done) => {
+    it('should allow reusing the connection after validation errors during streaming bulk loads', function(done) {
       const bulkLoad = connection.newBulkLoad('#stream_test', completeBulkLoad);
       bulkLoad.addColumn('value', TYPES.Date, { nullable: false });
 
@@ -1554,7 +1554,7 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('should not throw in _transform function', (done) => {
+  it('should not throw in _transform function', function(done) {
     const bulkLoad = connection.newBulkLoad(
       '#tmpTestTable',
       (err, rowCount) => {

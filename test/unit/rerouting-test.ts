@@ -374,7 +374,7 @@ describe('Connecting to a server that sends a re-routing information', function(
     }
   });
 
-  it('it should throw an error with redirect information when targetserver connection failed', async function() {
+  it('should throw an error with redirect information when target server connection fails', async function() {
     routingServer.on('connection', async (connection) => {
       const debug = new Debug();
       const incomingMessageStream = new IncomingMessageStream(debug);

@@ -21,7 +21,7 @@ function assertPayload(payload: PreloginPayload, encryptionString: string, { maj
   assert.strictEqual(payload.fedAuthRequired, 1);
 }
 
-describe('prelogin-payload-assert', function() {
+describe('PreloginPayload', function() {
   it('should not encrypt', function() {
     const payload = new PreloginPayload();
     assertPayload(payload, 'NOT_SUP', { major: 0, minor: 0, build: 0, subbuild: 0 });

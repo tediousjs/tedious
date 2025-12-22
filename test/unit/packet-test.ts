@@ -98,7 +98,7 @@ describe('packet type tests', function() {
     assert.strictEqual(packet.dataToString('--'), expectedText);
   });
 
-  it('should data with exact lines worth', function() {
+  it('should convert data to string with exactly one line of data', function() {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
     const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
     const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
@@ -118,7 +118,7 @@ describe('packet type tests', function() {
     assert.strictEqual(packet.dataToString('--'), expectedText);
   });
 
-  it('should convert data to strings in mulitple lines', function() {
+  it('should convert data to strings in multiple lines', function() {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
     const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
     const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
@@ -146,18 +146,18 @@ describe('packet type tests', function() {
     assert.strictEqual(packet.dataToString('--'), expectedText);
   });
 
-  it('should packet complete shorter than header', function() {
+  it('should report incomplete when buffer is shorter than header', function() {
     const buffer = Buffer.alloc(7);
     assert.isFalse(isPacketComplete(buffer));
   });
 
-  it('should packet complete with just header', function() {
+  it('should report complete when buffer contains only header', function() {
     const buffer = new Packet(TYPE.PRELOGIN).buffer;
 
     assert.isTrue(isPacketComplete(buffer));
   });
 
-  it('should not packet complete too short', function() {
+  it('should report incomplete when buffer is shorter than declared length', function() {
     const buffer = Buffer.from([
       0x00,
       0x00,
@@ -174,7 +174,7 @@ describe('packet type tests', function() {
     assert.isFalse(isPacketComplete(buffer));
   });
 
-  it('should packet complete long enough', function() {
+  it('should report complete when buffer matches declared length', function() {
     const buffer = Buffer.from([
       0x00,
       0x00,
