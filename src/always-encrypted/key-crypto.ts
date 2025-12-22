@@ -1,7 +1,7 @@
 // This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
 // Copyright (c) 2019 Microsoft Corporation
 
-import { type CryptoMetadata, type EncryptionKeyInfo, type EncryptionOptions } from './types';
+import { type CryptoMetadata, type EncryptionAlgorithm, type EncryptionKeyInfo, type EncryptionOptions } from './types';
 import SymmetricKey from './symmetric-key';
 import { getKey } from './symmetric-key-cache';
 import { AeadAes256CbcHmac256Algorithm, algorithmName } from './aead-aes-256-cbc-hmac-algorithm';
@@ -15,16 +15,12 @@ export const validateAndGetEncryptionAlgorithmName = (cipherAlgorithmId: number,
   return algorithmName;
 };
 
-export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, options: EncryptionOptions): Promise<Buffer> => {
-  if (!md.cipherAlgorithm) {
-    await decryptSymmetricKey(md, options);
+export const encryptWithKey = (plaintext: Buffer, cipherAlgorithm: EncryptionAlgorithm): Buffer => {
+  if (!cipherAlgorithm) {
+    throw new Error('Cipher algorithm must be initialized before encryption');
   }
 
-  if (!md.cipherAlgorithm) {
-    throw new Error('Cipher Algorithm should not be null in EncryptWithKey');
-  }
-
-  const cipherText: Buffer = md.cipherAlgorithm.encryptData(plaintext);
+  const cipherText: Buffer = cipherAlgorithm.encryptData(plaintext);
 
   if (!cipherText) {
     throw new Error('Internal error. Ciphertext value cannot be null.');
@@ -33,16 +29,12 @@ export const encryptWithKey = async (plaintext: Buffer, md: CryptoMetadata, opti
   return cipherText;
 };
 
-export const decryptWithKey = (cipherText: Buffer, md: CryptoMetadata, options: EncryptionOptions): Buffer => {
-  // if (!md.cipherAlgorithm) {
-  //   await decryptSymmetricKey(md, options);
-  // }
-
-  if (!md.cipherAlgorithm) {
-    throw new Error('Cipher Algorithm should not be null in DecryptWithKey');
+export const decryptWithKey = (cipherText: Buffer, cipherAlgorithm: EncryptionAlgorithm): Buffer => {
+  if (!cipherAlgorithm) {
+    throw new Error('Cipher algorithm must be initialized before decryption');
   }
 
-  const plainText: Buffer = md.cipherAlgorithm.decryptData(cipherText);
+  const plainText: Buffer = cipherAlgorithm.decryptData(cipherText);
 
   if (!plainText) {
     throw new Error('Internal error. Plaintext value cannot be null.');

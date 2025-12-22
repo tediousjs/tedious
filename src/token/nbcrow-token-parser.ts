@@ -255,7 +255,7 @@ async function decryptColumnValue(
   }
 
   // Decrypt the cipher text
-  const decryptedValue = decryptWithKey(value, cryptoMetadata, options);
+  const decryptedValue = decryptWithKey(value, cryptoMetadata.cipherAlgorithm!);
 
   // Parse the decrypted bytes using the base type info
   // Note: Decrypted values are raw bytes WITHOUT TDS length prefixes

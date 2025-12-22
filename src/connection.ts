@@ -2778,15 +2778,16 @@ class Connection extends EventEmitter {
         }
 
         // Encrypt parameters that have cryptoMetadata
-        encryptParameters(request.parameters, this.config.options).then(() => {
+        try {
+          encryptParameters(request.parameters, this.config.options);
           this.execSqlAfterEncryption(request);
-        }).catch((error) => {
+        } catch (error: any) {
           request.error = error;
           process.nextTick(() => {
             this.debug.log(error.message);
             request.callback(error);
           });
-        });
+        }
       });
     } else {
       this.execSqlAfterEncryption(request);
@@ -3109,15 +3110,16 @@ class Connection extends EventEmitter {
         }
 
         // Encrypt parameters that have cryptoMetadata
-        encryptParameters(request.parameters, this.config.options).then(() => {
+        try {
+          encryptParameters(request.parameters, this.config.options);
           this.callProcedureAfterEncryption(request);
-        }).catch((error) => {
+        } catch (error: any) {
           request.error = error;
           process.nextTick(() => {
             this.debug.log(error.message);
             request.callback(error);
           });
-        });
+        }
       });
     } else {
       this.callProcedureAfterEncryption(request);

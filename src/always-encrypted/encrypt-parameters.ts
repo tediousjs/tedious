@@ -62,20 +62,15 @@ function serializeParameterValue(parameter: Parameter, options: ConnectionOption
  * @param parameters - Array of parameters to encrypt
  * @param options - Connection options
  */
-export async function encryptParameters(
+export function encryptParameters(
   parameters: Parameter[],
   options: ConnectionOptions
-): Promise<void> {
-  const encryptionPromises: Promise<void>[] = [];
-
+): void {
   for (const parameter of parameters) {
     if (parameter.cryptoMetadata) {
-      const promise = encryptParameter(parameter, options);
-      encryptionPromises.push(promise);
+      encryptParameter(parameter, options);
     }
   }
-
-  await Promise.all(encryptionPromises);
 }
 
 /**
@@ -84,10 +79,10 @@ export async function encryptParameters(
  * @param parameter - The parameter to encrypt
  * @param options - Connection options
  */
-async function encryptParameter(
+function encryptParameter(
   parameter: Parameter,
   options: ConnectionOptions
-): Promise<void> {
+): void {
   const cryptoMetadata = parameter.cryptoMetadata!;
 
   // Serialize the value to bytes
@@ -99,7 +94,10 @@ async function encryptParameter(
   }
 
   // Encrypt the serialized value
-  const ciphertext = await encryptWithKey(plaintext, cryptoMetadata, options);
+  if (!cryptoMetadata.cipherAlgorithm) {
+    throw new Error('Cipher algorithm must be initialized before encryption');
+  }
+  const ciphertext = encryptWithKey(plaintext, cryptoMetadata.cipherAlgorithm);
 
   // Store the encrypted value
   parameter.encryptedVal = ciphertext;
