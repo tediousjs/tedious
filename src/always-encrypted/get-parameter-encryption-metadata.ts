@@ -48,6 +48,19 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
           paramCount++;
           const paramName: string = columns[DescribeParameterEncryptionResultSet2.ParameterName].value;
           const paramIndex: number = request.parameters.findIndex((param: Parameter) => paramName === `@${param.name}`);
+
+          // Check encryption type BEFORE looking up CEK - plaintext parameters have ordinal 0 (no CEK)
+          const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
+          if (SQLServerEncryptionType.PlainText === encType) {
+            // Plaintext parameter - no CEK lookup needed
+            if (request.parameters[paramIndex].forceEncrypt === true) {
+              return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
+            }
+            // Skip to next parameter
+            continue;
+          }
+
+          // For encrypted parameters, look up the CEK
           const cekOrdinal: number = columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionKeyOrdinal].value;
           const cekEntry: CEKEntry = cekList[cekOrdinal];
 
@@ -55,19 +68,14 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
             return callback(new Error(`Internal error. The referenced column encryption key ordinal "${cekOrdinal}" is missing in the encryption metadata returned by sp_describe_parameter_encryption. Max ordinal is "${cekList.length - 1}".`));
           }
 
-          const encType = columns[DescribeParameterEncryptionResultSet2.ColumnEncrytionType].value;
-          if (SQLServerEncryptionType.PlainText !== encType) {
-            request.parameters[paramIndex].cryptoMetadata = {
-              cekEntry: cekEntry,
-              ordinal: cekOrdinal,
-              cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
-              encryptionType: encType,
-              normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
-            };
-            decryptSymmetricKeyPromises.push(decryptSymmetricKey(request.parameters[paramIndex].cryptoMetadata as CryptoMetadata, connection.config.options));
-          } else if (request.parameters[paramIndex].forceEncrypt === true) {
-            return callback(new Error(`Cannot execute statement or procedure ${request.sqlTextOrProcedure} because Force Encryption was set as true for parameter ${paramIndex + 1} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`));
-          }
+          request.parameters[paramIndex].cryptoMetadata = {
+            cekEntry: cekEntry,
+            ordinal: cekOrdinal,
+            cipherAlgorithmId: columns[DescribeParameterEncryptionResultSet2.ColumnEncryptionAlgorithm].value,
+            encryptionType: encType,
+            normalizationRuleVersion: Buffer.from([columns[DescribeParameterEncryptionResultSet2.NormalizationRuleVersion].value]),
+          };
+          decryptSymmetricKeyPromises.push(decryptSymmetricKey(request.parameters[paramIndex].cryptoMetadata as CryptoMetadata, connection.config.options));
         }
       } catch {
         return callback(new Error(`Internal error. Unable to parse parameter encryption metadata in statement or procedure "${request.sqlTextOrProcedure}"`));

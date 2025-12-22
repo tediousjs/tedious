@@ -82,16 +82,16 @@ class RpcRequestPayload implements Iterable<Buffer> {
     if (parameter.output) {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
-    // Set fEncrypted flag if parameter is encrypted
-    if (parameter.encryptedVal !== undefined && parameter.cryptoMetadata) {
+    // Set fEncrypted flag if parameter is encrypted (including NULL encrypted values)
+    if (parameter.cryptoMetadata) {
       statusFlags |= STATUS.ENCRYPTED;
     }
     buffer.writeUInt8(statusFlags);
 
     yield buffer.data;
 
-    // Handle encrypted parameters
-    if (parameter.encryptedVal !== undefined && parameter.cryptoMetadata) {
+    // Handle encrypted parameters (including NULL encrypted values)
+    if (parameter.cryptoMetadata) {
       yield * this.generateEncryptedParameterData(parameter);
       return;
     }
@@ -151,15 +151,15 @@ class RpcRequestPayload implements Iterable<Buffer> {
    *    - NormVersion: BYTE (must be 1)
    */
   * generateEncryptedParameterData(parameter: Parameter) {
-    const encryptedValue = parameter.encryptedVal!;
+    const encryptedValue = parameter.encryptedVal;
     const cryptoMetadata = parameter.cryptoMetadata!;
     const cekEntry = cryptoMetadata.cekEntry!;
 
     // 1. Create ParameterData for the encrypted value (as VarBinary)
-    const encryptedParam: ParameterData = {
-      value: encryptedValue,
-      length: encryptedValue.length
-    };
+    // For NULL values, encryptedValue will be undefined and we send a NULL VarBinary
+    const encryptedParam: ParameterData = encryptedValue !== undefined ?
+      { value: encryptedValue, length: encryptedValue.length } :
+      { value: null, length: 8000 }; // Use max length for NULL so we get the short NULL marker
 
     // Send VarBinary type info, length, and data for the ciphertext
     yield VarBinary.generateTypeInfo(encryptedParam, this.options);
@@ -174,31 +174,43 @@ class RpcRequestPayload implements Iterable<Buffer> {
     const cipherInfoBuffer = new WritableTrackingBuffer(50);
 
     // TYPE_INFO: Original parameter type info
+    // For encrypted parameters, use baseTypeInfo from crypto metadata if available
+    // This ensures the type info matches the column definition from the server
+    const baseTypeInfo = cryptoMetadata.baseTypeInfo;
     const originalType = parameter.type;
     const originalParam: ParameterData = { value: parameter.value };
 
-    if ((originalType.id & 0x30) === 0x20) {
-      if (parameter.length) {
-        originalParam.length = parameter.length;
-      } else if (originalType.resolveLength) {
-        originalParam.length = originalType.resolveLength(parameter);
+    if (baseTypeInfo) {
+      // Use the type info from the server's metadata (available for decrypting column data)
+      originalParam.length = baseTypeInfo.dataLength;
+      originalParam.precision = baseTypeInfo.precision;
+      originalParam.scale = baseTypeInfo.scale;
+      originalParam.collation = baseTypeInfo.collation;
+    } else {
+      // Fall back to resolving from parameter
+      if ((originalType.id & 0x30) === 0x20) {
+        if (parameter.length) {
+          originalParam.length = parameter.length;
+        } else if (originalType.resolveLength) {
+          originalParam.length = originalType.resolveLength(parameter);
+        }
       }
-    }
 
-    if (parameter.precision) {
-      originalParam.precision = parameter.precision;
-    } else if (originalType.resolvePrecision) {
-      originalParam.precision = originalType.resolvePrecision(parameter);
-    }
+      if (parameter.precision) {
+        originalParam.precision = parameter.precision;
+      } else if (originalType.resolvePrecision) {
+        originalParam.precision = originalType.resolvePrecision(parameter);
+      }
 
-    if (parameter.scale) {
-      originalParam.scale = parameter.scale;
-    } else if (originalType.resolveScale) {
-      originalParam.scale = originalType.resolveScale(parameter);
-    }
+      if (parameter.scale) {
+        originalParam.scale = parameter.scale;
+      } else if (originalType.resolveScale) {
+        originalParam.scale = originalType.resolveScale(parameter);
+      }
 
-    if (this.collation) {
-      originalParam.collation = this.collation;
+      if (this.collation) {
+        originalParam.collation = this.collation;
+      }
     }
 
     yield originalType.generateTypeInfo(originalParam, this.options);

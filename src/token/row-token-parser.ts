@@ -2,6 +2,7 @@
 
 import Parser, { type ParserOptions } from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
+import { type BaseMetadata } from '../metadata-parser';
 
 import { RowToken } from './token';
 import * as iconv from 'iconv-lite';
@@ -14,6 +15,225 @@ import { type CryptoMetadata } from '../always-encrypted/types';
 interface Column {
   value: unknown;
   metadata: ColumnMetadata;
+}
+
+/**
+ * Parses a decrypted value (raw bytes) into the appropriate JavaScript type.
+ * Unlike readValue(), this function handles raw decrypted data that does NOT
+ * have TDS length prefixes.
+ *
+ * @param buffer - The decrypted raw bytes
+ * @param metadata - The base type metadata for the decrypted value
+ * @param options - Parser options
+ * @returns The parsed JavaScript value
+ */
+function parseDecryptedValue(buffer: Buffer, metadata: BaseMetadata, options: ParserOptions): unknown {
+  const type = metadata.type;
+
+  // Handle null/empty
+  if (buffer.length === 0) {
+    return null;
+  }
+
+  switch (type.name) {
+    case 'Null':
+      return null;
+
+    case 'TinyInt':
+      if (buffer.length !== 1) {
+        throw new Error(`Invalid decrypted TinyInt: expected 1 byte, got ${buffer.length}`);
+      }
+      return buffer.readUInt8(0);
+
+    case 'SmallInt':
+      if (buffer.length !== 2) {
+        throw new Error(`Invalid decrypted SmallInt: expected 2 bytes, got ${buffer.length}`);
+      }
+      return buffer.readInt16LE(0);
+
+    case 'Int':
+      if (buffer.length !== 4) {
+        throw new Error(`Invalid decrypted Int: expected 4 bytes, got ${buffer.length}`);
+      }
+      return buffer.readInt32LE(0);
+
+    case 'BigInt':
+      if (buffer.length !== 8) {
+        throw new Error(`Invalid decrypted BigInt: expected 8 bytes, got ${buffer.length}`);
+      }
+      return buffer.readBigInt64LE(0).toString();
+
+    case 'Real':
+      if (buffer.length !== 4) {
+        throw new Error(`Invalid decrypted Real: expected 4 bytes, got ${buffer.length}`);
+      }
+      return buffer.readFloatLE(0);
+
+    case 'Float':
+      if (buffer.length !== 8) {
+        throw new Error(`Invalid decrypted Float: expected 8 bytes, got ${buffer.length}`);
+      }
+      return buffer.readDoubleLE(0);
+
+    case 'SmallMoney': {
+      if (buffer.length !== 4) {
+        throw new Error(`Invalid decrypted SmallMoney: expected 4 bytes, got ${buffer.length}`);
+      }
+      const value = buffer.readInt32LE(0);
+      return value / 10000;
+    }
+
+    case 'Money': {
+      if (buffer.length !== 8) {
+        throw new Error(`Invalid decrypted Money: expected 8 bytes, got ${buffer.length}`);
+      }
+      const high = buffer.readInt32LE(4);
+      const low = buffer.readUInt32LE(0);
+      const value = (BigInt(high) << 32n) + BigInt(low);
+      return Number(value) / 10000;
+    }
+
+    case 'Bit':
+      if (buffer.length !== 1) {
+        throw new Error(`Invalid decrypted Bit: expected 1 byte, got ${buffer.length}`);
+      }
+      return buffer.readUInt8(0) === 1;
+
+    case 'SmallDateTime': {
+      if (buffer.length !== 4) {
+        throw new Error(`Invalid decrypted SmallDateTime: expected 4 bytes, got ${buffer.length}`);
+      }
+      const days = buffer.readUInt16LE(0);
+      const minutes = buffer.readUInt16LE(2);
+      const date = new Date(Date.UTC(1900, 0, 1));
+      date.setUTCDate(date.getUTCDate() + days);
+      date.setUTCMinutes(date.getUTCMinutes() + minutes);
+      return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
+    }
+
+    case 'DateTime': {
+      if (buffer.length !== 8) {
+        throw new Error(`Invalid decrypted DateTime: expected 8 bytes, got ${buffer.length}`);
+      }
+      const days = buffer.readInt32LE(0);
+      const threeHundredthsOfSecond = buffer.readUInt32LE(4);
+      const date = new Date(Date.UTC(1900, 0, 1));
+      date.setUTCDate(date.getUTCDate() + days);
+      date.setUTCMilliseconds(date.getUTCMilliseconds() + threeHundredthsOfSecond * 10 / 3);
+      return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
+    }
+
+    case 'Date': {
+      if (buffer.length !== 3) {
+        throw new Error(`Invalid decrypted Date: expected 3 bytes, got ${buffer.length}`);
+      }
+      const days = buffer.readUIntLE(0, 3);
+      const date = new Date(Date.UTC(1, 0, 1));
+      date.setUTCFullYear(1);
+      date.setUTCDate(date.getUTCDate() + days);
+      return options.useUTC === false ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : date;
+    }
+
+    case 'UniqueIdentifier': {
+      if (buffer.length !== 16) {
+        throw new Error(`Invalid decrypted UniqueIdentifier: expected 16 bytes, got ${buffer.length}`);
+      }
+      if (options.lowerCaseGuids) {
+        return [
+          buffer.toString('hex', 3, 4) + buffer.toString('hex', 2, 3) +
+          buffer.toString('hex', 1, 2) + buffer.toString('hex', 0, 1),
+          buffer.toString('hex', 5, 6) + buffer.toString('hex', 4, 5),
+          buffer.toString('hex', 7, 8) + buffer.toString('hex', 6, 7),
+          buffer.toString('hex', 8, 10),
+          buffer.toString('hex', 10, 16)
+        ].join('-');
+      } else {
+        return [
+          buffer.toString('hex', 3, 4).toUpperCase() + buffer.toString('hex', 2, 3).toUpperCase() +
+          buffer.toString('hex', 1, 2).toUpperCase() + buffer.toString('hex', 0, 1).toUpperCase(),
+          buffer.toString('hex', 5, 6).toUpperCase() + buffer.toString('hex', 4, 5).toUpperCase(),
+          buffer.toString('hex', 7, 8).toUpperCase() + buffer.toString('hex', 6, 7).toUpperCase(),
+          buffer.toString('hex', 8, 10).toUpperCase(),
+          buffer.toString('hex', 10, 16).toUpperCase()
+        ].join('-');
+      }
+    }
+
+    case 'VarChar':
+    case 'Char':
+    case 'Text': {
+      // Validate max length
+      if (metadata.dataLength !== undefined && buffer.length > metadata.dataLength) {
+        throw new Error(`Decrypted VarChar size (${buffer.length}) exceeds max (${metadata.dataLength})`);
+      }
+      // Raw bytes, decode with collation's codepage
+      return iconv.decode(buffer, metadata.collation?.codepage ?? 'utf8');
+    }
+
+    case 'NVarChar':
+    case 'NChar':
+    case 'NText':
+    case 'Xml': {
+      // Validate max length
+      if (metadata.dataLength !== undefined && buffer.length > metadata.dataLength) {
+        throw new Error(`Decrypted NVarChar size (${buffer.length}) exceeds max (${metadata.dataLength})`);
+      }
+      // Validate even number of bytes for UCS-2
+      if (buffer.length % 2 !== 0) {
+        throw new Error(`Invalid decrypted NVarChar: odd byte count (${buffer.length})`);
+      }
+      // Raw UCS-2/UTF-16LE bytes
+      return buffer.toString('ucs2');
+    }
+
+    case 'VarBinary':
+    case 'Binary':
+    case 'Image': {
+      // Validate max length
+      if (metadata.dataLength !== undefined && buffer.length > metadata.dataLength) {
+        throw new Error(`Decrypted VarBinary size (${buffer.length}) exceeds max (${metadata.dataLength})`);
+      }
+      return buffer;
+    }
+
+    case 'Numeric':
+    case 'Decimal': {
+      // Validate minimum size (1 byte sign + at least some value bytes)
+      if (buffer.length < 1) {
+        throw new Error(`Invalid decrypted Numeric: buffer too small (${buffer.length})`);
+      }
+      // First byte is sign (0=positive, 1=negative)
+      const signByte = buffer.readUInt8(0);
+      if (signByte !== 0 && signByte !== 1) {
+        throw new Error(`Invalid decrypted Numeric: invalid sign byte (${signByte})`);
+      }
+      const sign = signByte === 0 ? 1 : -1;
+      // Remaining bytes are the value in little-endian
+      let value = 0n;
+      for (let i = buffer.length - 1; i >= 1; i--) {
+        value = value * 256n + BigInt(buffer.readUInt8(i));
+      }
+      const scale = metadata.scale ?? 0;
+      if (scale === 0) {
+        return sign * Number(value);
+      }
+      const divisor = 10n ** BigInt(scale);
+      const intPart = value / divisor;
+      const fracPart = value % divisor;
+      const fracStr = fracPart.toString().padStart(scale, '0');
+      return sign * Number(`${intPart}.${fracStr}`);
+    }
+
+    case 'Time':
+    case 'DateTime2':
+    case 'DateTimeOffset':
+      // These have complex formats - for now fall through to error
+      // TODO: Implement proper parsing
+      throw new Error(`Decryption of ${type.name} type is not yet implemented`);
+
+    default:
+      throw new Error(`Unsupported decrypted type: ${type.name}`);
+  }
 }
 
 /**
@@ -38,12 +258,12 @@ async function decryptColumnValue(
   const decryptedValue = decryptWithKey(value, cryptoMetadata, options);
 
   // Parse the decrypted bytes using the base type info
+  // Note: Decrypted values are raw bytes WITHOUT TDS length prefixes
   if (!cryptoMetadata.baseTypeInfo) {
     throw new Error('baseTypeInfo is required for decryption');
   }
 
-  const result = readValue(decryptedValue, 0, cryptoMetadata.baseTypeInfo, options);
-  return result.value;
+  return parseDecryptedValue(decryptedValue, cryptoMetadata.baseTypeInfo, options);
 }
 
 async function rowParser(parser: Parser): Promise<RowToken> {

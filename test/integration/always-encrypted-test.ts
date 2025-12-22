@@ -630,6 +630,13 @@ describe('Always Encrypted', function() {
         // Third column (EncryptedText) should be encrypted
         assert.isDefined(cols[2].cryptoMetadata, 'EncryptedText should have cryptoMetadata');
         assert.strictEqual(cols[2].cryptoMetadata!.encryptionType, 1, 'Should be deterministic');
+
+        // Verify baseTypeInfo contains correct length for NVARCHAR(100)
+        const baseTypeInfo = cols[2].cryptoMetadata!.baseTypeInfo;
+        assert.isDefined(baseTypeInfo, 'baseTypeInfo should be defined');
+        assert.strictEqual(baseTypeInfo!.type.name, 'NVarChar', 'Base type should be NVarChar');
+        // NVARCHAR(100) = 200 bytes (100 chars * 2 bytes/char)
+        assert.strictEqual(baseTypeInfo!.dataLength, 200, 'dataLength should be 200 bytes for NVARCHAR(100)');
       });
 
       connection.execSql(request);
@@ -845,7 +852,8 @@ describe('Always Encrypted', function() {
       });
 
       insertRequest.addParameter('plainText', TYPES.NVarChar, plainTextValue);
-      insertRequest.addParameter('encryptedText', TYPES.NVarChar, null);
+      // For NULL encrypted values, we need to specify the length to match the column definition
+      insertRequest.addParameter('encryptedText', TYPES.NVarChar, null, { length: 100 });
 
       connection.execSql(insertRequest);
     });
