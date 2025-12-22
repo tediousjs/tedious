@@ -4,6 +4,7 @@
 import { type Parameter, type ParameterData } from '../data-type';
 import { type InternalConnectionOptions as ConnectionOptions } from '../connection';
 import { encryptWithKey } from './key-crypto';
+import { SQLServerEncryptionType } from './types';
 
 /**
  * Serializes a parameter value to bytes according to its data type.
@@ -84,6 +85,10 @@ function encryptParameter(
   options: ConnectionOptions
 ): void {
   const cryptoMetadata = parameter.cryptoMetadata!;
+
+  if (cryptoMetadata.encryptionType === SQLServerEncryptionType.PlainText && parameter.forceEncrypt === true) {
+    throw new Error(`Force Encryption was set as true for parameter ${parameter.name} and the database expects this parameter to be sent as plaintext. This may be due to a configuration error.`);
+  }
 
   // Serialize the value to bytes
   const plaintext = serializeParameterValue(parameter, options);
