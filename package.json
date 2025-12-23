@@ -10,7 +10,8 @@
     "lastonesky",
     "Patrik Simek <patrik@patriksimek.cz>",
     "Phil Dodderidge <pdodde@poyntz.com>",
-    "Zach Aller"
+    "Zach Aller",
+    "Jamie Nicholson <jamie.nicholson@gmail.com>"
   ],
   "name": "tedious",
   "description": "A TDS driver, for connecting to MS SQLServer databases.",
