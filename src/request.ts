@@ -46,7 +46,7 @@ interface RequestOptions {
 /**
  * ```js
  * const { Request } = require('tedious');
- * const request = new Request("select 42, 'hello world'", (err, rowCount) {
+ * const request = new Request("select 42, 'hello world'", (err, rowCount) => {
  *   // Request completion callback...
  * });
  * connection.execSql(request);
@@ -154,7 +154,7 @@ class Request extends EventEmitter {
     listener:
       /**
        * An array or object (depends on [[ConnectionOptions.useColumnNames]]), where the columns can be accessed by index/name.
-       * Each column has two properties, `metadata` and `value`：
+       * Each column has two properties, `metadata` and `value`:
        *
        * * `metadata`
        *
@@ -258,7 +258,7 @@ class Request extends EventEmitter {
        *   The parameter's output value.
        *
        * @param metadata
-       *   The same data that is exposed in the `columnMetaData` event.
+       *   The same data that is exposed in the `columnMetadata` event.
        */
       (parameterName: string, value: unknown, metadata: Metadata) => void
   ): this
@@ -469,7 +469,7 @@ class Request extends EventEmitter {
   }
 
   /**
-   * Temporarily suspends the flow of data from the database. No more `row` events will be emitted until [[resume] is called.
+   * Temporarily suspends the flow of data from the database. No more `row` events will be emitted until [[resume]] is called.
    * If this request is already in a paused state, calling [[pause]] has no effect.
    */
   pause() {
