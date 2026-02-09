@@ -35,7 +35,7 @@ describe('Prepare Execute Statement', function() {
     const connection = new Connection(config);
 
     request.on('prepared', function() {
-      assert.ok(request.handle);
+      assert.isDefined(request.handle);
       connection.execute(request, { param: value });
     });
 
@@ -84,7 +84,7 @@ describe('Prepare Execute Statement', function() {
       request.addParameter('param', TYPES.Int);
 
       request.on('prepared', function() {
-        assert.ok(request.handle);
+        assert.isDefined(request.handle);
 
         assert.lengthOf(returnValues, 1);
         assert.strictEqual(returnValues[0].parameterName, 'handle');
@@ -166,7 +166,7 @@ describe('Prepare Execute Statement', function() {
     const connection = new Connection(config);
 
     request.on('prepared', function() {
-      assert.ok(request.handle);
+      assert.isDefined(request.handle);
       connection.unprepare(request);
     });
 

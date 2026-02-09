@@ -5,20 +5,21 @@ describe('packet type tests', function() {
   it('should create Empty', function() {
     const packet = new Packet(TYPE.PRELOGIN);
 
-    assert.isOk(packet);
-    assert.isOk(
-      packet.buffer.equals(Buffer.from([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0]))
+    assert.isDefined(packet);
+    assert.deepEqual(
+      packet.buffer,
+      Buffer.from([TYPE.PRELOGIN, 0, 0, 8, 0, 0, 1, 0])
     );
   });
 
   it('should be last', function() {
     let packet = new Packet(TYPE.PRELOGIN);
-    assert.isOk(!packet.isLast());
+    assert.isFalse(packet.isLast());
 
     packet = new Packet(TYPE.PRELOGIN);
-    assert.isOk(!packet.last());
+    assert.isFalse(packet.last());
     packet.last(true);
-    assert.isOk(packet.last());
+    assert.isTrue(packet.last());
   });
 
   it('should have correct packet id', function() {
@@ -36,15 +37,15 @@ describe('packet type tests', function() {
 
     const packet = new Packet(TYPE.PRELOGIN);
     assert.strictEqual(packet.length(), 8);
-    assert.isOk(packet.data().equals(Buffer.alloc(0)));
+    assert.deepEqual(packet.data(), Buffer.alloc(0));
 
     packet.addData(data1);
     assert.strictEqual(packet.length(), 8 + data1.length);
-    assert.isOk(packet.data().equals(data1));
+    assert.deepEqual(packet.data(), data1);
 
     packet.addData(data2);
     assert.strictEqual(packet.length(), 8 + allData.length);
-    assert.isOk(packet.data().equals(allData));
+    assert.deepEqual(packet.data(), allData);
   });
 
   it('should create from buffer', function() {
@@ -63,8 +64,8 @@ describe('packet type tests', function() {
     const packet = new Packet(buffer);
 
     assert.strictEqual(packet.length(), 0x0a);
-    assert.isOk(packet.isLast());
-    assert.isOk(packet.data().equals(Buffer.from([0x01, 0xff])));
+    assert.isTrue(packet.isLast());
+    assert.deepEqual(packet.data(), Buffer.from([0x01, 0xff]));
   });
 
   it('should convert header to string', function() {
@@ -97,7 +98,7 @@ describe('packet type tests', function() {
     assert.strictEqual(packet.dataToString('--'), expectedText);
   });
 
-  it('should data with exact lines worth', function() {
+  it('should convert data to string with exactly one line of data', function() {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
     const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
     const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
@@ -117,7 +118,7 @@ describe('packet type tests', function() {
     assert.strictEqual(packet.dataToString('--'), expectedText);
   });
 
-  it('should convert data to strings in mulitple lines', function() {
+  it('should convert data to strings in multiple lines', function() {
     const dataLine1a = Buffer.from([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
     const dataLine1b = Buffer.from([0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f]);
     const dataLine2a = Buffer.from([0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17]);
@@ -145,18 +146,18 @@ describe('packet type tests', function() {
     assert.strictEqual(packet.dataToString('--'), expectedText);
   });
 
-  it('should packet complete shorter than header', function() {
+  it('should report incomplete when buffer is shorter than header', function() {
     const buffer = Buffer.alloc(7);
-    assert.isOk(!isPacketComplete(buffer));
+    assert.isFalse(isPacketComplete(buffer));
   });
 
-  it('should packet complete with just header', function() {
+  it('should report complete when buffer contains only header', function() {
     const buffer = new Packet(TYPE.PRELOGIN).buffer;
 
-    assert.isOk(isPacketComplete(buffer));
+    assert.isTrue(isPacketComplete(buffer));
   });
 
-  it('should not packet complete too short', function() {
+  it('should report incomplete when buffer is shorter than declared length', function() {
     const buffer = Buffer.from([
       0x00,
       0x00,
@@ -170,10 +171,10 @@ describe('packet type tests', function() {
       0x00
     ]);
 
-    assert.isOk(!isPacketComplete(buffer));
+    assert.isFalse(isPacketComplete(buffer));
   });
 
-  it('should packet complete long enough', function() {
+  it('should report complete when buffer matches declared length', function() {
     const buffer = Buffer.from([
       0x00,
       0x00,
@@ -189,6 +190,6 @@ describe('packet type tests', function() {
       0x00
     ]);
 
-    assert.isOk(isPacketComplete(buffer));
+    assert.isTrue(isPacketComplete(buffer));
   });
 });

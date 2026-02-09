@@ -107,7 +107,7 @@ describe('IncomingMessageStream', function() {
     });
   });
 
-  it('correctly handles the last package coming in after the stream was paused', function(done) {
+  it('correctly handles the last packet coming in after the stream was paused', function(done) {
     const packetData = Buffer.from('test1234');
     const packetHeader = Buffer.alloc(8);
 

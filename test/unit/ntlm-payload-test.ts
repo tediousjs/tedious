@@ -11,7 +11,7 @@ const challenge = {
   }
 };
 
-describe('ntlm payload test', function() {
+describe('NTLMPayload', function() {
   it('should respond to challenge', function() {
 
     const response = new NTLMPayload(challenge);

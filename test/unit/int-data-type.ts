@@ -1,7 +1,12 @@
 import { assert } from 'chai';
 import { typeByName } from '../../src/data-type';
+import { type InternalConnectionOptions } from '../../src/connection';
 
 const { Int, SmallInt, TinyInt, BigInt } = typeByName;
+
+// Test options - using type assertion since tests only exercise code paths
+// that use a subset of the full InternalConnectionOptions
+const options: InternalConnectionOptions = {} as InternalConnectionOptions;
 
 describe('integer-data-types', function() {
   describe('int data type test', function() {
@@ -13,7 +18,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...Int.generateParameterData(item.param, {} as any)]);
+        const buffer = Buffer.concat([...Int.generateParameterData(item.param, options)]);
         assert.equal(buffer.readInt32LE(0), item.expected);
       });
     });
@@ -28,7 +33,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, {} as any)]);
+        const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, options)]);
         assert.equal(buffer.readInt16LE(0), item.expected);
       });
     });
@@ -43,7 +48,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, {} as any)]);
+        const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, options)]);
         assert.equal(buffer.readInt8(0), item.expected);
       });
     });
@@ -57,7 +62,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...BigInt.generateParameterData(item.param, {} as any)]);
+        const buffer = Buffer.concat([...BigInt.generateParameterData(item.param, options)]);
         assert.equal(buffer.readBigInt64LE(0), item.expected);
       });
     });

@@ -1,6 +1,10 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { DoneToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
+
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 function parse(status: number, curCmd: number, doneRowCount: number) {
   const doneRowCountLow = doneRowCount % 0x100000000;
@@ -14,12 +18,13 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
+  const debug = new Debug();
+  const parser = StreamParser.parseTokens([buffer.data], debug, options);
   return parser;
 }
 
 describe('Done Token Parser', () => {
-  it('should done', async () => {
+  it('should parse a final done token', async function() {
     const status = 0x0000;
     const curCmd = 1;
     const doneRowCount = 2;
@@ -29,12 +34,13 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as any).more);
-    assert.strictEqual((token as any).curCmd, curCmd);
-    assert.isOk(!(token as any).rowCount);
+    assert.instanceOf(token, DoneToken);
+    assert.isFalse(token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isUndefined(token.rowCount);
   });
 
-  it('should more', async () => {
+  it('should parse a done token with more results', async function() {
     const status = 0x0001;
     const curCmd = 1;
     const doneRowCount = 2;
@@ -44,12 +50,13 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk((token as any).more);
-    assert.strictEqual((token as any).curCmd, curCmd);
-    assert.isOk(!(token as any).rowCount);
+    assert.instanceOf(token, DoneToken);
+    assert.isTrue(token.more);
+    assert.strictEqual(token.curCmd, curCmd);
+    assert.isUndefined(token.rowCount);
   });
 
-  it('should done row count', async () => {
+  it('should parse a done token with row count', async function() {
     const status = 0x0010;
     const curCmd = 1;
     const doneRowCount = 0x1200000034;
@@ -59,8 +66,9 @@ describe('Done Token Parser', () => {
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.isOk(!(token as any).more);
-    assert.strictEqual((token as any).curCmd, 1);
-    assert.strictEqual((token as any).rowCount, doneRowCount);
+    assert.instanceOf(token, DoneToken);
+    assert.isFalse(token.more);
+    assert.strictEqual(token.curCmd, 1);
+    assert.strictEqual(token.rowCount, doneRowCount);
   });
 });
