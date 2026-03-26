@@ -2,7 +2,7 @@ import DuplexPair from 'native-duplexpair';
 
 import { Duplex } from 'stream';
 import * as tls from 'tls';
-import { Socket } from 'net';
+import { isIP, Socket } from 'net';
 import { EventEmitter } from 'events';
 
 import Debug from './debug';
@@ -73,7 +73,7 @@ class MessageIO extends EventEmitter {
       const securePair = this.securePair = {
         cleartext: tls.connect({
           socket: duplexpair.socket1 as Socket,
-          servername: hostname,
+          servername: isIP(hostname) ? '' : hostname,
           secureContext: secureContext,
           rejectUnauthorized: !trustServerCertificate
         }),
