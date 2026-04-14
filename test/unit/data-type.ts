@@ -1384,6 +1384,36 @@ describe('TinyInt', function() {
 });
 
 describe('TVP', function() {
+  describe('.declaration', function() {
+    it('returns type name with readonly', function() {
+      const result = TYPES.TVP.declaration({
+        value: { name: 'MyTableType', schema: '', columns: [], rows: [] }
+      } as any);
+      assert.strictEqual(result, 'MyTableType readonly');
+    });
+
+    it('includes schema when present', function() {
+      const result = TYPES.TVP.declaration({
+        value: { name: 'UDT_StringArray', schema: 'AI', columns: [], rows: [] }
+      } as any);
+      assert.strictEqual(result, 'AI.UDT_StringArray readonly');
+    });
+
+    it('works with null schema', function() {
+      const result = TYPES.TVP.declaration({
+        value: { name: 'MyTableType', schema: null, columns: [], rows: [] }
+      } as any);
+      assert.strictEqual(result, 'MyTableType readonly');
+    });
+
+    it('works with undefined schema', function() {
+      const result = TYPES.TVP.declaration({
+        value: { name: 'MyTableType', columns: [], rows: [] }
+      } as any);
+      assert.strictEqual(result, 'MyTableType readonly');
+    });
+  });
+
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(TYPES.TVP.generateParameterLength({ value: null }, options), Buffer.from([0xFF, 0xFF]));
