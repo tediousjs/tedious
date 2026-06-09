@@ -147,8 +147,8 @@ class Parser {
     return result.value;
   }
 
-  async readNbcRowToken(): Promise<NBCRowToken> {
-    return await nbcRowParser(this);
+  readNbcRowToken(): NBCRowToken | Promise<NBCRowToken> {
+    return nbcRowParser(this);
   }
 
   async readReturnValueToken(): Promise<ReturnValueToken> {

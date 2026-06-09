@@ -5,7 +5,7 @@ import Parser from './stream-parser';
 import { ReturnValueToken } from './token';
 
 import { readMetadata } from '../metadata-parser';
-import { isPLPStream, readPLPStream, readValue } from '../value-parser';
+import { isPLPStream, readPLPStreamAsync, readValue } from '../value-parser';
 import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt8 } from './helpers';
 import * as iconv from 'iconv-lite';
 
@@ -47,7 +47,7 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
     let offset = parser.position;
 
     if (isPLPStream(metadata)) {
-      const chunks = await readPLPStream(parser);
+      const chunks = await readPLPStreamAsync(parser);
 
       if (chunks === null) {
         value = chunks;
