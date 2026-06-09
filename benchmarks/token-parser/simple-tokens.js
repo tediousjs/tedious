@@ -1,6 +1,7 @@
 const { createBenchmark } = require('../common');
 
 const { Parser } = require('tedious/lib/token/token-stream-parser');
+const Debug = require('tedious/lib/debug');
 
 const bench = createBenchmark(main, {
   n: [10, 100, 1000]
@@ -347,7 +348,7 @@ function main({ n }) {
     '1100C10064000000000000007900000000FE0000E0000000000000000000'
   ].join(''), 'hex');
 
-  const parser = new Parser(repeat(data, n), {}, {
+  const parser = new Parser(repeat(data, n), new Debug(), {
     onColMetadata: () => { },
     onRow: () => { },
     onDoneInProc: () => { },
