@@ -135,7 +135,7 @@ class Parser {
       result = featureExtAckParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readFeatureExtAckToken();
         });
       }
@@ -168,7 +168,7 @@ class Parser {
       result = sspiParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readSSPIToken();
         });
       }
@@ -187,7 +187,7 @@ class Parser {
       result = fedAuthInfoParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readFedAuthInfoToken();
         });
       }
@@ -206,7 +206,7 @@ class Parser {
       result = orderParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readOrderToken();
         });
       }
@@ -225,7 +225,7 @@ class Parser {
       result = returnStatusParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readReturnStatusToken();
         });
       }
@@ -244,7 +244,7 @@ class Parser {
       result = loginAckParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readLoginAckToken();
         });
       }
@@ -263,7 +263,7 @@ class Parser {
       result = envChangeParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readEnvChangeToken();
         });
       }
@@ -286,7 +286,7 @@ class Parser {
       result = infoParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readInfoToken();
         });
       }
@@ -305,7 +305,7 @@ class Parser {
       result = errorParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readErrorToken();
         });
       }
@@ -324,7 +324,7 @@ class Parser {
       result = doneInProcParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readDoneInProcToken();
         });
       }
@@ -343,7 +343,7 @@ class Parser {
       result = doneProcParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readDoneProcToken();
         });
       }
@@ -362,7 +362,7 @@ class Parser {
       result = doneParser(this.buffer, this.position, this.options);
     } catch (err: any) {
       if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
+        return this.waitForChunk(err.byteCount).then(() => {
           return this.readDoneToken();
         });
       }
@@ -385,18 +385,51 @@ class Parser {
     this.position = 0;
   }
 
-  async waitForChunk() {
-    const result = await this.iterator.next();
-    if (result.done) {
-      throw new Error('unexpected end of data');
+  /**
+   * Wait for additional data to arrive. Any data that was already consumed
+   * from the buffer is discarded, and `position` is reset to `0`.
+   *
+   * If a `byteCount` is given, this waits until at least `byteCount` bytes
+   * (counted from the current buffer's start) are available, collecting
+   * incoming chunks and assembling them into a new buffer in a single pass.
+   * This avoids copying all previously received data again whenever a new
+   * chunk arrives while waiting for large values to be transmitted.
+   */
+  async waitForChunk(byteCount?: number) {
+    // The requirement, relative to the remaining unconsumed data.
+    const requiredLength = byteCount === undefined ? 1 : byteCount - this.position;
+
+    const segments: Buffer[] = [];
+    let availableLength = 0;
+
+    if (this.position !== this.buffer.length) {
+      segments.push(this.position === 0 ? this.buffer : this.buffer.slice(this.position));
+      availableLength = segments[0].length;
     }
 
-    if (this.position === this.buffer.length) {
-      this.buffer = result.value;
-    } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), result.value]);
-    }
+    do {
+      let result;
+      try {
+        result = await this.iterator.next();
+      } catch (err: unknown) {
+        this.commitSegments(segments);
+        throw err;
+      }
 
+      if (result.done) {
+        this.commitSegments(segments);
+        throw new Error('unexpected end of data');
+      }
+
+      segments.push(result.value);
+      availableLength += result.value.length;
+    } while (availableLength < requiredLength);
+
+    this.commitSegments(segments);
+  }
+
+  commitSegments(segments: Buffer[]) {
+    this.buffer = segments.length === 1 ? segments[0] : Buffer.concat(segments);
     this.position = 0;
   }
 }

@@ -663,7 +663,7 @@ function readPLPStream(buf: Buffer, offset: number): Result<null | Buffer[]> {
  */
 async function readPLPStreamAsync(parser: Parser): Promise<null | Buffer[]> {
   while (parser.buffer.length < parser.position + 8) {
-    await parser.waitForChunk();
+    await parser.waitForChunk(parser.position + 8);
   }
 
   const expectedLength = parser.buffer.readBigUInt64LE(parser.position);
@@ -678,7 +678,7 @@ async function readPLPStreamAsync(parser: Parser): Promise<null | Buffer[]> {
 
   while (true) {
     while (parser.buffer.length < parser.position + 4) {
-      await parser.waitForChunk();
+      await parser.waitForChunk(parser.position + 4);
     }
 
     const chunkLength = parser.buffer.readUInt32LE(parser.position);
@@ -689,7 +689,7 @@ async function readPLPStreamAsync(parser: Parser): Promise<null | Buffer[]> {
     }
 
     while (parser.buffer.length < parser.position + chunkLength) {
-      await parser.waitForChunk();
+      await parser.waitForChunk(parser.position + chunkLength);
     }
 
     chunks.push(parser.buffer.slice(parser.position, parser.position + chunkLength));

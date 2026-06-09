@@ -99,7 +99,7 @@ async function readNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
   const bitmapByteLength = Math.ceil(colMetadata.length / 8);
 
   while (parser.buffer.length - parser.position < bitmapByteLength) {
-    await parser.waitForChunk();
+    await parser.waitForChunk(parser.position + bitmapByteLength);
   }
 
   const bytes = parser.buffer.slice(parser.position, parser.position + bitmapByteLength);
@@ -123,7 +123,7 @@ async function readNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
           result = readValue(parser.buffer, parser.position, metadata, parser.options);
         } catch (err) {
           if (err instanceof NotEnoughDataError) {
-            await parser.waitForChunk();
+            await parser.waitForChunk(err.byteCount);
             continue;
           }
 

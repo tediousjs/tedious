@@ -93,7 +93,7 @@ async function readRowAsync(parser: Parser): Promise<RowToken> {
           result = readValue(parser.buffer, parser.position, metadata, parser.options);
         } catch (err) {
           if (err instanceof NotEnoughDataError) {
-            await parser.waitForChunk();
+            await parser.waitForChunk(err.byteCount);
             continue;
           }
 

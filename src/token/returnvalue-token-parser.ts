@@ -30,7 +30,7 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
       }
     } catch (err) {
       if (err instanceof NotEnoughDataError) {
-        await parser.waitForChunk();
+        await parser.waitForChunk(err.byteCount);
         continue;
       }
 
@@ -63,7 +63,7 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
         ({ value, offset } = readValue(buf, offset, metadata, parser.options));
       } catch (err) {
         if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
+          await parser.waitForChunk(err.byteCount);
           continue;
         }
 
