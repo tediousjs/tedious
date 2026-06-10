@@ -1,11 +1,12 @@
 import Parser, { type ParserOptions } from './token/stream-parser';
-import { type Metadata, readCollation } from './metadata-parser';
+import { type Metadata } from './metadata-parser';
+import { Collation } from './collation';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
-import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
+import { NotEnoughDataError } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -15,96 +16,263 @@ const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
 const DEFAULT_ENCODING = 'utf8';
 
-function readTinyInt(buf: Buffer, offset: number): Result<number> {
-  return readUInt8(buf, offset);
+/**
+ * A mutable cursor over a buffer.
+ *
+ * Read functions advance `position` by the number of bytes consumed and
+ * return the read value directly, instead of allocating a `Result` object
+ * for every read. When there is not enough data buffered, they throw a
+ * `NotEnoughDataError` - `position` may have been advanced partially at that
+ * point, so callers need to save and restore it when retrying.
+ */
+interface Cursor {
+  buffer: Buffer;
+  position: number;
 }
 
-function readSmallInt(buf: Buffer, offset: number): Result<number> {
-  return readInt16LE(buf, offset);
+function readUInt8(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 1) {
+    throw new NotEnoughDataError(position + 1);
+  }
+
+  cursor.position = position + 1;
+  return cursor.buffer.readUInt8(position);
 }
 
-function readInt(buf: Buffer, offset: number): Result<number> {
-  return readInt32LE(buf, offset);
+function readUInt16LE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 2) {
+    throw new NotEnoughDataError(position + 2);
+  }
+
+  cursor.position = position + 2;
+  return cursor.buffer.readUInt16LE(position);
 }
 
-function readBigInt(buf: Buffer, offset: number): Result<string> {
-  let value;
-  ({ offset, value } = readBigInt64LE(buf, offset));
+function readInt16LE(cursor: Cursor): number {
+  const position = cursor.position;
 
-  return new Result(value.toString(), offset);
+  if (cursor.buffer.length < position + 2) {
+    throw new NotEnoughDataError(position + 2);
+  }
+
+  cursor.position = position + 2;
+  return cursor.buffer.readInt16LE(position);
 }
 
-function readReal(buf: Buffer, offset: number): Result<number> {
-  return readFloatLE(buf, offset);
+function readUInt24LE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 3) {
+    throw new NotEnoughDataError(position + 3);
+  }
+
+  cursor.position = position + 3;
+  return cursor.buffer.readUIntLE(position, 3);
 }
 
-function readFloat(buf: Buffer, offset: number): Result<number> {
-  return readDoubleLE(buf, offset);
+function readUInt32LE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 4) {
+    throw new NotEnoughDataError(position + 4);
+  }
+
+  cursor.position = position + 4;
+  return cursor.buffer.readUInt32LE(position);
 }
 
-function readSmallMoney(buf: Buffer, offset: number): Result<number> {
-  let value;
-  ({ offset, value } = readInt32LE(buf, offset));
+function readInt32LE(cursor: Cursor): number {
+  const position = cursor.position;
 
-  return new Result(value / MONEY_DIVISOR, offset);
+  if (cursor.buffer.length < position + 4) {
+    throw new NotEnoughDataError(position + 4);
+  }
+
+  cursor.position = position + 4;
+  return cursor.buffer.readInt32LE(position);
 }
 
-function readMoney(buf: Buffer, offset: number): Result<number> {
-  let high;
-  ({ offset, value: high } = readInt32LE(buf, offset));
+function readUInt40LE(cursor: Cursor): number {
+  const position = cursor.position;
 
-  let low;
-  ({ offset, value: low } = readUInt32LE(buf, offset));
+  if (cursor.buffer.length < position + 5) {
+    throw new NotEnoughDataError(position + 5);
+  }
 
-  return new Result((low + (0x100000000 * high)) / MONEY_DIVISOR, offset);
+  cursor.position = position + 5;
+  return cursor.buffer.readUIntLE(position, 5);
 }
 
-function readBit(buf: Buffer, offset: number): Result<boolean> {
-  let value;
-  ({ offset, value } = readUInt8(buf, offset));
+function readBigInt64LE(cursor: Cursor): bigint {
+  const position = cursor.position;
 
-  return new Result(!!value, offset);
+  if (cursor.buffer.length < position + 8) {
+    throw new NotEnoughDataError(position + 8);
+  }
+
+  cursor.position = position + 8;
+  return cursor.buffer.readBigInt64LE(position);
 }
 
-function readValue(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
+function readFloatLE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 4) {
+    throw new NotEnoughDataError(position + 4);
+  }
+
+  cursor.position = position + 4;
+  return cursor.buffer.readFloatLE(position);
+}
+
+function readDoubleLE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 8) {
+    throw new NotEnoughDataError(position + 8);
+  }
+
+  cursor.position = position + 8;
+  return cursor.buffer.readDoubleLE(position);
+}
+
+function readUNumeric64LE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 8) {
+    throw new NotEnoughDataError(position + 8);
+  }
+
+  const low = cursor.buffer.readUInt32LE(position);
+  const high = cursor.buffer.readUInt32LE(position + 4);
+
+  cursor.position = position + 8;
+  return (0x100000000 * high) + low;
+}
+
+function readUNumeric96LE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 12) {
+    throw new NotEnoughDataError(position + 12);
+  }
+
+  const dword1 = cursor.buffer.readUInt32LE(position);
+  const dword2 = cursor.buffer.readUInt32LE(position + 4);
+  const dword3 = cursor.buffer.readUInt32LE(position + 8);
+
+  cursor.position = position + 12;
+  return dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3);
+}
+
+function readUNumeric128LE(cursor: Cursor): number {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 16) {
+    throw new NotEnoughDataError(position + 16);
+  }
+
+  const dword1 = cursor.buffer.readUInt32LE(position);
+  const dword2 = cursor.buffer.readUInt32LE(position + 4);
+  const dword3 = cursor.buffer.readUInt32LE(position + 8);
+  const dword4 = cursor.buffer.readUInt32LE(position + 12);
+
+  cursor.position = position + 16;
+  return dword1 + (0x100000000 * dword2) + (0x100000000 * 0x100000000 * dword3) + (0x100000000 * 0x100000000 * 0x100000000 * dword4);
+}
+
+function readCollation(cursor: Cursor): Collation {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + 5) {
+    throw new NotEnoughDataError(position + 5);
+  }
+
+  cursor.position = position + 5;
+  return Collation.fromBuffer(cursor.buffer.slice(position, position + 5));
+}
+
+function readTinyInt(cursor: Cursor): number {
+  return readUInt8(cursor);
+}
+
+function readSmallInt(cursor: Cursor): number {
+  return readInt16LE(cursor);
+}
+
+function readInt(cursor: Cursor): number {
+  return readInt32LE(cursor);
+}
+
+function readBigInt(cursor: Cursor): string {
+  return readBigInt64LE(cursor).toString();
+}
+
+function readReal(cursor: Cursor): number {
+  return readFloatLE(cursor);
+}
+
+function readFloat(cursor: Cursor): number {
+  return readDoubleLE(cursor);
+}
+
+function readSmallMoney(cursor: Cursor): number {
+  return readInt32LE(cursor) / MONEY_DIVISOR;
+}
+
+function readMoney(cursor: Cursor): number {
+  const high = readInt32LE(cursor);
+  const low = readUInt32LE(cursor);
+
+  return (low + (0x100000000 * high)) / MONEY_DIVISOR;
+}
+
+function readBit(cursor: Cursor): boolean {
+  return !!readUInt8(cursor);
+}
+
+function readValue(cursor: Cursor, metadata: Metadata, options: ParserOptions): unknown {
   const type = metadata.type;
 
   switch (type.name) {
     case 'Null':
-      return new Result(null, offset);
+      return null;
 
     case 'TinyInt': {
-      return readTinyInt(buf, offset);
+      return readTinyInt(cursor);
     }
 
     case 'SmallInt': {
-      return readSmallInt(buf, offset);
+      return readSmallInt(cursor);
     }
 
     case 'Int': {
-      return readInt(buf, offset);
+      return readInt(cursor);
     }
 
     case 'BigInt': {
-      return readBigInt(buf, offset);
+      return readBigInt(cursor);
     }
 
     case 'IntN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       switch (dataLength) {
         case 0:
-          return new Result(null, offset);
+          return null;
 
         case 1:
-          return readTinyInt(buf, offset);
+          return readTinyInt(cursor);
         case 2:
-          return readSmallInt(buf, offset);
+          return readSmallInt(cursor);
         case 4:
-          return readInt(buf, offset);
+          return readInt(cursor);
         case 8:
-          return readBigInt(buf, offset);
+          return readBigInt(cursor);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for IntN');
@@ -112,25 +280,24 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Real': {
-      return readReal(buf, offset);
+      return readReal(cursor);
     }
 
     case 'Float': {
-      return readFloat(buf, offset);
+      return readFloat(cursor);
     }
 
     case 'FloatN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       switch (dataLength) {
         case 0:
-          return new Result(null, offset);
+          return null;
 
         case 4:
-          return readReal(buf, offset);
+          return readReal(cursor);
         case 8:
-          return readFloat(buf, offset);
+          return readFloat(cursor);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for FloatN');
@@ -138,24 +305,23 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'SmallMoney': {
-      return readSmallMoney(buf, offset);
+      return readSmallMoney(cursor);
     }
 
     case 'Money':
-      return readMoney(buf, offset);
+      return readMoney(cursor);
 
     case 'MoneyN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       switch (dataLength) {
         case 0:
-          return new Result(null, offset);
+          return null;
 
         case 4:
-          return readSmallMoney(buf, offset);
+          return readSmallMoney(cursor);
         case 8:
-          return readMoney(buf, offset);
+          return readMoney(cursor);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for MoneyN');
@@ -163,19 +329,18 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Bit': {
-      return readBit(buf, offset);
+      return readBit(cursor);
     }
 
     case 'BitN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       switch (dataLength) {
         case 0:
-          return new Result(null, offset);
+          return null;
 
         case 1:
-          return readBit(buf, offset);
+          return readBit(cursor);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for BitN');
@@ -186,120 +351,110 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     case 'Char': {
       const codepage = metadata.collation!.codepage!;
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      const dataLength = readUInt16LE(cursor);
 
       if (dataLength === NULL) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readChars(buf, offset, dataLength, codepage);
+      return readChars(cursor, dataLength, codepage);
     }
 
     case 'NVarChar':
     case 'NChar': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      const dataLength = readUInt16LE(cursor);
 
       if (dataLength === NULL) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readNChars(buf, offset, dataLength);
+      return readNChars(cursor, dataLength);
     }
 
     case 'VarBinary':
     case 'Binary': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      const dataLength = readUInt16LE(cursor);
 
       if (dataLength === NULL) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readBinary(buf, offset, dataLength);
+      return readBinary(cursor, dataLength);
     }
 
     case 'Text': {
-      let textPointerLength;
-      ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+      const textPointerLength = readUInt8(cursor);
 
       if (textPointerLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
       // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      readBinary(cursor, textPointerLength);
 
       // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      readBinary(cursor, 8);
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = readUInt32LE(cursor);
 
-      return readChars(buf, offset, dataLength, metadata.collation!.codepage!);
+      return readChars(cursor, dataLength, metadata.collation!.codepage!);
     }
 
     case 'NText': {
-      let textPointerLength;
-      ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+      const textPointerLength = readUInt8(cursor);
 
       if (textPointerLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
       // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      readBinary(cursor, textPointerLength);
 
       // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      readBinary(cursor, 8);
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = readUInt32LE(cursor);
 
-      return readNChars(buf, offset, dataLength);
+      return readNChars(cursor, dataLength);
     }
 
     case 'Image': {
-      let textPointerLength;
-      ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+      const textPointerLength = readUInt8(cursor);
 
       if (textPointerLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
       // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      readBinary(cursor, textPointerLength);
 
       // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      readBinary(cursor, 8);
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = readUInt32LE(cursor);
 
-      return readBinary(buf, offset, dataLength);
+      return readBinary(cursor, dataLength);
     }
 
     case 'SmallDateTime': {
-      return readSmallDateTime(buf, offset, options.useUTC);
+      return readSmallDateTime(cursor, options.useUTC);
     }
 
     case 'DateTime': {
-      return readDateTime(buf, offset, options.useUTC);
+      return readDateTime(cursor, options.useUTC);
     }
 
     case 'DateTimeN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       switch (dataLength) {
         case 0:
-          return new Result(null, offset);
+          return null;
 
         case 4:
-          return readSmallDateTime(buf, offset, options.useUTC);
+          return readSmallDateTime(cursor, options.useUTC);
         case 8:
-          return readDateTime(buf, offset, options.useUTC);
+          return readDateTime(cursor, options.useUTC);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
@@ -307,86 +462,79 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Time': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       if (dataLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readTime(buf, offset, dataLength, metadata.scale!, options.useUTC);
+      return readTime(cursor, dataLength, metadata.scale!, options.useUTC);
     }
 
     case 'Date': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       if (dataLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readDate(buf, offset, options.useUTC);
+      return readDate(cursor, options.useUTC);
     }
 
     case 'DateTime2': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       if (dataLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readDateTime2(buf, offset, dataLength, metadata.scale!, options.useUTC);
+      return readDateTime2(cursor, dataLength, metadata.scale!, options.useUTC);
     }
 
     case 'DateTimeOffset': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       if (dataLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readDateTimeOffset(buf, offset, dataLength, metadata.scale!);
+      return readDateTimeOffset(cursor, dataLength, metadata.scale!);
     }
 
     case 'NumericN':
     case 'DecimalN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       if (dataLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readNumeric(buf, offset, dataLength, metadata.precision!, metadata.scale!);
+      return readNumeric(cursor, dataLength, metadata.precision!, metadata.scale!);
     }
 
     case 'UniqueIdentifier': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      const dataLength = readUInt8(cursor);
 
       switch (dataLength) {
         case 0:
-          return new Result(null, offset);
+          return null;
 
         case 0x10:
-          return readUniqueIdentifier(buf, offset, options);
+          return readUniqueIdentifier(cursor, options);
 
         default:
-          throw new Error(sprintf('Unsupported guid size %d', dataLength! - 1));
+          throw new Error(sprintf('Unsupported guid size %d', dataLength - 1));
       }
     }
 
     case 'Variant': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = readUInt32LE(cursor);
 
       if (dataLength === 0) {
-        return new Result(null, offset);
+        return null;
       }
 
-      return readVariant(buf, offset, options, dataLength);
+      return readVariant(cursor, options, dataLength);
     }
 
     default: {
@@ -413,146 +561,133 @@ function isPLPStream(metadata: Metadata) {
   }
 }
 
-function readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOptions): Result<string> {
-  let data;
-  ({ value: data, offset } = readBinary(buf, offset, 0x10));
+function readUniqueIdentifier(cursor: Cursor, options: ParserOptions): string {
+  const data = readBinary(cursor, 0x10);
 
-  return new Result(options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data), offset);
+  return options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data);
 }
 
-function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
-  let sign;
-  ({ offset, value: sign } = readUInt8(buf, offset));
-
-  sign = sign === 1 ? 1 : -1;
+function readNumeric(cursor: Cursor, dataLength: number, _precision: number, scale: number): number {
+  const sign = readUInt8(cursor) === 1 ? 1 : -1;
 
   let value;
   if (dataLength === 5) {
-    ({ offset, value } = readUInt32LE(buf, offset));
+    value = readUInt32LE(cursor);
   } else if (dataLength === 9) {
-    ({ offset, value } = readUNumeric64LE(buf, offset));
+    value = readUNumeric64LE(cursor);
   } else if (dataLength === 13) {
-    ({ offset, value } = readUNumeric96LE(buf, offset));
+    value = readUNumeric96LE(cursor);
   } else if (dataLength === 17) {
-    ({ offset, value } = readUNumeric128LE(buf, offset));
+    value = readUNumeric128LE(cursor);
   } else {
     throw new Error(sprintf('Unsupported numeric dataLength %d', dataLength));
   }
 
-  return new Result((value * sign) / Math.pow(10, scale), offset);
+  return (value * sign) / Math.pow(10, scale);
 }
 
-function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLength: number): Result<unknown> {
-  let baseType;
-  ({ value: baseType, offset } = readUInt8(buf, offset));
+function readVariant(cursor: Cursor, options: ParserOptions, dataLength: number): unknown {
+  const baseType = readUInt8(cursor);
 
   const type = TYPE[baseType];
 
-  let propBytes;
-  ({ value: propBytes, offset } = readUInt8(buf, offset));
+  const propBytes = readUInt8(cursor);
 
   dataLength = dataLength - propBytes - 2;
 
   switch (type.name) {
     case 'UniqueIdentifier':
-      return readUniqueIdentifier(buf, offset, options);
+      return readUniqueIdentifier(cursor, options);
 
     case 'Bit':
-      return readBit(buf, offset);
+      return readBit(cursor);
 
     case 'TinyInt':
-      return readTinyInt(buf, offset);
+      return readTinyInt(cursor);
 
     case 'SmallInt':
-      return readSmallInt(buf, offset);
+      return readSmallInt(cursor);
 
     case 'Int':
-      return readInt(buf, offset);
+      return readInt(cursor);
 
     case 'BigInt':
-      return readBigInt(buf, offset);
+      return readBigInt(cursor);
 
     case 'SmallDateTime':
-      return readSmallDateTime(buf, offset, options.useUTC);
+      return readSmallDateTime(cursor, options.useUTC);
 
     case 'DateTime':
-      return readDateTime(buf, offset, options.useUTC);
+      return readDateTime(cursor, options.useUTC);
 
     case 'Real':
-      return readReal(buf, offset);
+      return readReal(cursor);
 
     case 'Float':
-      return readFloat(buf, offset);
+      return readFloat(cursor);
 
     case 'SmallMoney':
-      return readSmallMoney(buf, offset);
+      return readSmallMoney(cursor);
 
     case 'Money':
-      return readMoney(buf, offset);
+      return readMoney(cursor);
 
     case 'Date':
-      return readDate(buf, offset, options.useUTC);
+      return readDate(cursor, options.useUTC);
 
     case 'Time': {
-      let scale;
-      ({ value: scale, offset } = readUInt8(buf, offset));
+      const scale = readUInt8(cursor);
 
-      return readTime(buf, offset, dataLength, scale, options.useUTC);
+      return readTime(cursor, dataLength, scale, options.useUTC);
     }
 
     case 'DateTime2': {
-      let scale;
-      ({ value: scale, offset } = readUInt8(buf, offset));
+      const scale = readUInt8(cursor);
 
-      return readDateTime2(buf, offset, dataLength, scale, options.useUTC);
+      return readDateTime2(cursor, dataLength, scale, options.useUTC);
     }
 
     case 'DateTimeOffset': {
-      let scale;
-      ({ value: scale, offset } = readUInt8(buf, offset));
+      const scale = readUInt8(cursor);
 
-      return readDateTimeOffset(buf, offset, dataLength, scale);
+      return readDateTimeOffset(cursor, dataLength, scale);
     }
 
     case 'VarBinary':
     case 'Binary': {
       // maxLength (unused?)
-      ({ offset } = readUInt16LE(buf, offset));
+      readUInt16LE(cursor);
 
-      return readBinary(buf, offset, dataLength);
+      return readBinary(cursor, dataLength);
     }
 
     case 'NumericN':
     case 'DecimalN': {
-      let precision;
-      ({ value: precision, offset } = readUInt8(buf, offset));
+      const precision = readUInt8(cursor);
+      const scale = readUInt8(cursor);
 
-      let scale;
-      ({ value: scale, offset } = readUInt8(buf, offset));
-
-      return readNumeric(buf, offset, dataLength, precision, scale);
+      return readNumeric(cursor, dataLength, precision, scale);
     }
 
     case 'VarChar':
     case 'Char': {
       // maxLength (unused?)
-      ({ offset } = readUInt16LE(buf, offset));
+      readUInt16LE(cursor);
 
-      let collation;
-      ({ value: collation, offset } = readCollation(buf, offset));
+      const collation = readCollation(cursor);
 
-      return readChars(buf, offset, dataLength, collation.codepage!);
+      return readChars(cursor, dataLength, collation.codepage!);
     }
 
     case 'NVarChar':
     case 'NChar': {
       // maxLength (unused?)
-      ({ offset } = readUInt16LE(buf, offset));
+      readUInt16LE(cursor);
 
       // collation (unused?)
-      ({ offset } = readCollation(buf, offset));
+      readCollation(cursor);
 
-      return readNChars(buf, offset, dataLength);
+      return readNChars(cursor, dataLength);
     }
 
     default:
@@ -560,28 +695,37 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
   }
 }
 
-function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buffer> {
-  if (buf.length < offset + dataLength) {
-    throw new NotEnoughDataError(offset + dataLength);
+function readBinary(cursor: Cursor, dataLength: number): Buffer {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + dataLength) {
+    throw new NotEnoughDataError(position + dataLength);
   }
 
-  return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
+  cursor.position = position + dataLength;
+  return cursor.buffer.slice(position, position + dataLength);
 }
 
-function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
-  if (buf.length < offset + dataLength) {
-    throw new NotEnoughDataError(offset + dataLength);
+function readChars(cursor: Cursor, dataLength: number, codepage: string): string {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + dataLength) {
+    throw new NotEnoughDataError(position + dataLength);
   }
 
-  return new Result(iconv.decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  cursor.position = position + dataLength;
+  return iconv.decode(cursor.buffer.slice(position, position + dataLength), codepage ?? DEFAULT_ENCODING);
 }
 
-function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
-  if (buf.length < offset + dataLength) {
-    throw new NotEnoughDataError(offset + dataLength);
+function readNChars(cursor: Cursor, dataLength: number): string {
+  const position = cursor.position;
+
+  if (cursor.buffer.length < position + dataLength) {
+    throw new NotEnoughDataError(position + dataLength);
   }
 
-  return new Result(buf.toString('ucs2', offset, offset + dataLength), offset + dataLength);
+  cursor.position = position + dataLength;
+  return cursor.buffer.toString('ucs2', position, position + dataLength);
 }
 
 async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
@@ -629,62 +773,50 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
   return chunks;
 }
 
-function readSmallDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
-  let days;
-  ({ offset, value: days } = readUInt16LE(buf, offset));
+function readSmallDateTime(cursor: Cursor, useUTC: boolean): Date {
+  const days = readUInt16LE(cursor);
+  const minutes = readUInt16LE(cursor);
 
-  let minutes;
-  ({ offset, value: minutes } = readUInt16LE(buf, offset));
-
-  let value;
   if (useUTC) {
-    value = new Date(Date.UTC(1900, 0, 1 + days, 0, minutes));
+    return new Date(Date.UTC(1900, 0, 1 + days, 0, minutes));
   } else {
-    value = new Date(1900, 0, 1 + days, 0, minutes);
+    return new Date(1900, 0, 1 + days, 0, minutes);
   }
-
-  return new Result(value, offset);
 }
 
-function readDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
-  let days;
-  ({ offset, value: days } = readInt32LE(buf, offset));
-
-  let threeHundredthsOfSecond;
-  ({ offset, value: threeHundredthsOfSecond } = readInt32LE(buf, offset));
+function readDateTime(cursor: Cursor, useUTC: boolean): Date {
+  const days = readInt32LE(cursor);
+  const threeHundredthsOfSecond = readInt32LE(cursor);
 
   const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
 
-  let value;
   if (useUTC) {
-    value = new Date(Date.UTC(1900, 0, 1 + days, 0, 0, 0, milliseconds));
+    return new Date(Date.UTC(1900, 0, 1 + days, 0, 0, 0, milliseconds));
   } else {
-    value = new Date(1900, 0, 1 + days, 0, 0, 0, milliseconds);
+    return new Date(1900, 0, 1 + days, 0, 0, 0, milliseconds);
   }
-
-  return new Result(value, offset);
 }
 
 interface DateWithNanosecondsDelta extends Date {
   nanosecondsDelta: number;
 }
 
-function readTime(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
+function readTime(cursor: Cursor, dataLength: number, scale: number, useUTC: boolean): DateWithNanosecondsDelta {
   let value;
 
   switch (dataLength) {
     case 3: {
-      ({ value, offset } = readUInt24LE(buf, offset));
+      value = readUInt24LE(cursor);
       break;
     }
 
     case 4: {
-      ({ value, offset } = readUInt32LE(buf, offset));
+      value = readUInt32LE(cursor);
       break;
     }
 
     case 5: {
-      ({ value, offset } = readUInt40LE(buf, offset));
+      value = readUInt40LE(cursor);
       break;
     }
 
@@ -710,26 +842,23 @@ function readTime(buf: Buffer, offset: number, dataLength: number, scale: number
     value: (value % 10000) / Math.pow(10, 7)
   });
 
-  return new Result(date, offset);
+  return date;
 }
 
-function readDate(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
-  let days;
-  ({ offset, value: days } = readUInt24LE(buf, offset));
+function readDate(cursor: Cursor, useUTC: boolean): Date {
+  const days = readUInt24LE(cursor);
 
   if (useUTC) {
-    return new Result(new Date(Date.UTC(2000, 0, days - 730118)), offset);
+    return new Date(Date.UTC(2000, 0, days - 730118));
   } else {
-    return new Result(new Date(2000, 0, days - 730118), offset);
+    return new Date(2000, 0, days - 730118);
   }
 }
 
-function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
-  let time;
-  ({ offset, value: time } = readTime(buf, offset, dataLength - 3, scale, useUTC));
+function readDateTime2(cursor: Cursor, dataLength: number, scale: number, useUTC: boolean): DateWithNanosecondsDelta {
+  const time = readTime(cursor, dataLength - 3, scale, useUTC);
 
-  let days;
-  ({ offset, value: days } = readUInt24LE(buf, offset));
+  const days = readUInt24LE(cursor);
 
   let date;
   if (useUTC) {
@@ -742,25 +871,23 @@ function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: n
     value: time.nanosecondsDelta
   });
 
-  return new Result(date, offset);
+  return date;
 }
 
-function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<DateWithNanosecondsDelta> {
-  let time;
-  ({ offset, value: time } = readTime(buf, offset, dataLength - 5, scale, true));
+function readDateTimeOffset(cursor: Cursor, dataLength: number, scale: number): DateWithNanosecondsDelta {
+  const time = readTime(cursor, dataLength - 5, scale, true);
 
-  let days;
-  ({ offset, value: days } = readUInt24LE(buf, offset));
+  const days = readUInt24LE(cursor);
 
   // time offset?
-  ({ offset } = readUInt16LE(buf, offset));
+  readUInt16LE(cursor);
 
   const date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time)) as DateWithNanosecondsDelta;
   Object.defineProperty(date, 'nanosecondsDelta', {
     enumerable: false,
     value: time.nanosecondsDelta
   });
-  return new Result(date, offset);
+  return date;
 }
 
 module.exports.readValue = readValue;

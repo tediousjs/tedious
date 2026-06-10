@@ -43,9 +43,6 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
 
   let value;
   while (true) {
-    const buf = parser.buffer;
-    let offset = parser.position;
-
     if (isPLPStream(metadata)) {
       const chunks = await readPLPStream(parser);
 
@@ -59,18 +56,19 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
         value = Buffer.concat(chunks);
       }
     } else {
+      const startPosition = parser.position;
+
       try {
-        ({ value, offset } = readValue(buf, offset, metadata, parser.options));
+        value = readValue(parser, metadata, parser.options);
       } catch (err) {
         if (err instanceof NotEnoughDataError) {
+          parser.position = startPosition;
           await parser.waitForChunk();
           continue;
         }
 
         throw err;
       }
-
-      parser.position = offset;
     }
 
     break;

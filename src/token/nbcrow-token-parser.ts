@@ -61,11 +61,14 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
           columns.push({ value: Buffer.concat(chunks), metadata });
         }
       } else {
-        let result;
+        const startPosition = parser.position;
+
+        let value;
         try {
-          result = readValue(parser.buffer, parser.position, metadata, parser.options);
+          value = readValue(parser, metadata, parser.options);
         } catch (err) {
           if (err instanceof NotEnoughDataError) {
+            parser.position = startPosition;
             await parser.waitForChunk();
             continue;
           }
@@ -73,8 +76,7 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
           throw err;
         }
 
-        parser.position = result.offset;
-        columns.push({ value: result.value, metadata });
+        columns.push({ value, metadata });
       }
 
       break;
