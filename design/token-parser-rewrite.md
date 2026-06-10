@@ -166,6 +166,90 @@ version:
   parsing burst, with pause/resume based backpressure, so iterator consumers
   do not pay a promise per row.
 
+### Phase 8 - Streaming consumption APIs ⬜
+
+A tiered consumption API on top of the phase 1-7 machinery. The tiers make
+the cost model visible: each tier is the obvious tool for its job.
+
+**The constraint that shapes the design:** TDS delivers a row's cells
+strictly in column order, inline in the stream - a large PLP value in column
+3 sits physically between columns 2 and 4, and result sets arrive strictly
+one after another. Any API that hands out complete row objects with lazy
+streams inside, or result set handles that stay usable after later data was
+consumed, would have to secretly spool data to keep its promises. Instead,
+the API makes sequential consumption explicit (the JDBC sequential-access /
+ADO.NET `CommandBehavior.SequentialAccess` model, adapted to async
+iterables).
+
+**Tier 1 - row iteration (ergonomic default):**
+
+```js
+for await (const row of request.rows()) { ... }
+```
+
+Implemented on top of the internal batch queue, so the parser never pays a
+promise per row - only the API edge does. Breaking out of the loop cancels
+the request.
+
+**Tier 2 - batch iteration (hot loops, shipped in phase 7):**
+
+```js
+for await (const batch of request.batches()) {
+  for (const row of batch) { /* no promises in here */ }
+}
+```
+
+One promise per parsing burst. `rows()` is a thin generator over this.
+
+**Result sets:** `request.rows()` / `request.batches()` iterate the rows of
+*all* result sets, flattened - the right default for the single-result set
+case. For multi-result set requests, the hierarchy is explicit:
+
+```js
+for await (const resultSet of request.resultSets()) {
+  resultSet.columns; // metadata, available immediately
+  for await (const row of resultSet.rows()) { ... }
+}
+```
+
+Liveness rules mirror the wire order: a result set's rows can only be
+iterated while it is the current one. Advancing the outer iterator discards
+(skips) any unconsumed rows of the previous result set; abandoning an inner
+iterator discards that result set's remaining rows without cancelling the
+request; abandoning the outer iterator cancels the request.
+
+**Tier 3 - sequential rows (PLP / large value streaming):**
+
+```js
+for await (const row of request.sequentialRows()) {
+  const id = await row.value(0);
+  const stream = await row.stream(2); // null for NULL values
+  if (stream) {
+    for await (const chunk of stream) { ... } // Buffer chunks, copies
+  }
+}
+```
+
+- `row.value(i)` parses up to column `i` and returns the materialized value.
+  Non-PLP values are cached; passed-over PLP cells are drained at wire speed
+  without materializing and can no longer be accessed.
+- `row.stream(i)` positions at column `i` and resolves to an async iterable
+  of `Buffer` chunks (or `null` for NULL values). The stream is live only
+  until a later column is accessed or the row loop advances; chunk delivery
+  is bounded by buffered data, so even a single multi-gigabyte PLP chunk
+  streams with flat memory.
+- Advancing the row loop (or breaking out of it) drains anything unconsumed.
+- Consumption *is* parse loop progress: the run loop parses the next token
+  only after the current row was finished, so backpressure falls out of the
+  existing message-queue/socket chain with no extra buffering - the parser
+  and the consumer run in lockstep with a single in-flight row.
+- Sequential mode is per request and bypasses `rowFormat` and the row
+  collection options; rows are accessed positionally through the handle.
+- A decoded-text stream variant for `(n)varchar(max)`/xml (feeding chunks
+  through a per-value stateful decoder) is a planned follow-up; note that the
+  *shared* cached decoders must not be used for this, since a stream holds
+  its decoder across awaits.
+
 ## Non-goals
 
 - No `new Function` code generation for row readers: measured dispatch cost
@@ -209,3 +293,4 @@ Phase 7: `rowFormat: 'values'` vs `'columns'`: offline row parsing +18%
 | 5 - Flatten the packet/message layer | ✅ done |
 | 6 - Value materialization fast paths | ⬜ planned |
 | 7 - Row shape and consumption API | ✅ done (default flip pending major version) |
+| 8 - Streaming consumption APIs | ⬜ in progress |
