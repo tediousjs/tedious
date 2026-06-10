@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import StreamParser, { type ParserOptions } from './stream-parser';
 import Debug from '../debug';
-import Message from '../message';
 import { TokenHandler } from './handler';
 
 /**
@@ -20,7 +19,7 @@ export class Parser extends EventEmitter {
   declare paused: boolean;
   declare resumeCallback: (() => void) | null;
 
-  constructor(message: Message, debug: Debug, handler: TokenHandler, options: ParserOptions) {
+  constructor(message: AsyncIterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions) {
     super();
 
     this.debug = debug;

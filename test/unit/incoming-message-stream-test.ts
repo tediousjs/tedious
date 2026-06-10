@@ -1,194 +1,114 @@
-import BufferList from 'bl';
 import { assert } from 'chai';
-import IncomingMessageStream from '../../src/incoming-message-stream';
-import Message from '../../src/message';
+import IncomingMessageStream, { IncomingMessage } from '../../src/incoming-message-stream';
 import Debug from '../../src/debug';
 import { ConnectionError } from '../../src/errors';
 
+function buildPacket(data: Buffer, { type = 0x11, last = false } = {}) {
+  const header = Buffer.alloc(8);
+
+  let offset = 0;
+  offset = header.writeUInt8(type, offset);
+  offset = header.writeUInt8(last ? 0x01 : 0x00, offset);
+  offset = header.writeUInt16BE(8 + data.length, offset);
+  offset = header.writeUInt16BE(0x0000, offset);
+  offset = header.writeUInt8(1, offset);
+  header.writeUInt8(0x00, offset);
+
+  return Buffer.concat([header, data]);
+}
+
+async function readAll(message: IncomingMessage): Promise<Buffer> {
+  const chunks = [];
+  for await (const chunk of message) {
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 describe('IncomingMessageStream', function() {
-  it('extract messages from packet data', function(done) {
+  it('extracts a message and its payload from packet data', async function() {
     const packetData = Buffer.from('test1234');
-    const packetHeader = Buffer.alloc(8);
-
-    let offset = 0;
-    offset = packetHeader.writeUInt8(0x11, offset);
-    offset = packetHeader.writeUInt8(0x01, offset);
-    offset = packetHeader.writeUInt16BE(8 + packetData.length, offset);
-    offset = packetHeader.writeUInt16BE(0x0000, offset);
-    offset = packetHeader.writeUInt8(1, offset);
-    packetHeader.writeUInt8(0x00, offset);
-
-    const packet = Buffer.concat([packetHeader, packetData]);
 
     const incoming = new IncomingMessageStream(new Debug());
+    incoming.end(buildPacket(packetData, { last: true }));
 
-    incoming.on('data', function(message) {
-      assert.instanceOf(message, Message);
+    const messages: IncomingMessage[] = [];
+    for await (const message of incoming) {
+      assert.instanceOf(message, IncomingMessage);
       assert.strictEqual(message.type, 0x11);
-      assert.strictEqual(message.resetConnection, false);
 
-      const result = new BufferList(function(err, res) {
-        if (err) {
-          return done(err);
-        }
+      assert.deepEqual(await readAll(message), packetData);
 
-        assert.deepEqual(res, packetData);
+      messages.push(message);
+    }
 
-        done();
-      });
-
-      message.pipe(result);
-    });
-
-    incoming.end(packet);
+    assert.lengthOf(messages, 1);
   });
 
-  it('streams packet data into the message as packets come in', function(done) {
+  it('streams packet data into the message as packets come in', async function() {
     const packetData = Buffer.from('test1234');
-    const packetHeader = Buffer.alloc(8);
-
-    let offset = 0;
-    offset = packetHeader.writeUInt8(0x11, offset);
-    offset = packetHeader.writeUInt8(0x00, offset);
-    offset = packetHeader.writeUInt16BE(8 + packetData.length, offset);
-    offset = packetHeader.writeUInt16BE(0x0000, offset);
-    offset = packetHeader.writeUInt8(1, offset);
-    packetHeader.writeUInt8(0x00, offset);
-
-    const firstPacket = Buffer.concat([packetHeader, packetData]);
-
-    offset = 0;
-    offset = packetHeader.writeUInt8(0x11, offset);
-    offset = packetHeader.writeUInt8(0x01, offset);
-    offset = packetHeader.writeUInt16BE(8 + packetData.length, offset);
-    offset = packetHeader.writeUInt16BE(0x0000, offset);
-    offset = packetHeader.writeUInt8(1, offset);
-    packetHeader.writeUInt8(0x00, offset);
-
-    const secondPacket = Buffer.concat([packetHeader, packetData]);
 
     const incoming = new IncomingMessageStream(new Debug());
 
-    const result = new BufferList(function(err, res) {
-      if (err) {
-        return done(err);
-      }
+    incoming.write(buildPacket(packetData));
 
-      assert.deepEqual(res, Buffer.concat([packetData, packetData]));
-
-      done();
+    const message = await new Promise<IncomingMessage>((resolve) => {
+      incoming.once('data', resolve);
     });
+    const iterator = message[Symbol.asyncIterator]();
 
-    let messageEnded = false;
-    incoming.on('data', function(message) {
-      assert.instanceOf(message, Message);
+    // The first packet's data is available before the last packet arrived.
+    assert.deepEqual((await iterator.next()).value, packetData);
 
-      message.on('end', function() {
-        messageEnded = true;
-      });
+    incoming.end(buildPacket(packetData, { last: true }));
 
-      message.pipe(result);
-    });
-
-    incoming.write(firstPacket, function() {
-      const writtenData = result.slice();
-
-      assert.strictEqual(writtenData.length, 8);
-      assert.deepEqual(writtenData, packetData);
-
-      incoming.write(secondPacket, function() {
-        const writtenData = result.slice();
-
-        assert.strictEqual(writtenData.length, 16);
-        assert.deepEqual(writtenData, Buffer.concat([packetData, packetData]));
-
-        assert.strictEqual(messageEnded, true);
-      });
-    });
+    assert.deepEqual((await iterator.next()).value, packetData);
+    assert.isTrue((await iterator.next()).done);
   });
 
-  it('correctly handles the last packet coming in after the stream was paused', function(done) {
+  it('handles packets split across multiple writes, including inside the header', async function() {
     const packetData = Buffer.from('test1234');
-    const packetHeader = Buffer.alloc(8);
-
-    let offset = 0;
-    offset = packetHeader.writeUInt8(0x11, offset);
-    offset = packetHeader.writeUInt8(0x00, offset);
-    offset = packetHeader.writeUInt16BE(8 + packetData.length, offset);
-    offset = packetHeader.writeUInt16BE(0x0000, offset);
-    offset = packetHeader.writeUInt8(1, offset);
-    packetHeader.writeUInt8(0x00, offset);
-
-    const firstPacket = Buffer.concat([packetHeader, packetData]);
-
-    offset = 0;
-    offset = packetHeader.writeUInt8(0x11, offset);
-    offset = packetHeader.writeUInt8(0x01, offset);
-    offset = packetHeader.writeUInt16BE(8 + packetData.length, offset);
-    offset = packetHeader.writeUInt16BE(0x0000, offset);
-    offset = packetHeader.writeUInt8(1, offset);
-    packetHeader.writeUInt8(0x00, offset);
-
-    const secondPacket = Buffer.concat([packetHeader, packetData]);
+    const packet = buildPacket(packetData, { last: true });
 
     const incoming = new IncomingMessageStream(new Debug());
 
-    const result = new BufferList(function(err, res) {
-      if (err) {
-        return done(err);
-      }
+    for (let i = 0; i < packet.length; i += 3) {
+      incoming.write(packet.slice(i, i + 3));
+    }
+    incoming.end();
 
-      assert.deepEqual(res, Buffer.concat([packetData, packetData]));
+    for await (const message of incoming) {
+      assert.deepEqual(await readAll(message), packetData);
+    }
+  });
 
-      done();
-    });
+  it('handles multiple messages, waiting for one to be consumed before continuing with the next', async function() {
+    const firstData = Buffer.from('first123');
+    const secondData = Buffer.from('second12');
 
-    let messageEnded = false;
-    incoming.on('data', function(message) {
-      assert.instanceOf(message, Message);
+    const incoming = new IncomingMessageStream(new Debug());
 
-      message.on('end', function() {
-        messageEnded = true;
-      });
+    // Both messages arrive in a single chunk.
+    incoming.end(Buffer.concat([
+      buildPacket(firstData, { last: true }),
+      buildPacket(secondData, { type: 0x12, last: true })
+    ]));
 
-      message.pipe(result);
-    });
+    const received = [];
+    for await (const message of incoming) {
+      received.push({ type: message.type, data: await readAll(message) });
+    }
 
-    incoming.write(firstPacket, function() {
-      const writtenData = result.slice();
-
-      assert.strictEqual(writtenData.length, 8);
-      assert.deepEqual(writtenData, packetData);
-
-      incoming.pause();
-
-      incoming.write(secondPacket, function() {
-        const writtenData = result.slice();
-
-        assert.strictEqual(writtenData.length, 16);
-        assert.deepEqual(writtenData, Buffer.concat([packetData, packetData]));
-
-        assert.strictEqual(messageEnded, true);
-      });
-
-      assert.isFalse(messageEnded);
-      incoming.resume();
-    });
+    assert.deepEqual(received, [
+      { type: 0x11, data: firstData },
+      { type: 0x12, data: secondData }
+    ]);
   });
 
   it('should validate packet header size', function(done) {
     const packetData = Buffer.from('test1234');
-    const packetHeader = Buffer.alloc(8);
-
-    let offset = 0;
-    offset = packetHeader.writeUInt8(0x11, offset);
-    offset = packetHeader.writeUInt8(0x01, offset);
-    offset = packetHeader.writeUInt16BE(5, offset);
-    offset = packetHeader.writeUInt16BE(0x0000, offset);
-    offset = packetHeader.writeUInt8(1, offset);
-    packetHeader.writeUInt8(0x00, offset);
-
-    const packet = Buffer.concat([packetHeader, packetData]);
+    const packet = buildPacket(packetData, { last: true });
+    packet.writeUInt16BE(5, 2); // invalid packet length
 
     const incoming = new IncomingMessageStream(new Debug());
 
@@ -198,6 +118,7 @@ describe('IncomingMessageStream', function() {
       done();
     });
 
+    incoming.on('data', () => {});
     incoming.end(packet);
   });
 });
