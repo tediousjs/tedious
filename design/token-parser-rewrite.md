@@ -111,7 +111,7 @@ socket ──→ packet reassembly ──→ byte cursor ──→ token parser 
 - The sync and async row parsers consume the compiled readers; `readValue`
   remains as the uncompiled path for RETURNVALUE tokens.
 
-### Phase 4 - Contiguous reusable read buffer ⬜
+### Phase 4 - Contiguous reusable read buffer
 
 Replace the `waitForChunk` re-concatenation (O(n²) for values spanning many
 chunks) and the `bl` + slice copies with a single growable, reusable buffer:
@@ -182,6 +182,10 @@ Interleaved A/B medians against `master`, measured on this branch:
   1000 rows x 3 columns (incl. nvarchar(max)): ~+37%
   1000 rows x 4 varchar columns: ~+44%
 
+Phase 4: row parsing throughput unchanged; parsing a 64MB PLP value is
+~20% faster at the median with a much tighter tail (max 428ms vs 953ms),
+since the per-refill allocation churn (and its GC spikes) is gone.
+
 ## Status
 
 | Phase | Status |
@@ -190,7 +194,7 @@ Interleaved A/B medians against `master`, measured on this branch:
 | 1 - Sync-first parsing, direct dispatch | ✅ done |
 | 2 - Cached encoding decoders | ✅ done |
 | 3 - Compiled per-column readers | ✅ done |
-| 4 - Contiguous reusable read buffer | ⬜ planned |
+| 4 - Contiguous reusable read buffer | ✅ done |
 | 5 - Flatten the packet/message layer | ⬜ planned |
 | 6 - Value materialization fast paths | ⬜ planned |
 | 7 - Row shape and consumption API | ⬜ planned (major version) |
