@@ -129,7 +129,7 @@ chunks) and the `bl` + slice copies with a single growable, reusable buffer:
   (`write()` per chunk, `end()` at the value boundary) instead of
   `Buffer.concat`-ing the whole value, so large values never exist twice.
 
-### Phase 5 - Flatten the packet/message layer ⬜
+### Phase 5 - Flatten the packet/message layer
 
 - Parse the 8-byte packet headers directly where data enters (replacing
   `IncomingMessageStream` + per-message `Message` PassThrough + `Packet`
@@ -186,6 +186,9 @@ Phase 4: row parsing throughput unchanged; parsing a 64MB PLP value is
 ~20% faster at the median with a much tighter tail (max 428ms vs 953ms),
 since the per-refill allocation churn (and its GC spikes) is gone.
 
+Phase 5: end-to-end row workloads unchanged; bulk transfer throughput
+(repeated 6MB nvarchar(max) values) improves by ~10-20%.
+
 ## Status
 
 | Phase | Status |
@@ -195,6 +198,6 @@ since the per-refill allocation churn (and its GC spikes) is gone.
 | 2 - Cached encoding decoders | ✅ done |
 | 3 - Compiled per-column readers | ✅ done |
 | 4 - Contiguous reusable read buffer | ✅ done |
-| 5 - Flatten the packet/message layer | ⬜ planned |
+| 5 - Flatten the packet/message layer | ✅ done |
 | 6 - Value materialization fast paths | ⬜ planned |
 | 7 - Row shape and consumption API | ⬜ planned (major version) |
