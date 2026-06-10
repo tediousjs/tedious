@@ -4,7 +4,7 @@ import Parser from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { RowToken } from './token';
-import * as iconv from 'iconv-lite';
+import { decode } from '../iconv-helpers';
 
 import { isPLPStream, readPLPStream, readValue } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
@@ -27,7 +27,7 @@ async function rowParser(parser: Parser): Promise<RowToken> {
         } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
           columns.push({ value: Buffer.concat(chunks).toString('ucs2'), metadata });
         } else if (metadata.type.name === 'VarChar') {
-          columns.push({ value: iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
+          columns.push({ value: decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
         } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
           columns.push({ value: Buffer.concat(chunks), metadata });
         }
