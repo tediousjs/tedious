@@ -30,6 +30,7 @@ import {
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
+import { SequentialRow } from '../sequential-row';
 
 export class UnexpectedTokenError extends Error {
   constructor(handler: TokenHandler, token: Token) {
@@ -463,17 +464,29 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onRow(row: unknown) {
-    if (!this.request.canceled) {
+    if (this.request.canceled) {
+      // In sequential row mode, the parse loop waits for the row to be
+      // consumed - drain it.
+      if (row instanceof SequentialRow) {
+        row.finish().catch(() => {
+          // Errors during the drain surface through the parse loop.
+        });
+      }
+
+      return;
+    }
+
+    if (!(row instanceof SequentialRow)) {
       if (this.connection.config.options.rowCollectionOnRequestCompletion) {
-        this.request.rows!.push(row);
+        this.request.collectedRows!.push(row);
       }
 
       if (this.connection.config.options.rowCollectionOnDone) {
         this.request.rst!.push(row);
       }
-
-      this.request.emit('row', row);
     }
+
+    this.request.emit('row', row);
   }
 
   onReturnStatus(token: ReturnStatusToken) {

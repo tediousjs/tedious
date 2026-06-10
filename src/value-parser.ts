@@ -1103,6 +1103,146 @@ function readPLPStreamSync(buf: Buffer, offset: number): Result<null | Buffer[]>
   return new Result(chunks, offset);
 }
 
+/**
+ * Incremental reader for a single PLP value, used for streaming consumption.
+ *
+ * After `start()`, the value's bytes are read piece by piece via `next()` -
+ * pieces are bounded by the currently buffered data, so even a single
+ * multi-gigabyte PLP chunk is streamed with flat memory. `drain()` skips the
+ * rest of the value without materializing it.
+ */
+class PLPStreamReader {
+  declare parser: Parser;
+
+  declare expectedLength: bigint;
+  declare currentLength: number;
+  declare remainingInChunk: number;
+  declare finished: boolean;
+
+  constructor(parser: Parser) {
+    this.parser = parser;
+
+    this.expectedLength = UNKNOWN_PLP_LEN;
+    this.currentLength = 0;
+    this.remainingInChunk = 0;
+    this.finished = false;
+  }
+
+  /**
+   * Reads the PLP header. Returns `false` when the value is NULL - the
+   * value is fully consumed in that case.
+   */
+  async start(): Promise<boolean> {
+    const parser = this.parser;
+
+    while (parser.buffer.length < parser.position + 8) {
+      await parser.waitForChunk();
+    }
+
+    const expectedLength = parser.buffer.readBigUInt64LE(parser.position);
+    parser.position += 8;
+
+    if (expectedLength === PLP_NULL) {
+      this.finished = true;
+      return false;
+    }
+
+    this.expectedLength = expectedLength;
+    return true;
+  }
+
+  /**
+   * Returns the next piece of the value (a copy, safe to retain), or `null`
+   * once the value is complete.
+   */
+  async next(): Promise<Buffer | null> {
+    const parser = this.parser;
+
+    while (true) {
+      if (this.finished) {
+        return null;
+      }
+
+      if (this.remainingInChunk === 0) {
+        if (!(await this.#startChunk())) {
+          return null;
+        }
+      }
+
+      if (parser.position === parser.buffer.length) {
+        await parser.waitForChunk();
+      }
+
+      const available = parser.buffer.length - parser.position;
+      if (available === 0) {
+        continue;
+      }
+
+      const size = Math.min(available, this.remainingInChunk);
+      const piece = Buffer.from(parser.buffer.subarray(parser.position, parser.position + size));
+      parser.position += size;
+      this.remainingInChunk -= size;
+      this.currentLength += size;
+
+      return piece;
+    }
+  }
+
+  /**
+   * Skips the rest of the value without materializing it.
+   */
+  async drain(): Promise<void> {
+    const parser = this.parser;
+
+    while (!this.finished) {
+      if (this.remainingInChunk === 0) {
+        if (!(await this.#startChunk())) {
+          return;
+        }
+      }
+
+      const available = parser.buffer.length - parser.position;
+      if (available === 0) {
+        await parser.waitForChunk();
+        continue;
+      }
+
+      const size = Math.min(available, this.remainingInChunk);
+      parser.position += size;
+      this.remainingInChunk -= size;
+      this.currentLength += size;
+    }
+  }
+
+  /**
+   * Reads the next PLP chunk header. Returns `false` when the value's
+   * terminator was reached.
+   */
+  async #startChunk(): Promise<boolean> {
+    const parser = this.parser;
+
+    while (parser.buffer.length < parser.position + 4) {
+      await parser.waitForChunk();
+    }
+
+    const chunkLength = parser.buffer.readUInt32LE(parser.position);
+    parser.position += 4;
+
+    if (chunkLength === 0) {
+      this.finished = true;
+
+      if (this.expectedLength !== UNKNOWN_PLP_LEN && this.currentLength !== Number(this.expectedLength)) {
+        throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + this.expectedLength + ', but got ' + this.currentLength + ' bytes');
+      }
+
+      return false;
+    }
+
+    this.remainingInChunk = chunkLength;
+    return true;
+  }
+}
+
 async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
   while (parser.buffer.length < parser.position + 8) {
     await parser.waitForChunk();
@@ -1290,5 +1430,6 @@ module.exports.readPLPStream = readPLPStream;
 module.exports.readPLPStreamSync = readPLPStreamSync;
 module.exports.buildValueReader = buildValueReader;
 module.exports.buildPLPDecoder = buildPLPDecoder;
+module.exports.PLPStreamReader = PLPStreamReader;
 
-export { readValue, isPLPStream, readPLPStream, readPLPStreamSync, buildValueReader, buildPLPDecoder };
+export { readValue, isPLPStream, readPLPStream, readPLPStreamSync, buildValueReader, buildPLPDecoder, PLPStreamReader };

@@ -4,6 +4,7 @@ import Debug from '../debug';
 import { TYPE } from './token';
 import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
+import { SequentialRow } from '../sequential-row';
 import { TokenHandler } from './handler';
 
 /**
@@ -21,8 +22,9 @@ export class Parser extends EventEmitter {
 
   declare paused: boolean;
   declare resumeCallback: (() => void) | null;
+  declare streamRows: boolean;
 
-  constructor(message: AsyncIterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions) {
+  constructor(message: AsyncIterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions, { streamRows = false }: { streamRows?: boolean } = {}) {
     super();
 
     this.debug = debug;
@@ -31,6 +33,7 @@ export class Parser extends EventEmitter {
 
     this.paused = false;
     this.resumeCallback = null;
+    this.streamRows = streamRows;
 
     this.parser = new StreamParser(message, debug, options);
 
@@ -63,6 +66,15 @@ export class Parser extends EventEmitter {
         // Rows are parsed and dispatched directly, without allocating a
         // token object per row.
         if (type === TYPE.ROW || type === TYPE.NBCROW) {
+          if (this.streamRows) {
+            // Sequential row mode: the consumer drives the parsing of the
+            // row's cells; only continue once the row was fully consumed.
+            const row = await SequentialRow.create(parser, type === TYPE.NBCROW);
+            handler.onRow(row);
+            await row.completion;
+            continue;
+          }
+
           let row = type === TYPE.ROW ? rowParser(parser) : nbcRowParser(parser);
           if (row instanceof Promise) {
             row = await row;

@@ -3,6 +3,7 @@ import { type Parameter, type DataType } from './data-type';
 import { RequestError } from './errors';
 
 import Connection from './connection';
+import { SequentialRow } from './sequential-row';
 import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
@@ -44,6 +45,170 @@ interface RequestOptions {
 }
 
 /**
+ * A single result set of a request, exposing the result set's column
+ * metadata and an async iterable over its rows.
+ *
+ * Only consumable while it is the current result set - see
+ * [[Request.resultSets]] for the liveness rules.
+ */
+class ResultSet {
+  /**
+   * The result set's column metadata, in the same shape as the
+   * `columnMetadata` event's payload.
+   */
+  declare readonly columns: any;
+
+  declare private request: Request;
+  declare private queue: unknown[][];
+  declare private currentBatch: unknown[];
+  declare private flushScheduled: boolean;
+  declare private ended: boolean;
+  declare private discarded: boolean;
+  declare private pausedByThis: boolean;
+  declare private wakeup: (() => void) | undefined;
+
+  /**
+   * @private
+   */
+  constructor(request: Request, columns: any) {
+    this.request = request;
+    this.columns = columns;
+
+    this.queue = [];
+    this.currentBatch = [];
+    this.flushScheduled = false;
+    this.ended = false;
+    this.discarded = false;
+    this.pausedByThis = false;
+    this.wakeup = undefined;
+  }
+
+  /**
+   * @private
+   */
+  push(row: unknown) {
+    if (this.discarded) {
+      return;
+    }
+
+    if (!this.flushScheduled) {
+      this.flushScheduled = true;
+      queueMicrotask(() => {
+        this.flush();
+      });
+    }
+
+    this.currentBatch.push(row);
+  }
+
+  /**
+   * @private
+   */
+  end() {
+    this.ended = true;
+    this.flush();
+  }
+
+  /**
+   * Stops delivering rows for this result set - any buffered and future
+   * rows are dropped.
+   *
+   * @private
+   */
+  discard() {
+    this.discarded = true;
+    this.queue = [];
+    this.currentBatch = [];
+
+    if (this.pausedByThis) {
+      this.pausedByThis = false;
+      this.request.resume();
+    }
+
+    this.wake();
+  }
+
+  private flush() {
+    this.flushScheduled = false;
+
+    if (this.currentBatch.length > 0 && !this.discarded) {
+      this.queue.push(this.currentBatch);
+      this.currentBatch = [];
+
+      if (this.queue.length > 1 && !this.pausedByThis) {
+        this.pausedByThis = true;
+        this.request.pause();
+      }
+    }
+
+    this.wake();
+  }
+
+  private wake() {
+    const resolve = this.wakeup;
+    if (resolve !== undefined) {
+      this.wakeup = undefined;
+      resolve();
+    }
+  }
+
+  /**
+   * Returns an async iterable over the result set's rows, yielding batches
+   * (arrays) of rows - one per parsing burst, like [[Request.batches]].
+   */
+  batches(): AsyncIterableIterator<unknown[]> {
+    const iterator: AsyncIterableIterator<unknown[]> = {
+      [Symbol.asyncIterator]() {
+        return iterator;
+      },
+
+      next: async (): Promise<IteratorResult<unknown[], undefined>> => {
+        while (true) {
+          if (this.queue.length > 0) {
+            const batch = this.queue.shift()!;
+
+            if (this.pausedByThis && this.queue.length <= 1) {
+              this.pausedByThis = false;
+              this.request.resume();
+            }
+
+            return { value: batch, done: false };
+          }
+
+          if (this.ended || this.discarded) {
+            return { value: undefined, done: true };
+          }
+
+          await new Promise<void>((resolve) => {
+            this.wakeup = resolve;
+          });
+        }
+      },
+
+      return: async (): Promise<IteratorResult<unknown[], undefined>> => {
+        this.discard();
+        return { value: undefined, done: true };
+      }
+    };
+
+    return iterator;
+  }
+
+  /**
+   * Returns an async iterable over the result set's rows.
+   */
+  rows(): AsyncIterableIterator<unknown> {
+    const batches = this.batches();
+
+    return (async function*() {
+      for await (const batch of batches) {
+        yield* batch;
+      }
+    })();
+  }
+}
+
+/**
  * ```js
  * const { Request } = require('tedious');
  * const request = new Request("select 42, 'hello world'", (err, rowCount) {
@@ -77,6 +242,11 @@ class Request extends EventEmitter {
    * @private
    */
   declare paused: boolean;
+
+  /**
+   * @private
+   */
+  declare sequentialRowMode: boolean;
   /**
    * @private
    */
@@ -101,7 +271,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare rows?: Array<any>;
+  declare collectedRows?: Array<any>;
   /**
    * @private
    */
@@ -361,6 +531,7 @@ class Request extends EventEmitter {
     this.handle = undefined;
     this.canceled = false;
     this.paused = false;
+    this.sequentialRowMode = false;
     this.error = undefined;
     this.connection = undefined;
     this.timeout = undefined;
@@ -589,6 +760,261 @@ class Request extends EventEmitter {
             wakeup = resolve;
           });
         }
+      },
+
+      return: async (): Promise<IteratorResult<unknown[], undefined>> => {
+        // Abandoning the iteration cancels the request.
+        this.removeListener('row', onRow);
+
+        if (pausedByIterator) {
+          pausedByIterator = false;
+          this.resume();
+        }
+
+        if (!finished) {
+          this.cancel();
+        }
+
+        return { value: undefined, done: true };
+      }
+    };
+  }
+
+  /**
+   * Returns an async iterable over the rows of this request, across all of
+   * its result sets.
+   *
+   * A thin convenience layer over [[batches]] - rows are still gathered in
+   * batches internally, only the iteration is per row. Use [[resultSets]]
+   * when the result set structure matters, and [[batches]] for the lowest
+   * iteration overhead.
+   *
+   * Must be called before the request is executed (or at least within the
+   * same tick). Breaking out of the iteration cancels the request. When the
+   * request fails, the error is also thrown to the consumer.
+   */
+  rows(): AsyncIterableIterator<unknown> {
+    // Subscribe eagerly - a generator would only start listening for rows
+    // once the iteration starts.
+    const batches = this.batches();
+
+    return (async function*() {
+      for await (const batch of batches) {
+        yield* batch;
+      }
+    })();
+  }
+
+  /**
+   * Returns an async iterable over the result sets of this request, in the
+   * order they arrive. Each result set exposes its column metadata and an
+   * async iterable over its rows.
+   *
+   * Result sets arrive strictly in order: a result set's rows can only be
+   * consumed while it is the current one. Advancing this iterator discards
+   * any unconsumed rows of the previous result set; abandoning a result
+   * set's row iterator discards its remaining rows without cancelling the
+   * request; abandoning this iterator cancels the request.
+   *
+   * Must be called before the request is executed (or at least within the
+   * same tick). When the request fails, the error is also thrown to the
+   * consumer.
+   */
+  resultSets(): AsyncIterableIterator<ResultSet> {
+    const pending: ResultSet[] = [];
+    let currentSet: ResultSet | undefined;
+    let activeSet: ResultSet | undefined;
+    let finished = false;
+    let wakeup: (() => void) | undefined;
+
+    const wake = () => {
+      const resolve = wakeup;
+      if (resolve !== undefined) {
+        wakeup = undefined;
+        resolve();
+      }
+    };
+
+    const onColumnMetadata = (columns: unknown) => {
+      if (currentSet !== undefined) {
+        currentSet.end();
+      }
+
+      currentSet = new ResultSet(this, columns);
+      pending.push(currentSet);
+      wake();
+    };
+
+    const onRow = (row: unknown) => {
+      currentSet!.push(row);
+    };
+
+    const onCompleted = () => {
+      this.removeListener('columnMetadata', onColumnMetadata);
+      this.removeListener('row', onRow);
+
+      if (currentSet !== undefined) {
+        currentSet.end();
+      }
+
+      finished = true;
+      wake();
+    };
+
+    this.on('columnMetadata', onColumnMetadata);
+    this.on('row', onRow);
+    this.once('requestCompleted', onCompleted);
+
+    return {
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+
+      next: async (): Promise<IteratorResult<ResultSet, undefined>> => {
+        // Advancing discards whatever is left of the previous result set.
+        if (activeSet !== undefined) {
+          activeSet.discard();
+          activeSet = undefined;
+        }
+
+        while (true) {
+          if (pending.length > 0) {
+            activeSet = pending.shift()!;
+            return { value: activeSet, done: false };
+          }
+
+          if (finished) {
+            if (this.error) {
+              throw this.error;
+            }
+
+            return { value: undefined, done: true };
+          }
+
+          await new Promise<void>((resolve) => {
+            wakeup = resolve;
+          });
+        }
+      },
+
+      return: async (): Promise<IteratorResult<ResultSet, undefined>> => {
+        if (activeSet !== undefined) {
+          activeSet.discard();
+          activeSet = undefined;
+        }
+
+        this.removeListener('columnMetadata', onColumnMetadata);
+        this.removeListener('row', onRow);
+
+        if (!finished) {
+          this.cancel();
+        }
+
+        return { value: undefined, done: true };
+      }
+    };
+  }
+
+  /**
+   * Returns an async iterable over the rows of this request, consumed
+   * sequentially - large (`(max)` typed, xml and UDT) values can be read as
+   * streams of chunks through the [[SequentialRow]] handles instead of
+   * being materialized.
+   *
+   * In this mode, the parser and the consumer run in lockstep with a single
+   * in-flight row: the next row is only parsed once the current one was
+   * consumed (advancing the iteration drains whatever was left of the
+   * current row). The `rowFormat` and row collection options do not apply.
+   *
+   * Must be called before the request is executed. Breaking out of the
+   * iteration cancels the request. When the request fails, the error is
+   * also thrown to the consumer.
+   */
+  sequentialRows(): AsyncIterableIterator<SequentialRow> {
+    this.sequentialRowMode = true;
+
+    let pendingRow: SequentialRow | undefined;
+    let currentRow: SequentialRow | undefined;
+    let finished = false;
+    let wakeup: (() => void) | undefined;
+
+    const wake = () => {
+      const resolve = wakeup;
+      if (resolve !== undefined) {
+        wakeup = undefined;
+        resolve();
+      }
+    };
+
+    const onRow = (row: unknown) => {
+      pendingRow = row as SequentialRow;
+      wake();
+    };
+
+    const onCompleted = () => {
+      this.removeListener('row', onRow);
+
+      finished = true;
+      wake();
+    };
+
+    this.on('row', onRow);
+    this.once('requestCompleted', onCompleted);
+
+    return {
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+
+      next: async (): Promise<IteratorResult<SequentialRow, undefined>> => {
+        // Let the parser continue past the current row.
+        if (currentRow !== undefined) {
+          const row = currentRow;
+          currentRow = undefined;
+          await row.finish();
+        }
+
+        while (true) {
+          if (pendingRow !== undefined) {
+            currentRow = pendingRow;
+            pendingRow = undefined;
+            return { value: currentRow, done: false };
+          }
+
+          if (finished) {
+            if (this.error) {
+              throw this.error;
+            }
+
+            return { value: undefined, done: true };
+          }
+
+          await new Promise<void>((resolve) => {
+            wakeup = resolve;
+          });
+        }
+      },
+
+      return: async (): Promise<IteratorResult<SequentialRow, undefined>> => {
+        if (currentRow !== undefined) {
+          const row = currentRow;
+          currentRow = undefined;
+          await row.finish();
+        }
+
+        if (pendingRow !== undefined) {
+          const row = pendingRow;
+          pendingRow = undefined;
+          await row.finish();
+        }
+
+        this.removeListener('row', onRow);
+
+        if (!finished) {
+          this.cancel();
+        }
+
+        return { value: undefined, done: true };
       }
     };
   }
@@ -619,4 +1045,5 @@ class Request extends EventEmitter {
 }
 
 export default Request;
+export { ResultSet };
 module.exports = Request;

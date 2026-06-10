@@ -2199,8 +2199,8 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: AsyncIterable<Buffer>, handler: TokenHandler) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options);
+  createTokenStreamParser(message: AsyncIterable<Buffer>, handler: TokenHandler, streamRows = false) {
+    return new TokenStreamParser(message, this.debug, handler, this.config.options, { streamRows });
   }
 
   async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -3206,7 +3206,7 @@ class Connection extends EventEmitter {
       this.request = request;
       request.connection! = this;
       request.rowCount! = 0;
-      request.rows! = [];
+      request.collectedRows! = [];
       request.rst! = [];
 
       const onCancel = () => {
@@ -3748,7 +3748,7 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!), this.request instanceof Request && this.request.sequentialRowMode);
 
         // If the request was canceled and we have a `cancelTimer`
         // defined, we send a attention message after the
@@ -3807,7 +3807,7 @@ Connection.prototype.STATE = {
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
             this.inTransaction = false;
           }
-          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.collectedRows);
         };
 
         tokenStreamParser.once('end', onEndOfMessage);
