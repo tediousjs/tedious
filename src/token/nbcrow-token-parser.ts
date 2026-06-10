@@ -6,7 +6,7 @@ import { type ColumnMetadata } from './colmetadata-token-parser';
 import { NBCRowToken } from './token';
 import * as iconv from 'iconv-lite';
 
-import { isPLPStream, readPLPStream, readValue } from '../value-parser';
+import { isPLPStream, readPLPStream, readPLPStreamSync, readValue } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
 
 interface Column {
@@ -14,7 +14,84 @@ interface Column {
   metadata: ColumnMetadata;
 }
 
-async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
+function decodePLPColumn(metadata: ColumnMetadata, chunks: null | Buffer[]): unknown {
+  if (chunks === null) {
+    return null;
+  } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
+    return Buffer.concat(chunks).toString('ucs2');
+  } else if (metadata.type.name === 'VarChar') {
+    return iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
+  } else {
+    // 'VarBinary' / 'UDT'
+    return Buffer.concat(chunks);
+  }
+}
+
+function buildNbcRowToken(parser: Parser, columns: Column[]): NBCRowToken {
+  if (parser.options.useColumnNames) {
+    const columnsMap: { [key: string]: Column } = Object.create(null);
+
+    columns.forEach((column) => {
+      const colName = column.metadata.colName;
+      if (columnsMap[colName] == null) {
+        columnsMap[colName] = column;
+      }
+    });
+
+    return new NBCRowToken(columnsMap);
+  } else {
+    return new NBCRowToken(columns);
+  }
+}
+
+/**
+ * Parses a complete row from the already buffered data, without ever
+ * suspending. Throws a `NotEnoughDataError` if the row is not fully buffered
+ * yet - the parser position is only updated after the row was fully parsed.
+ */
+function parseNbcRowSync(parser: Parser): NBCRowToken {
+  const colMetadata = parser.colMetadata;
+  const length = colMetadata.length;
+  const columns: Column[] = [];
+
+  const buf = parser.buffer;
+  let offset = parser.position;
+
+  const bitmapByteLength = Math.ceil(length / 8);
+  if (buf.length < offset + bitmapByteLength) {
+    throw new NotEnoughDataError(offset + bitmapByteLength);
+  }
+
+  const bitmapStart = offset;
+  offset += bitmapByteLength;
+
+  for (let i = 0; i < length; i++) {
+    const metadata = colMetadata[i];
+
+    if ((buf[bitmapStart + (i >>> 3)] >>> (i & 0b111)) & 0b1) {
+      columns.push({ value: null, metadata });
+      continue;
+    }
+
+    if (isPLPStream(metadata)) {
+      let chunks;
+      ({ value: chunks, offset } = readPLPStreamSync(buf, offset));
+
+      columns.push({ value: decodePLPColumn(metadata, chunks), metadata });
+    } else {
+      const result = readValue(buf, offset, metadata, parser.options);
+      offset = result.offset;
+
+      columns.push({ value: result.value, metadata });
+    }
+  }
+
+  parser.position = offset;
+
+  return buildNbcRowToken(parser, columns);
+}
+
+async function parseNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
   const colMetadata = parser.colMetadata;
   const columns: Column[] = [];
   const bitmap: boolean[] = [];
@@ -51,15 +128,7 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
       if (isPLPStream(metadata)) {
         const chunks = await readPLPStream(parser);
 
-        if (chunks === null) {
-          columns.push({ value: chunks, metadata });
-        } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
-          columns.push({ value: Buffer.concat(chunks).toString('ucs2'), metadata });
-        } else if (metadata.type.name === 'VarChar') {
-          columns.push({ value: iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
-        } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
-          columns.push({ value: Buffer.concat(chunks), metadata });
-        }
+        columns.push({ value: decodePLPColumn(metadata, chunks), metadata });
       } else {
         let result;
         try {
@@ -81,22 +150,20 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
     }
   }
 
-  if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = Object.create(null);
-
-    columns.forEach((column) => {
-      const colName = column.metadata.colName;
-      if (columnsMap[colName] == null) {
-        columnsMap[colName] = column;
-      }
-    });
-
-    return new NBCRowToken(columnsMap);
-  } else {
-    return new NBCRowToken(columns);
-  }
+  return buildNbcRowToken(parser, columns);
 }
 
+function nbcRowParser(parser: Parser): NBCRowToken | Promise<NBCRowToken> {
+  try {
+    return parseNbcRowSync(parser);
+  } catch (err) {
+    if (err instanceof NotEnoughDataError) {
+      return parseNbcRowAsync(parser);
+    }
+
+    throw err;
+  }
+}
 
 export default nbcRowParser;
 module.exports = nbcRowParser;
