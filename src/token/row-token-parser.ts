@@ -4,7 +4,7 @@ import Parser from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { RowToken } from './token';
-import * as iconv from 'iconv-lite';
+import { decode } from '../iconv-helpers';
 
 import { isPLPStream, readPLPStream, readPLPStreamSync, readValue } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
@@ -20,7 +20,7 @@ function decodePLPColumn(metadata: ColumnMetadata, chunks: null | Buffer[]): unk
   } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
     return Buffer.concat(chunks).toString('ucs2');
   } else if (metadata.type.name === 'VarChar') {
-    return iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
+    return decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
   } else {
     // 'VarBinary' / 'UDT'
     return Buffer.concat(chunks);

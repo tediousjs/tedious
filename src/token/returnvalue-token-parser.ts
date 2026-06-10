@@ -7,7 +7,7 @@ import { ReturnValueToken } from './token';
 import { readMetadata } from '../metadata-parser';
 import { isPLPStream, readPLPStream, readValue } from '../value-parser';
 import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt8 } from './helpers';
-import * as iconv from 'iconv-lite';
+import { decode } from '../iconv-helpers';
 
 async function returnParser(parser: Parser): Promise<ReturnValueToken> {
   let paramName;
@@ -54,7 +54,7 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
       } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
         value = Buffer.concat(chunks).toString('ucs2');
       } else if (metadata.type.name === 'VarChar') {
-        value = iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
+        value = decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
       } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
         value = Buffer.concat(chunks);
       }
