@@ -149,18 +149,22 @@ chunks) and the `bl` + slice copies with a single growable, reusable buffer:
   falling back to the cached iconv decoder otherwise.
 - Optional `bigint` return mode to skip the per-value `toString()`.
 
-### Phase 7 - Row shape and consumption API (major version) ⬜
+### Phase 7 - Row shape and consumption API
 
-Breaking changes, kept separate from everything above:
+Implemented as an opt-in `rowFormat` connection option (`'columns'`, the
+default, is today's shape; `'values'` is the new one), so that the suite and
+downstream consumers keep working unchanged - flipping the default to
+`'values'` is the actual breaking change and is left to the next major
+version:
 
-- Emit rows as a values array positionally aligned with a shared, per-result
-  set columns array, instead of one `{ value, metadata }` wrapper object per
-  cell. `useColumnNames` becomes a single precomputed name → index map per
-  result set.
-- Dispatch `onRow(values)` without allocating a `RowToken` per row.
-- Add a batched async iterator API (`for await (const rows of ...)` yielding
-  arrays of rows per refill) so iterator consumers do not reintroduce a
-  promise per row.
+- `rowFormat: 'values'` emits rows as a plain values array (or, with
+  `useColumnNames`, a name keyed map of values built from a name lookup
+  precomputed once per result set).
+- ROW/NBCROW tokens are dispatched to the handler directly in both formats,
+  without allocating a `RowToken` per row.
+- `request.batches()`: an async iterable yielding one array of rows per
+  parsing burst, with pause/resume based backpressure, so iterator consumers
+  do not pay a promise per row.
 
 ## Non-goals
 
@@ -189,6 +193,10 @@ since the per-refill allocation churn (and its GC spikes) is gone.
 Phase 5: end-to-end row workloads unchanged; bulk transfer throughput
 (repeated 6MB nvarchar(max) values) improves by ~10-20%.
 
+Phase 7: `rowFormat: 'values'` vs `'columns'`: offline row parsing +18%
+(narrow), +8% (wide), +4% (varchar-heavy); end-to-end 1000-row queries
+~+9%. The `'columns'` format is unchanged to slightly faster (~+3%).
+
 ## Status
 
 | Phase | Status |
@@ -200,4 +208,4 @@ Phase 5: end-to-end row workloads unchanged; bulk transfer throughput
 | 4 - Contiguous reusable read buffer | ✅ done |
 | 5 - Flatten the packet/message layer | ✅ done |
 | 6 - Value materialization fast paths | ⬜ planned |
-| 7 - Row shape and consumption API | ⬜ planned (major version) |
+| 7 - Row shape and consumption API | ✅ done (default flip pending major version) |
