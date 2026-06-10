@@ -166,7 +166,7 @@ version:
   parsing burst, with pause/resume based backpressure, so iterator consumers
   do not pay a promise per row.
 
-### Phase 8 - Streaming consumption APIs ⬜
+### Phase 8 - Streaming consumption APIs
 
 A tiered consumption API on top of the phase 1-7 machinery. The tiers make
 the cost model visible: each tier is the obvious tool for its job.
@@ -281,6 +281,11 @@ Phase 7: `rowFormat: 'values'` vs `'columns'`: offline row parsing +18%
 (narrow), +8% (wide), +4% (varchar-heavy); end-to-end 1000-row queries
 ~+9%. The `'columns'` format is unchanged to slightly faster (~+3%).
 
+Phase 8: streaming a 64MB varchar(max) value through
+`request.sequentialRows()` peaks at ~125MB RSS vs ~320MB when
+materializing; skipping an unconsumed 32MB value leaves the heap flat.
+Row parsing throughput is unchanged.
+
 ## Status
 
 | Phase | Status |
@@ -293,4 +298,4 @@ Phase 7: `rowFormat: 'values'` vs `'columns'`: offline row parsing +18%
 | 5 - Flatten the packet/message layer | ✅ done |
 | 6 - Value materialization fast paths | ⬜ planned |
 | 7 - Row shape and consumption API | ✅ done (default flip pending major version) |
-| 8 - Streaming consumption APIs | ⬜ in progress |
+| 8 - Streaming consumption APIs | ✅ done |
