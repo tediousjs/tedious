@@ -2199,8 +2199,22 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: AsyncIterable<Buffer>, handler: TokenHandler, streamRows = false) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options, { streamRows });
+  createTokenStreamParser(message: AsyncIterable<Buffer>, handler: TokenHandler, request?: Request | BulkLoad | undefined) {
+    let options = this.config.options;
+    let streamRows = false;
+
+    if (request instanceof Request) {
+      streamRows = request.sequentialRowMode;
+
+      if (request.iterationRowMode) {
+        // The iteration APIs own the row shape: rows are parsed as plain
+        // value arrays, independent of the connection's `rowFormat` and
+        // `useColumnNames` options.
+        options = { ...options, rowFormat: 'values', useColumnNames: false };
+      }
+    }
+
+    return new TokenStreamParser(message, this.debug, handler, options, { streamRows });
   }
 
   async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -3748,7 +3762,7 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!), this.request instanceof Request && this.request.sequentialRowMode);
+        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!), this.request!);
 
         // If the request was canceled and we have a `cancelTimer`
         // defined, we send a attention message after the

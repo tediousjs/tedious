@@ -440,6 +440,10 @@ export class RequestTokenHandler extends TokenHandler {
 
   onColMetadata(token: ColMetadataToken) {
     if (!this.request.canceled) {
+      if (this.request instanceof Request) {
+        this.request.currentColumns = token.columns;
+      }
+
       if (this.connection.config.options.useColumnNames) {
         const columns: { [key: string]: ColumnMetadata } = Object.create(null);
 

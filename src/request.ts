@@ -4,6 +4,8 @@ import { RequestError } from './errors';
 
 import Connection from './connection';
 import { SequentialRow } from './sequential-row';
+import { buildRow } from './token/row-format';
+import { type ParserOptions } from './token/stream-parser';
 import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
@@ -53,10 +55,9 @@ interface RequestOptions {
  */
 class ResultSet {
   /**
-   * The result set's column metadata, in the same shape as the
-   * `columnMetadata` event's payload.
+   * The result set's column metadata.
    */
-  declare readonly columns: any;
+  declare readonly columns: ColumnMetadata[];
 
   declare private request: Request;
   declare private queue: unknown[][];
@@ -70,7 +71,7 @@ class ResultSet {
   /**
    * @private
    */
-  constructor(request: Request, columns: any) {
+  constructor(request: Request, columns: ColumnMetadata[]) {
     this.request = request;
     this.columns = columns;
 
@@ -156,13 +157,13 @@ class ResultSet {
    * Returns an async iterable over the result set's rows, yielding batches
    * (arrays) of rows - one per parsing burst, like [[Request.batches]].
    */
-  batches(): AsyncIterableIterator<unknown[]> {
-    const iterator: AsyncIterableIterator<unknown[]> = {
+  batches<T extends unknown[] = unknown[]>(): AsyncIterableIterator<T[]> {
+    const iterator: AsyncIterableIterator<T[]> = {
       [Symbol.asyncIterator]() {
         return iterator;
       },
 
-      next: async (): Promise<IteratorResult<unknown[], undefined>> => {
+      next: async (): Promise<IteratorResult<T[], undefined>> => {
         while (true) {
           if (this.queue.length > 0) {
             const batch = this.queue.shift()!;
@@ -172,7 +173,7 @@ class ResultSet {
               this.request.resume();
             }
 
-            return { value: batch, done: false };
+            return { value: batch as T[], done: false };
           }
 
           if (this.ended || this.discarded) {
@@ -185,7 +186,7 @@ class ResultSet {
         }
       },
 
-      return: async (): Promise<IteratorResult<unknown[], undefined>> => {
+      return: async (): Promise<IteratorResult<T[], undefined>> => {
         this.discard();
         return { value: undefined, done: true };
       }
@@ -195,10 +196,11 @@ class ResultSet {
   }
 
   /**
-   * Returns an async iterable over the result set's rows.
+   * Returns an async iterable over the result set's rows, as arrays of
+   * values, positionally aligned with [[columns]].
    */
-  rows(): AsyncIterableIterator<unknown> {
-    const batches = this.batches();
+  rows<T extends unknown[] = unknown[]>(): AsyncIterableIterator<T> {
+    const batches = this.batches<T>();
 
     return (async function*() {
       for await (const batch of batches) {
@@ -206,7 +208,27 @@ class ResultSet {
       }
     })();
   }
+
+  /**
+   * Returns an async iterable over the result set's rows, as objects
+   * mapping column names to values. For duplicated column names, the first
+   * column wins.
+   */
+  rowsAsObjects<T extends Record<string, unknown> = Record<string, unknown>>(): AsyncIterableIterator<T> {
+    const batches = this.batches();
+    const columns = this.columns;
+
+    return (async function*() {
+      for await (const batch of batches) {
+        for (const values of batch) {
+          yield buildRow(columns, values, OBJECT_ROW_OPTIONS) as T;
+        }
+      }
+    })();
+  }
 }
+
+const OBJECT_ROW_OPTIONS = { rowFormat: 'values', useColumnNames: true } as ParserOptions;
 
 /**
  * ```js
@@ -247,6 +269,20 @@ class Request extends EventEmitter {
    * @private
    */
   declare sequentialRowMode: boolean;
+  /**
+   * Set when one of the iteration APIs is used - rows are then parsed as
+   * plain value arrays, independent of the connection's `rowFormat` and
+   * `useColumnNames` options.
+   *
+   * @private
+   */
+  declare iterationRowMode: boolean;
+  /**
+   * The column metadata of the result set currently being received.
+   *
+   * @private
+   */
+  declare currentColumns: ColumnMetadata[] | undefined;
   /**
    * @private
    */
@@ -532,6 +568,8 @@ class Request extends EventEmitter {
     this.canceled = false;
     this.paused = false;
     this.sequentialRowMode = false;
+    this.iterationRowMode = false;
+    this.currentColumns = undefined;
     this.error = undefined;
     this.connection = undefined;
     this.timeout = undefined;
@@ -664,6 +702,17 @@ class Request extends EventEmitter {
   }
 
   /**
+   * @private
+   */
+  private enableIterationRowMode() {
+    if (this.sequentialRowMode) {
+      throw new Error('`sequentialRows` cannot be combined with the other iteration APIs');
+    }
+
+    this.iterationRowMode = true;
+  }
+
+  /**
    * Returns an async iterable over the rows of this request, yielding
    * batches (arrays) of rows.
    *
@@ -673,11 +722,17 @@ class Request extends EventEmitter {
    * produced faster than they are consumed, and resumed once the consumer
    * catches up.
    *
-   * Must be called before the request is executed (or at least within the
-   * same tick), otherwise rows may be missed. When the request fails, the
-   * error is also thrown to the consumer of the iterable.
+   * Rows are always plain value arrays, independent of the connection's
+   * `rowFormat` and `useColumnNames` options. Batches never span result set
+   * boundaries.
+   *
+   * Must be called before the request is executed, otherwise rows may be
+   * missed or arrive in the wrong shape. When the request fails, the error
+   * is also thrown to the consumer of the iterable.
    */
-  batches(): AsyncIterableIterator<unknown[]> {
+  batches<T extends unknown[] = unknown[]>(): AsyncIterableIterator<T[]> {
+    this.enableIterationRowMode();
+
     const queue: unknown[][] = [];
     let currentBatch: unknown[] = [];
     let flushScheduled = false;
@@ -720,14 +775,19 @@ class Request extends EventEmitter {
       currentBatch.push(row);
     };
 
+    // A new result set forces a batch boundary.
+    const onColumnMetadata = flush;
+
     const onCompleted = () => {
       this.removeListener('row', onRow);
+      this.removeListener('columnMetadata', onColumnMetadata);
 
       finished = true;
       flush();
     };
 
     this.on('row', onRow);
+    this.on('columnMetadata', onColumnMetadata);
     this.once('requestCompleted', onCompleted);
 
     return {
@@ -735,7 +795,7 @@ class Request extends EventEmitter {
         return this;
       },
 
-      next: async (): Promise<IteratorResult<unknown[], undefined>> => {
+      next: async (): Promise<IteratorResult<T[], undefined>> => {
         while (true) {
           if (queue.length > 0) {
             const batch = queue.shift()!;
@@ -745,7 +805,7 @@ class Request extends EventEmitter {
               this.resume();
             }
 
-            return { value: batch, done: false };
+            return { value: batch as T[], done: false };
           }
 
           if (finished) {
@@ -762,9 +822,10 @@ class Request extends EventEmitter {
         }
       },
 
-      return: async (): Promise<IteratorResult<unknown[], undefined>> => {
+      return: async (): Promise<IteratorResult<T[], undefined>> => {
         // Abandoning the iteration cancels the request.
         this.removeListener('row', onRow);
+        this.removeListener('columnMetadata', onColumnMetadata);
 
         if (pausedByIterator) {
           pausedByIterator = false;
@@ -784,23 +845,49 @@ class Request extends EventEmitter {
    * Returns an async iterable over the rows of this request, across all of
    * its result sets.
    *
+   * Rows are always plain value arrays, positionally aligned with the
+   * `columnMetadata` event's columns, independent of the connection's
+   * `rowFormat` and `useColumnNames` options. Use [[rowsAsObjects]] for
+   * rows keyed by column name.
+   *
    * A thin convenience layer over [[batches]] - rows are still gathered in
    * batches internally, only the iteration is per row. Use [[resultSets]]
    * when the result set structure matters, and [[batches]] for the lowest
    * iteration overhead.
    *
-   * Must be called before the request is executed (or at least within the
-   * same tick). Breaking out of the iteration cancels the request. When the
-   * request fails, the error is also thrown to the consumer.
+   * Must be called before the request is executed. Breaking out of the
+   * iteration cancels the request. When the request fails, the error is
+   * also thrown to the consumer.
    */
-  rows(): AsyncIterableIterator<unknown> {
+  rows<T extends unknown[] = unknown[]>(): AsyncIterableIterator<T> {
     // Subscribe eagerly - a generator would only start listening for rows
     // once the iteration starts.
-    const batches = this.batches();
+    const batches = this.batches<T>();
 
     return (async function*() {
       for await (const batch of batches) {
         yield* batch;
+      }
+    })();
+  }
+
+  /**
+   * Returns an async iterable over the rows of this request, across all of
+   * its result sets, as objects mapping column names to values. For
+   * duplicated column names, the first column wins.
+   *
+   * Must be called before the request is executed. Breaking out of the
+   * iteration cancels the request. When the request fails, the error is
+   * also thrown to the consumer.
+   */
+  rowsAsObjects<T extends Record<string, unknown> = Record<string, unknown>>(): AsyncIterableIterator<T> {
+    // Built on the result set iteration, since the name keying needs each
+    // result set's columns.
+    const resultSets = this.resultSets();
+
+    return (async function*() {
+      for await (const resultSet of resultSets) {
+        yield* resultSet.rowsAsObjects<T>();
       }
     })();
   }
@@ -816,11 +903,12 @@ class Request extends EventEmitter {
    * set's row iterator discards its remaining rows without cancelling the
    * request; abandoning this iterator cancels the request.
    *
-   * Must be called before the request is executed (or at least within the
-   * same tick). When the request fails, the error is also thrown to the
-   * consumer.
+   * Must be called before the request is executed. When the request fails,
+   * the error is also thrown to the consumer.
    */
   resultSets(): AsyncIterableIterator<ResultSet> {
+    this.enableIterationRowMode();
+
     const pending: ResultSet[] = [];
     let currentSet: ResultSet | undefined;
     let activeSet: ResultSet | undefined;
@@ -840,7 +928,9 @@ class Request extends EventEmitter {
         currentSet.end();
       }
 
-      currentSet = new ResultSet(this, columns);
+      // `currentColumns` always holds the plain columns array, while the
+      // event payload's shape varies with `useColumnNames`.
+      currentSet = new ResultSet(this, this.currentColumns ?? columns as ColumnMetadata[]);
       pending.push(currentSet);
       wake();
     };
@@ -931,6 +1021,10 @@ class Request extends EventEmitter {
    * also thrown to the consumer.
    */
   sequentialRows(): AsyncIterableIterator<SequentialRow> {
+    if (this.iterationRowMode) {
+      throw new Error('`sequentialRows` cannot be combined with the other iteration APIs');
+    }
+
     this.sequentialRowMode = true;
 
     let pendingRow: SequentialRow | undefined;
