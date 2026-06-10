@@ -172,14 +172,24 @@ Breaking changes, kept separate from everything above:
   byte work already runs in native code.
 - No public API changes before Phase 7.
 
+## Measured results (phases 1-3 combined)
+
+Interleaved A/B medians against `master`, measured on this branch:
+
+- offline row parsing: narrow schema ~2.0x, wide schema ~1.8x,
+  varchar-heavy schema ~2.1x
+- end-to-end sequential queries against SQL Server 2022:
+  1000 rows x 3 columns (incl. nvarchar(max)): ~+37%
+  1000 rows x 4 varchar columns: ~+44%
+
 ## Status
 
 | Phase | Status |
 |---|---|
-| 0 - Benchmarks and verification harness | ⬜ planned (port) |
-| 1 - Sync-first parsing, direct dispatch | ⬜ planned (port) |
-| 2 - Cached encoding decoders | ⬜ planned (port) |
-| 3 - Compiled per-column readers | ⬜ planned |
+| 0 - Benchmarks and verification harness | ✅ done |
+| 1 - Sync-first parsing, direct dispatch | ✅ done |
+| 2 - Cached encoding decoders | ✅ done |
+| 3 - Compiled per-column readers | ✅ done |
 | 4 - Contiguous reusable read buffer | ⬜ planned |
 | 5 - Flatten the packet/message layer | ⬜ planned |
 | 6 - Value materialization fast paths | ⬜ planned |
