@@ -201,6 +201,16 @@ for await (const batch of request.batches()) {
 
 One promise per parsing burst. `rows()` is a thin generator over this.
 
+**Shape is part of the API, not connection state:** the iteration APIs
+always yield plain value arrays (`rows()`, `batches()`) or name keyed
+objects (`rowsAsObjects()`), independent of the connection's `rowFormat` /
+`useColumnNames` options (which keep applying to the legacy `'row'` event
+only). This makes the row type statically knowable, so all iteration
+methods take optional type parameters (`rows<[number, string]>()`,
+`rowsAsObjects<{ id: number }>()`) - unchecked assertions, but honest
+defaults (`unknown[]`, not `any`). Runtime-checked typing (Standard Schema
+validators) is a possible follow-up.
+
 **Result sets:** `request.rows()` / `request.batches()` iterate the rows of
 *all* result sets, flattened - the right default for the single-result set
 case. For multi-result set requests, the hierarchy is explicit:
