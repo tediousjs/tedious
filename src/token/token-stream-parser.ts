@@ -1,35 +1,86 @@
 import { EventEmitter } from 'events';
 import StreamParser, { type ParserOptions } from './stream-parser';
 import Debug from '../debug';
-import { Token } from './token';
-import { Readable } from 'stream';
 import Message from '../message';
 import { TokenHandler } from './handler';
 
+/**
+ * Reads tokens from a message and dispatches them to the given handler.
+ *
+ * Tokens are parsed and dispatched synchronously as long as enough data is
+ * buffered - the parsing loop only goes asynchronous when it has to wait for
+ * more data, when a slow (streaming) token parser is hit, or when paused.
+ */
 export class Parser extends EventEmitter {
   declare debug: Debug;
   declare options: ParserOptions;
-  declare parser: Readable;
+  declare parser: StreamParser;
+  declare handler: TokenHandler;
+
+  declare paused: boolean;
+  declare resumeCallback: (() => void) | null;
 
   constructor(message: Message, debug: Debug, handler: TokenHandler, options: ParserOptions) {
     super();
 
     this.debug = debug;
     this.options = options;
+    this.handler = handler;
 
-    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options));
-    this.parser.on('data', (token: Token) => {
-      debug.token(token);
-      handler[token.handlerName as keyof TokenHandler](token as any);
-    });
+    this.paused = false;
+    this.resumeCallback = null;
 
-    this.parser.on('drain', () => {
-      this.emit('drain');
-    });
+    this.parser = new StreamParser(message, debug, options);
 
-    this.parser.on('end', () => {
+    this.run().then(() => {
       this.emit('end');
+    }, (err) => {
+      this.emit('error', err);
     });
+  }
+
+  async run() {
+    const parser = this.parser;
+    const handler = this.handler;
+    const debug = this.debug;
+
+    while (true) {
+      // Parse and dispatch as many buffered tokens as possible.
+      while (parser.buffer.length >= parser.position + 1) {
+        if (this.paused) {
+          await new Promise<void>((resolve) => {
+            this.resumeCallback = resolve;
+          });
+
+          continue;
+        }
+
+        const type = parser.buffer.readUInt8(parser.position);
+        parser.position += 1;
+
+        let token = parser.readToken(type);
+        if (token instanceof Promise) {
+          token = await token;
+        }
+
+        if (token !== undefined) {
+          debug.token(token);
+          handler[token.handlerName as keyof TokenHandler](token as any);
+        }
+      }
+
+      // Wait for more data.
+      try {
+        await parser.waitForChunk();
+      } catch (err: unknown) {
+        if (parser.position === parser.buffer.length) {
+          // All data was consumed - the end of the token stream was reached.
+          return;
+        }
+
+        throw err;
+      }
+    }
   }
 
   declare on: (
@@ -38,10 +89,16 @@ export class Parser extends EventEmitter {
   );
 
   pause() {
-    return this.parser.pause();
+    this.paused = true;
   }
 
   resume() {
-    return this.parser.resume();
+    this.paused = false;
+
+    const resumeCallback = this.resumeCallback;
+    if (resumeCallback) {
+      this.resumeCallback = null;
+      resumeCallback();
+    }
   }
 }

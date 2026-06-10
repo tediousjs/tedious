@@ -584,6 +584,56 @@ function readNChars(buf: Buffer, offset: number, dataLength: number): Result<str
   return new Result(buf.toString('ucs2', offset, offset + dataLength), offset + dataLength);
 }
 
+/**
+ * Synchronous variant of `readPLPStream` - reads a PLP value from `buf`,
+ * starting at `offset`, and throws a `NotEnoughDataError` if the value is not
+ * fully buffered yet.
+ */
+function readPLPStreamSync(buf: Buffer, offset: number): Result<null | Buffer[]> {
+  if (buf.length < offset + 8) {
+    throw new NotEnoughDataError(offset + 8);
+  }
+
+  const expectedLength = buf.readBigUInt64LE(offset);
+  offset += 8;
+
+  if (expectedLength === PLP_NULL) {
+    return new Result(null, offset);
+  }
+
+  const chunks: Buffer[] = [];
+  let currentLength = 0;
+
+  while (true) {
+    if (buf.length < offset + 4) {
+      throw new NotEnoughDataError(offset + 4);
+    }
+
+    const chunkLength = buf.readUInt32LE(offset);
+    offset += 4;
+
+    if (!chunkLength) {
+      break;
+    }
+
+    if (buf.length < offset + chunkLength) {
+      throw new NotEnoughDataError(offset + chunkLength);
+    }
+
+    chunks.push(buf.slice(offset, offset + chunkLength));
+    offset += chunkLength;
+    currentLength += chunkLength;
+  }
+
+  if (expectedLength !== UNKNOWN_PLP_LEN) {
+    if (currentLength !== Number(expectedLength)) {
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + currentLength + ' bytes');
+    }
+  }
+
+  return new Result(chunks, offset);
+}
+
 async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
   while (parser.buffer.length < parser.position + 8) {
     await parser.waitForChunk();
@@ -766,5 +816,6 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
+module.exports.readPLPStreamSync = readPLPStreamSync;
 
-export { readValue, isPLPStream, readPLPStream };
+export { readValue, isPLPStream, readPLPStream, readPLPStreamSync };
