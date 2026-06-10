@@ -49,6 +49,15 @@ export type BaseMetadata = {
   schema: XmlSchema | undefined;
 
   udtInfo: UdtInfo | undefined;
+
+  /**
+   * A reader function for values of this column, built once per column via
+   * `buildValueReader` and cached here. `null` indicates a PLP streamed
+   * column, `undefined` indicates the reader was not built yet.
+   *
+   * @private
+   */
+  reader?: ((buf: Buffer, offset: number) => Result<unknown>) | null;
 }
 
 export type Metadata = {

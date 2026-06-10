@@ -6,7 +6,7 @@ import { type ColumnMetadata } from './colmetadata-token-parser';
 import { NBCRowToken } from './token';
 import * as iconv from 'iconv-lite';
 
-import { isPLPStream, readPLPStream, readValue } from '../value-parser';
+import { buildValueReader, readPLPStream } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
 
 interface Column {
@@ -47,8 +47,13 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
       continue;
     }
 
+    let reader = metadata.reader;
+    if (reader === undefined) {
+      reader = metadata.reader = buildValueReader(metadata, parser.options);
+    }
+
     while (true) {
-      if (isPLPStream(metadata)) {
+      if (reader === null) {
         const chunks = await readPLPStream(parser);
 
         if (chunks === null) {
@@ -63,7 +68,7 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
       } else {
         let result;
         try {
-          result = readValue(parser.buffer, parser.position, metadata, parser.options);
+          result = reader(parser.buffer, parser.position);
         } catch (err) {
           if (err instanceof NotEnoughDataError) {
             await parser.waitForChunk();
