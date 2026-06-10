@@ -4,27 +4,13 @@ import Parser from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { RowToken } from './token';
-import { decode } from '../iconv-helpers';
 
-import { isPLPStream, readPLPStream, readPLPStreamSync, readValue } from '../value-parser';
+import { buildPLPDecoder, buildValueReader, readPLPStream, readPLPStreamSync } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
 
 interface Column {
   value: unknown;
   metadata: ColumnMetadata;
-}
-
-function decodePLPColumn(metadata: ColumnMetadata, chunks: null | Buffer[]): unknown {
-  if (chunks === null) {
-    return null;
-  } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
-    return Buffer.concat(chunks).toString('ucs2');
-  } else if (metadata.type.name === 'VarChar') {
-    return decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
-  } else {
-    // 'VarBinary' / 'UDT'
-    return Buffer.concat(chunks);
-  }
 }
 
 function buildRowToken(parser: Parser, columns: Column[]): RowToken {
@@ -60,13 +46,23 @@ function parseRowSync(parser: Parser): RowToken {
   for (let i = 0; i < length; i++) {
     const metadata = colMetadata[i];
 
-    if (isPLPStream(metadata)) {
+    let reader = metadata.reader;
+    if (reader === undefined) {
+      reader = metadata.reader = buildValueReader(metadata, parser.options);
+    }
+
+    if (reader === null) {
       let chunks;
       ({ value: chunks, offset } = readPLPStreamSync(buf, offset));
 
-      columns.push({ value: decodePLPColumn(metadata, chunks), metadata });
+      let plpDecoder = metadata.plpDecoder;
+      if (plpDecoder === undefined) {
+        plpDecoder = metadata.plpDecoder = buildPLPDecoder(metadata, parser.options);
+      }
+
+      columns.push({ value: plpDecoder(chunks), metadata });
     } else {
-      const result = readValue(buf, offset, metadata, parser.options);
+      const result = reader(buf, offset);
       offset = result.offset;
 
       columns.push({ value: result.value, metadata });
@@ -82,15 +78,25 @@ async function parseRowAsync(parser: Parser): Promise<RowToken> {
   const columns: Column[] = [];
 
   for (const metadata of parser.colMetadata) {
+    let reader = metadata.reader;
+    if (reader === undefined) {
+      reader = metadata.reader = buildValueReader(metadata, parser.options);
+    }
+
     while (true) {
-      if (isPLPStream(metadata)) {
+      if (reader === null) {
         const chunks = await readPLPStream(parser);
 
-        columns.push({ value: decodePLPColumn(metadata, chunks), metadata });
+        let plpDecoder = metadata.plpDecoder;
+        if (plpDecoder === undefined) {
+          plpDecoder = metadata.plpDecoder = buildPLPDecoder(metadata, parser.options);
+        }
+
+        columns.push({ value: plpDecoder(chunks), metadata });
       } else {
         let result;
         try {
-          result = readValue(parser.buffer, parser.position, metadata, parser.options);
+          result = reader(parser.buffer, parser.position);
         } catch (err) {
           if (err instanceof NotEnoughDataError) {
             await parser.waitForChunk();

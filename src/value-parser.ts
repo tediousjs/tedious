@@ -3,7 +3,8 @@ import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import { sprintf } from 'sprintf-js';
-import { decode } from './iconv-helpers';
+import { type DecoderStream } from 'iconv-lite';
+import { decode, decodeWith, getCachedDecoder } from './iconv-helpers';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
@@ -64,6 +65,455 @@ function readBit(buf: Buffer, offset: number): Result<boolean> {
   ({ offset, value } = readUInt8(buf, offset));
 
   return new Result(!!value, offset);
+}
+
+function readNull(buf: Buffer, offset: number): Result<null> {
+  return new Result(null, offset);
+}
+
+function readIntN(buf: Buffer, offset: number): Result<number | string | null> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+  switch (dataLength) {
+    case 0:
+      return new Result(null, offset);
+
+    case 1:
+      return readTinyInt(buf, offset);
+    case 2:
+      return readSmallInt(buf, offset);
+    case 4:
+      return readInt(buf, offset);
+    case 8:
+      return readBigInt(buf, offset);
+
+    default:
+      throw new Error('Unsupported dataLength ' + dataLength + ' for IntN');
+  }
+}
+
+function readFloatN(buf: Buffer, offset: number): Result<number | null> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+  switch (dataLength) {
+    case 0:
+      return new Result(null, offset);
+
+    case 4:
+      return readReal(buf, offset);
+    case 8:
+      return readFloat(buf, offset);
+
+    default:
+      throw new Error('Unsupported dataLength ' + dataLength + ' for FloatN');
+  }
+}
+
+function readMoneyN(buf: Buffer, offset: number): Result<number | null> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+  switch (dataLength) {
+    case 0:
+      return new Result(null, offset);
+
+    case 4:
+      return readSmallMoney(buf, offset);
+    case 8:
+      return readMoney(buf, offset);
+
+    default:
+      throw new Error('Unsupported dataLength ' + dataLength + ' for MoneyN');
+  }
+}
+
+function readBitN(buf: Buffer, offset: number): Result<boolean | null> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+  switch (dataLength) {
+    case 0:
+      return new Result(null, offset);
+
+    case 1:
+      return readBit(buf, offset);
+
+    default:
+      throw new Error('Unsupported dataLength ' + dataLength + ' for BitN');
+  }
+}
+
+function readNVarCharValue(buf: Buffer, offset: number): Result<string | null> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+  if (dataLength === NULL) {
+    return new Result(null, offset);
+  }
+
+  return readNChars(buf, offset, dataLength);
+}
+
+function readVarBinaryValue(buf: Buffer, offset: number): Result<Buffer | null> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+  if (dataLength === NULL) {
+    return new Result(null, offset);
+  }
+
+  return readBinary(buf, offset, dataLength);
+}
+
+function readCharsWith(buf: Buffer, offset: number, dataLength: number, decoder: DecoderStream): Result<string> {
+  if (buf.length < offset + dataLength) {
+    throw new NotEnoughDataError(offset + dataLength);
+  }
+
+  return new Result(decodeWith(decoder, buf.slice(offset, offset + dataLength)), offset + dataLength);
+}
+
+export type ValueReader = (buf: Buffer, offset: number) => Result<unknown>;
+
+/**
+ * Builds a reader function for values of the column described by the given
+ * `metadata`. All metadata and option based decisions are made once, when
+ * the reader is built, instead of once per value.
+ *
+ * Returns `null` for columns whose values are sent as PLP streams - these
+ * need to be read via `readPLPStream` / `readPLPStreamSync` and decoded with
+ * the function built by `buildPLPDecoder` instead.
+ */
+function buildValueReader(metadata: Metadata, options: ParserOptions): ValueReader | null {
+  if (isPLPStream(metadata)) {
+    return null;
+  }
+
+  const type = metadata.type;
+
+  switch (type.name) {
+    case 'Null':
+      return readNull;
+
+    case 'TinyInt':
+      return readTinyInt;
+
+    case 'SmallInt':
+      return readSmallInt;
+
+    case 'Int':
+      return readInt;
+
+    case 'BigInt':
+      return readBigInt;
+
+    case 'IntN':
+      return readIntN;
+
+    case 'Real':
+      return readReal;
+
+    case 'Float':
+      return readFloat;
+
+    case 'FloatN':
+      return readFloatN;
+
+    case 'SmallMoney':
+      return readSmallMoney;
+
+    case 'Money':
+      return readMoney;
+
+    case 'MoneyN':
+      return readMoneyN;
+
+    case 'Bit':
+      return readBit;
+
+    case 'BitN':
+      return readBitN;
+
+    case 'VarChar':
+    case 'Char': {
+      const decoder = getCachedDecoder(metadata.collation!.codepage ?? DEFAULT_ENCODING);
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+        if (dataLength === NULL) {
+          return new Result(null, offset);
+        }
+
+        return readCharsWith(buf, offset, dataLength, decoder);
+      };
+    }
+
+    case 'NVarChar':
+    case 'NChar':
+      return readNVarCharValue;
+
+    case 'VarBinary':
+    case 'Binary':
+      return readVarBinaryValue;
+
+    case 'Text': {
+      const decoder = getCachedDecoder(metadata.collation!.codepage ?? DEFAULT_ENCODING);
+
+      return (buf, offset) => {
+        let textPointerLength;
+        ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+
+        if (textPointerLength === 0) {
+          return new Result(null, offset);
+        }
+
+        // Textpointer
+        ({ offset } = readBinary(buf, offset, textPointerLength));
+
+        // Timestamp
+        ({ offset } = readBinary(buf, offset, 8));
+
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+
+        return readCharsWith(buf, offset, dataLength, decoder);
+      };
+    }
+
+    case 'NText':
+      return (buf, offset) => {
+        let textPointerLength;
+        ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+
+        if (textPointerLength === 0) {
+          return new Result(null, offset);
+        }
+
+        // Textpointer
+        ({ offset } = readBinary(buf, offset, textPointerLength));
+
+        // Timestamp
+        ({ offset } = readBinary(buf, offset, 8));
+
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+
+        return readNChars(buf, offset, dataLength);
+      };
+
+    case 'Image':
+      return (buf, offset) => {
+        let textPointerLength;
+        ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+
+        if (textPointerLength === 0) {
+          return new Result(null, offset);
+        }
+
+        // Textpointer
+        ({ offset } = readBinary(buf, offset, textPointerLength));
+
+        // Timestamp
+        ({ offset } = readBinary(buf, offset, 8));
+
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+
+        return readBinary(buf, offset, dataLength);
+      };
+
+    case 'SmallDateTime': {
+      const useUTC = options.useUTC;
+
+      return (buf, offset) => readSmallDateTime(buf, offset, useUTC);
+    }
+
+    case 'DateTime': {
+      const useUTC = options.useUTC;
+
+      return (buf, offset) => readDateTime(buf, offset, useUTC);
+    }
+
+    case 'DateTimeN': {
+      const useUTC = options.useUTC;
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        switch (dataLength) {
+          case 0:
+            return new Result(null, offset);
+
+          case 4:
+            return readSmallDateTime(buf, offset, useUTC);
+          case 8:
+            return readDateTime(buf, offset, useUTC);
+
+          default:
+            throw new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
+        }
+      };
+    }
+
+    case 'Time': {
+      const scale = metadata.scale!;
+      const useUTC = options.useUTC;
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        if (dataLength === 0) {
+          return new Result(null, offset);
+        }
+
+        return readTime(buf, offset, dataLength, scale, useUTC);
+      };
+    }
+
+    case 'Date': {
+      const useUTC = options.useUTC;
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        if (dataLength === 0) {
+          return new Result(null, offset);
+        }
+
+        return readDate(buf, offset, useUTC);
+      };
+    }
+
+    case 'DateTime2': {
+      const scale = metadata.scale!;
+      const useUTC = options.useUTC;
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        if (dataLength === 0) {
+          return new Result(null, offset);
+        }
+
+        return readDateTime2(buf, offset, dataLength, scale, useUTC);
+      };
+    }
+
+    case 'DateTimeOffset': {
+      const scale = metadata.scale!;
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        if (dataLength === 0) {
+          return new Result(null, offset);
+        }
+
+        return readDateTimeOffset(buf, offset, dataLength, scale);
+      };
+    }
+
+    case 'NumericN':
+    case 'DecimalN': {
+      const divisor = Math.pow(10, metadata.scale!);
+
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        if (dataLength === 0) {
+          return new Result(null, offset);
+        }
+
+        return readNumericWithDivisor(buf, offset, dataLength, divisor);
+      };
+    }
+
+    case 'UniqueIdentifier':
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt8(buf, offset));
+
+        switch (dataLength) {
+          case 0:
+            return new Result(null, offset);
+
+          case 0x10:
+            return readUniqueIdentifier(buf, offset, options);
+
+          default:
+            throw new Error(sprintf('Unsupported guid size %d', dataLength - 1));
+        }
+      };
+
+    case 'Variant':
+      return (buf, offset) => {
+        let dataLength;
+        ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+
+        if (dataLength === 0) {
+          return new Result(null, offset);
+        }
+
+        return readVariant(buf, offset, options, dataLength);
+      };
+
+    default: {
+      throw new Error('Invalid type!');
+    }
+  }
+}
+
+export type PLPDecoder = (chunks: Buffer[] | null) => unknown;
+
+/**
+ * Builds a function that converts the accumulated chunks of a PLP streamed
+ * value (as produced by `readPLPStream` / `readPLPStreamSync`) into the
+ * column's value.
+ */
+function buildPLPDecoder(metadata: Metadata, _options: ParserOptions): PLPDecoder {
+  switch (metadata.type.name) {
+    case 'NVarChar':
+    case 'Xml':
+      return (chunks) => {
+        if (chunks === null) {
+          return null;
+        }
+
+        return Buffer.concat(chunks).toString('ucs2');
+      };
+
+    case 'VarChar': {
+      const decoder = getCachedDecoder(metadata.collation?.codepage ?? DEFAULT_ENCODING);
+
+      return (chunks) => {
+        if (chunks === null) {
+          return null;
+        }
+
+        return decodeWith(decoder, Buffer.concat(chunks));
+      };
+    }
+
+    default:
+      // 'VarBinary' / 'UDT'
+      return (chunks) => {
+        if (chunks === null) {
+          return null;
+        }
+
+        return Buffer.concat(chunks);
+      };
+  }
 }
 
 function readValue(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
@@ -421,6 +871,10 @@ function readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOption
 }
 
 function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
+  return readNumericWithDivisor(buf, offset, dataLength, Math.pow(10, scale));
+}
+
+function readNumericWithDivisor(buf: Buffer, offset: number, dataLength: number, divisor: number): Result<number> {
   let sign;
   ({ offset, value: sign } = readUInt8(buf, offset));
 
@@ -439,7 +893,7 @@ function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision
     throw new Error(sprintf('Unsupported numeric dataLength %d', dataLength));
   }
 
-  return new Result((value * sign) / Math.pow(10, scale), offset);
+  return new Result((value * sign) / divisor, offset);
 }
 
 function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLength: number): Result<unknown> {
@@ -817,5 +1271,7 @@ module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
 module.exports.readPLPStreamSync = readPLPStreamSync;
+module.exports.buildValueReader = buildValueReader;
+module.exports.buildPLPDecoder = buildPLPDecoder;
 
-export { readValue, isPLPStream, readPLPStream, readPLPStreamSync };
+export { readValue, isPLPStream, readPLPStream, readPLPStreamSync, buildValueReader, buildPLPDecoder };
