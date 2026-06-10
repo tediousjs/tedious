@@ -1,6 +1,9 @@
 import { EventEmitter } from 'events';
 import StreamParser, { type ParserOptions } from './stream-parser';
 import Debug from '../debug';
+import { TYPE } from './token';
+import rowParser from './row-token-parser';
+import nbcRowParser from './nbcrow-token-parser';
 import { TokenHandler } from './handler';
 
 /**
@@ -56,6 +59,18 @@ export class Parser extends EventEmitter {
 
         const type = parser.buffer.readUInt8(parser.position);
         parser.position += 1;
+
+        // Rows are parsed and dispatched directly, without allocating a
+        // token object per row.
+        if (type === TYPE.ROW || type === TYPE.NBCROW) {
+          let row = type === TYPE.ROW ? rowParser(parser) : nbcRowParser(parser);
+          if (row instanceof Promise) {
+            row = await row;
+          }
+
+          handler.onRow(row);
+          continue;
+        }
 
         let token = parser.readToken(type);
         if (token instanceof Promise) {

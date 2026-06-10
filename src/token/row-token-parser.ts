@@ -1,44 +1,20 @@
 // s2.2.7.17
 
 import Parser from './stream-parser';
-import { type ColumnMetadata } from './colmetadata-token-parser';
-
-import { RowToken } from './token';
 
 import { buildPLPDecoder, buildValueReader, readPLPStream, readPLPStreamSync } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
-
-interface Column {
-  value: unknown;
-  metadata: ColumnMetadata;
-}
-
-function buildRowToken(parser: Parser, columns: Column[]): RowToken {
-  if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = Object.create(null);
-
-    columns.forEach((column) => {
-      const colName = column.metadata.colName;
-      if (columnsMap[colName] == null) {
-        columnsMap[colName] = column;
-      }
-    });
-
-    return new RowToken(columnsMap);
-  } else {
-    return new RowToken(columns);
-  }
-}
+import { buildRow } from './row-format';
 
 /**
  * Parses a complete row from the already buffered data, without ever
  * suspending. Throws a `NotEnoughDataError` if the row is not fully buffered
  * yet - the parser position is only updated after the row was fully parsed.
  */
-function parseRowSync(parser: Parser): RowToken {
+function parseRowSync(parser: Parser): unknown {
   const colMetadata = parser.colMetadata;
   const length = colMetadata.length;
-  const columns: Column[] = [];
+  const values: unknown[] = [];
 
   const buf = parser.buffer;
   let offset = parser.position;
@@ -60,24 +36,25 @@ function parseRowSync(parser: Parser): RowToken {
         plpDecoder = metadata.plpDecoder = buildPLPDecoder(metadata, parser.options);
       }
 
-      columns.push({ value: plpDecoder(chunks), metadata });
+      values.push(plpDecoder(chunks));
     } else {
       const result = reader(buf, offset);
       offset = result.offset;
 
-      columns.push({ value: result.value, metadata });
+      values.push(result.value);
     }
   }
 
   parser.position = offset;
 
-  return buildRowToken(parser, columns);
+  return buildRow(colMetadata, values, parser.options);
 }
 
-async function parseRowAsync(parser: Parser): Promise<RowToken> {
-  const columns: Column[] = [];
+async function parseRowAsync(parser: Parser): Promise<unknown> {
+  const colMetadata = parser.colMetadata;
+  const values: unknown[] = [];
 
-  for (const metadata of parser.colMetadata) {
+  for (const metadata of colMetadata) {
     let reader = metadata.reader;
     if (reader === undefined) {
       reader = metadata.reader = buildValueReader(metadata, parser.options);
@@ -92,7 +69,7 @@ async function parseRowAsync(parser: Parser): Promise<RowToken> {
           plpDecoder = metadata.plpDecoder = buildPLPDecoder(metadata, parser.options);
         }
 
-        columns.push({ value: plpDecoder(chunks), metadata });
+        values.push(plpDecoder(chunks));
       } else {
         let result;
         try {
@@ -107,17 +84,21 @@ async function parseRowAsync(parser: Parser): Promise<RowToken> {
         }
 
         parser.position = result.offset;
-        columns.push({ value: result.value, metadata });
+        values.push(result.value);
       }
 
       break;
     }
   }
 
-  return buildRowToken(parser, columns);
+  return buildRow(colMetadata, values, parser.options);
 }
 
-function rowParser(parser: Parser): RowToken | Promise<RowToken> {
+/**
+ * Parses the row following a ROW token and returns it in the shape
+ * determined by the `rowFormat` and `useColumnNames` options.
+ */
+function rowParser(parser: Parser): unknown | Promise<unknown> {
   try {
     return parseRowSync(parser);
   } catch (err) {

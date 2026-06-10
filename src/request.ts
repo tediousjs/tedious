@@ -493,6 +493,107 @@ class Request extends EventEmitter {
   }
 
   /**
+   * Returns an async iterable over the rows of this request, yielding
+   * batches (arrays) of rows.
+   *
+   * Rows are batched per parsing burst - all rows that are parsed from the
+   * currently buffered data are delivered as a single batch, so iterating
+   * does not pay a promise per row. The request is paused when batches are
+   * produced faster than they are consumed, and resumed once the consumer
+   * catches up.
+   *
+   * Must be called before the request is executed (or at least within the
+   * same tick), otherwise rows may be missed. When the request fails, the
+   * error is also thrown to the consumer of the iterable.
+   */
+  batches(): AsyncIterableIterator<unknown[]> {
+    const queue: unknown[][] = [];
+    let currentBatch: unknown[] = [];
+    let flushScheduled = false;
+    let finished = false;
+    let pausedByIterator = false;
+    let wakeup: (() => void) | undefined;
+
+    const wake = () => {
+      const resolve = wakeup;
+      if (resolve !== undefined) {
+        wakeup = undefined;
+        resolve();
+      }
+    };
+
+    const flush = () => {
+      flushScheduled = false;
+
+      if (currentBatch.length > 0) {
+        queue.push(currentBatch);
+        currentBatch = [];
+
+        if (queue.length > 1 && !pausedByIterator) {
+          pausedByIterator = true;
+          this.pause();
+        }
+      }
+
+      wake();
+    };
+
+    const onRow = (row: unknown) => {
+      // Rows arriving in the same parsing burst are dispatched synchronously,
+      // so flushing on the next microtask batches them up.
+      if (!flushScheduled) {
+        flushScheduled = true;
+        queueMicrotask(flush);
+      }
+
+      currentBatch.push(row);
+    };
+
+    const onCompleted = () => {
+      this.removeListener('row', onRow);
+
+      finished = true;
+      flush();
+    };
+
+    this.on('row', onRow);
+    this.once('requestCompleted', onCompleted);
+
+    return {
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+
+      next: async (): Promise<IteratorResult<unknown[], undefined>> => {
+        while (true) {
+          if (queue.length > 0) {
+            const batch = queue.shift()!;
+
+            if (pausedByIterator && queue.length <= 1) {
+              pausedByIterator = false;
+              this.resume();
+            }
+
+            return { value: batch, done: false };
+          }
+
+          if (finished) {
+            if (this.error) {
+              throw this.error;
+            }
+
+            return { value: undefined, done: true };
+          }
+
+          await new Promise<void>((resolve) => {
+            wakeup = resolve;
+          });
+        }
+      }
+    };
+  }
+
+  /**
    * Cancels a request while waiting for a server response.
    */
   cancel() {

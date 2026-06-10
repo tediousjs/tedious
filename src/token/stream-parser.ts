@@ -18,7 +18,7 @@ import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 import { NotEnoughDataError } from './helpers';
 
-export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
+export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'> & Pick<Partial<InternalConnectionOptions>, 'rowFormat'>;
 
 const INITIAL_BUFFER_SIZE = 8 * 1024;
 
@@ -156,7 +156,12 @@ class Parser {
   }
 
   readNbcRowToken(): NBCRowToken | Promise<NBCRowToken> {
-    return nbcRowParser(this);
+    const row = nbcRowParser(this);
+    if (row instanceof Promise) {
+      return row.then((row) => new NBCRowToken(row));
+    }
+
+    return new NBCRowToken(row);
   }
 
   async readReturnValueToken(): Promise<ReturnValueToken> {
@@ -284,7 +289,12 @@ class Parser {
   }
 
   readRowToken(): RowToken | Promise<RowToken> {
-    return rowParser(this);
+    const row = rowParser(this);
+    if (row instanceof Promise) {
+      return row.then((row) => new RowToken(row));
+    }
+
+    return new RowToken(row);
   }
 
   readInfoToken(): InfoMessageToken | Promise<InfoMessageToken> {

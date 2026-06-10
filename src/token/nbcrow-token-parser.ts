@@ -1,44 +1,20 @@
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
 import Parser from './stream-parser';
-import { type ColumnMetadata } from './colmetadata-token-parser';
-
-import { NBCRowToken } from './token';
 
 import { buildPLPDecoder, buildValueReader, readPLPStream, readPLPStreamSync } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
-
-interface Column {
-  value: unknown;
-  metadata: ColumnMetadata;
-}
-
-function buildNbcRowToken(parser: Parser, columns: Column[]): NBCRowToken {
-  if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = Object.create(null);
-
-    columns.forEach((column) => {
-      const colName = column.metadata.colName;
-      if (columnsMap[colName] == null) {
-        columnsMap[colName] = column;
-      }
-    });
-
-    return new NBCRowToken(columnsMap);
-  } else {
-    return new NBCRowToken(columns);
-  }
-}
+import { buildRow } from './row-format';
 
 /**
  * Parses a complete row from the already buffered data, without ever
  * suspending. Throws a `NotEnoughDataError` if the row is not fully buffered
  * yet - the parser position is only updated after the row was fully parsed.
  */
-function parseNbcRowSync(parser: Parser): NBCRowToken {
+function parseNbcRowSync(parser: Parser): unknown {
   const colMetadata = parser.colMetadata;
   const length = colMetadata.length;
-  const columns: Column[] = [];
+  const values: unknown[] = [];
 
   const buf = parser.buffer;
   let offset = parser.position;
@@ -55,7 +31,7 @@ function parseNbcRowSync(parser: Parser): NBCRowToken {
     const metadata = colMetadata[i];
 
     if ((buf[bitmapStart + (i >>> 3)] >>> (i & 0b111)) & 0b1) {
-      columns.push({ value: null, metadata });
+      values.push(null);
       continue;
     }
 
@@ -73,23 +49,23 @@ function parseNbcRowSync(parser: Parser): NBCRowToken {
         plpDecoder = metadata.plpDecoder = buildPLPDecoder(metadata, parser.options);
       }
 
-      columns.push({ value: plpDecoder(chunks), metadata });
+      values.push(plpDecoder(chunks));
     } else {
       const result = reader(buf, offset);
       offset = result.offset;
 
-      columns.push({ value: result.value, metadata });
+      values.push(result.value);
     }
   }
 
   parser.position = offset;
 
-  return buildNbcRowToken(parser, columns);
+  return buildRow(colMetadata, values, parser.options);
 }
 
-async function parseNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
+async function parseNbcRowAsync(parser: Parser): Promise<unknown> {
   const colMetadata = parser.colMetadata;
-  const columns: Column[] = [];
+  const values: unknown[] = [];
   const bitmap: boolean[] = [];
   const bitmapByteLength = Math.ceil(colMetadata.length / 8);
 
@@ -116,7 +92,7 @@ async function parseNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
   for (let i = 0; i < colMetadata.length; i++) {
     const metadata = colMetadata[i];
     if (bitmap[i]) {
-      columns.push({ value: null, metadata });
+      values.push(null);
       continue;
     }
 
@@ -134,7 +110,7 @@ async function parseNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
           plpDecoder = metadata.plpDecoder = buildPLPDecoder(metadata, parser.options);
         }
 
-        columns.push({ value: plpDecoder(chunks), metadata });
+        values.push(plpDecoder(chunks));
       } else {
         let result;
         try {
@@ -149,17 +125,21 @@ async function parseNbcRowAsync(parser: Parser): Promise<NBCRowToken> {
         }
 
         parser.position = result.offset;
-        columns.push({ value: result.value, metadata });
+        values.push(result.value);
       }
 
       break;
     }
   }
 
-  return buildNbcRowToken(parser, columns);
+  return buildRow(colMetadata, values, parser.options);
 }
 
-function nbcRowParser(parser: Parser): NBCRowToken | Promise<NBCRowToken> {
+/**
+ * Parses the row following a NBCROW token and returns it in the shape
+ * determined by the `rowFormat` and `useColumnNames` options.
+ */
+function nbcRowParser(parser: Parser): unknown | Promise<unknown> {
   try {
     return parseNbcRowSync(parser);
   } catch (err) {

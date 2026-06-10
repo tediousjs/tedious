@@ -92,9 +92,29 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
   }
 
   const resultRows: any[] = [];
+  const options = connection.config.options;
 
-  metadataRequest.on('row', (columns: any) => {
-    resultRows.push(columns);
+  let currentColumnMetadata: any;
+  metadataRequest.on('columnMetadata', (columns: any) => {
+    currentColumnMetadata = Array.isArray(columns) ? columns : Object.values(columns);
+  });
+
+  metadataRequest.on('row', (row: any) => {
+    // Normalize the row into an array of `{ value, metadata }` column
+    // objects, independent of the connection's `rowFormat` and
+    // `useColumnNames` options. The column names in these result sets are
+    // unique, so name keyed rows can be mapped back losslessly.
+    if (options.rowFormat === 'values') {
+      if (options.useColumnNames) {
+        row = currentColumnMetadata.map((metadata: any) => ({ value: row[metadata.colName], metadata }));
+      } else {
+        row = row.map((value: any, i: number) => ({ value, metadata: currentColumnMetadata[i] }));
+      }
+    } else if (!Array.isArray(row)) {
+      row = currentColumnMetadata.map((metadata: any) => row[metadata.colName]);
+    }
+
+    resultRows.push(row);
   });
 
   connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest.sqlTextOrProcedure!, metadataRequest.parameters, connection.currentTransactionDescriptor(), connection.config.options, connection.databaseCollation));

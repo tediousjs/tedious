@@ -397,6 +397,7 @@ export interface InternalConnectionOptions {
   rowCollectionOnRequestCompletion: boolean;
   serverName: undefined | string;
   serverSupportsColumnEncryption: boolean;
+  rowFormat: 'columns' | 'values';
   tdsVersion: string;
   textsize: number;
   trustedServerNameAE: string | undefined;
@@ -846,6 +847,24 @@ export interface ConnectionOptions {
    *
    */
   serverName?: string;
+
+  /**
+   * The shape in which rows are emitted.
+   *
+   * With `'columns'`, each row is an array of `{ value, metadata }` column
+   * objects (or, with `useColumnNames`, an object mapping column names to
+   * such column objects).
+   *
+   * With `'values'`, each row is a plain array of values (or, with
+   * `useColumnNames`, an object mapping column names to values), with the
+   * column metadata only being emitted once per result set through the
+   * `columnMetadata` event. This avoids allocating a column object per
+   * value and is therefore faster.
+   *
+   * (default: `'columns'`).
+   */
+  rowFormat?: 'columns' | 'values';
+
   /**
    * A boolean determining whether to return rows as arrays or key-value collections.
    *
@@ -1317,6 +1336,7 @@ class Connection extends EventEmitter {
         serverName: undefined,
         serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
+        rowFormat: 'columns',
         textsize: DEFAULT_TEXTSIZE,
         trustedServerNameAE: undefined,
         trustServerCertificate: false,
@@ -1712,6 +1732,14 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.serverName" property must be of type string.');
         }
         this.config.options.serverName = config.options.serverName;
+      }
+
+      if (config.options.rowFormat !== undefined) {
+        if (config.options.rowFormat !== 'columns' && config.options.rowFormat !== 'values') {
+          throw new TypeError('The "config.options.rowFormat" property must be either "columns" or "values".');
+        }
+
+        this.config.options.rowFormat = config.options.rowFormat;
       }
 
       if (config.options.useColumnNames !== undefined) {

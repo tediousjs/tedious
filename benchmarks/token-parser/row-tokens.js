@@ -10,6 +10,7 @@ const WritableTrackingBuffer = require('tedious/lib/tracking-buffer/writable-tra
 
 const bench = createBenchmark(main, {
   schema: ['narrow', 'wide', 'chars'],
+  format: ['columns', 'values'],
   rows: [100],
   n: [500]
 });
@@ -160,7 +161,7 @@ async function * repeat(data, n) {
   }
 }
 
-function main({ schema: schemaName, rows, n }) {
+function main({ schema: schemaName, format, rows, n }) {
   const data = buildTokenStream(SCHEMAS[schemaName], rows);
 
   const debug = { token() {} };
@@ -172,7 +173,7 @@ function main({ schema: schemaName, rows, n }) {
     onDone() {},
     onDoneInProc() {},
     onDoneProc() {}
-  }, { tdsVersion: '7_4', useUTC: true });
+  }, { tdsVersion: '7_4', useUTC: true, rowFormat: format });
 
   bench.start();
 

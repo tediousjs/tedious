@@ -19,7 +19,6 @@ import {
   InfoMessageToken,
   LanguageEnvChangeToken,
   LoginAckToken,
-  NBCRowToken,
   OrderToken,
   PacketSizeEnvChangeToken,
   ResetConnectionEnvChangeToken,
@@ -27,7 +26,6 @@ import {
   ReturnValueToken,
   RollbackTransactionEnvChangeToken,
   RoutingEnvChangeToken,
-  RowToken,
   SSPIToken,
   Token
 } from './token';
@@ -112,8 +110,8 @@ export class TokenHandler {
     throw new UnexpectedTokenError(this, token);
   }
 
-  onRow(token: RowToken | NBCRowToken) {
-    throw new UnexpectedTokenError(this, token);
+  onRow(row: unknown) {
+    throw new Error('Unexpected row in `' + this.constructor.name + '`');
   }
 
   onReturnStatus(token: ReturnStatusToken) {
@@ -209,7 +207,7 @@ export class InitialSqlTokenHandler extends TokenHandler {
     this.connection.close();
   }
 
-  onRow(token: RowToken | NBCRowToken) {
+  onRow(row: unknown) {
     this.connection.emit('error', new Error("Received 'row' when no sqlRequest is in progress"));
     this.connection.close();
   }
@@ -464,17 +462,17 @@ export class RequestTokenHandler extends TokenHandler {
     }
   }
 
-  onRow(token: RowToken | NBCRowToken) {
+  onRow(row: unknown) {
     if (!this.request.canceled) {
       if (this.connection.config.options.rowCollectionOnRequestCompletion) {
-        this.request.rows!.push(token.columns);
+        this.request.rows!.push(row);
       }
 
       if (this.connection.config.options.rowCollectionOnDone) {
-        this.request.rst!.push(token.columns);
+        this.request.rst!.push(row);
       }
 
-      this.request.emit('row', token.columns);
+      this.request.emit('row', row);
     }
   }
 
