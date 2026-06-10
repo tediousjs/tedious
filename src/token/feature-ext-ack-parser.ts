@@ -32,7 +32,9 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
       throw new NotEnoughDataError(offset + featureAckDataLen);
     }
 
-    const featureData = buf.slice(offset, offset + featureAckDataLen);
+    // Copy the bytes out of `buf` - the token outlives the parse buffer,
+    // which is reused and overwritten on refills.
+    const featureData = Buffer.from(buf.subarray(offset, offset + featureAckDataLen));
     offset += featureAckDataLen;
 
     switch (featureId) {

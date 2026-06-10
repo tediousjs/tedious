@@ -20,12 +20,20 @@ import { NotEnoughDataError } from './helpers';
 
 export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
 
+const INITIAL_BUFFER_SIZE = 8 * 1024;
+
 class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
   options: ParserOptions;
 
   iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
+
+  /**
+   * The underlying storage of the parse buffer. Reused across refills;
+   * `buffer` is a view of the filled part of this storage.
+   */
+  storage: Buffer;
   buffer: Buffer;
   position: number;
 
@@ -381,7 +389,8 @@ class Parser {
 
     this.iterator = ((iterable as AsyncIterable<Buffer>)[Symbol.asyncIterator] || (iterable as Iterable<Buffer>)[Symbol.iterator]).call(iterable);
 
-    this.buffer = Buffer.alloc(0);
+    this.storage = Buffer.allocUnsafe(INITIAL_BUFFER_SIZE);
+    this.buffer = this.storage.subarray(0, 0);
     this.position = 0;
   }
 
@@ -391,12 +400,65 @@ class Parser {
       throw new Error('unexpected end of data');
     }
 
-    if (this.position === this.buffer.length) {
-      this.buffer = result.value;
-    } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), result.value]);
+    this.append(result.value);
+  }
+
+  /**
+   * Appends a chunk of incoming data to the parse buffer, reusing the
+   * existing storage whenever possible.
+   *
+   * When the previous data was fully consumed, the chunk is adopted as the
+   * parse buffer directly, without copying. Otherwise, the unconsumed
+   * remainder and the chunk are merged into the (reused) storage. This
+   * invalidates views into the parse buffer, so any data that needs to
+   * outlive the current parse step (values handed out to user code, token
+   * fields, PLP chunks collected across refills) must be copied out of the
+   * buffer, and parsing must restart from `position` after every refill.
+   */
+  append(chunk: Buffer) {
+    const dataEnd = this.buffer.length;
+
+    if (this.position === dataEnd) {
+      // The previous data was fully consumed - adopt the chunk directly.
+      this.buffer = chunk;
+      this.position = 0;
+      return;
     }
 
+    const remaining = dataEnd - this.position;
+    const needed = remaining + chunk.length;
+
+    // The parse buffer is either a view of `storage` (starting at offset 0)
+    // or an adopted chunk.
+    const storageBacked = this.buffer.buffer === this.storage.buffer;
+
+    if (storageBacked && dataEnd + chunk.length <= this.storage.length) {
+      // The chunk fits into the remaining storage space.
+      chunk.copy(this.storage, dataEnd);
+      this.buffer = this.storage.subarray(0, dataEnd + chunk.length);
+      return;
+    }
+
+    if (needed > this.storage.length) {
+      // Grow the storage. `allocUnsafe` is fine here as `buffer` only ever
+      // exposes the bytes that were copied in.
+      let size = this.storage.length * 2;
+      while (size < needed) {
+        size *= 2;
+      }
+
+      this.storage = Buffer.allocUnsafe(size);
+      this.buffer.copy(this.storage, 0, this.position, dataEnd);
+    } else if (storageBacked) {
+      // Reclaim the consumed space at the start of the storage.
+      this.storage.copyWithin(0, this.position, dataEnd);
+    } else {
+      // Move the remainder of an adopted chunk into the storage.
+      this.buffer.copy(this.storage, 0, this.position, dataEnd);
+    }
+
+    chunk.copy(this.storage, remaining);
+    this.buffer = this.storage.subarray(0, needed);
     this.position = 0;
   }
 }

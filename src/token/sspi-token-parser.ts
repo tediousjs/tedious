@@ -49,7 +49,9 @@ function sspiParser(buf: Buffer, offset: number, _options: ParserOptions): Resul
     throw new NotEnoughDataError(offset + tokenLength);
   }
 
-  const data = buf.slice(offset, offset + tokenLength);
+  // Copy the bytes out of `buf` - the token outlives the parse buffer,
+  // which is reused and overwritten on refills.
+  const data = Buffer.from(buf.subarray(offset, offset + tokenLength));
   offset += tokenLength;
 
   return new Result(new SSPIToken(parseChallenge(data), data), offset);

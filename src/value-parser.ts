@@ -272,10 +272,10 @@ function buildValueReader(metadata: Metadata, options: ParserOptions): ValueRead
         }
 
         // Textpointer
-        ({ offset } = readBinary(buf, offset, textPointerLength));
+        offset = skipBytes(buf, offset, textPointerLength);
 
         // Timestamp
-        ({ offset } = readBinary(buf, offset, 8));
+        offset = skipBytes(buf, offset, 8);
 
         let dataLength;
         ({ offset, value: dataLength } = readUInt32LE(buf, offset));
@@ -294,10 +294,10 @@ function buildValueReader(metadata: Metadata, options: ParserOptions): ValueRead
         }
 
         // Textpointer
-        ({ offset } = readBinary(buf, offset, textPointerLength));
+        offset = skipBytes(buf, offset, textPointerLength);
 
         // Timestamp
-        ({ offset } = readBinary(buf, offset, 8));
+        offset = skipBytes(buf, offset, 8);
 
         let dataLength;
         ({ offset, value: dataLength } = readUInt32LE(buf, offset));
@@ -315,10 +315,10 @@ function buildValueReader(metadata: Metadata, options: ParserOptions): ValueRead
         }
 
         // Textpointer
-        ({ offset } = readBinary(buf, offset, textPointerLength));
+        offset = skipBytes(buf, offset, textPointerLength);
 
         // Timestamp
-        ({ offset } = readBinary(buf, offset, 8));
+        offset = skipBytes(buf, offset, 8);
 
         let dataLength;
         ({ offset, value: dataLength } = readUInt32LE(buf, offset));
@@ -679,10 +679,10 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       }
 
       // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      offset = skipBytes(buf, offset, textPointerLength);
 
       // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      offset = skipBytes(buf, offset, 8);
 
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
@@ -699,10 +699,10 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       }
 
       // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      offset = skipBytes(buf, offset, textPointerLength);
 
       // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      offset = skipBytes(buf, offset, 8);
 
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
@@ -719,10 +719,10 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       }
 
       // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      offset = skipBytes(buf, offset, textPointerLength);
 
       // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      offset = skipBytes(buf, offset, 8);
 
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
@@ -864,10 +864,15 @@ function isPLPStream(metadata: Metadata) {
 }
 
 function readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOptions): Result<string> {
-  let data;
-  ({ value: data, offset } = readBinary(buf, offset, 0x10));
+  if (buf.length < offset + 0x10) {
+    throw new NotEnoughDataError(offset + 0x10);
+  }
 
-  return new Result(options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data), offset);
+  // The bytes are converted to a string right away, so a transient view is
+  // enough here.
+  const data = buf.subarray(offset, offset + 0x10);
+
+  return new Result(options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data), offset + 0x10);
 }
 
 function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
@@ -1019,7 +1024,17 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
     throw new NotEnoughDataError(offset + dataLength);
   }
 
-  return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
+  // Copy the bytes out of `buf` - the value outlives the parse buffer,
+  // which is reused and overwritten on refills.
+  return new Result(Buffer.from(buf.subarray(offset, offset + dataLength)), offset + dataLength);
+}
+
+function skipBytes(buf: Buffer, offset: number, byteLength: number): number {
+  if (buf.length < offset + byteLength) {
+    throw new NotEnoughDataError(offset + byteLength);
+  }
+
+  return offset + byteLength;
 }
 
 function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
@@ -1119,7 +1134,9 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
       await parser.waitForChunk();
     }
 
-    chunks.push(parser.buffer.slice(parser.position, parser.position + chunkLength));
+    // Copy the bytes out of the parse buffer - the chunks are collected
+    // across refills, which reuse and overwrite the buffer.
+    chunks.push(Buffer.from(parser.buffer.subarray(parser.position, parser.position + chunkLength)));
     parser.position += chunkLength;
     currentLength += chunkLength;
   }

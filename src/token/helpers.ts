@@ -162,7 +162,9 @@ export function readBVarByte(buf: Buffer, offset: number): Result<Buffer> {
     throw new NotEnoughDataError(offset + byteLength);
   }
 
-  return new Result(buf.slice(offset, offset + byteLength), offset + byteLength);
+  // Copy the bytes out of `buf` - it may be a view of the parse buffer,
+  // which is reused and overwritten on refills.
+  return new Result(Buffer.from(buf.subarray(offset, offset + byteLength)), offset + byteLength);
 }
 
 export function readUsVarChar(buf: Buffer, offset: number): Result<string> {
@@ -190,7 +192,9 @@ export function readUsVarByte(buf: Buffer, offset: number): Result<Buffer> {
     throw new NotEnoughDataError(offset + byteLength);
   }
 
-  return new Result(buf.slice(offset, offset + byteLength), offset + byteLength);
+  // Copy the bytes out of `buf` - it may be a view of the parse buffer,
+  // which is reused and overwritten on refills.
+  return new Result(Buffer.from(buf.subarray(offset, offset + byteLength)), offset + byteLength);
 }
 
 export function readUNumeric64LE(buf: Buffer, offset: number): Result<number> {
