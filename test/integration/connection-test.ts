@@ -1428,6 +1428,136 @@ update #tab1 set name = 'a3' where name like 'a%'\
     }
   });
 
+  it('should support cancelling a request while the response is being streamed', function(done) {
+    const config = getConfig();
+
+    let canceled = false;
+    let cancelledAt: [number, number];
+
+    // A query that produces a large result set, so that the server is still
+    // streaming response packets when the attention message arrives. The
+    // attention acknowledgement is then placed in the tail of the (partially
+    // received) response message, instead of being sent in a separate message.
+    const request = new Request("select top 20000 replicate('x', 500) as filler from sys.all_columns a cross join sys.all_columns b", (err, rowCount) => {
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Canceled.');
+
+      assert.isUndefined(rowCount);
+
+      // Ensure that not too much time has passed since the cancellation was requested.
+      const [seconds] = process.hrtime(cancelledAt);
+      assert.strictEqual(seconds, 0);
+
+      // Ensure that the connection is still usable after the cancelTimeout has passed.
+      setTimeout(() => {
+        const request = new Request('select 1', (err) => {
+          assert.ifError(err);
+
+          connection.close();
+        });
+
+        connection.execSql(request);
+      }, 2000 + 100);
+    });
+
+    request.on('row', () => {
+      if (!canceled) {
+        canceled = true;
+
+        cancelledAt = process.hrtime();
+        request.cancel();
+      }
+    });
+
+    const connection = new Connection({
+      ...config,
+      options: {
+        ...config.options,
+        cancelTimeout: 2000
+      }
+    });
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+  });
+
+  it('should support cancelling a request before any response data was received', function(done) {
+    const config = getConfig();
+
+    let cancelledAt: [number, number];
+
+    // A query that does not produce any response data before the attention
+    // message arrives. The attention acknowledgement is then the very first
+    // response data that is received for the request.
+    const request = new Request("waitfor delay '00:00:05'; select 2 as C2", (err, rowCount) => {
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Canceled.');
+
+      assert.isUndefined(rowCount);
+
+      // Ensure that not too much time has passed since the cancellation was requested.
+      const [seconds] = process.hrtime(cancelledAt);
+      assert.strictEqual(seconds, 0);
+
+      // Ensure that the connection is still usable after the cancelTimeout has passed.
+      setTimeout(() => {
+        const request = new Request('select 1', (err) => {
+          assert.ifError(err);
+
+          connection.close();
+        });
+
+        connection.execSql(request);
+      }, 2000 + 100);
+    });
+
+    request.on('columnMetadata', (columnsMetadata) => {
+      assert.fail('Expected no columnMetadata event');
+    });
+
+    request.on('row', (columns) => {
+      assert.fail('Expected no row event');
+    });
+
+    const connection = new Connection({
+      ...config,
+      options: {
+        ...config.options,
+        cancelTimeout: 2000
+      }
+    });
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+
+      setTimeout(() => {
+        cancelledAt = process.hrtime();
+        request.cancel();
+      }, 1000);
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+  });
+
   it('should request timeout', function(done) {
     const request = new Request(
       "select 1 as C1;waitfor delay '00:00:05';select 2 as C2",
