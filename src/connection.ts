@@ -3195,7 +3195,11 @@ class Connection extends EventEmitter {
 
       const onCancel = () => {
         payloadStream.unpipe(message);
-        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+        payloadStream.destroy();
+
+        // The request error might already be set, e.g. if the payload
+        // stream errored before the cancellation.
+        request.error ??= new RequestError('Canceled.', 'ECANCEL');
 
         // set the ignore bit and end the message.
         message.ignore = true;

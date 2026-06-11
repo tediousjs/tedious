@@ -229,4 +229,139 @@ describe('Canceling a request', function() {
       done();
     });
   });
+
+  it('should complete the request with `ECANCEL` when canceled before the request message was fully sent', function(done) {
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildLoginAckToken());
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (Initial SQL)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`select 1`) - the request message was canceled
+        // while it was being sent, so its final packet carries the
+        // `IGNORE` bit. The server discards the request, but still
+        // responds with a (empty) response message.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`select 2`) - no attention message is expected
+        // in between, as the canceled request was never fully sent.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken(7));
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const request = new Request('select 1', (err) => {
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(err.code, 'ECANCEL');
+
+        // The message stream should still be aligned: the next request
+        // must receive its own response.
+        const secondRequest = new Request('select 2', (err, rowCount) => {
+          assert.isUndefined(err);
+          assert.strictEqual(rowCount, 7);
+
+          connection.close();
+        });
+
+        connection.execSqlBatch(secondRequest);
+      });
+
+      connection.execSqlBatch(request);
+
+      // Cancel the request immediately, before the request message
+      // was fully sent off.
+      connection.cancel();
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
 });
