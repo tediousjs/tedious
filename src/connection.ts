@@ -3847,6 +3847,7 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (handler.attentionReceived) {
+          this.attentionSent = false;
           this.clearCancelTimer();
 
           const sqlRequest = this.request!;
