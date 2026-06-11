@@ -1036,6 +1036,14 @@ class Connection extends EventEmitter {
   declare requestTimer: undefined | NodeJS.Timeout;
 
   /**
+   * Whether an attention message was sent to the server to cancel the
+   * currently active request.
+   *
+   * @private
+   */
+  declare attentionSent: boolean;
+
+  /**
    * @private
    */
   declare _cancelAfterRequestSent: () => void;
@@ -1780,8 +1788,11 @@ class Connection extends EventEmitter {
 
     this.state = this.STATE.INITIALIZED;
 
+    this.attentionSent = false;
+
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
+      this.attentionSent = true;
       this.createCancelTimer();
     };
 
@@ -3176,6 +3187,7 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
+      this.attentionSent = false;
       request.connection! = this;
       request.rowCount! = 0;
       request.rows! = [];
@@ -3722,15 +3734,15 @@ Connection.prototype.STATE = {
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
-        // If the request was canceled and we have a `cancelTimer`
-        // defined, we send a attention message after the
-        // request message was fully sent off.
+        // If the request was canceled after the request message was
+        // fully sent off, an attention message was sent to the server.
         //
-        // We already started consuming the current message
-        // (but all the token handlers should be no-ops), and
-        // need to ensure the next message is handled by the
-        // `SENT_ATTENTION` state.
-        if (this.request?.canceled && this.cancelTimer) {
+        // We already started consuming the current message (the response
+        // to the canceled request, with all the token handlers being
+        // no-ops), and need to ensure the next message (containing the
+        // attention acknowledgement) is handled by the `SENT_ATTENTION`
+        // state.
+        if (this.request?.canceled && this.attentionSent) {
           return this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
