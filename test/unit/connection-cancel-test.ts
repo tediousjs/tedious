@@ -102,6 +102,15 @@ describe('Canceling a request', function() {
   });
 
   it('should complete the canceled request and leave the message stream aligned when `cancelTimeout` is disabled', function(done) {
+    // Used by the server side to signal to the client side that the request
+    // message was fully received. Canceling after this point guarantees the
+    // cancellation is performed by sending an attention message, not by
+    // terminating the request message with the `IGNORE` bit set.
+    let signalRequestReceived!: () => void;
+    const requestReceived = new Promise<void>((resolve) => {
+      signalRequestReceived = resolve;
+    });
+
     server.on('connection', async (connection) => {
       const debug = new Debug();
       const incomingMessageStream = new IncomingMessageStream(debug);
@@ -134,7 +143,7 @@ describe('Canceling a request', function() {
           await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
-          responseMessage.end(buildLoginAckToken());
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
           outgoingMessageStream.write(responseMessage);
         }
 
@@ -157,6 +166,8 @@ describe('Canceling a request', function() {
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
+
+          signalRequestReceived();
         }
 
         // ATTENTION
@@ -226,13 +237,10 @@ describe('Canceling a request', function() {
 
       connection.execSqlBatch(request);
 
-      // Cancel the request after a short delay, to ensure the request
-      // message was fully sent off and the cancellation is performed by
-      // sending an attention message, not by terminating the request
-      // message with the `IGNORE` bit set.
-      setTimeout(() => {
+      // Cancel the request once the server received the request message.
+      requestReceived.then(() => {
         connection.cancel();
-      }, 50);
+      });
     });
 
     connection.on('end', () => {
@@ -273,7 +281,7 @@ describe('Canceling a request', function() {
           await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
-          responseMessage.end(buildLoginAckToken());
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
           outgoingMessageStream.write(responseMessage);
         }
 
@@ -400,7 +408,7 @@ describe('Canceling a request', function() {
           await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
-          responseMessage.end(buildLoginAckToken());
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
           outgoingMessageStream.write(responseMessage);
         }
 
@@ -519,12 +527,12 @@ describe('Canceling a request', function() {
         });
       })());
 
-      // Cancel the bulk load once its message is being sent and the
-      // first part of the response message has arrived.
-      setTimeout(() => {
+      // Cancel the bulk load once the first part of the response message
+      // has arrived, while the bulk load message is still being sent.
+      bulkLoad.on('columnMetadata', () => {
         connection.cancel();
         signalCanceled();
-      }, 100);
+      });
     });
 
     connection.on('end', () => {

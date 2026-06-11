@@ -2164,6 +2164,7 @@ class Connection extends EventEmitter {
         this.request = undefined;
       }
 
+      this.attentionSent = false;
       this.closed = true;
     }
   }
