@@ -3766,6 +3766,14 @@ Connection.prototype.STATE = {
         }
 
         const onCancel = () => {
+          // If the request was canceled before the request message was
+          // fully sent, the message was terminated with the `IGNORE` bit
+          // set and no attention message was sent. The server's response
+          // to the ignored message is handled like a regular response.
+          if (!this.attentionSent) {
+            return;
+          }
+
           tokenStreamParser.removeListener('end', onEndOfMessage);
 
           if (this.request instanceof Request && this.request.paused) {
