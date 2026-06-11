@@ -56,6 +56,16 @@ function buildAttentionAckToken(): Buffer {
   return buffer;
 }
 
+/**
+ * Reads and discards all data of the given message.
+ */
+async function drainMessage(message: Message): Promise<void> {
+  const iterator = message[Symbol.asyncIterator]();
+  while (!(await iterator.next()).done) {
+    // Discard the data.
+  }
+}
+
 describe('Canceling a request', function() {
   let server: net.Server;
   let _connections: net.Socket[];
@@ -93,10 +103,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x12);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
@@ -109,10 +116,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x10);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end(buildLoginAckToken());
@@ -124,10 +128,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end();
@@ -140,10 +141,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
         }
 
         // ATTENTION
@@ -151,10 +149,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x06);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           // Every client request receives exactly one response message:
           // first the response to the canceled request, then a separate
@@ -174,17 +169,14 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end(buildDoneToken(7));
           outgoingMessageStream.write(responseMessage);
         }
-      } catch (err) {
-        console.log(err);
+      } catch (err: any) {
+        done(err);
       }
     });
 
@@ -219,7 +211,10 @@ describe('Canceling a request', function() {
 
       connection.execSqlBatch(request);
 
-      // Cancel the request once the request message has been sent off.
+      // Cancel the request after a short delay, to ensure the request
+      // message was fully sent off and the cancellation is performed by
+      // sending an attention message, not by terminating the request
+      // message with the `IGNORE` bit set.
       setTimeout(() => {
         connection.cancel();
       }, 50);
@@ -247,10 +242,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x12);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
@@ -263,10 +255,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x10);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end(buildLoginAckToken());
@@ -278,10 +267,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end();
@@ -296,10 +282,7 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end();
@@ -312,17 +295,14 @@ describe('Canceling a request', function() {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
 
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end(buildDoneToken(7));
           outgoingMessageStream.write(responseMessage);
         }
-      } catch (err) {
-        console.log(err);
+      } catch (err: any) {
+        done(err);
       }
     });
 
@@ -364,4 +344,5 @@ describe('Canceling a request', function() {
       done();
     });
   });
+
 });
