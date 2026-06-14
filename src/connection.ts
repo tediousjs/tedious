@@ -1044,6 +1044,14 @@ class Connection extends EventEmitter {
   declare closeController: undefined | AbortController;
 
   /**
+   * Whether an attention message was sent to the server to cancel the
+   * currently active request.
+   *
+   * @private
+   */
+  declare attentionSent: boolean;
+
+  /**
    * @private
    */
   declare _cancelAfterRequestSent: () => void;
@@ -1788,8 +1796,11 @@ class Connection extends EventEmitter {
 
     this.state = this.STATE.INITIALIZED;
 
+    this.attentionSent = false;
+
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
+      this.attentionSent = true;
       this.createCancelTimer();
     };
 
@@ -2154,6 +2165,7 @@ class Connection extends EventEmitter {
   cleanupConnection() {
     if (!this.closed) {
       this.clearRequestTimer();
+      this.clearCancelTimer();
       this.closeConnection();
 
       process.nextTick(() => {
@@ -2167,6 +2179,7 @@ class Connection extends EventEmitter {
         this.request = undefined;
       }
 
+      this.attentionSent = false;
       this.closed = true;
     }
   }
@@ -3190,6 +3203,7 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
+      this.attentionSent = false;
       request.connection! = this;
       request.rowCount! = 0;
       request.rows! = [];
@@ -3197,7 +3211,11 @@ class Connection extends EventEmitter {
 
       const onCancel = () => {
         payloadStream.unpipe(message);
-        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+        payloadStream.destroy();
+
+        // The request error might already be set, e.g. if the payload
+        // stream errored before the cancellation.
+        request.error ??= new RequestError('Canceled.', 'ECANCEL');
 
         // set the ignore bit and end the message.
         message.ignore = true;
@@ -3219,7 +3237,11 @@ class Connection extends EventEmitter {
 
       message.once('finish', () => {
         request.removeListener('cancel', onCancel);
-        request.once('cancel', this._cancelAfterRequestSent);
+        // Prepend the listener so it always runs before the
+        // `SentClientRequest` state's `cancel` handler, regardless of the
+        // order in which the two were registered. The latter relies on
+        // `attentionSent` already being set, which only this listener does.
+        request.prependOnceListener('cancel', this._cancelAfterRequestSent);
 
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
@@ -3748,15 +3770,15 @@ Connection.prototype.STATE = {
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
-        // If the request was canceled and we have a `cancelTimer`
-        // defined, we send a attention message after the
-        // request message was fully sent off.
+        // If the request was canceled after the request message was
+        // fully sent off, an attention message was sent to the server.
         //
-        // We already started consuming the current message
-        // (but all the token handlers should be no-ops), and
-        // need to ensure the next message is handled by the
-        // `SENT_ATTENTION` state.
-        if (this.request?.canceled && this.cancelTimer) {
+        // We already started consuming the current message (the response
+        // to the canceled request, with all the token handlers being
+        // no-ops), and need to ensure the next message (containing the
+        // attention acknowledgement) is handled by the `SENT_ATTENTION`
+        // state.
+        if (this.request?.canceled && this.attentionSent) {
           return this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
@@ -3776,6 +3798,14 @@ Connection.prototype.STATE = {
         }
 
         const onCancel = () => {
+          // If the request was canceled before the request message was
+          // fully sent, the message was terminated with the `IGNORE` bit
+          // set and no attention message was sent. The server's response
+          // to the ignored message is handled like a regular response.
+          if (!this.attentionSent) {
+            return;
+          }
+
           tokenStreamParser.removeListener('end', onEndOfMessage);
 
           if (this.request instanceof Request && this.request.paused) {
@@ -3849,6 +3879,7 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (handler.attentionReceived) {
+          this.attentionSent = false;
           this.clearCancelTimer();
 
           const sqlRequest = this.request!;
