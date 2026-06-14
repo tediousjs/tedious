@@ -2140,6 +2140,7 @@ class Connection extends EventEmitter {
   cleanupConnection() {
     if (!this.closed) {
       this.clearRequestTimer();
+      this.clearCancelTimer();
       this.closeConnection();
 
       process.nextTick(() => {
