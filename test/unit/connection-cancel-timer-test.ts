@@ -28,13 +28,9 @@ function buildLoginAckToken(): Buffer {
 
 // Consume and discard a message's data so the iterator can advance to the
 // next incoming message.
-//
-// This drives the async iterator explicitly rather than using `for await...of`
-// because the project's eslint config (`no-unused-vars` + `no-void`) rejects an
-// unused loop binding.
 async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
-  const iterator = message[Symbol.asyncIterator]();
-  while (!(await iterator.next()).done) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for await (const _ of message) {
     // Discard each chunk.
   }
 }
