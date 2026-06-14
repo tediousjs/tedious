@@ -72,6 +72,34 @@ function buildColMetadataToken(): Buffer {
 }
 
 /**
+ * Builds an `ERROR` token, as a server would send when it encounters an
+ * error in the middle of processing a request (e.g. a failing bulk load).
+ */
+function buildErrorToken(): Buffer {
+  const message = 'Bulk load data conversion error.';
+  const messageData = Buffer.from(message, 'ucs2');
+
+  const data = Buffer.alloc(4 + 1 + 1 + 2 + messageData.length + 1 + 1 + 4);
+
+  let offset = 0;
+  offset = data.writeUInt32LE(4815, offset); // number
+  offset = data.writeUInt8(1, offset); // state
+  offset = data.writeUInt8(16, offset); // class
+  offset = data.writeUInt16LE(message.length, offset); // message length (in characters)
+  offset += messageData.copy(data, offset); // message
+  offset = data.writeUInt8(0, offset); // server name length
+  offset = data.writeUInt8(0, offset); // proc name length
+  data.writeUInt32LE(0, offset); // line number (TDS 7.2+)
+
+  const buffer = Buffer.alloc(3 + data.length);
+  buffer.writeUInt8(0xAA, 0); // ERROR
+  buffer.writeUInt16LE(data.length, 1); // token length
+  data.copy(buffer, 3);
+
+  return buffer;
+}
+
+/**
  * Reads and discards all data of the given message.
  */
 async function drainMessage(message: Message): Promise<void> {
@@ -532,6 +560,214 @@ describe('Canceling a request', function() {
       bulkLoad.on('columnMetadata', () => {
         connection.cancel();
         signalCanceled();
+      });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('should complete the request with `ECANCEL` when a bulk load is canceled after it was fully sent but the server already responded with an error', function(done) {
+    // This models a real bulk load that the server rejects mid-stream: the
+    // server starts responding (here with an error) while the client is
+    // still sending the bulk load message, the client keeps streaming the
+    // remaining rows until the message is fully sent, and only then is the
+    // bulk load canceled.
+    //
+    // In that ordering the client registers its `SentClientRequest` cancel
+    // handler (when the response starts arriving) *before* the request
+    // message finishes sending (which registers the post-send cancel
+    // handler). The post-send handler must still run first so that an
+    // attention message is sent and acknowledged; otherwise the attention
+    // acknowledgement is left unread and corrupts the next request.
+
+    // Signals (client -> generator) that the error response was received,
+    // so the bulk load row stream may complete.
+    let signalErrorReceived!: () => void;
+    const errorReceived = new Promise<void>((resolve) => {
+      signalErrorReceived = resolve;
+    });
+
+    // Signals (server -> client) that the full bulk load message was
+    // received, which means the client already finished sending it (so its
+    // `finish` event fired and the post-send cancel handler is registered).
+    // Canceling only after this point exercises the post-send cancel path
+    // with a response that started arriving early.
+    let signalDrained!: () => void;
+    const requestDrained = new Promise<void>((resolve) => {
+      signalDrained = resolve;
+    });
+
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          await drainMessage(message);
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (Initial SQL)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`insert bulk ...`)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // Bulk Load
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x07);
+
+          // Start responding with an error right away, while the client is
+          // still sending the bulk load message, like a server would do
+          // when it rejects a bulk load (e.g. a data conversion error).
+          // The response message is left open (no final packet yet) until
+          // the bulk load message has been fully received.
+          const packet = new Packet(0x04);
+          packet.packetId(1);
+          packet.addData(buildErrorToken());
+          connection.write(packet.buffer);
+
+          // Drain the rest of the bulk load message. Once this resolves,
+          // the client has finished sending the bulk load message, so its
+          // `finish` event already fired.
+          await drainMessage(message);
+
+          // Now let the client cancel - after the request message was
+          // fully sent off.
+          signalDrained();
+
+          // The cancellation is performed by sending an attention message.
+          const { value: attentionMessage } = await messageIterator.next();
+          assert.strictEqual(attentionMessage.type, 0x06);
+
+          await drainMessage(attentionMessage);
+
+          // Finish the (cut short) response to the canceled request.
+          const finalPacket = new Packet(0x04);
+          finalPacket.packetId(2);
+          finalPacket.last(true);
+          finalPacket.addData(buildDoneToken());
+          connection.write(finalPacket.buffer);
+
+          // Acknowledge the attention message in a separate message.
+          const ackMessage = new Message({ type: 0x04 });
+          ackMessage.end(buildAttentionAckToken());
+          outgoingMessageStream.write(ackMessage);
+        }
+
+        // SQL Batch (`select 2`)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken(7));
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false,
+        cancelTimeout: 0
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const bulkLoad = connection.newBulkLoad('#tmp', (err) => {
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual(err.code, 'ECANCEL');
+
+        // The message stream should still be aligned: the next request
+        // must receive its own response, not the leftover attention
+        // acknowledgement message.
+        const secondRequest = new Request('select 2', (err, rowCount) => {
+          assert.isUndefined(err);
+          assert.strictEqual(rowCount, 7);
+
+          connection.close();
+        });
+
+        connection.execSqlBatch(secondRequest);
+      });
+
+      bulkLoad.addColumn('a', TYPES.VarBinary, { length: 8000, nullable: false });
+
+      // A row stream that completes only once the error response has been
+      // received, so the bulk load message is guaranteed to finish sending
+      // *after* the response started arriving. The first row is large
+      // enough to fill a packet, so the server starts receiving the bulk
+      // load message right away.
+      connection.execBulkLoad(bulkLoad, (async function*() {
+        yield [Buffer.alloc(8000)];
+
+        await errorReceived;
+      })());
+
+      connection.on('errorMessage', () => {
+        signalErrorReceived();
+      });
+
+      // Cancel the bulk load once the server received the full bulk load
+      // message, i.e. after the request message was fully sent off.
+      requestDrained.then(() => {
+        connection.cancel();
       });
     });
 

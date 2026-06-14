@@ -3223,7 +3223,11 @@ class Connection extends EventEmitter {
 
       message.once('finish', () => {
         request.removeListener('cancel', onCancel);
-        request.once('cancel', this._cancelAfterRequestSent);
+        // Prepend the listener so it always runs before the
+        // `SentClientRequest` state's `cancel` handler, regardless of the
+        // order in which the two were registered. The latter relies on
+        // `attentionSent` already being set, which only this listener does.
+        request.prependOnceListener('cancel', this._cancelAfterRequestSent);
 
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
