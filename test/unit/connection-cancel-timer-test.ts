@@ -28,11 +28,27 @@ function buildLoginAckToken(): Buffer {
 
 // Consume and discard a message's data so the iterator can advance to the
 // next incoming message.
+//
+// This drives the async iterator explicitly rather than using `for await...of`
+// because the project's eslint config (`no-unused-vars` + `no-void`) rejects an
+// unused loop binding.
 async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
   const iterator = message[Symbol.asyncIterator]();
   while (!(await iterator.next()).done) {
     // Discard each chunk.
   }
+}
+
+// Read the next message the client sends, assert its TDS packet type, and drain
+// its payload. Guards against the message stream ending unexpectedly, so a
+// premature end surfaces as a clear assertion failure rather than a `TypeError`
+// on `message.type`.
+async function expectMessage(iterator: AsyncIterableIterator<Message>, expectedType: number): Promise<void> {
+  const { value: message, done } = await iterator.next();
+  assert.isNotOk(done, 'expected another message from the client, but the stream ended');
+  assert.isDefined(message, 'expected a message from the client, but received none');
+  assert.strictEqual(message.type, expectedType);
+  await drainMessage(message);
 }
 
 describe('Connection cancel timer handling', function() {
@@ -102,11 +118,8 @@ describe('Connection cancel timer handling', function() {
 
       try {
         // PRELOGIN
+        await expectMessage(messageIterator, 0x12);
         {
-          const { value: message } = await messageIterator.next();
-          assert.strictEqual(message.type, 0x12);
-          await drainMessage(message);
-
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
           responseMessage.end(responsePayload.data);
@@ -114,36 +127,26 @@ describe('Connection cancel timer handling', function() {
         }
 
         // LOGIN7
+        await expectMessage(messageIterator, 0x10);
         {
-          const { value: message } = await messageIterator.next();
-          assert.strictEqual(message.type, 0x10);
-          await drainMessage(message);
-
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end(buildLoginAckToken());
           outgoingMessageStream.write(responseMessage);
         }
 
         // SQL Batch (Initial SQL)
+        await expectMessage(messageIterator, 0x01);
         {
-          const { value: message } = await messageIterator.next();
-          assert.strictEqual(message.type, 0x01);
-          await drainMessage(message);
-
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end();
           outgoingMessageStream.write(responseMessage);
         }
 
-        // The client is now logged in and will issue a request. Read the request
-        // message in full - completing the read means the client finished sending
-        // it, so the "cancel after request sent" path (which sends an attention
-        // message and arms the cancel timer) is now wired up.
-        {
-          const { value: message } = await messageIterator.next();
-          assert.strictEqual(message.type, 0x03); // RPC_REQUEST
-          await drainMessage(message);
-        }
+        // The client is now logged in and will issue a request. Reading the
+        // request message in full means the client finished sending it, so the
+        // "cancel after request sent" path (which sends an attention message and
+        // arms the cancel timer) is now wired up.
+        await expectMessage(messageIterator, 0x03); // RPC_REQUEST
 
         // Cancel the in-flight request from the client side. This sends an
         // attention message to the server and arms the cancel timer.
@@ -151,11 +154,7 @@ describe('Connection cancel timer handling', function() {
 
         // Read the attention message the client sends. Once we have it, we know
         // the cancel timer has been armed on the client.
-        {
-          const { value: message } = await messageIterator.next();
-          assert.strictEqual(message.type, 0x06); // ATTENTION
-          await drainMessage(message);
-        }
+        await expectMessage(messageIterator, 0x06); // ATTENTION
 
         // Send the (cut short) response to the canceled request so the client
         // moves into its `SentAttention` state, waiting for the attention
