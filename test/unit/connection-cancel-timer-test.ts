@@ -26,18 +26,27 @@ function buildLoginAckToken(): Buffer {
   return buffer;
 }
 
+// Consume and discard a message's data so the iterator can advance to the
+// next incoming message.
+async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
+  const iterator = message[Symbol.asyncIterator]();
+  while (!(await iterator.next()).done) {
+    // Discard each chunk.
+  }
+}
+
 describe('Connection cancel timer handling', function() {
   let server: net.Server;
-  let _connections: net.Socket[];
+  let serverConnections: net.Socket[];
 
   beforeEach(function(done) {
-    _connections = [];
+    serverConnections = [];
     server = net.createServer();
     server.listen(0, '127.0.0.1', done);
   });
 
   afterEach(function(done) {
-    _connections.forEach((connection) => {
+    serverConnections.forEach((connection) => {
       connection.destroy();
     });
 
@@ -55,12 +64,15 @@ describe('Connection cancel timer handling', function() {
   // has no handler and therefore emits a spurious `error` event - long after the
   // connection has already emitted `end`.
   it('does not emit a spurious cancel-timeout error when closed while a cancel is in flight', function(done) {
-    const cancelTimeout = 150;
+    const cancelTimeout = 300;
 
     // The time `connection.close()` was called, and the delays (relative to it)
     // at which `error` events were observed on the client connection.
     let closeTime: number | undefined;
     const errorDelays: number[] = [];
+
+    // The error the in-flight request completed with.
+    let requestError: (Error & { code?: string }) | null | undefined;
 
     let finished = false;
     const finish = (err?: Error) => {
@@ -72,7 +84,7 @@ describe('Connection cancel timer handling', function() {
     };
 
     server.on('connection', async (socket) => {
-      _connections.push(socket);
+      serverConnections.push(socket);
 
       // The client closes its socket abruptly as part of this test, which
       // surfaces as an `ECONNRESET` on the server socket. Swallow it so it
@@ -93,10 +105,7 @@ describe('Connection cancel timer handling', function() {
         {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x12);
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });
@@ -108,10 +117,7 @@ describe('Connection cancel timer handling', function() {
         {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x10);
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end(buildLoginAckToken());
@@ -122,10 +128,7 @@ describe('Connection cancel timer handling', function() {
         {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x01);
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
 
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.end();
@@ -139,10 +142,7 @@ describe('Connection cancel timer handling', function() {
         {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x03); // RPC_REQUEST
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
         }
 
         // Cancel the in-flight request from the client side. This sends an
@@ -154,10 +154,7 @@ describe('Connection cancel timer handling', function() {
         {
           const { value: message } = await messageIterator.next();
           assert.strictEqual(message.type, 0x06); // ATTENTION
-          const chunks: Buffer[] = [];
-          for await (const data of message) {
-            chunks.push(data);
-          }
+          await drainMessage(message);
         }
 
         // Send the (cut short) response to the canceled request so the client
@@ -178,20 +175,22 @@ describe('Connection cancel timer handling', function() {
 
         // Give the (leaked) cancel timer well over `cancelTimeout` to fire.
         //
-        // Tearing down a connection that is waiting on a response surfaces an
+        // Tearing down a connection that is waiting on a response may surface an
         // immediate "connection lost" socket error, so we cannot simply assert
         // that no `error` is emitted. Instead we rely on timing: any error
         // caused by the teardown itself arrives within a few milliseconds of
         // `close()`, whereas the orphaned cancel timer only fires roughly
-        // `cancelTimeout` later. An error observed well after `close()` can
-        // therefore only have come from the leaked timer.
+        // `cancelTimeout` later. With a `cancelTimeout` of 300ms, an error
+        // observed 150ms or more after `close()` is comfortably separated from
+        // teardown noise and can only have come from the leaked timer.
         setTimeout(() => {
-          const lateError = errorDelays.some((delay) => delay >= cancelTimeout / 2);
-
-          if (lateError) {
-            finish(new Error('A spurious error was emitted ~' + cancelTimeout + 'ms after the connection was closed (leaked cancel timer).'));
-          } else {
+          try {
+            const lateError = errorDelays.some((delay) => delay >= cancelTimeout / 2);
+            assert.isFalse(lateError, 'a spurious error was emitted ~' + cancelTimeout + 'ms after the connection was closed (leaked cancel timer)');
+            assert.strictEqual(requestError?.code, 'ECLOSE', 'the in-flight request should complete with an ECLOSE error');
             finish();
+          } catch (assertionError) {
+            finish(assertionError as Error);
           }
         }, cancelTimeout + 150);
       } catch (err) {
@@ -221,9 +220,8 @@ describe('Connection cancel timer handling', function() {
         return finish(err);
       }
 
-      const request = new Request('SELECT 1', () => {
-        // The request is expected to complete with an `ECLOSE` error once the
-        // connection is closed. Nothing to assert here.
+      const request = new Request('SELECT 1', (reqErr) => {
+        requestError = reqErr as (Error & { code?: string }) | null | undefined;
       });
 
       connection.execSql(request);
