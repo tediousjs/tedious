@@ -108,4 +108,3 @@ const NChar: DataType & { maximumLength: number } = {
 };
 
 export default NChar;
-module.exports = NChar;

@@ -282,4 +282,3 @@ class PreloginPayload {
 }
 
 export default PreloginPayload;
-module.exports = PreloginPayload;

@@ -503,4 +503,3 @@ class Login7Payload {
 }
 
 export default Login7Payload;
-module.exports = Login7Payload;

@@ -27,4 +27,3 @@ const FloatN: DataType = {
 };
 
 export default FloatN;
-module.exports = FloatN;

@@ -110,4 +110,3 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
 };
 
 export default Decimal;
-module.exports = Decimal;

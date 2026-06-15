@@ -123,4 +123,3 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
 };
 
 export default DateTimeOffset;
-module.exports = DateTimeOffset;

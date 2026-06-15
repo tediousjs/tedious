@@ -109,4 +109,3 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
 };
 
 export default Numeric;
-module.exports = Numeric;

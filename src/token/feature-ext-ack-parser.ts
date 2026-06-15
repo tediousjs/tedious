@@ -47,4 +47,3 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
 }
 
 export default featureExtAckParser;
-module.exports = featureExtAckParser;

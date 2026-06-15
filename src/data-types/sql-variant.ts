@@ -27,4 +27,3 @@ const Variant: DataType = {
 };
 
 export default Variant;
-module.exports = Variant;

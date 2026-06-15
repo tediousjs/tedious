@@ -27,4 +27,3 @@ const DateTimeN: DataType = {
 };
 
 export default DateTimeN;
-module.exports = DateTimeN;

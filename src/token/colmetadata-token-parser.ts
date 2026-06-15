@@ -125,4 +125,3 @@ async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
 }
 
 export default colMetadataParser;
-module.exports = colMetadataParser;

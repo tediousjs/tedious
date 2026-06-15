@@ -48,4 +48,3 @@ const Real: DataType = {
 };
 
 export default Real;
-module.exports = Real;

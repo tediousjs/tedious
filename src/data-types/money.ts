@@ -62,4 +62,3 @@ const Money: DataType = {
 };
 
 export default Money;
-module.exports = Money;

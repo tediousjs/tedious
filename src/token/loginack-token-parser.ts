@@ -58,4 +58,3 @@ function loginAckParser(buf: Buffer, offset: number, _options: ParserOptions): R
 }
 
 export default loginAckParser;
-module.exports = loginAckParser;

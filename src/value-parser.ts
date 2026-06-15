@@ -763,8 +763,4 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
   return new Result(date, offset);
 }
 
-module.exports.readValue = readValue;
-module.exports.isPLPStream = isPLPStream;
-module.exports.readPLPStream = readPLPStream;
-
 export { readValue, isPLPStream, readPLPStream };

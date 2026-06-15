@@ -130,4 +130,3 @@ const VarBinary: { maximumLength: number } & DataType = {
 };
 
 export default VarBinary;
-module.exports = VarBinary;

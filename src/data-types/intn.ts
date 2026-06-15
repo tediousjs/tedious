@@ -27,4 +27,3 @@ const IntN: DataType = {
 };
 
 export default IntN;
-module.exports = IntN;

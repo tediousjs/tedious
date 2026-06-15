@@ -85,4 +85,3 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
 }
 
 export default returnParser;
-module.exports = returnParser;

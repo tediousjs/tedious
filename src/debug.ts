@@ -61,4 +61,3 @@ class Debug extends EventEmitter {
 }
 
 export default Debug;
-module.exports = Debug;

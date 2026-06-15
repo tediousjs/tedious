@@ -74,4 +74,3 @@ const Binary: { maximumLength: number } & DataType = {
 };
 
 export default Binary;
-module.exports = Binary;

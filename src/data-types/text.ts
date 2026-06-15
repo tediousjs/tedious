@@ -81,4 +81,3 @@ const Text: DataType = {
 };
 
 export default Text;
-module.exports = Text;

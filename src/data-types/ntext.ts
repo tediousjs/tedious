@@ -67,4 +67,3 @@ const NText: DataType = {
 };
 
 export default NText;
-module.exports = NText;

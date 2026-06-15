@@ -17,4 +17,3 @@ const procedures = {
 };
 
 export default procedures;
-module.exports = procedures;
