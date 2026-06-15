@@ -28,5 +28,13 @@
     "name": "Tedious",
     "out": "./docs",
     "entryPoints": ["./src/tedious.ts"]
+  },
+
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "commonjs",
+      "verbatimModuleSyntax": false
+    }
   }
 }
