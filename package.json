@@ -42,9 +42,9 @@
     "provenance": true
   },
   "dependencies": {
-    "@azure/core-auth": "^1.7.2",
-    "@azure/identity": "^4.2.1",
-    "@azure/keyvault-keys": "^4.4.0",
+    "@azure/core-auth": "^1.10.1",
+    "@azure/identity": "^4.13.1",
+    "@azure/keyvault-keys": "^4.10.0",
     "@js-joda/core": "^5.6.5",
     "@types/node": ">=18",
     "bl": "^6.1.4",
