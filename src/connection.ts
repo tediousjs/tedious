@@ -3609,13 +3609,15 @@ class Connection extends EventEmitter {
           signal.throwIfAborted();
 
           throw new AggregateError(
-            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err],
+            `Security token could not be authenticated or authorized: ${err instanceof Error ? err.message : String(err)}`);
         }
 
         // Type guard the token value so that it is never null.
         if (tokenResponse === null) {
           throw new AggregateError(
-            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
+            [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')],
+            'Security token could not be authenticated or authorized.');
         }
 
         this.sendFedAuthTokenMessage(tokenResponse.token);
