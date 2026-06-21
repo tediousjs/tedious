@@ -45,7 +45,7 @@
     "@azure/core-auth": "^1.7.2",
     "@azure/identity": "^4.2.1",
     "@azure/keyvault-keys": "^4.4.0",
-    "@js-joda/core": "^5.6.5",
+    "@js-joda/core": "^6.0.1",
     "@types/node": ">=18",
     "bl": "^6.1.4",
     "iconv-lite": "^0.7.0",
@@ -79,7 +79,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "async": "^3.2.6",
-    "babel-plugin-istanbul": "^7.0.1",
+    "babel-plugin-istanbul": "^8.0.0",
     "chai": "^4.5.0",
     "codecov": "^3.8.3",
     "eslint": "^9.39.1",
@@ -88,9 +88,9 @@
     "nyc": "^17.1.0",
     "rimraf": "^5.0.10",
     "semantic-release": "^22.0.12",
-    "sinon": "^21.0.0",
+    "sinon": "^22.0.0",
     "typedoc": "^0.28.14",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "scripts": {
     "docs": "typedoc",
