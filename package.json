@@ -53,6 +53,13 @@
     "native-duplexpair": "^1.0.0",
     "sprintf-js": "^1.1.3"
   },
+  "overrides": {
+    "@azure/core-client": "<1.10.0",
+    "@azure/core-rest-pipeline": "<1.22.0",
+    "@azure/core-tracing": "<1.3.0",
+    "@azure/core-util": "<1.13.0",
+    "@azure/logger": "<1.3.0"
+  },
   "devDependencies": {
     "@babel/cli": "^7.28.3",
     "@babel/core": "^7.28.5",
