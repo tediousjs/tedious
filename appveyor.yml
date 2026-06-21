@@ -1,5 +1,10 @@
 version: "{build}"
 
+# Newer Node.js releases require Windows 10 / Windows Server 2016 or higher.
+# The default AppVeyor image (Visual Studio 2015) runs on Windows Server 2012 R2,
+# so pin a newer image. SQL Server 2017 is still pre-installed on this one.
+image: Visual Studio 2022
+
 environment:
   matrix:
     - nodejs_version: "22"
