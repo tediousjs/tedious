@@ -13,7 +13,7 @@ branches:
     - /v\d+\.\d+\.\d+/
 
 install:
-  - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version)
+  - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version) x64
   - npm install
 
 services:
