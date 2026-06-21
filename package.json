@@ -74,7 +74,6 @@
     "async": "^3.2.6",
     "babel-plugin-istanbul": "^8.0.0",
     "chai": "^4.5.0",
-    "codecov": "^3.8.3",
     "eslint": "^9.39.1",
     "mitm": "^1.7.3",
     "mocha": "^11.7.5",
