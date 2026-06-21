@@ -5,7 +5,6 @@ on:
     - cron: '0 12 * * *'
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -20,11 +19,14 @@ jobs:
       with:
         node-version: "20"
         cache: 'npm'
+        registry-url: 'https://registry.npmjs.org'
 
     - name: Update npm
       run: npm install -g npm@latest
 
     - name: Tag latest release
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: |
         read next latest <<< $(npm info tedious --json | jq -r '."dist-tags".next, ."dist-tags".latest')
         if [ "$(printf '%s\n' "$latest" "$next" | sort -V | tail -n 1)" != "$latest" ]; then
