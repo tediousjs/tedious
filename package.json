@@ -41,6 +41,23 @@
     "tag": "next",
     "provenance": true
   },
+  "release": {
+    "branches": [
+      "+([0-9])?(.{+([0-9]),x}).x",
+      {
+        "name": "master",
+        "channel": "next"
+      },
+      {
+        "name": "beta",
+        "prerelease": true
+      },
+      {
+        "name": "alpha",
+        "prerelease": true
+      }
+    ]
+  },
   "dependencies": {
     "@azure/core-auth": "^1.7.2",
     "@azure/identity": "^4.2.1",
