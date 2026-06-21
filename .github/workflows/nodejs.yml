@@ -18,10 +18,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -34,7 +34,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 21.x]
+        node-version: [22.x, 24.x, 26.x]
       fail-fast: false
 
     steps:
@@ -121,7 +121,7 @@ jobs:
     strategy:
       matrix:
         mssql-version: [2016, 2017, 2019, 2022]
-        node-version: [18.x, 20.x, 21.x]
+        node-version: [22.x, 24.x, 26.x]
       fail-fast: false
 
     steps:
@@ -233,7 +233,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-sql-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -243,10 +243,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -267,7 +267,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-ad-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -277,10 +277,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -303,7 +303,7 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   token-credential-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -313,10 +313,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -340,7 +340,7 @@ jobs:
 
 
   azure-ad-service-principal-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -350,10 +350,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -389,10 +389,10 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
+    - name: Use Node.js 22
       uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci

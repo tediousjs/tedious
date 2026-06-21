@@ -1,10 +1,15 @@
 version: "{build}"
 
+# Newer Node.js releases require Windows 10 / Windows Server 2016 or higher.
+# The default AppVeyor image (Visual Studio 2015) runs on Windows Server 2012 R2,
+# so pin a newer image. SQL Server 2017 is still pre-installed on this one.
+image: Visual Studio 2022
+
 environment:
   matrix:
-    - nodejs_version: "18"
-    - nodejs_version: "20"
-    - nodejs_version: "21"
+    - nodejs_version: "22"
+    - nodejs_version: "24"
+    - nodejs_version: "26"
 
 branches:
   only:
@@ -13,7 +18,7 @@ branches:
     - /v\d+\.\d+\.\d+/
 
 install:
-  - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version)
+  - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version) x64
   - npm install
 
 services:
