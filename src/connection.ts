@@ -1036,6 +1036,14 @@ class Connection extends EventEmitter {
   declare requestTimer: undefined | NodeJS.Timeout;
 
   /**
+   * Controller used to abort the connection establishment process
+   * when the connection is closed before it was fully established.
+   *
+   * @private
+   */
+  declare closeController: undefined | AbortController;
+
+  /**
    * Whether an attention message was sent to the server to cancel the
    * currently active request.
    *
@@ -1832,6 +1840,8 @@ class Connection extends EventEmitter {
       this.once('error', onError);
     }
 
+    this.closeController = new AbortController();
+
     this.transitionTo(this.STATE.CONNECTING);
     this.initialiseConnection().then(() => {
       process.nextTick(() => {
@@ -1839,14 +1849,12 @@ class Connection extends EventEmitter {
       });
     }, (err) => {
       this.transitionTo(this.STATE.FINAL);
-      this.closed = true;
 
       process.nextTick(() => {
         this.emit('connect', err);
       });
-      process.nextTick(() => {
-        this.emit('end');
-      });
+
+      this.cleanupConnection();
     });
   }
 
@@ -1991,6 +1999,8 @@ class Connection extends EventEmitter {
    * The [[Event_end]] will be emitted once the connection has been closed.
    */
   close() {
+    this.closeController?.abort(new ConnectionError('Connection closed before the connection was established.', 'ECLOSE'));
+
     this.transitionTo(this.STATE.FINAL);
     this.cleanupConnection();
   }
@@ -2016,7 +2026,7 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
 
     try {
-      let signal = timeoutController.signal;
+      let signal = AbortSignal.any([timeoutController.signal, this.closeController!.signal]);
 
       let port = this.config.options.port;
 
@@ -2067,6 +2077,11 @@ class Connection extends EventEmitter {
         try {
           signal = AbortSignal.any([signal, controller.signal]);
 
+          // The connection may have been closed while we were waiting for the
+          // socket to connect. Adding an abort listener to an already aborted
+          // signal will not call the listener, so we need to check here.
+          signal.throwIfAborted();
+
           socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
           this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
@@ -2074,7 +2089,6 @@ class Connection extends EventEmitter {
 
           this.socket = socket;
 
-          this.closed = false;
           this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
 
           this.sendPreLogin();
@@ -3424,9 +3438,21 @@ class Connection extends EventEmitter {
     const port = this.routingData ? this.routingData.port : this.config.options.port;
     this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-    const { promise, resolve } = withResolvers<void>();
-    setTimeout(resolve, this.config.options.connectionRetryInterval);
-    await promise;
+    const closeSignal = this.closeController!.signal;
+    closeSignal.throwIfAborted();
+
+    const { promise, resolve, reject } = withResolvers<void>();
+
+    const onAbort = () => { reject(closeSignal.reason); };
+    closeSignal.addEventListener('abort', onAbort, { once: true });
+
+    const retryTimer = setTimeout(resolve, this.config.options.connectionRetryInterval);
+    try {
+      await promise;
+    } finally {
+      clearTimeout(retryTimer);
+      closeSignal.removeEventListener('abort', onAbort);
+    }
 
     this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
