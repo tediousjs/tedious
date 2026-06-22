@@ -1,5 +1,7 @@
 import { typeByName as TYPES } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
+import { loadTemporal, getTemporal } from '../../src/temporal';
+import { readValue } from '../../src/value-parser';
 
 import { assert } from 'chai';
 
@@ -8,6 +10,25 @@ import { assert } from 'chai';
 const options: InternalConnectionOptions = {} as InternalConnectionOptions;
 const optionsWithUTCFalse: InternalConnectionOptions = { useUTC: false } as InternalConnectionOptions;
 const optionsWithUTCTrue: InternalConnectionOptions = { useUTC: true } as InternalConnectionOptions;
+
+// The date/time types are backed by `temporal-polyfill`, which is loaded
+// asynchronously. Make sure it is available before any test runs.
+before(async function() {
+  await loadTemporal();
+});
+
+// `readValue` reads a leading `UInt8` data-length for these types; the legacy
+// `DateTime`/`SmallDateTime` types do not.
+const LENGTH_PREFIXED = new Set(['Date', 'Time', 'DateTime2', 'DateTimeOffset']);
+
+// Encode a value through `generateParameterData`, then decode it back through
+// `readValue`, returning the parsed value.
+function roundTrip(type: any, value: any, scale?: number): any {
+  const validated = type.validate(value, undefined);
+  const body = Buffer.concat([...type.generateParameterData({ value: validated, scale }, optionsWithUTCTrue)]);
+  const buf = LENGTH_PREFIXED.has(type.name) ? Buffer.concat([Buffer.from([body.length]), body]) : body;
+  return readValue(buf, 0, { type, scale } as any, optionsWithUTCTrue).value;
+}
 
 describe('BigInt', function() {
   describe('.generateParameterLength', function() {
@@ -190,22 +211,34 @@ describe('Char', function() {
 describe('Date', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
+      const Temporal = getTemporal();
       assert.deepEqual(TYPES.Date.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.Date.generateParameterLength({ value: new Date() }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Date.generateParameterLength({ value: Temporal.PlainDate.from('2015-06-19') }, options), Buffer.from([0x03]));
     });
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts dates during daylight savings period', function() {
+    it('encodes a `Temporal.PlainDate` as days since 0001-01-01', function() {
+      const Temporal = getTemporal();
       for (const [value, expectedBuffer] of [
-        [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('163a0b', 'hex')],
-        [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('173a0b', 'hex')],
-        [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('173a0b', 'hex')],
-        [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('183a0b', 'hex')]
-      ]) {
-        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: value }, optionsWithUTCFalse)]);
+        ['2015-06-18', Buffer.from('163a0b', 'hex')],
+        ['2015-06-19', Buffer.from('173a0b', 'hex')],
+        ['2015-06-20', Buffer.from('183a0b', 'hex')]
+      ] as const) {
+        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: Temporal.PlainDate.from(value) }, options)]);
         assert.deepEqual(buffer, expectedBuffer);
       }
+    });
+
+    it('round-trips through the value parser', function() {
+      const Temporal = getTemporal();
+      for (const value of ['0001-01-01', '2023-07-15', '9999-12-31']) {
+        assert.strictEqual(roundTrip(TYPES.Date, Temporal.PlainDate.from(value)).toString(), value);
+      }
+    });
+
+    it('accepts ISO date strings', function() {
+      assert.strictEqual(roundTrip(TYPES.Date, '2020-02-29').toString(), '2020-02-29');
     });
   });
 
@@ -221,15 +254,16 @@ describe('Date', function() {
 
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
+      const Temporal = getTemporal();
       assert.throws(() => {
-        const testDate = new Date();
-        testDate.setFullYear(0);
-        TYPES.Date.validate(testDate, undefined);
+        TYPES.Date.validate(Temporal.PlainDate.from('-000001-01-01'), undefined);
       }, TypeError, 'Out of range.');
+    });
 
+    it('returns a TypeError for invalid input', function() {
       assert.throws(() => {
-        TYPES.Date.validate(new Date('Jan 1, 10000'), undefined);
-      }, TypeError, 'Out of range.');
+        TYPES.Date.validate('not a date', undefined);
+      }, TypeError, 'Invalid date.');
     });
   });
 });
@@ -237,23 +271,29 @@ describe('Date', function() {
 describe('DateTime', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
+      const Temporal = getTemporal();
       assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: new Date() }, options), Buffer.from([0x08]));
+      assert.deepEqual(TYPES.DateTime.generateParameterLength({ value: Temporal.PlainDateTime.from('2015-06-19T00:00') }, options), Buffer.from([0x08]));
     });
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts dates during daylight savings period', function() {
-      for (const testSet of [
-        [new Date(2015, 5, 18, 23, 59, 59), 42171],
-        [new Date(2015, 5, 19, 0, 0, 0), 42172],
-        [new Date(2015, 5, 19, 23, 59, 59), 42172],
-        [new Date(2015, 5, 20, 0, 0, 0), 42173]
-      ]) {
-        const parameter = { value: testSet[0] };
-        const expectedNoOfDays = testSet[1];
-        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData(parameter, optionsWithUTCFalse)]);
+    it('encodes the date portion as days since 1900-01-01', function() {
+      const Temporal = getTemporal();
+      for (const [value, expectedNoOfDays] of [
+        ['2015-06-18T23:59:59', 42171],
+        ['2015-06-19T00:00:00', 42172],
+        ['2015-06-20T00:00:00', 42173]
+      ] as const) {
+        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData({ value: Temporal.PlainDateTime.from(value) }, options)]);
         assert.strictEqual(buffer.readInt32LE(0), expectedNoOfDays);
+      }
+    });
+
+    it('round-trips through the value parser', function() {
+      const Temporal = getTemporal();
+      for (const value of ['1753-01-01T00:00:00', '1999-12-31T23:59:59.997', '9999-12-31T23:59:59.997']) {
+        assert.strictEqual(roundTrip(TYPES.DateTime, Temporal.PlainDateTime.from(value)).toString(), value);
       }
     });
   });
@@ -270,12 +310,13 @@ describe('DateTime', function() {
 
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
+      const Temporal = getTemporal();
       assert.throws(() => {
-        TYPES.DateTime.validate(new Date('Dec 1, 1752'), undefined);
+        TYPES.DateTime.validate(Temporal.PlainDateTime.from('1752-12-01T00:00'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.DateTime.validate('Jan 1, 10000', undefined);
+        TYPES.DateTime.validate(Temporal.PlainDateTime.from('+010000-01-01T00:00'), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -305,15 +346,22 @@ describe('DateTime2', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts dates during daylight savings period', function() {
+    it('encodes the time and date portions (scale 0)', function() {
+      const Temporal = getTemporal();
       for (const [value, expectedBuffer] of [
-        [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('7f5101163a0b', 'hex')],
-        [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('000000173a0b', 'hex')],
-        [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('7f5101173a0b', 'hex')],
-        [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('000000183a0b', 'hex')]
-      ]) {
-        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: value, scale: 0 }, optionsWithUTCFalse)]);
+        ['2015-06-18T23:59:59', Buffer.from('7f5101163a0b', 'hex')],
+        ['2015-06-19T00:00:00', Buffer.from('000000173a0b', 'hex')],
+        ['2015-06-20T00:00:00', Buffer.from('000000183a0b', 'hex')]
+      ] as const) {
+        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: Temporal.PlainDateTime.from(value), scale: 0 }, options)]);
         assert.deepEqual(buffer, expectedBuffer);
+      }
+    });
+
+    it('round-trips at full (100ns) precision', function() {
+      const Temporal = getTemporal();
+      for (const value of ['0001-01-01T00:00:00', '2023-07-15T08:09:10.1234567', '9999-12-31T23:59:59.9999999']) {
+        assert.strictEqual(roundTrip(TYPES.DateTime2, Temporal.PlainDateTime.from(value), 7).toString(), value);
       }
     });
   });
@@ -328,14 +376,9 @@ describe('DateTime2', function() {
   });
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
+      const Temporal = getTemporal();
       assert.throws(() => {
-        const testDate = new Date();
-        testDate.setFullYear(0);
-        TYPES.DateTime2.validate(testDate, undefined);
-      }, TypeError, 'Out of range.');
-
-      assert.throws(() => {
-        TYPES.DateTime2.validate(new Date('Jan 1, 10000'), undefined);
+        TYPES.DateTime2.validate(Temporal.PlainDateTime.from('-000001-01-01T00:00'), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -365,12 +408,13 @@ describe('DateTimeOffset', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts `Date` values', function() {
-      const value = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
+    it('encodes the UTC date and time (scale 0)', function() {
+      const Temporal = getTemporal();
+      // 2014-02-14T17:59:59.999Z, expressed with a +00:00 offset.
+      const value = Temporal.ZonedDateTime.from('2014-02-14T17:59:59.999+00:00[+00:00]');
       const expected = Buffer.from('20fd002d380b', 'hex');
-      const parameterValue = { value, scale: 0 };
 
-      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue)]);
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData({ value, scale: 0 }, optionsWithUTCTrue)]);
       assert.deepEqual(buffer.slice(0, 6), expected);
     });
 
@@ -381,6 +425,19 @@ describe('DateTimeOffset', function() {
       const parameterValue = { value, scale: 0 };
       const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue)]);
       assert.deepEqual(buffer, expected);
+    });
+
+    it('round-trips the wall-clock time, offset and instant', function() {
+      const Temporal = getTemporal();
+      for (const value of [
+        '2023-07-15T08:09:10.1234567+05:30[+05:30]',
+        '2023-01-01T00:00:00-08:00[-08:00]',
+        '2023-06-01T12:00:00+00:00[+00:00]'
+      ]) {
+        const zdt = Temporal.ZonedDateTime.from(value);
+        const result = roundTrip(TYPES.DateTimeOffset, zdt, 7) as InstanceType<ReturnType<typeof getTemporal>['ZonedDateTime']>;
+        assert.isTrue(result.equals(zdt), `expected ${result.toString()} to equal ${value}`);
+      }
     });
   });
 
@@ -395,14 +452,9 @@ describe('DateTimeOffset', function() {
 
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
+      const Temporal = getTemporal();
       assert.throws(() => {
-        const testDate = new Date();
-        testDate.setFullYear(0);
-        TYPES.DateTimeOffset.validate(testDate, undefined);
-      }, TypeError, 'Out of range.');
-
-      assert.throws(() => {
-        TYPES.DateTimeOffset.validate(new Date('Jan 1, 10000'), undefined);
+        TYPES.DateTimeOffset.validate(Temporal.ZonedDateTime.from('-000001-01-01T00:00+00:00[+00:00]'), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -1044,22 +1096,30 @@ describe('Real', function() {
 describe('SmallDateTime', function() {
   describe('.generateParameterLength', function() {
     it('returns the correct data length', function() {
+      const Temporal = getTemporal();
       assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: null }, options), Buffer.from([0x00]));
-      assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: new Date() }, options), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.SmallDateTime.generateParameterLength({ value: Temporal.PlainDateTime.from('2015-06-19T00:00') }, options), Buffer.from([0x04]));
     });
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts dates during daylight savings period', function() {
+    it('encodes the date portion as days since 1900-01-01', function() {
+      const Temporal = getTemporal();
       for (const [value, expectedNoOfDays] of [
-        [new Date(2015, 5, 18, 23, 59, 59), 42171],
-        [new Date(2015, 5, 19, 0, 0, 0), 42172],
-        [new Date(2015, 5, 19, 23, 59, 59), 42172],
-        [new Date(2015, 5, 20, 0, 0, 0), 42173]
-      ]) {
-        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value }, optionsWithUTCFalse)]);
+        ['2015-06-18T23:59:59', 42171],
+        ['2015-06-19T00:00:00', 42172],
+        ['2015-06-20T00:00:00', 42173]
+      ] as const) {
+        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value: Temporal.PlainDateTime.from(value) }, options)]);
 
         assert.strictEqual(buffer.readUInt16LE(0), expectedNoOfDays);
+      }
+    });
+
+    it('round-trips at minute precision', function() {
+      const Temporal = getTemporal();
+      for (const value of ['1900-01-01T00:00:00', '2001-02-03T04:05:00', '2079-06-06T23:59:00']) {
+        assert.strictEqual(roundTrip(TYPES.SmallDateTime, Temporal.PlainDateTime.from(value)).toString(), value);
       }
     });
   });
@@ -1075,16 +1135,17 @@ describe('SmallDateTime', function() {
 
   describe('.validate', function() {
     it('returns a TypeError for dates that are out of range', function() {
+      const Temporal = getTemporal();
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('Dec 31, 1889'), undefined);
+        TYPES.SmallDateTime.validate(Temporal.PlainDateTime.from('1889-12-31T00:00'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('Jan 1, 2080'), undefined);
+        TYPES.SmallDateTime.validate(Temporal.PlainDateTime.from('2080-01-01T00:00'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('June 7, 2079'), undefined);
+        TYPES.SmallDateTime.validate(Temporal.PlainDateTime.from('2079-06-07T00:00'), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -1267,47 +1328,44 @@ describe('Time', function() {
       assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 6 }, options), Buffer.from([0x00]));
       assert.deepEqual(TYPES.Time.generateParameterLength({ value: null, scale: 7 }, options), Buffer.from([0x00]));
 
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 0 }, options), Buffer.from([0x03]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 1 }, options), Buffer.from([0x03]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 2 }, options), Buffer.from([0x03]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 3 }, options), Buffer.from([0x04]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 4 }, options), Buffer.from([0x04]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 5 }, options), Buffer.from([0x05]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 6 }, options), Buffer.from([0x05]));
-      assert.deepEqual(TYPES.Time.generateParameterLength({ value: new Date(), scale: 7 }, options), Buffer.from([0x05]));
+      const Temporal = getTemporal();
+      const noon = Temporal.PlainTime.from('12:00:00');
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 0 }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 1 }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 2 }, options), Buffer.from([0x03]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 3 }, options), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 4 }, options), Buffer.from([0x04]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 5 }, options), Buffer.from([0x05]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 6 }, options), Buffer.from([0x05]));
+      assert.deepEqual(TYPES.Time.generateParameterLength({ value: noon, scale: 7 }, options), Buffer.from([0x05]));
     });
   });
   describe('.generateParameterData', function() {
-    // Test rounding of nanosecondDelta
-    it('correctly converts `Date` values with a `nanosecondDelta` property', function() {
-      const type = TYPES.Time;
-      // Date with nanosecondDelta is an extended Date type used by the library for sub-millisecond precision
-      interface DateWithNanosecondDelta extends Date {
-        nanosecondDelta: number;
-      }
-      interface TimeTestCase {
-        value: DateWithNanosecondDelta;
-        scale: number;
-        expectedBuffer: Buffer;
-      }
-
-      const createTestDate = (date: Date, nanosecondDelta: number): DateWithNanosecondDelta => {
-        const d = date as DateWithNanosecondDelta;
-        d.nanosecondDelta = nanosecondDelta;
-        return d;
-      };
-
-      const testCases: TimeTestCase[] = [
-        { value: createTestDate(new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264), scale: 7, expectedBuffer: Buffer.from('68fc624b91', 'hex') },
-        { value: createTestDate(new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612), scale: 7, expectedBuffer: Buffer.from('c422ceb80c', 'hex') },
-        { value: createTestDate(new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118), scale: 7, expectedBuffer: Buffer.from('1e94c8e96b', 'hex') }
+    it('encodes a `Temporal.PlainTime` at the requested scale', function() {
+      const Temporal = getTemporal();
+      const testCases = [
+        { value: '17:20:03.5036264', scale: 7, expectedBuffer: Buffer.from('68fc624b91', 'hex') },
+        { value: '01:31:04.0124612', scale: 7, expectedBuffer: Buffer.from('c422ceb80c', 'hex') },
+        { value: '12:52:28.3737118', scale: 7, expectedBuffer: Buffer.from('1e94c8e96b', 'hex') }
       ];
 
       for (const { value, scale, expectedBuffer } of testCases) {
-        const parameter = { value, scale };
-        const buffer = Buffer.concat([...type.generateParameterData(parameter, optionsWithUTCFalse)]);
+        const parameter = { value: Temporal.PlainTime.from(value), scale };
+        const buffer = Buffer.concat([...TYPES.Time.generateParameterData(parameter, options)]);
         assert.deepEqual(buffer, expectedBuffer);
       }
+    });
+
+    it('round-trips at full (100ns) precision', function() {
+      const Temporal = getTemporal();
+      for (const value of ['00:00:00', '12:34:56.1234567', '23:59:59.9999999']) {
+        assert.strictEqual(roundTrip(TYPES.Time, Temporal.PlainTime.from(value), 7).toString(), value);
+      }
+    });
+
+    it('truncates to the requested scale', function() {
+      const Temporal = getTemporal();
+      assert.strictEqual(roundTrip(TYPES.Time, Temporal.PlainTime.from('12:34:56.1234567'), 3).toString(), '12:34:56.123');
     });
   });
 

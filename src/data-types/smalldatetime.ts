@@ -1,12 +1,13 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-
-const EPOCH_DATE = new Date(1900, 0, 1);
-const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
+import { getTemporal, type Temporal } from '../temporal';
+import { plainDateToEpochDays, EPOCH_1900 } from '../temporal-conversion';
 
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
 
+// SQL Server `smalldatetime` is a zoneless wall-clock date and time, represented
+// as a `Temporal.PlainDateTime` (native resolution is one minute).
 const SmallDateTime: DataType = {
   id: 0x3A,
   type: 'DATETIM4',
@@ -33,17 +34,12 @@ const SmallDateTime: DataType = {
       return;
     }
 
+    const value = parameter.value as Temporal.PlainDateTime;
+
     const buffer = Buffer.alloc(4);
 
-    let days: number, dstDiff: number, minutes: number;
-    if (options.useUTC) {
-      days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-      minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
-    } else {
-      dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-      days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-      minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
-    }
+    const days = plainDateToEpochDays(value.toPlainDate(), EPOCH_1900);
+    const minutes = (value.hour * 60) + value.minute;
 
     buffer.writeUInt16LE(days, 0);
     buffer.writeUInt16LE(minutes, 2);
@@ -51,45 +47,40 @@ const SmallDateTime: DataType = {
     yield buffer;
   },
 
-  validate: function(value, collation, options): null | Date {
+  validate: function(value, collation, options): null | Temporal.PlainDateTime {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
-    }
+    const Temporal = getTemporal();
 
-    value = value as Date;
-
-    let year, month, date;
-    if (options && options.useUTC) {
-      year = value.getUTCFullYear();
-      month = value.getUTCMonth();
-      date = value.getUTCDate();
+    let dateTime: Temporal.PlainDateTime;
+    if (value instanceof Temporal.PlainDateTime) {
+      dateTime = value;
+    } else if (value instanceof Temporal.ZonedDateTime) {
+      dateTime = value.toPlainDateTime();
+    } else if (value instanceof Temporal.PlainDate) {
+      dateTime = value.toPlainDateTime();
     } else {
-      year = value.getFullYear();
-      month = value.getMonth();
-      date = value.getDate();
+      try {
+        dateTime = Temporal.PlainDateTime.from(value as any);
+      } catch {
+        throw new TypeError('Invalid date.');
+      }
     }
 
-    if (year < 1900 || year > 2079) {
+    if (dateTime.year < 1900 || dateTime.year > 2079) {
       throw new TypeError('Out of range.');
     }
 
-    if (year === 2079) {
-      // Month is 0-indexed, i.e. Jan = 0, Dec = 11
-      // See: https://learn.microsoft.com/en-us/sql/t-sql/data-types/smalldatetime-transact-sql?view=sql-server-ver16
-      if (month > 5 || (month === 5 && date > 6)) {
+    if (dateTime.year === 2079) {
+      // See: https://learn.microsoft.com/en-us/sql/t-sql/data-types/smalldatetime-transact-sql
+      if (dateTime.month > 6 || (dateTime.month === 6 && dateTime.day > 6)) {
         throw new TypeError('Out of range.');
       }
     }
 
-    if (isNaN(value)) {
-      throw new TypeError('Invalid date.');
-    }
-
-    return value;
+    return dateTime;
   }
 };
 

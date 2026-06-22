@@ -1,11 +1,14 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
+import { getTemporal, type Temporal } from '../temporal';
+import { plainDateToEpochDays, EPOCH_1900 } from '../temporal-conversion';
 
-const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
+const THREE_HUNDREDTHS = 3 + (1 / 3);
 const NULL_LENGTH = Buffer.from([0x00]);
 const DATA_LENGTH = Buffer.from([0x08]);
 
+// SQL Server `datetime` is a zoneless wall-clock date and time, represented as
+// a `Temporal.PlainDateTime` (native resolution is ~3.33ms).
 const DateTime: DataType = {
   id: 0x3D,
   type: 'DATETIME',
@@ -32,32 +35,13 @@ const DateTime: DataType = {
       return;
     }
 
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    const value = parameter.value as Temporal.PlainDateTime;
 
-    let date: LocalDate;
-    if (options.useUTC) {
-      date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
-    } else {
-      date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
-    }
+    let days = plainDateToEpochDays(value.toPlainDate(), EPOCH_1900);
 
-    let days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+    const milliseconds = ((value.hour * 60 + value.minute) * 60 + value.second) * 1000 + value.millisecond;
 
-    let milliseconds, threeHundredthsOfSecond;
-    if (options.useUTC) {
-      let seconds = value.getUTCHours() * 60 * 60;
-      seconds += value.getUTCMinutes() * 60;
-      seconds += value.getUTCSeconds();
-      milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
-    } else {
-      let seconds = value.getHours() * 60 * 60;
-      seconds += value.getMinutes() * 60;
-      seconds += value.getSeconds();
-      milliseconds = (seconds * 1000) + value.getMilliseconds();
-    }
-
-    threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
-    threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+    let threeHundredthsOfSecond = Math.round(milliseconds / THREE_HUNDREDTHS);
 
     // 25920000 equals one day
     if (threeHundredthsOfSecond === 25920000) {
@@ -71,34 +55,33 @@ const DateTime: DataType = {
     yield buffer;
   },
 
-  // TODO: type 'any' needs to be revisited.
-  validate: function(value: any, collation, options): null | number {
+  validate: function(value, collation, options): null | Temporal.PlainDateTime {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
-    }
+    const Temporal = getTemporal();
 
-    value = value as Date;
-
-    let year;
-    if (options && options.useUTC) {
-      year = value.getUTCFullYear();
+    let dateTime: Temporal.PlainDateTime;
+    if (value instanceof Temporal.PlainDateTime) {
+      dateTime = value;
+    } else if (value instanceof Temporal.ZonedDateTime) {
+      dateTime = value.toPlainDateTime();
+    } else if (value instanceof Temporal.PlainDate) {
+      dateTime = value.toPlainDateTime();
     } else {
-      year = value.getFullYear();
+      try {
+        dateTime = Temporal.PlainDateTime.from(value as any);
+      } catch {
+        throw new TypeError('Invalid date.');
+      }
     }
 
-    if (year < 1753 || year > 9999) {
+    if (dateTime.year < 1753 || dateTime.year > 9999) {
       throw new TypeError('Out of range.');
     }
 
-    if (isNaN(value)) {
-      throw new TypeError('Invalid date.');
-    }
-
-    return value;
+    return dateTime;
   }
 };
 

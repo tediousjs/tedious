@@ -14,6 +14,11 @@ import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import Debug from '../../../src/debug';
 import { Collation } from '../../../src/collation';
+import { loadTemporal } from '../../../src/temporal';
+
+before(async function() {
+  await loadTemporal();
+});
 
 const options = {
   useUTC: false,
@@ -1075,9 +1080,11 @@ describe('Row Token Parser', function() {
       const token = result.value;
       assert.instanceOf(token, RowToken);
       assert.strictEqual(token.columns.length, 1);
+      // `datetime` is zoneless, so it parses to a `Temporal.PlainDateTime`
+      // regardless of the `useUTC` option.
       assert.strictEqual(
-        token.columns[0].value.getTime(),
-        new Date('January 3, 1900 00:00:45').getTime()
+        token.columns[0].value.toString(),
+        '1900-01-03T00:00:45'
       );
 
       result = await parser.next();
@@ -1095,8 +1102,8 @@ describe('Row Token Parser', function() {
       assert.instanceOf(token, RowToken);
       assert.strictEqual(token.columns.length, 1);
       assert.strictEqual(
-        token.columns[0].value.getTime(),
-        new Date('January 3, 1900 00:00:45 GMT').getTime()
+        token.columns[0].value.toString(),
+        '1900-01-03T00:00:45'
       );
 
       result = await parser.next();

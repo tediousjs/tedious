@@ -42,6 +42,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, TYPES } from './data-type';
+import { loadTemporal } from './temporal';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -1999,6 +2000,11 @@ class Connection extends EventEmitter {
    * @private
    */
   async initialiseConnection() {
+    // Date/time values are parsed and encoded synchronously, but the Temporal
+    // implementation backing them is loaded asynchronously (the polyfill is
+    // ESM-only). Ensure it is available before any value crosses the wire.
+    await loadTemporal();
+
     const timeoutController = new AbortController();
 
     const connectTimer = setTimeout(() => {

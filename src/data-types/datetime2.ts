@@ -1,10 +1,12 @@
 import { type DataType } from '../data-type';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
+import { getTemporal, type Temporal } from '../temporal';
+import { plainDateToEpochDays, plainTimeToScaledTicks } from '../temporal-conversion';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
-const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
 
+// SQL Server `datetime2(n)` is a zoneless wall-clock date and time, represented
+// as a `Temporal.PlainDateTime`. Its nanosecond resolution covers all scales.
 const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2A,
   type: 'DATETIME2N',
@@ -58,77 +60,61 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
       return;
     }
 
-    const value = parameter.value;
-    let scale = parameter.scale;
+    const value = parameter.value as Temporal.PlainDateTime;
+    const scale = parameter.scale!;
 
     const buffer = new WritableTrackingBuffer(16);
-    scale = scale!;
 
-    let timestamp: number;
-    if (options.useUTC) {
-      timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
-    } else {
-      timestamp = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
-    }
-    timestamp = timestamp * Math.pow(10, scale - 3);
-    timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
-    timestamp = Math.round(timestamp);
+    const ticks = plainTimeToScaledTicks(value.toPlainTime(), scale);
 
     switch (scale) {
       case 0:
       case 1:
       case 2:
-        buffer.writeUInt24LE(timestamp);
+        buffer.writeUInt24LE(ticks);
         break;
       case 3:
       case 4:
-        buffer.writeUInt32LE(timestamp);
+        buffer.writeUInt32LE(ticks);
         break;
       case 5:
       case 6:
       case 7:
-        buffer.writeUInt40LE(timestamp);
+        buffer.writeUInt40LE(ticks);
     }
 
-    let date;
-    if (options.useUTC) {
-      date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
-    } else {
-      date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
-    }
-
-    const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
+    const days = plainDateToEpochDays(value.toPlainDate());
     buffer.writeUInt24LE(days);
     yield buffer.data;
   },
 
-  validate: function(value: any, collation, options): null | number {
+  validate: function(value, collation, options): null | Temporal.PlainDateTime {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
-    }
+    const Temporal = getTemporal();
 
-    value = value as Date;
-
-    let year;
-    if (options && options.useUTC) {
-      year = value.getUTCFullYear();
+    let dateTime: Temporal.PlainDateTime;
+    if (value instanceof Temporal.PlainDateTime) {
+      dateTime = value;
+    } else if (value instanceof Temporal.ZonedDateTime) {
+      dateTime = value.toPlainDateTime();
+    } else if (value instanceof Temporal.PlainDate) {
+      dateTime = value.toPlainDateTime();
     } else {
-      year = value.getFullYear();
+      try {
+        dateTime = Temporal.PlainDateTime.from(value as any);
+      } catch {
+        throw new TypeError('Invalid date.');
+      }
     }
 
-    if (year < 1 || year > 9999) {
+    if (dateTime.year < 1 || dateTime.year > 9999) {
       throw new TypeError('Out of range.');
     }
 
-    if (isNaN(value)) {
-      throw new TypeError('Invalid date.');
-    }
-
-    return value;
+    return dateTime;
   }
 };
 

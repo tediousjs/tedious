@@ -6,6 +6,8 @@ import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
+import { type Temporal } from './temporal';
+import { epochDaysToPlainDate, offsetMinutesToString, scaledTicksToPlainTime, EPOCH_1900 } from './temporal-conversion';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -281,11 +283,11 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'SmallDateTime': {
-      return readSmallDateTime(buf, offset, options.useUTC);
+      return readSmallDateTime(buf, offset);
     }
 
     case 'DateTime': {
-      return readDateTime(buf, offset, options.useUTC);
+      return readDateTime(buf, offset);
     }
 
     case 'DateTimeN': {
@@ -297,9 +299,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
           return new Result(null, offset);
 
         case 4:
-          return readSmallDateTime(buf, offset, options.useUTC);
+          return readSmallDateTime(buf, offset);
         case 8:
-          return readDateTime(buf, offset, options.useUTC);
+          return readDateTime(buf, offset);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
@@ -314,7 +316,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readTime(buf, offset, dataLength, metadata.scale!, options.useUTC);
+      return readTime(buf, offset, dataLength, metadata.scale!);
     }
 
     case 'Date': {
@@ -325,7 +327,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readDate(buf, offset, options.useUTC);
+      return readDate(buf, offset);
     }
 
     case 'DateTime2': {
@@ -336,7 +338,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readDateTime2(buf, offset, dataLength, metadata.scale!, options.useUTC);
+      return readDateTime2(buf, offset, dataLength, metadata.scale!);
     }
 
     case 'DateTimeOffset': {
@@ -473,10 +475,10 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       return readBigInt(buf, offset);
 
     case 'SmallDateTime':
-      return readSmallDateTime(buf, offset, options.useUTC);
+      return readSmallDateTime(buf, offset);
 
     case 'DateTime':
-      return readDateTime(buf, offset, options.useUTC);
+      return readDateTime(buf, offset);
 
     case 'Real':
       return readReal(buf, offset);
@@ -491,20 +493,20 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       return readMoney(buf, offset);
 
     case 'Date':
-      return readDate(buf, offset, options.useUTC);
+      return readDate(buf, offset);
 
     case 'Time': {
       let scale;
       ({ value: scale, offset } = readUInt8(buf, offset));
 
-      return readTime(buf, offset, dataLength, scale, options.useUTC);
+      return readTime(buf, offset, dataLength, scale);
     }
 
     case 'DateTime2': {
       let scale;
       ({ value: scale, offset } = readUInt8(buf, offset));
 
-      return readDateTime2(buf, offset, dataLength, scale, options.useUTC);
+      return readDateTime2(buf, offset, dataLength, scale);
     }
 
     case 'DateTimeOffset': {
@@ -629,24 +631,25 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
   return chunks;
 }
 
-function readSmallDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
+// SQL Server `smalldatetime` is a zoneless wall-clock date and time, mapped to
+// `Temporal.PlainDateTime`.
+function readSmallDateTime(buf: Buffer, offset: number): Result<Temporal.PlainDateTime> {
   let days;
   ({ offset, value: days } = readUInt16LE(buf, offset));
 
   let minutes;
   ({ offset, value: minutes } = readUInt16LE(buf, offset));
 
-  let value;
-  if (useUTC) {
-    value = new Date(Date.UTC(1900, 0, 1 + days, 0, minutes));
-  } else {
-    value = new Date(1900, 0, 1 + days, 0, minutes);
-  }
+  const value = epochDaysToPlainDate(days, EPOCH_1900)
+    .toPlainDateTime()
+    .add({ minutes });
 
   return new Result(value, offset);
 }
 
-function readDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
+// SQL Server `datetime` is a zoneless wall-clock date and time, mapped to
+// `Temporal.PlainDateTime`.
+function readDateTime(buf: Buffer, offset: number): Result<Temporal.PlainDateTime> {
   let days;
   ({ offset, value: days } = readInt32LE(buf, offset));
 
@@ -655,112 +658,79 @@ function readDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date
 
   const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
 
-  let value;
-  if (useUTC) {
-    value = new Date(Date.UTC(1900, 0, 1 + days, 0, 0, 0, milliseconds));
-  } else {
-    value = new Date(1900, 0, 1 + days, 0, 0, 0, milliseconds);
-  }
+  const value = epochDaysToPlainDate(days, EPOCH_1900)
+    .toPlainDateTime()
+    .add({ milliseconds });
 
   return new Result(value, offset);
 }
 
-interface DateWithNanosecondsDelta extends Date {
-  nanosecondsDelta: number;
-}
-
-function readTime(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
-  let value;
-
+// Read the SQL Server scaled time-of-day value shared by `time`, `datetime2`
+// and `datetimeoffset`, returning the wire integer (in 10^-scale-second units).
+function readScaledTime(buf: Buffer, offset: number, dataLength: number): Result<number> {
   switch (dataLength) {
-    case 3: {
-      ({ value, offset } = readUInt24LE(buf, offset));
-      break;
-    }
-
-    case 4: {
-      ({ value, offset } = readUInt32LE(buf, offset));
-      break;
-    }
-
-    case 5: {
-      ({ value, offset } = readUInt40LE(buf, offset));
-      break;
-    }
-
-    default: {
+    case 3:
+      return readUInt24LE(buf, offset);
+    case 4:
+      return readUInt32LE(buf, offset);
+    case 5:
+      return readUInt40LE(buf, offset);
+    default:
       throw new Error('unreachable');
-    }
   }
-
-  if (scale < 7) {
-    for (let i = scale; i < 7; i++) {
-      value *= 10;
-    }
-  }
-
-  let date;
-  if (useUTC) {
-    date = new Date(Date.UTC(1970, 0, 1, 0, 0, 0, value / 10000)) as DateWithNanosecondsDelta;
-  } else {
-    date = new Date(1970, 0, 1, 0, 0, 0, value / 10000) as DateWithNanosecondsDelta;
-  }
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (value % 10000) / Math.pow(10, 7)
-  });
-
-  return new Result(date, offset);
 }
 
-function readDate(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
+// SQL Server `time` is a zoneless time of day, mapped to `Temporal.PlainTime`,
+// whose nanosecond resolution covers all scales (0..7, i.e. down to 100ns).
+function readTime(buf: Buffer, offset: number, dataLength: number, scale: number): Result<Temporal.PlainTime> {
+  let ticks;
+  ({ offset, value: ticks } = readScaledTime(buf, offset, dataLength));
+
+  return new Result(scaledTicksToPlainTime(ticks, scale), offset);
+}
+
+// SQL Server `date` is a calendar date with no time or zone, mapped to
+// `Temporal.PlainDate`.
+function readDate(buf: Buffer, offset: number): Result<Temporal.PlainDate> {
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  if (useUTC) {
-    return new Result(new Date(Date.UTC(2000, 0, days - 730118)), offset);
-  } else {
-    return new Result(new Date(2000, 0, days - 730118), offset);
-  }
+  return new Result(epochDaysToPlainDate(days), offset);
 }
 
-function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
+// SQL Server `datetime2` is a zoneless wall-clock date and time, mapped to
+// `Temporal.PlainDateTime`.
+function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: number): Result<Temporal.PlainDateTime> {
   let time;
-  ({ offset, value: time } = readTime(buf, offset, dataLength - 3, scale, useUTC));
+  ({ offset, value: time } = readTime(buf, offset, dataLength - 3, scale));
 
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  let date;
-  if (useUTC) {
-    date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time)) as DateWithNanosecondsDelta;
-  } else {
-    date = new Date(2000, 0, days - 730118, time.getHours(), time.getMinutes(), time.getSeconds(), time.getMilliseconds()) as DateWithNanosecondsDelta;
-  }
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: time.nanosecondsDelta
-  });
-
-  return new Result(date, offset);
+  return new Result(epochDaysToPlainDate(days).toPlainDateTime(time), offset);
 }
 
-function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<DateWithNanosecondsDelta> {
+// SQL Server `datetimeoffset` stores a UTC date and time plus a fixed UTC
+// offset, mapped to a `Temporal.ZonedDateTime` in an offset time zone. This
+// preserves the local wall-clock time, the offset, and the exact instant.
+function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<Temporal.ZonedDateTime> {
   let time;
-  ({ offset, value: time } = readTime(buf, offset, dataLength - 5, scale, true));
+  ({ offset, value: time } = readTime(buf, offset, dataLength - 5, scale));
 
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  // time offset?
-  ({ offset } = readUInt16LE(buf, offset));
+  let offsetMinutes;
+  ({ offset, value: offsetMinutes } = readInt16LE(buf, offset));
 
-  const date = new Date(Date.UTC(2000, 0, days - 730118, 0, 0, 0, +time)) as DateWithNanosecondsDelta;
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: time.nanosecondsDelta
-  });
-  return new Result(date, offset);
+  const instant = epochDaysToPlainDate(days)
+    .toPlainDateTime(time)
+    .toZonedDateTime('UTC')
+    .toInstant();
+
+  const value = instant.toZonedDateTimeISO(offsetMinutesToString(offsetMinutes));
+
+  return new Result(value, offset);
 }
 
 module.exports.readValue = readValue;

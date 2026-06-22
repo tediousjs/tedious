@@ -1,6 +1,11 @@
 import { Collation } from '../../src/collation';
 import { typeByName as TYPE } from '../../src/data-type';
+import { loadTemporal, getTemporal } from '../../src/temporal';
 import { assert } from 'chai';
+
+before(async function() {
+  await loadTemporal();
+});
 
 describe('Validations', function() {
   it('Bit', function() {
@@ -89,15 +94,17 @@ describe('Validations', function() {
   });
 
   it('SmallDateTime', function() {
+    const Temporal = getTemporal();
+
     let value = TYPE.SmallDateTime.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.SmallDateTime.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const dateTime = Temporal.PlainDateTime.from('2015-02-12T16:43:13');
+    value = TYPE.SmallDateTime.validate(dateTime, undefined);
+    assert.isTrue(dateTime.equals(value as any));
 
-    value = TYPE.SmallDateTime.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.SmallDateTime.validate('2015-02-12T16:43:13', undefined);
+    assert.strictEqual((value as any).toString(), '2015-02-12T16:43:13');
 
     assert.throws(() => {
       TYPE.SmallDateTime.validate('xxx', undefined);
@@ -105,15 +112,17 @@ describe('Validations', function() {
   });
 
   it('DateTime', function() {
+    const Temporal = getTemporal();
+
     let value = TYPE.DateTime.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.DateTime.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const dateTime = Temporal.PlainDateTime.from('2015-02-12T16:43:13.632');
+    value = TYPE.DateTime.validate(dateTime, undefined);
+    assert.isTrue(dateTime.equals(value as any));
 
-    value = TYPE.DateTime.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.DateTime.validate('2015-02-12T16:43:13.632', undefined);
+    assert.strictEqual((value as any).toString(), '2015-02-12T16:43:13.632');
 
     assert.throws(() => {
       TYPE.DateTime.validate('xxx', undefined);
@@ -121,15 +130,17 @@ describe('Validations', function() {
   });
 
   it('DateTime2', function() {
+    const Temporal = getTemporal();
+
     let value = TYPE.DateTime2.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.DateTime2.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const dateTime = Temporal.PlainDateTime.from('2015-02-12T16:43:13.6320000');
+    value = TYPE.DateTime2.validate(dateTime, undefined);
+    assert.isTrue(dateTime.equals(value as any));
 
-    value = TYPE.DateTime2.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.DateTime2.validate('2015-02-12T16:43:13.632', undefined);
+    assert.strictEqual((value as any).toString(), '2015-02-12T16:43:13.632');
 
     assert.throws(() => {
       TYPE.DateTime2.validate('xxx', undefined);
@@ -137,15 +148,17 @@ describe('Validations', function() {
   });
 
   it('Time', function() {
+    const Temporal = getTemporal();
+
     let value = TYPE.Time.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.Time.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const time = Temporal.PlainTime.from('16:43:13.632');
+    value = TYPE.Time.validate(time, undefined);
+    assert.isTrue(time.equals(value as any));
 
-    value = TYPE.Time.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.Time.validate('16:43:13.632', undefined);
+    assert.strictEqual((value as any).toString(), '16:43:13.632');
 
     assert.throws(() => {
       TYPE.Time.validate('xxx', undefined);
@@ -153,15 +166,17 @@ describe('Validations', function() {
   });
 
   it('DateTimeOffset', function() {
+    const Temporal = getTemporal();
+
     let value = TYPE.DateTimeOffset.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.DateTimeOffset.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const zoned = Temporal.ZonedDateTime.from('2015-02-12T16:43:13.632+00:00[+00:00]');
+    value = TYPE.DateTimeOffset.validate(zoned, undefined);
+    assert.isTrue(zoned.equals(value as any));
 
-    value = TYPE.DateTimeOffset.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.DateTimeOffset.validate('2015-02-12T16:43:13.632+00:00[+00:00]', undefined);
+    assert.strictEqual((value as any).toString(), '2015-02-12T16:43:13.632+00:00[+00:00]');
 
     assert.throws(() => {
       TYPE.DateTimeOffset.validate('xxx', undefined);
