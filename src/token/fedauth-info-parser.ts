@@ -58,4 +58,3 @@ function fedAuthInfoParser(buf: Buffer, offset: number, _options: ParserOptions)
 }
 
 export default fedAuthInfoParser;
-module.exports = fedAuthInfoParser;

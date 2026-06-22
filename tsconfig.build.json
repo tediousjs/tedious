@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Emit JavaScript instead of just type-checking.
+    "noEmit": false,
+    "isolatedModules": false,
+
+    // The published package is CommonJS, so downlevel the ES module syntax.
+    // `verbatimModuleSyntax` is incompatible with emitting a different module
+    // format, so it is disabled here (it stays on for type-checking).
+    "verbatimModuleSyntax": false,
+    "module": "commonjs",
+
+    // Strip types only - keep the modern syntax as-is.
+    "target": "esnext",
+
+    "sourceMap": true,
+    "outDir": "lib",
+    "rootDir": "src"
+  },
+
+  "include": ["types/*.d.ts", "src/**/*.ts"],
+  "exclude": ["src/**/*.d.ts"]
+}

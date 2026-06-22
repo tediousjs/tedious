@@ -26,4 +26,3 @@ function orderParser(buf: Buffer, offset: number, _options: ParserOptions): Resu
 }
 
 export default orderParser;
-module.exports = orderParser;

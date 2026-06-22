@@ -58,4 +58,3 @@ const Image: DataType = {
 };
 
 export default Image;
-module.exports = Image;

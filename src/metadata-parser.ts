@@ -377,7 +377,3 @@ function metadataParse(parser: Parser, options: ParserOptions, callback: (metada
 
 export default metadataParse;
 export { readCollation, readMetadata };
-
-module.exports = metadataParse;
-module.exports.readCollation = readCollation;
-module.exports.readMetadata = readMetadata;

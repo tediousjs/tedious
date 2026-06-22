@@ -90,4 +90,3 @@ class OutgoingMessageStream extends Duplex {
 }
 
 export default OutgoingMessageStream;
-module.exports = OutgoingMessageStream;

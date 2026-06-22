@@ -621,4 +621,3 @@ class BulkLoad extends EventEmitter {
 }
 
 export default BulkLoad;
-module.exports = BulkLoad;

@@ -1,7 +1,7 @@
 const { createBenchmark } = require('../common');
 
 const { Request, TYPES } = require('tedious');
-const RpcRequestPayload = require('tedious/lib/rpcrequest-payload');
+const RpcRequestPayload = require('tedious/lib/rpcrequest-payload').default;
 
 const { Readable } = require('stream');
 

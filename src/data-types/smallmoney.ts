@@ -51,4 +51,3 @@ const SmallMoney: DataType = {
 };
 
 export default SmallMoney;
-module.exports = SmallMoney;

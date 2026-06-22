@@ -152,4 +152,3 @@ class NTLMResponsePayload {
 }
 
 export default NTLMResponsePayload;
-module.exports = NTLMResponsePayload;

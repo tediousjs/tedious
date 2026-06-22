@@ -27,4 +27,3 @@ const XML: DataType = {
 };
 
 export default XML;
-module.exports = XML;

@@ -27,4 +27,3 @@ const DecimalN: DataType = {
 };
 
 export default DecimalN;
-module.exports = DecimalN;

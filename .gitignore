@@ -7,6 +7,7 @@ README.html
 generated
 lib/
 /scratch
+coverage/
 
 test/unit/perf-buffer.coffee
 

@@ -69,4 +69,3 @@ async function rowParser(parser: Parser): Promise<RowToken> {
 }
 
 export default rowParser;
-module.exports = rowParser;

@@ -27,4 +27,3 @@ const NumericN: DataType = {
 };
 
 export default NumericN;
-module.exports = NumericN;

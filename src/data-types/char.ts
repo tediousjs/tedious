@@ -97,4 +97,3 @@ const Char: { maximumLength: number } & DataType = {
 };
 
 export default Char;
-module.exports = Char;

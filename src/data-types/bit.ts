@@ -46,4 +46,3 @@ const Bit: DataType = {
 };
 
 export default Bit;
-module.exports = Bit;

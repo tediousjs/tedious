@@ -99,4 +99,3 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
 
 
 export default nbcRowParser;
-module.exports = nbcRowParser;

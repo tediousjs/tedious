@@ -130,4 +130,3 @@ const TVP: DataType = {
 };
 
 export default TVP;
-module.exports = TVP;

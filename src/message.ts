@@ -15,4 +15,3 @@ class Message extends PassThrough {
 }
 
 export default Message;
-module.exports = Message;
