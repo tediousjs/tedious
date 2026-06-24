@@ -3194,6 +3194,7 @@ class Connection extends EventEmitter {
       request.rowCount! = 0;
       request.rows! = [];
       request.rst! = [];
+      request.error = undefined;
 
       const onCancel = () => {
         payloadStream.unpipe(message);
