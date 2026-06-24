@@ -22,6 +22,7 @@ title: API - Connection
 <ul class="toc">
   <li><a href="#function_newConnection">new Connection(config)</a></li>
   <li><a href="#event_connect">Event: 'connect'</a></li>
+  <li><a href="#event_retry">Event: 'retry'</a></li>
   <li><a href="#event_end">Event: 'end'</a></li>
   <li><a href="#event_error">Event: 'error'</a></li>
   <li><a href="#event_debug">Event: 'debug'</a></li>
@@ -720,7 +721,8 @@ connection.connect();
         <code>options.connector</code>
       </dt>
       <dd>
-        
+        A function that returns a <code>Promise</code> for a custom <code>net.Socket</code> to connect through, instead of Tedious opening its own connection.
+        (default: <code>undefined</code>)
       </dd>
 
       <dt>
