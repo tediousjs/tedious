@@ -48,14 +48,14 @@ Copy the directory containg <i>tedious</i> in to your project's
       <li>Pull the docker image: </br>
         <pre class="code">
         <code>
-          docker pull mcr.microsoft.com/mssql/server:2019-latest
+          docker pull mcr.microsoft.com/mssql/server:2022-latest
         </code>
       </pre>
       </li>
       <li>Start the SQL Server: </br>
         <pre class="code">
           <code>
-            docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=password_01" -p 1433:1433 -v sqldatavol:/var/opt/mssql -d
+            docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=password_01" -p 1433:1433 -v sqldatavol:/var/opt/mssql -d
           </code>
       </pre>
         <ul>

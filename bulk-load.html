@@ -72,10 +72,17 @@ connection.execBulkLoad(bulkLoad, [
       </dd>
 
       <dt>
-        <code>tableLock</code>
+        <code>lockTable</code>
       </dt>
       <dd>
         Places a bulk update(BU) lock on table while performing bulk load, using T-SQL <a href="https://technet.microsoft.com/en-us/library/ms180876(v=sql.105).aspx">TABLOCK</a>. (default: <code>false</code>)
+      </dd>
+
+      <dt>
+        <code>order</code>
+      </dt>
+      <dd>
+        Specifies the order the row data is already sorted in, letting the SQL Server skip a sort to speed up the load, using T-SQL <a href="https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)">ORDER</a>. (default: <code>{}</code>)
       </dd>
       </dl>
   </div>
@@ -157,4 +164,10 @@ bulkLoad.setTimeout(timeout);
 </div>
 <p>
   When no timeout is set for the bulk load, the <code>options.requestTimeout</code> of the <code>Connection</code> is used.
+</p>
+
+<h2 id="function_cancel">bulkLoad.cancel()</h2>
+<p>
+  Cancels this bulk load. The bulk load's completion callback passed to <a href="api-connection.html#function_execBulkLoad">connection.execBulkLoad</a> is invoked with a <code>RequestError</code>.
+  Has no effect once the bulk load has already been completed (or cancelled).
 </p>

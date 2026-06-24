@@ -576,3 +576,9 @@ request.setTimeout(timeout);
 <p>
   When no timeout is set for the request, the <code>options.requestTimeout</code> of the <code>Connection</code> is used.
 </p>
+
+<h2 id="function_cancel">request.cancel()</h2>
+<p>
+  Cancels this request. The requests completion callback is invoked with a <code>RequestError</code> whose <code>code</code> set to <code>'ECANCEL'</code>.
+  Has no effect on requests that have already been completed (or cancelled).
+</p>

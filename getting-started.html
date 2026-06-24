@@ -68,6 +68,21 @@ title: Getting started
 </p>
 
 <p>
+  As a shortcut, <code>tedious.connect()</code> constructs the connection and initiates it in one call, returning the <code>Connection</code> object:
+  {% highlight javascript %}
+  var connect = require('tedious').connect;
+
+  var connection = connect(config, function(err) {
+    if (err) {
+      console.log('Error: ', err);
+      return;
+    }
+    executeStatement();
+  });
+{% endhighlight %}
+</p>
+
+<p>
   Once a connection has been established, a query can be executed.
 </p>
 
@@ -143,11 +158,15 @@ var ISOLATION_LEVEL = require('tedious').ISOLATION_LEVEL;
 var Connection = require('tedious').Connection;
 
   var config = {
-    userName: 'test',
-    password: 'test',
     server: '192.168.1.210',
-    
-    // If you're on Azure Data Warehouse, you will need this:
+    authentication: {
+      type: 'default',
+      options: {
+        userName: 'test',
+        password: 'test',
+      }
+    }
+    // If you're on Azure SQL / Synapse (Data Warehouse):
     options: {
       encrypt: true,
       enableArithAbort: true,
