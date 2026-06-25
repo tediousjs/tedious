@@ -404,3 +404,39 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: npm run semantic-release
+
+  generate-documentation:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Use Node.js 12
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+
+    - name: Determine npm cache directory
+      id: npm-cache
+      run: |
+        echo "::set-output name=dir::$(npm config get cache)"
+
+    - uses: actions/cache@v2
+      with:
+        path: ${{ steps.npm-cache.outputs.dir }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - run: npm ci
+
+    - name: Generate documentation
+      run: npx typedoc
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v2
+      with:
+        name: documentation
+        path: docs
+        retention-days: 5
