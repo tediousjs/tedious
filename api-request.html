@@ -26,6 +26,7 @@ title: API - Request
   <li><a href="#function_pause">request.pause()</a></li>
   <li><a href="#function_resume">request.resume()</a></li>
   <li><a href="#function_setTimeout">request.setTimeout(timeout)</a></li>
+  <li><a href="#function_cancel">request.cancel()</a></li>
 </ul>
 
 <h2 id="function_newRequest">new Request(sql, callback)</h2>
@@ -575,4 +576,10 @@ request.setTimeout(timeout);
 </div>
 <p>
   When no timeout is set for the request, the <code>options.requestTimeout</code> of the <code>Connection</code> is used.
+</p>
+
+<h2 id="function_cancel">request.cancel()</h2>
+<p>
+  Cancels this request. The requests completion callback is invoked with a <code>RequestError</code> whose <code>code</code> set to <code>'ECANCEL'</code>.
+  Has no effect on requests that have already been completed (or cancelled).
 </p>
