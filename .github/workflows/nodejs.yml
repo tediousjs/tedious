@@ -140,15 +140,9 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
 
-    - name: Install dbatools
-      shell: powershell
-      run: Install-Module dbatools -Force
-
     - name: Set up TLS Key and Certificate
       shell: powershell
       run: |
-        Import-Module dbatools
-
         $certificate = New-SelfSignedCertificate `
           -Type SSLServerAuthentication `
           -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
@@ -160,8 +154,17 @@ jobs:
           -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
           -CertStoreLocation Cert:\LocalMachine\My `
 
-        $sqlinstance = Find-DbaInstance -ComputerName localhost
-        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+        # Grant the SQL Server service account read access to the certificate's private key
+        $serviceAccount = (Get-CimInstance Win32_Service -Filter "Name='MSSQLSERVER'").StartName
+        $keyContainerName = $certificate.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+        $keyPath = Join-Path "$env:ProgramData\Microsoft\Crypto\RSA\MachineKeys" $keyContainerName
+        $acl = Get-Acl $keyPath
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($serviceAccount, 'Read', 'Allow')))
+        Set-Acl $keyPath $acl
+
+        # Register the certificate with the SQL Server instance
+        $instanceId = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL').MSSQLSERVER
+        Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer\SuperSocketNetLib" -Name Certificate -Value $certificate.Thumbprint.ToLower()
 
         Restart-Service MSSQLSERVER
 
