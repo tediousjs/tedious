@@ -3480,7 +3480,10 @@ class Connection extends EventEmitter {
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      await once(tokenStreamParser, 'end');
+      await Promise.race([
+        once(tokenStreamParser, 'end'),
+        signalAborted
+      ]);
 
       if (handler.loginAckReceived) {
         return handler.routingData;
