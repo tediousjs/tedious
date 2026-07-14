@@ -2,6 +2,8 @@
   "compilerOptions": {
     "target": "esnext",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "types": [ "node", "mocha" ],
     "allowJs": true,
     "noEmit": true,
     "strict": true,
