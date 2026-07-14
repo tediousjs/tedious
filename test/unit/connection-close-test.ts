@@ -116,7 +116,7 @@ describe('Closing a connection while connecting', function() {
           outgoingMessageStream.write(responseMessage);
         }
       } catch (err) {
-        console.log(err);
+        done(err);
       }
     });
 
@@ -136,7 +136,7 @@ describe('Closing a connection while connecting', function() {
     connection.connect((err) => {
       assert.instanceOf(err, ConnectionError);
       assert.strictEqual(err.code, 'ECLOSE');
-      assert.strictEqual('Connection closed before the connection was established.', err.message);
+      assert.strictEqual(err.message, 'Connection closed before the connection was established.');
 
       assert.strictEqual(endCount, 1);
 
