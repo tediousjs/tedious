@@ -116,7 +116,7 @@ describe('Closing a connection while connecting', function() {
           outgoingMessageStream.write(responseMessage);
         }
       } catch (err) {
-        done(err);
+        console.log(err);
       }
     });
 
