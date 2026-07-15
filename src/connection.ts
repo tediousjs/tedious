@@ -3156,6 +3156,10 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+    // Clear any error left over from a previous execution of this request,
+    // even if the request is rejected before being sent.
+    request.error = undefined;
+
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3176,7 +3180,6 @@ class Connection extends EventEmitter {
       request.rowCount! = 0;
       request.rows! = [];
       request.rst! = [];
-      request.error = undefined;
 
       const onCancel = () => {
         payloadStream.unpipe(message);

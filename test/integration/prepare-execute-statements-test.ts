@@ -301,6 +301,58 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
+  it('should not report a stale error when execution is rejected on a closed connection', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    const errors: (Error | null | undefined)[] = [];
+
+    const request = new Request('select 1 / @divisor as result', function(err) {
+      errors.push(err ?? undefined);
+    });
+    request.addParameter('divisor', TYPES.Int);
+
+    request.on('prepared', function() {
+      assert.ok(request.handle);
+
+      // First execution: fails with a divide by zero error
+      request.once('requestCompleted', function() {
+        assert.isDefined(request.error, 'First execution should have set an error');
+
+        connection.close();
+      });
+
+      connection.execute(request, { divisor: 0 });
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      // Second execution: rejected because the connection is closed.
+      // The callback receives an `EINVALIDSTATE` error, and the stale
+      // divide by zero error from the first execution should be cleared.
+      request.once('requestCompleted', function() {
+        assert.isDefined(errors[1], 'Rejected execution should have an error');
+        assert.include(errors[1]!.message, 'Requests can only be made in the LoggedIn state', 'Error should be the invalid state error');
+        assert.isUndefined(request.error, 'Stale error from the previous execution should be cleared');
+
+        done();
+      });
+
+      connection.execute(request, { divisor: 1 });
+    });
+  });
+
   it('should test unprepare', function(done) {
     const config = getConfig();
     const request = new Request('select 3', function(err) {
