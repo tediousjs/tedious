@@ -156,7 +156,7 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
-  it('should not persist error state between executions of prepared statement (GH#1712)', function(done) {
+  it('should not persist error state between executions of prepared statement', function(done) {
     const config = getConfig();
 
     const connection = new Connection(config);
@@ -234,6 +234,68 @@ describe('Prepare Execute Statement', function() {
       // Third execution succeeded - this is the key assertion for GH#1712
       assert.isUndefined(errors[2], 'Third execution should have no error (error state should be cleared)');
       assert.strictEqual(results[1], 0, 'Third execution should return 0 (1/2 truncated to int)');
+
+      done();
+    });
+  });
+
+  it('should not persist parameter validation errors between executions of prepared statement', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    const errors: (Error | null | undefined)[] = [];
+    const results: (number | null)[] = [];
+
+    const request = new Request('select 1 / @divisor as result', function(err) {
+      errors.push(err ?? undefined);
+    });
+    request.addParameter('divisor', TYPES.Int);
+
+    request.on('row', function(columns) {
+      results.push(columns[0].value);
+    });
+
+    request.on('prepared', function() {
+      assert.ok(request.handle);
+
+      // First execution: fails client-side parameter validation,
+      // `request.error` is set without the request ever being sent
+      request.once('requestCompleted', function() {
+        // Second execution: should succeed with a valid parameter value.
+        // Before the fix, this would report the stale validation error.
+        request.once('requestCompleted', function() {
+          request.once('requestCompleted', function() {
+            connection.close();
+          });
+          connection.unprepare(request);
+        });
+
+        connection.execute(request, { divisor: 1 });
+      });
+
+      connection.execute(request, { divisor: 'not a number' });
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      // First execution failed with a validation error
+      assert.isDefined(errors[0], 'First execution should have a validation error');
+      assert.include(errors[0]!.message, 'Invalid number', 'Error should be the validation error');
+
+      // Second execution succeeded and the validation error was not re-reported
+      assert.isUndefined(errors[1], 'Second execution should have no error (error state should be cleared)');
+      assert.strictEqual(results[0], 1, 'Second execution should return 1');
 
       done();
     });
