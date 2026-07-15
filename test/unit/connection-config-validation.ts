@@ -20,13 +20,13 @@ describe('Connection configuration validation', function() {
     config.server = 'localhost';
   });
 
-  it('default transient retry interval', () => {
+  it('default transient retry interval', function() {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.connectionRetryInterval, 500);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('good transient retry interval', () => {
+  it('good transient retry interval', function() {
     const goodRetryInterval = 75;
     config.options.connectionRetryInterval = goodRetryInterval;
     const connection = new Connection(config);
@@ -34,7 +34,7 @@ describe('Connection configuration validation', function() {
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('bad transient retry interval', () => {
+  it('bad transient retry interval', function() {
     const zeroRetryInterval = 0;
     config.options.connectionRetryInterval = zeroRetryInterval;
     assert.throws(() => {
@@ -48,13 +48,13 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('default max transient retries', () => {
+  it('default max transient retries', function() {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.maxRetriesOnTransientErrors, 3);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('good max transient retries', () => {
+  it('good max transient retries', function() {
     const zeroMaxRetries = 0;
     config.options.maxRetriesOnTransientErrors = zeroMaxRetries;
     const firstConnection = new Connection(config);
@@ -70,7 +70,7 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad max transient retries', () => {
+  it('bad max transient retries', function() {
     const negativeMaxRetries = -5;
     config.options.maxRetriesOnTransientErrors = negativeMaxRetries;
     assert.throws(() => {
@@ -78,7 +78,7 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad azure ad authentication method', () => {
+  it('bad azure ad authentication method', function() {
     const authenticationMethod = 'abc';
     config.authentication = authenticationMethod;
     assert.throws(() => {
@@ -86,7 +86,7 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad tds version for with azure ad', () => {
+  it('bad tds version for with azure ad', function() {
     const authenticationMethod = 'activedirectorypassword';
     config.authentication = authenticationMethod;
     config.options.tdsVersion = '7_2';
@@ -95,7 +95,7 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad encrypt value type', () => {
+  it('bad encrypt value type', function() {
     const numberEncrypt = 0;
     config.options.encrypt = numberEncrypt;
     assert.throws(() => {
@@ -103,28 +103,28 @@ describe('Connection configuration validation', function() {
     });
   });
 
-  it('bad encrypt string', () => {
+  it('bad encrypt string', function() {
     config.options.encrypt = 'false';
     assert.throws(() => {
       new Connection(config);
     });
   });
 
-  it('good false encrypt value', () => {
+  it('good false encrypt value', function() {
     config.options.encrypt = false;
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.encrypt, false);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('good true encrypt value', () => {
+  it('good true encrypt value', function() {
     config.options.encrypt = true;
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.encrypt, true);
     ensureConnectionIsClosed(connection, () => {});
   });
 
-  it('good strict encrypt value', () => {
+  it('good strict encrypt value', function() {
     config.options.encrypt = 'strict';
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.encrypt, 'strict');

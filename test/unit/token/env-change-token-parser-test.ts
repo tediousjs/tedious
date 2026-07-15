@@ -1,9 +1,14 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { DatabaseEnvChangeToken, PacketSizeEnvChangeToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
+
 describe('Env Change Token Parser', () => {
-  it('should write to database', async () => {
+  it('should parse database change', async function() {
+    const debug = new Debug();
     const oldDb = 'old';
     const newDb = 'new';
 
@@ -18,16 +23,19 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).type, 'DATABASE');
-    assert.strictEqual((token as any).oldValue, 'old');
-    assert.strictEqual((token as any).newValue, 'new');
+
+    assert.instanceOf(token, DatabaseEnvChangeToken);
+    assert.strictEqual(token.type, 'DATABASE');
+    assert.strictEqual(token.oldValue, 'old');
+    assert.strictEqual(token.newValue, 'new');
   });
 
-  it('should write with correct packet size', async () => {
+  it('should parse packet size change', async function() {
+    const debug = new Debug();
     const oldSize = '1024';
     const newSize = '2048';
 
@@ -42,17 +50,19 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
-    assert.strictEqual((token as any).type, 'PACKET_SIZE');
-    assert.strictEqual((token as any).oldValue, 1024);
-    assert.strictEqual((token as any).newValue, 2048);
+    assert.instanceOf(token, PacketSizeEnvChangeToken);
+    assert.strictEqual(token.type, 'PACKET_SIZE');
+    assert.strictEqual(token.oldValue, 1024);
+    assert.strictEqual(token.newValue, 2048);
   });
 
-  it('should be of bad type', async () => {
+  it('should skip unknown env change types', async function() {
+    const debug = new Debug();
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
     buffer.writeUInt8(0xe3);
@@ -62,7 +72,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], {} as any, {} as any);
+    const parser = StreamParser.parseTokens([data], debug, options);
     const result = await parser.next();
 
     assert.isTrue(result.done);

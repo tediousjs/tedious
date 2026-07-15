@@ -150,7 +150,7 @@ const arrays: number[][] = [
 ];
 
 describe('Guid Parser Test', function() {
-  it('guidToArray', () => {
+  it('guidToArray', function() {
     for (let i = 0; i < lowerGuids.length; i++) {
       const guid = lowerGuids[i];
       assert.deepEqual(guidParser.guidToArray(guid), arrays[i]);
@@ -167,14 +167,14 @@ describe('Guid Parser Test', function() {
     }
   });
 
-  it('bufferToLowerCaseGuid', () => {
+  it('bufferToLowerCaseGuid', function() {
     for (let i = 0; i < arrays.length; i++) {
       const array = arrays[i];
       assert.strictEqual(guidParser.bufferToLowerCaseGuid(Buffer.from(array)), lowerGuids[i]);
     }
   });
 
-  it('bufferToUpperCaseGuid', () => {
+  it('bufferToUpperCaseGuid', function() {
     for (let i = 0; i < arrays.length; i++) {
       const array = arrays[i];
       assert.strictEqual(guidParser.bufferToUpperCaseGuid(Buffer.from(array)), upperGuids[i]);

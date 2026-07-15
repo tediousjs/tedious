@@ -3,7 +3,7 @@ import { typeByName as TYPE } from '../../src/data-type';
 import { assert } from 'chai';
 
 describe('Validations', function() {
-  it('Bit', () => {
+  it('Bit', function() {
     let value = TYPE.Bit.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -23,7 +23,7 @@ describe('Validations', function() {
     assert.strictEqual(value, false);
   });
 
-  it('TinyInt', () => {
+  it('TinyInt', function() {
     let value = TYPE.TinyInt.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -38,7 +38,7 @@ describe('Validations', function() {
     }, TypeError, 'Value must be between 0 and 255, inclusive.');
   });
 
-  it('SmallInt', () => {
+  it('SmallInt', function() {
     let value = TYPE.SmallInt.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -50,7 +50,7 @@ describe('Validations', function() {
     }, TypeError, 'Value must be between -32768 and 32767, inclusive.');
   });
 
-  it('Int', () => {
+  it('Int', function() {
     let value = TYPE.Int.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -62,7 +62,7 @@ describe('Validations', function() {
     }, TypeError, 'Value must be between -2147483648 and 2147483647, inclusive.');
   });
 
-  it('BigInt', () => {
+  it('BigInt', function() {
     let value = TYPE.BigInt.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -88,7 +88,7 @@ describe('Validations', function() {
     }, RangeError, 'The number 0.5 cannot be converted to a BigInt because it is not an integer');
   });
 
-  it('SmallDateTime', () => {
+  it('SmallDateTime', function() {
     let value = TYPE.SmallDateTime.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -104,7 +104,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid date.');
   });
 
-  it('DateTime', () => {
+  it('DateTime', function() {
     let value = TYPE.DateTime.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -120,7 +120,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid date.');
   });
 
-  it('DateTime2', () => {
+  it('DateTime2', function() {
     let value = TYPE.DateTime2.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -136,7 +136,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid date.');
   });
 
-  it('Time', () => {
+  it('Time', function() {
     let value = TYPE.Time.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -152,7 +152,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid time.');
   });
 
-  it('DateTimeOffset', () => {
+  it('DateTimeOffset', function() {
     let value = TYPE.DateTimeOffset.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -168,7 +168,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid date.');
   });
 
-  it('Real', () => {
+  it('Real', function() {
     let value = TYPE.Real.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -183,7 +183,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid number.');
   });
 
-  it('Float', () => {
+  it('Float', function() {
     let value = TYPE.Float.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -198,7 +198,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid number.');
   });
 
-  it('Decimal', () => {
+  it('Decimal', function() {
     let value = TYPE.Decimal.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -213,7 +213,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid number.');
   });
 
-  it('Numeric', () => {
+  it('Numeric', function() {
     let value = TYPE.Numeric.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -228,7 +228,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid number.');
   });
 
-  it('Money', () => {
+  it('Money', function() {
     let value = TYPE.Money.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -243,7 +243,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid number.');
   });
 
-  it('SmallMoney', () => {
+  it('SmallMoney', function() {
     let value = TYPE.SmallMoney.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -255,7 +255,7 @@ describe('Validations', function() {
     }, TypeError, 'Value must be between -214748.3648 and 214748.3647');
   });
 
-  it('Image', () => {
+  it('Image', function() {
     let value = TYPE.Image.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -268,7 +268,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid buffer.');
   });
 
-  it('Binary', () => {
+  it('Binary', function() {
     let value = TYPE.Binary.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -281,7 +281,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid buffer.');
   });
 
-  it('VarBinary', () => {
+  it('VarBinary', function() {
     let value = TYPE.VarBinary.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -294,7 +294,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid buffer.');
   });
 
-  it('Text', () => {
+  it('Text', function() {
     // SQL_Latin1_General_CP1_CI_AS
     const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
@@ -313,7 +313,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid string.');
   });
 
-  it('VarChar', () => {
+  it('VarChar', function() {
     // SQL_Latin1_General_CP1_CI_AS
     const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
@@ -332,7 +332,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid string.');
   });
 
-  it('NVarChar', () => {
+  it('NVarChar', function() {
     let value = TYPE.NVarChar.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -348,7 +348,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid string.');
   });
 
-  it('Char', () => {
+  it('Char', function() {
     // SQL_Latin1_General_CP1_CI_AS
     const collation = Collation.fromBuffer(Buffer.from([ 0x09, 0x04, 0xd0, 0x00, 0x34 ]));
 
@@ -367,7 +367,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid string.');
   });
 
-  it('NChar', () => {
+  it('NChar', function() {
     let value = TYPE.NChar.validate(null, undefined);
     assert.strictEqual(value, null);
 
@@ -383,7 +383,7 @@ describe('Validations', function() {
     }, TypeError, 'Invalid string.');
   });
 
-  it('TVP', () => {
+  it('TVP', function() {
     let value = TYPE.TVP.validate(null, undefined);
     assert.strictEqual(value, null);
 

@@ -50,8 +50,8 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
-      assert.strictEqual((err as RequestError).number, 2627);
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.number, 2627);
     });
   });
 
@@ -63,8 +63,8 @@ describe('Errors Test', function() {
   `;
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
-      assert.strictEqual((err as RequestError).number, 515);
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.number, 515);
     });
   });
 
@@ -74,8 +74,8 @@ describe('Errors Test', function() {
   ';
 
     execSql(done, sql, function(err) {
-      assert.ok(err instanceof RequestError);
-      assert.strictEqual((err as RequestError).number, 3701);
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.number, 3701);
     });
   });
 
@@ -88,24 +88,21 @@ describe('Errors Test', function() {
     const connection = new Connection(config);
 
     const execProc = new Request('#testExtendedErrorInfo', function(err) {
-      if (!err) {
-        assert.fail('Expected `err` to not be undefined');
-      }
+      assert.isDefined(err);
+      assert.instanceOf(err, RequestError);
 
-      const requestError = err as RequestError;
+      assert.strictEqual(err.number, 50000);
+      assert.strictEqual(err.state, 42);
+      assert.strictEqual(err.class, 14);
 
-      assert.strictEqual(requestError.number, 50000);
-      assert.strictEqual(requestError.state, 42);
-      assert.strictEqual(requestError.class, 14);
-
-      assert.exists(requestError.serverName);
-      assert.exists(requestError.procName);
+      assert.exists(err.serverName);
+      assert.exists(err.procName);
 
       // The procedure name will actually be padded to 128 chars with underscores and
       // some random hexadecimal digits.
-      assert.match(requestError.procName as string, /^#testExtendedErrorInfo/);
+      assert.match(err.procName as string, /^#testExtendedErrorInfo/);
 
-      assert.strictEqual(requestError.lineNumber, 1);
+      assert.strictEqual(err.lineNumber, 1);
 
       connection.close();
     });

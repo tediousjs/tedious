@@ -42,8 +42,8 @@ describe('custom connector', function() {
 
     connection.on('end', () => {
       // validates the connection was stablished using the custom connector
-      assert.isOk(attemptedConnection);
-      assert.isOk(customConnectorCalled);
+      assert.isTrue(attemptedConnection);
+      assert.isTrue(customConnectorCalled);
 
       connection.close();
       done();

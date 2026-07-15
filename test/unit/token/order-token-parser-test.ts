@@ -1,9 +1,14 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { OrderToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-describe('Order Token Parser', () => {
-  it('should have one column', async () => {
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
+
+describe('Order Token Parser', function() {
+  it('should have one column', async function() {
+    const debug = new Debug();
     const numberOfColumns = 1;
     const length = numberOfColumns * 2;
     const column = 3;
@@ -15,16 +20,18 @@ describe('Order Token Parser', () => {
     buffer.writeUInt16LE(column);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).orderColumns.length, 1);
 
-    assert.strictEqual((token as any).orderColumns[0], column);
+    assert.instanceOf(token, OrderToken);
+    assert.strictEqual(token.orderColumns.length, 1);
+    assert.strictEqual(token.orderColumns[0], column);
   });
 
-  it('should have two columns', async () => {
+  it('should have two columns', async function() {
+    const debug = new Debug();
     const numberOfColumns = 2;
     const length = numberOfColumns * 2;
     const column1 = 3;
@@ -38,13 +45,15 @@ describe('Order Token Parser', () => {
     buffer.writeUInt16LE(column2);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], {} as any, { tdsVersion: '7_2' } as any);
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).orderColumns.length, 2);
-    assert.strictEqual((token as any).orderColumns[0], column1);
-    assert.strictEqual((token as any).orderColumns[1], column2);
+
+    assert.instanceOf(token, OrderToken);
+    assert.strictEqual(token.orderColumns.length, 2);
+    assert.strictEqual(token.orderColumns[0], column1);
+    assert.strictEqual(token.orderColumns[1], column2);
 
     assert.isTrue((await parser.next()).done);
   });

@@ -51,7 +51,7 @@ function execSql(
   request.addParameter('param', type, value, options);
 
   request.on('doneInProc', function(rowCount, more) {
-    assert.ok(more);
+    assert.isTrue(more);
     assert.strictEqual(rowCount, 1);
   });
 
@@ -117,7 +117,7 @@ function execSqlOutput(
   request.addOutputParameter('paramOut', type);
 
   request.on('doneInProc', function(rowCount, more) {
-    assert.ok(more);
+    assert.isTrue(more);
     assert.strictEqual(rowCount, 1);
   });
 
@@ -138,7 +138,7 @@ function execSqlOutput(
       assert.strictEqual(returnValue, expectedValue);
     }
 
-    assert.ok(metadata);
+    assert.isDefined(metadata);
   });
 
   const connectionConfig = Object.assign({}, config, { options: Object.assign({}, config.options, connectionOptions) });
@@ -1097,7 +1097,7 @@ describe('Parameterised Statements Test', function() {
         });
 
         request.on('doneInProc', function(rowCount, more) {
-          assert.ok(more);
+          assert.isTrue(more);
           assert.strictEqual(rowCount, 1);
         });
 
@@ -1140,7 +1140,7 @@ describe('Parameterised Statements Test', function() {
     request.addParameter('param2', TYPES.VarChar, 'qwerty');
 
     request.on('doneInProc', function(rowCount, more) {
-      assert.ok(more);
+      assert.isTrue(more);
       assert.strictEqual(rowCount, 1);
     });
 
@@ -1216,7 +1216,7 @@ end')\
 
       request.on('doneInProc', function(rowCount, more) {
         assert.strictEqual(rowCount, undefined);
-        assert.ok(more);
+        assert.isTrue(more);
       });
 
       request.on('row', function(columns) {

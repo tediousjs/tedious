@@ -1,9 +1,14 @@
-import StreamParser from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { LoginAckToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
-describe('Loginack Token Parser', () => {
-  it('should have correct info', async () => {
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
+
+describe('Loginack Token Parser', function() {
+  it('should have correct info', async function() {
+    const debug = new Debug();
     const interfaceType = 1;
     const version = 0x72090002;
     const progName = 'prog';
@@ -30,15 +35,17 @@ describe('Loginack Token Parser', () => {
     data.writeUInt16LE(data.length - 3, 1);
     // console.log(buffer)
 
-    const parser = StreamParser.parseTokens([data], {} as any, { tdsVersion: '7_2' } as any);
+    const parser = StreamParser.parseTokens([data], debug, options);
 
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
-    assert.strictEqual((token as any).interface, 'SQL_TSQL');
-    assert.strictEqual((token as any).tdsVersion, '7_2');
-    assert.strictEqual((token as any).progName, progName);
-    assert.deepEqual((token as any).progVersion, progVersion);
+
+    assert.instanceOf(token, LoginAckToken);
+    assert.strictEqual(token.interface, 'SQL_TSQL');
+    assert.strictEqual(token.tdsVersion, '7_2');
+    assert.strictEqual(token.progName, progName);
+    assert.deepEqual(token.progVersion, progVersion);
 
     assert.isTrue((await parser.next()).done);
   });

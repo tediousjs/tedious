@@ -374,7 +374,7 @@ describe('Connecting to a server that sends a re-routing information', function(
     }
   });
 
-  it('it should throw an error with redirect information when targetserver connection failed', async function() {
+  it('should throw an error with redirect information when target server connection fails', async function() {
     routingServer.on('connection', async (connection) => {
       const debug = new Debug();
       const incomingMessageStream = new IncomingMessageStream(debug);
@@ -449,7 +449,7 @@ describe('Connecting to a server that sends a re-routing information', function(
     } catch (err) {
       assert.instanceOf(err, ConnectionError);
       const message = `Failed to connect to test.invalid:${(targetServer.address() as net.AddressInfo).port} (redirected from ${(routingServer.address() as net.AddressInfo).address}:${(routingServer.address() as net.AddressInfo).port})`;
-      assert.include((err as Error).message, message);
+      assert.include(err.message, message);
     } finally {
       connection.close();
     }
