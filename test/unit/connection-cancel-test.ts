@@ -396,6 +396,124 @@ describe('Canceling a request', function() {
     });
   });
 
+  it('should complete the canceled request within `cancelTimeout` when canceled before the request message was fully sent and the server never responds', function(done) {
+    // A request that is canceled before its request message was fully sent
+    // is terminated by setting the `IGNORE` bit on the message's final
+    // packet. The client then waits for the server's response to the
+    // ignored message. If the server never sends that response, the
+    // `cancelTimeout` backstop must kick in and fail the request - the
+    // request must not be left waiting indefinitely.
+    this.timeout(2000);
+
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          await drainMessage(message);
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (Initial SQL)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`select 1`) - the request message was canceled while
+        // it was being sent, so its final packet carries the `IGNORE` bit.
+        // The message is received but never responded to, like a server
+        // that has become unresponsive.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false,
+        cancelTimeout: 300
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      let failure: Error | undefined;
+
+      // If the request is still pending well after `cancelTimeout` has
+      // elapsed, the backstop did not kick in - fail the test and close
+      // the connection ourselves so it can be torn down cleanly.
+      const guardTimer = setTimeout(() => {
+        failure = new Error('Canceled request was not completed within `cancelTimeout`');
+        connection.close();
+      }, 1000);
+
+      const request = new Request('select 1', (err) => {
+        clearTimeout(guardTimer);
+
+        try {
+          assert.instanceOf(err, Error);
+        } catch (assertionError: any) {
+          failure ??= assertionError;
+        }
+
+        connection.close();
+      });
+
+      connection.execSqlBatch(request);
+
+      // Cancel the request immediately, before the request message
+      // was fully sent off.
+      connection.cancel();
+
+      connection.on('end', () => {
+        done(failure);
+      });
+    });
+  });
+
   it('should complete the request with `ECANCEL` when canceled while the request message is being sent and the response already started arriving', function(done) {
     // Used by the client side to signal to the server side that the request
     // was canceled.

@@ -3225,6 +3225,12 @@ class Connection extends EventEmitter {
         message.ignore = true;
         message.end();
 
+        // The server responds to the ignored message like to any other
+        // request message. If that response never arrives (e.g. because
+        // the server has become unresponsive), the cancel timer ensures
+        // the canceled request still completes.
+        this.createCancelTimer();
+
         if (request instanceof Request && request.paused) {
           // resume the request if it was paused so we can read the remaining tokens
           request.resume();
@@ -3835,6 +3841,12 @@ Connection.prototype.STATE = {
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
+
+          // If the request was canceled before its request message was
+          // fully sent, this response belongs to the ignored message and
+          // a cancel timer is running - the response's arrival is what
+          // completes the cancellation.
+          this.clearCancelTimer();
 
           this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
