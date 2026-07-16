@@ -1869,7 +1869,7 @@ class Connection extends EventEmitter {
   on(
     event: 'connect',
     /**
-     * @param err If successfully connected, will be falsey. If there was a
+     * @param err If successfully connected, will be falsy. If there was a
      *   problem (with either connecting or validation), will be an [[Error]] object.
      */
     listener: (err: Error | undefined) => void
@@ -3592,7 +3592,7 @@ class Connection extends EventEmitter {
       const fedAuthInfoToken = handler.fedAuthInfoToken;
 
       if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-        /** Federated authentication configation. */
+        /** Federated authentication configuration. */
         const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
         /** Permission scope to pass to Entra ID when requesting an authentication token. */
         const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
