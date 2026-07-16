@@ -3882,6 +3882,15 @@ Connection.prototype.STATE = {
     name: 'SentAttention',
     enter: function() {
       (async () => {
+        // TDS is a request-response protocol at the message level: every
+        // client message - including the attention message - receives
+        // exactly one response message. By the time we enter this state,
+        // the response to the canceled request itself was already consumed
+        // in the `SentClientRequest` state, so the single message read here
+        // is the attention message's own response, containing the attention
+        // acknowledgement. Reading more than one message would consume the
+        // response belonging to the next request and desynchronize the
+        // message stream - so don't turn this into a loop.
         let message;
         try {
           message = await this.messageIo.readMessage();
