@@ -162,7 +162,7 @@ class MessageIO extends EventEmitter {
   }
 
   // TODO listen for 'drain' event when socket.write returns false.
-  // TODO implement incomplete request cancelation (2.2.1.6)
+  // TODO implement incomplete request cancellation (2.2.1.6)
   sendMessage(packetType: number, data?: Buffer, resetConnection?: boolean) {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);
