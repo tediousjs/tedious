@@ -2172,15 +2172,17 @@ class Connection extends EventEmitter {
         this.emit('end');
       });
 
+      // Mark the connection as closed and detach the active request
+      // before invoking its callback, so that a callback that synchronously
+      // calls `close` does not re-enter this cleanup logic.
       const request = this.request;
-      if (request) {
-        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
-        request.callback(err);
-        this.request = undefined;
-      }
-
+      this.request = undefined;
       this.attentionSent = false;
       this.closed = true;
+
+      if (request) {
+        request.callback(new RequestError('Connection closed before request completed.', 'ECLOSE'));
+      }
     }
   }
 
