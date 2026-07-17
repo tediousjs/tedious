@@ -329,10 +329,11 @@ describe('MessageIO', function() {
             receivedData.push(chunk);
           }
 
-          // The data of the individual packages gets merged together by the buffering happening
-          // inside the `IncomingMessageStream`. We don't actually care about this, so it's
-          // okay if this changes.
-          assert.deepEqual(receivedData, [ payload ]);
+          // How the payloads of the individual packets are chunked up by the buffering
+          // inside the `IncomingMessageStream` is an implementation detail we don't care
+          // about (and it varies across Node.js versions), so only assert on the
+          // concatenated data.
+          assert.deepEqual(Buffer.concat(receivedData), payload);
         })()
       ]);
     });
