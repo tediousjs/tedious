@@ -877,20 +877,32 @@ interface RoutingData {
 }
 
 /**
- * Helper function, equivalent to `Promise.withResolvers()`.
+ * Runs the given function, providing it with a promise that will reject
+ * with the given signal's abort reason once the signal is aborted.
  *
- * @returns An object with the properties `promise`, `resolve`, and `reject`.
+ * The function can race this promise against any asynchronous work it
+ * performs (potentially multiple times) to make itself abortable.
+ *
+ * The rejection is always considered handled, and the signal's abort
+ * listener is removed once the function settles.
  */
-function withResolvers<T>() {
-  let resolve: (value: T | PromiseLike<T>) => void;
-  let reject: (reason?: any) => void;
+async function withAbortRace<T>(signal: AbortSignal, func: (signalAborted: Promise<never>) => Promise<T>): Promise<T> {
+  signal.throwIfAborted();
 
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
+  const { promise: signalAborted, reject } = Promise.withResolvers<never>();
 
-  return { promise, resolve: resolve!, reject: reject! };
+  // Prevent unhandled rejections if the signal is aborted while
+  // `func` is not currently racing against `signalAborted`.
+  signalAborted.catch(() => {});
+
+  const onAbort = () => { reject(signal.reason); };
+  signal.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    return await func(signalAborted);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
 /**
@@ -2216,7 +2228,7 @@ class Connection extends EventEmitter {
       servername: this.config.options.serverName ? this.config.options.serverName : serverName,
     };
 
-    const { promise, resolve, reject } = withResolvers<tls.TLSSocket>();
+    const { promise, resolve, reject } = Promise.withResolvers<tls.TLSSocket>();
     const encryptsocket = tls.connect(encryptOptions);
 
     try {
@@ -3333,14 +3345,7 @@ class Connection extends EventEmitter {
    * @private
    */
   async performTlsNegotiation(preloginPayload: PreloginPayload, signal: AbortSignal) {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       if (preloginPayload.fedAuthRequired === 1) {
         this.fedAuthRequired = true;
       }
@@ -3357,22 +3362,13 @@ class Connection extends EventEmitter {
           signalAborted
         ]);
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   async readPreloginResponse(signal: AbortSignal): Promise<PreloginPayload> {
-    signal.throwIfAborted();
-
     let messageBuffer = Buffer.alloc(0);
 
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3399,9 +3395,7 @@ class Connection extends EventEmitter {
           await iterator.return();
         }
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
 
     const preloginPayload = new PreloginPayload(messageBuffer);
     this.debug.payload(function() {
@@ -3449,7 +3443,7 @@ class Connection extends EventEmitter {
     const closeSignal = this.closeController!.signal;
     closeSignal.throwIfAborted();
 
-    const { promise, resolve, reject } = withResolvers<void>();
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
 
     const onAbort = () => { reject(closeSignal.reason); };
     closeSignal.addEventListener('abort', onAbort, { once: true });
@@ -3471,14 +3465,7 @@ class Connection extends EventEmitter {
    * @private
    */
   async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3500,23 +3487,14 @@ class Connection extends EventEmitter {
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       while (true) {
         const message = await Promise.race([
           this.messageIo.readMessage().catch((err) => {
@@ -3556,23 +3534,14 @@ class Connection extends EventEmitter {
           throw new ConnectionError('Login failed.', 'ELOGIN');
         }
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3662,23 +3631,14 @@ class Connection extends EventEmitter {
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performLoggedInSendingInitialSql(signal: AbortSignal) {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       this.sendInitialSql();
 
       const message = await Promise.race([
@@ -3693,9 +3653,7 @@ class Connection extends EventEmitter {
         once(tokenStreamParser, 'end'),
         signalAborted
       ]);
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 }
 
