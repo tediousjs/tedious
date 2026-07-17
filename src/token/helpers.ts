@@ -16,7 +16,7 @@ export class Result<T> {
 // every construction is expensive, and the stack is never used as this
 // error never escapes the parsing internals.
 export class NotEnoughDataError {
-  byteCount: number;
+  declare byteCount: number;
 
   constructor(byteCount: number) {
     this.byteCount = byteCount;
