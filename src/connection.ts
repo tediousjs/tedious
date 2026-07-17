@@ -957,10 +957,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  declare loginError: undefined | AggregateError | ConnectionError;
-  /**
-   * @private
-   */
   declare debug: Debug;
   /**
    * @private
@@ -3499,13 +3495,12 @@ class Connection extends EventEmitter {
 
       if (handler.loginAckReceived) {
         return handler.routingData;
-      } else if (this.loginError) {
-        throw this.loginError;
+      } else if (handler.loginError) {
+        throw handler.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
     } finally {
-      this.loginError = undefined;
       signal.removeEventListener('abort', onAbort);
     }
   }
@@ -3555,14 +3550,13 @@ class Connection extends EventEmitter {
           });
 
           this.ntlmpacket = undefined;
-        } else if (this.loginError) {
-          throw this.loginError;
+        } else if (handler.loginError) {
+          throw handler.loginError;
         } else {
           throw new ConnectionError('Login failed.', 'ELOGIN');
         }
       }
     } finally {
-      this.loginError = undefined;
       signal.removeEventListener('abort', onAbort);
     }
   }
@@ -3663,13 +3657,12 @@ class Connection extends EventEmitter {
         // sent the fedAuth token message, the rest is similar to standard login 7
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
         return await this.performSentLogin7WithStandardLogin(signal);
-      } else if (this.loginError) {
-        throw this.loginError;
+      } else if (handler.loginError) {
+        throw handler.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
     } finally {
-      this.loginError = undefined;
       signal.removeEventListener('abort', onAbort);
     }
   }
