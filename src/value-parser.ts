@@ -14,7 +14,7 @@ const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
-const DEFAULT_ENCODING = 'utf8';
+const DEFAULT_ENCODING = 'utf-8';
 
 function readTinyInt(buf: Buffer, offset: number): Result<number> {
   return readUInt8(buf, offset);
@@ -572,7 +572,7 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
 // Codepages that decode the 7-bit ASCII range identically to ASCII,
 // allowing a fast path in `readChars`. This covers every codepage that a
 // `Collation` can produce (see `codepageByLanguageId` / `codepageBySortId`),
-// plus both spellings of UTF-8, as `DEFAULT_ENCODING` is `'utf8'`.
+// plus `DEFAULT_ENCODING`.
 //
 // A codepage missing from this list only loses the fast path - decoding
 // still works correctly via `iconv`.
@@ -580,7 +580,7 @@ const asciiCompatibleCodepages = new Set([
   'CP437', 'CP850', 'CP874',
   'CP932', 'CP936', 'CP949', 'CP950',
   'CP1250', 'CP1251', 'CP1252', 'CP1253', 'CP1254', 'CP1255', 'CP1256', 'CP1257', 'CP1258',
-  'utf-8', 'utf8'
+  'utf-8'
 ]);
 
 function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
@@ -599,34 +599,27 @@ function readChars(buf: Buffer, offset: number, dataLength: number, codepage: st
   return new Result(decodeChars(data, codepage ?? DEFAULT_ENCODING), offset + dataLength);
 }
 
-// `iconv.getCodec` is exported by `iconv-lite`, but missing from its type
-// definitions.
-const getCodec = (iconv as unknown as { getCodec(encoding: string): { bomAware?: boolean } }).getCodec;
+const decodersByCodepage = new Map<string, ReturnType<typeof iconv.getDecoder>>();
 
-const decodersByCodepage = new Map<string, ReturnType<typeof iconv.getDecoder> | null>();
-
-// Decodes a complete value via `iconv`, reusing one decoder per codepage
-// instead of letting `iconv.decode` create a fresh one for every value.
-// This is safe because a decoder that has fully consumed its input via
-// `write` + `end` is back in its initial state. Decoders for BOM aware
-// encodings are the exception: they remember whether a BOM was already
-// stripped, so they are not reused (`null` in the cache).
+// Decodes a complete value, treating the bytes as pure character data: a
+// leading byte order mark is *not* stripped, matching how `nvarchar` values
+// and other SQL Server drivers handle it. (`iconv.decode` would strip it.)
+//
+// UTF-8 values are decoded natively. Everything else is decoded via
+// `iconv`, reusing one decoder per codepage instead of letting `iconv`
+// create a fresh one for every value. This is safe because a decoder that
+// has fully consumed its input via `write` + `end` is back in its initial
+// state, and `stripBOM: false` avoids iconv's BOM wrapper, which is the
+// only decoder layer that carries state from one value to the next.
 function decodeChars(data: Buffer, codepage: string): string {
-  if (codepage === 'utf-8' || codepage === 'utf8') {
-    const result = data.toString('utf8');
-
-    // `iconv.decode` strips a leading byte order mark - match that behavior.
-    return result.charCodeAt(0) === 0xFEFF ? result.slice(1) : result;
+  if (codepage === 'utf-8') {
+    return data.toString('utf8');
   }
 
   let decoder = decodersByCodepage.get(codepage);
   if (decoder === undefined) {
-    decoder = getCodec(codepage).bomAware ? null : iconv.getDecoder(codepage);
+    decoder = iconv.getDecoder(codepage, { stripBOM: false });
     decodersByCodepage.set(codepage, decoder);
-  }
-
-  if (decoder === null) {
-    return iconv.decode(data, codepage);
   }
 
   const result = decoder.write(data);
@@ -846,5 +839,6 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
+module.exports.decodeChars = decodeChars;
 
-export { readValue, isPLPStream, readPLPStream };
+export { readValue, isPLPStream, readPLPStream, decodeChars };

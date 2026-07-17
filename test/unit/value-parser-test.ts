@@ -441,14 +441,15 @@ describe('readValue', function() {
       assert.strictEqual(result.value, 'Müller – 東京 🚀');
     });
 
-    it('should strip the byte order mark from every UTF-8 value', function() {
+    it('should preserve a leading byte order mark', function() {
+      // U+FEFF at the start of a value is part of the stored data, not an
+      // encoding marker - it must be returned, matching how `nvarchar`
+      // values are handled.
       const data = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from('héllo')]);
 
-      // Repeated parsing must strip the BOM every time, not just on the
-      // first parsed value.
       for (let i = 0; i < 3; i++) {
         const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
-        assert.strictEqual(result.value, 'héllo', `iteration ${i}`);
+        assert.strictEqual(result.value, '\uFEFFhéllo', `iteration ${i}`);
       }
     });
 
