@@ -411,7 +411,7 @@ function isPLPStream(metadata: Metadata) {
       return true;
     }
 
-    case 'Json': {
+    case 'JSON': {
       return true;
     }
   }

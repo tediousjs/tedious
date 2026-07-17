@@ -57,7 +57,7 @@ async function returnParser(parser: Parser): Promise<ReturnValueToken> {
         value = iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
       } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
         value = Buffer.concat(chunks);
-      } else if (metadata.type.name === 'Json') {
+      } else if (metadata.type.name === 'JSON') {
         value = Buffer.concat(chunks).toString('utf8');
       }
     } else {

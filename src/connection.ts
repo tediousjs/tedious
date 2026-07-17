@@ -3223,8 +3223,8 @@ class Connection extends EventEmitter {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
-    } else if (payload instanceof RpcRequestPayload && !this.serverSupportsJson && payload.parameters.some((parameter) => parameter.type === TYPES.Json)) {
-      const message = 'The server does not support the `json` data type. `TYPES.Json` parameters require SQL Server 2025 (or newer) or Azure SQL with JSON support enabled.';
+    } else if (payload instanceof RpcRequestPayload && !this.serverSupportsJson && payload.parameters.some((parameter) => parameter.type === TYPES.JSON)) {
+      const message = 'The server does not support the `json` data type. `TYPES.JSON` parameters require SQL Server 2025 (or newer) or Azure SQL with JSON support enabled.';
       this.debug.log(message);
       process.nextTick(() => {
         request.callback(new RequestError(message, 'EJSONNOTSUPPORTED'));

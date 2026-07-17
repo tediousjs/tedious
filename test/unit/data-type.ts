@@ -1680,46 +1680,46 @@ describe('VarChar', function() {
   });
 });
 
-describe('Json', function() {
+describe('JSON', function() {
   describe('.declaration', function() {
     it('returns "json"', function() {
-      assert.strictEqual(TYPES.Json.declaration({ value: '{}' } as any), 'json');
+      assert.strictEqual(TYPES.JSON.declaration({ value: '{}' } as any), 'json');
     });
   });
 
   describe('.generateTypeInfo', function() {
     it('returns the JSON type token without additional metadata', function() {
-      const result = TYPES.Json.generateTypeInfo({ value: null }, options);
+      const result = TYPES.JSON.generateTypeInfo({ value: null }, options);
       assert.deepEqual(result, Buffer.from([0xF4]));
     });
   });
 
   describe('.generateParameterLength', function() {
     it('returns the PLP null length for `null` values', function() {
-      const result = TYPES.Json.generateParameterLength({ value: null }, options);
+      const result = TYPES.JSON.generateParameterLength({ value: null }, options);
       assert.deepEqual(result, Buffer.from('ffffffffffffffff', 'hex'));
     });
 
     it('returns the unknown PLP length for non-null values', function() {
-      const result = TYPES.Json.generateParameterLength({ value: Buffer.from('{"a":1}') }, options);
+      const result = TYPES.JSON.generateParameterLength({ value: Buffer.from('{"a":1}') }, options);
       assert.deepEqual(result, Buffer.from('feffffffffffffff', 'hex'));
     });
   });
 
   describe('.generateParameterData', function() {
     it('generates no data for `null` values', function() {
-      const buffer = Buffer.concat([...TYPES.Json.generateParameterData({ value: null }, options)]);
+      const buffer = Buffer.concat([...TYPES.JSON.generateParameterData({ value: null }, options)]);
       assert.deepEqual(buffer, Buffer.alloc(0));
     });
 
     it('generates only the PLP terminator for empty values', function() {
-      const buffer = Buffer.concat([...TYPES.Json.generateParameterData({ value: Buffer.alloc(0) }, options)]);
+      const buffer = Buffer.concat([...TYPES.JSON.generateParameterData({ value: Buffer.alloc(0) }, options)]);
       assert.deepEqual(buffer, Buffer.from('00000000', 'hex'));
     });
 
     it('generates a single length-prefixed chunk followed by the PLP terminator', function() {
       const value = Buffer.from('{"a":1}', 'utf8');
-      const buffer = Buffer.concat([...TYPES.Json.generateParameterData({ value: value }, options)]);
+      const buffer = Buffer.concat([...TYPES.JSON.generateParameterData({ value: value }, options)]);
 
       const expected = Buffer.concat([
         Buffer.from('07000000', 'hex'),
@@ -1732,35 +1732,35 @@ describe('Json', function() {
 
   describe('.validate', function() {
     it('returns `null` for `null` and `undefined` values', function() {
-      assert.isNull(TYPES.Json.validate(null, undefined));
-      assert.isNull(TYPES.Json.validate(undefined, undefined));
+      assert.isNull(TYPES.JSON.validate(null, undefined));
+      assert.isNull(TYPES.JSON.validate(undefined, undefined));
     });
 
     it('returns the UTF-8 encoded value for strings containing valid JSON', function() {
-      const result = TYPES.Json.validate('{"a":"ü"}', undefined);
+      const result = TYPES.JSON.validate('{"a":"ü"}', undefined);
       assert.deepEqual(result, Buffer.from('{"a":"ü"}', 'utf8'));
     });
 
     it('throws for strings that do not contain valid JSON', function() {
       assert.throws(() => {
-        TYPES.Json.validate('{oops', undefined);
+        TYPES.JSON.validate('{oops', undefined);
       }, SyntaxError);
     });
 
     it('serializes objects and arrays to their UTF-8 encoded JSON representation', function() {
-      assert.deepEqual(TYPES.Json.validate({ a: [1, 'ü'] }, undefined), Buffer.from('{"a":[1,"ü"]}', 'utf8'));
-      assert.deepEqual(TYPES.Json.validate([1, 2], undefined), Buffer.from('[1,2]', 'utf8'));
+      assert.deepEqual(TYPES.JSON.validate({ a: [1, 'ü'] }, undefined), Buffer.from('{"a":[1,"ü"]}', 'utf8'));
+      assert.deepEqual(TYPES.JSON.validate([1, 2], undefined), Buffer.from('[1,2]', 'utf8'));
     });
 
     it('throws for Buffer values', function() {
       assert.throws(() => {
-        TYPES.Json.validate(Buffer.from('{"a":1}'), undefined);
+        TYPES.JSON.validate(Buffer.from('{"a":1}'), undefined);
       }, TypeError, 'Invalid JSON value.');
     });
 
     it('throws for values that can not be serialized to JSON', function() {
       assert.throws(() => {
-        TYPES.Json.validate(() => {}, undefined);
+        TYPES.JSON.validate(() => {}, undefined);
       }, TypeError, 'Invalid JSON value.');
     });
   });

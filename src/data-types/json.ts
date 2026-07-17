@@ -6,7 +6,7 @@ const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0
 const Json: DataType = {
   id: 0xF4,
   type: 'JSON',
-  name: 'Json',
+  name: 'JSON',
 
   declaration: (parameter) => {
     return 'json';
