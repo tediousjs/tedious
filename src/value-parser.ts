@@ -599,17 +599,34 @@ function readChars(buf: Buffer, offset: number, dataLength: number, codepage: st
   return new Result(decodeChars(data, codepage ?? DEFAULT_ENCODING), offset + dataLength);
 }
 
-const decodersByCodepage = new Map<string, ReturnType<typeof iconv.getDecoder>>();
+// `iconv.getCodec` is exported by `iconv-lite`, but missing from its type
+// definitions.
+const getCodec = (iconv as unknown as { getCodec(encoding: string): { bomAware?: boolean } }).getCodec;
+
+const decodersByCodepage = new Map<string, ReturnType<typeof iconv.getDecoder> | null>();
 
 // Decodes a complete value via `iconv`, reusing one decoder per codepage
 // instead of letting `iconv.decode` create a fresh one for every value.
 // This is safe because a decoder that has fully consumed its input via
-// `write` + `end` is back in its initial state.
+// `write` + `end` is back in its initial state. Decoders for BOM aware
+// encodings are the exception: they remember whether a BOM was already
+// stripped, so they are not reused (`null` in the cache).
 function decodeChars(data: Buffer, codepage: string): string {
+  if (codepage === 'utf-8' || codepage === 'utf8') {
+    const result = data.toString('utf8');
+
+    // `iconv.decode` strips a leading byte order mark - match that behavior.
+    return result.charCodeAt(0) === 0xFEFF ? result.slice(1) : result;
+  }
+
   let decoder = decodersByCodepage.get(codepage);
   if (decoder === undefined) {
-    decoder = iconv.getDecoder(codepage);
+    decoder = getCodec(codepage).bomAware ? null : iconv.getDecoder(codepage);
     decodersByCodepage.set(codepage, decoder);
+  }
+
+  if (decoder === null) {
+    return iconv.decode(data, codepage);
   }
 
   const result = decoder.write(data);

@@ -434,6 +434,38 @@ describe('readValue', function() {
       assert.strictEqual(result.value, 'fixed     ');
     });
 
+    it('should parse UTF-8 values', function() {
+      const data = Buffer.from('Müller – 東京 🚀');
+      const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
+
+      assert.strictEqual(result.value, 'Müller – 東京 🚀');
+    });
+
+    it('should strip the byte order mark from every UTF-8 value', function() {
+      const data = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from('héllo')]);
+
+      // Repeated parsing must strip the BOM every time, not just on the
+      // first parsed value.
+      for (let i = 0; i < 3; i++) {
+        const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
+        assert.strictEqual(result.value, 'héllo', `iteration ${i}`);
+      }
+    });
+
+    it('should parse malformed UTF-8 values like iconv does', function() {
+      const cases = [
+        Buffer.from([0x61, 0xE3, 0x81]), // "a" + truncated 3-byte sequence
+        Buffer.from([0x61, 0x80, 0x62]), // lone continuation byte
+        Buffer.from([0xF0, 0x9F, 0x62]), // truncated 4-byte sequence
+        Buffer.from([0xC0, 0xAF]) // overlong encoding
+      ];
+
+      for (const data of cases) {
+        const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
+        assert.strictEqual(result.value, iconv.decode(data, 'utf-8'), data.toString('hex'));
+      }
+    });
+
     it('should parse values independently of previously parsed values', function() {
       // A value that ends in a truncated CP932 multi-byte sequence...
       const truncated = Buffer.concat([iconv.encode('テスト', 'CP932'), Buffer.from([0x82])]);
