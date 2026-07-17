@@ -838,7 +838,7 @@ export interface ConnectionOptions {
    * the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly
    * matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed.
    *
-   * (default: `true`)
+   * (default: `false`)
    */
   trustServerCertificate?: boolean;
 
