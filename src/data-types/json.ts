@@ -31,14 +31,17 @@ const Json: DataType = {
 
   generateParameterData: function* (parameter, options) {
     const value = parameter.value as Buffer | null;
-    if (value == null || (value?.length ?? 0) === 0) {
+    if (value == null) {
       return;
     }
 
-    const buffer = Buffer.alloc(4);
-    buffer.writeUInt32LE(value.length, 0);
-    yield buffer;
-    yield value;
+    if (value.length > 0) {
+      const buffer = Buffer.alloc(4);
+      buffer.writeUInt32LE(value.length, 0);
+      yield buffer;
+      yield value;
+    }
+
     yield PLP_TERMINATOR;
   },
 
