@@ -631,6 +631,13 @@ async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
 
 // Epoch offsets for building UTC `Date` values via plain arithmetic, which
 // avoids the (comparatively slow) `Date.UTC` calendar calculations.
+//
+// Note that the day constants in the UTC and local time branches below differ
+// by one, even though both branches describe the same date: `days` arrives as
+// the wire-format day count since 0001-01-01 (e.g. 2000-01-01 is 730119). The
+// local time branches pass `days - 730118` as the *1-based* day-of-month
+// argument of `new Date(2000, 0, ...)`, while the UTC branches multiply
+// `days - 730119` as a *0-based* day offset from `UTC_EPOCH_2000`.
 const UTC_EPOCH_1900 = Date.UTC(1900, 0, 1);
 const UTC_EPOCH_2000 = Date.UTC(2000, 0, 1);
 const MILLISECONDS_PER_DAY = 86400000;
