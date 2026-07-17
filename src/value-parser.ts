@@ -596,7 +596,26 @@ function readChars(buf: Buffer, offset: number, dataLength: number, codepage: st
     return new Result(data.toString('latin1'), offset + dataLength);
   }
 
-  return new Result(iconv.decode(data, codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  return new Result(decodeChars(data, codepage ?? DEFAULT_ENCODING), offset + dataLength);
+}
+
+const decodersByCodepage = new Map<string, ReturnType<typeof iconv.getDecoder>>();
+
+// Decodes a complete value via `iconv`, reusing one decoder per codepage
+// instead of letting `iconv.decode` create a fresh one for every value.
+// This is safe because a decoder that has fully consumed its input via
+// `write` + `end` is back in its initial state.
+function decodeChars(data: Buffer, codepage: string): string {
+  let decoder = decodersByCodepage.get(codepage);
+  if (decoder === undefined) {
+    decoder = iconv.getDecoder(codepage);
+    decodersByCodepage.set(codepage, decoder);
+  }
+
+  const result = decoder.write(data);
+  const trailer = decoder.end();
+
+  return trailer ? result + trailer : result;
 }
 
 function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {

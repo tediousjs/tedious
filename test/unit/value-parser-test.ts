@@ -434,6 +434,17 @@ describe('readValue', function() {
       assert.strictEqual(result.value, 'fixed     ');
     });
 
+    it('should parse values independently of previously parsed values', function() {
+      // A value that ends in a truncated CP932 multi-byte sequence...
+      const truncated = Buffer.concat([iconv.encode('テスト', 'CP932'), Buffer.from([0x82])]);
+      const first = readValue(buildCharBuffer(truncated), 0, buildCharMetadata(dataTypeByName.VarChar, 'CP932'), utcOptions);
+      assert.strictEqual(first.value, iconv.decode(truncated, 'CP932'));
+
+      // ...must not leak into the decoding of the next value.
+      const second = readValue(buildCharBuffer(Buffer.from([0x82, 0xA0, 0x41])), 0, buildCharMetadata(dataTypeByName.VarChar, 'CP932'), utcOptions);
+      assert.strictEqual(second.value, 'あA');
+    });
+
     it('should parse values that are ASCII except for the final byte', function() {
       const buf = buildCharBuffer(Buffer.from([0x61, 0x62, 0x63, 0xFC])); // "abcü" in CP1252
       const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'CP1252'), utcOptions);
