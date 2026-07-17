@@ -204,11 +204,17 @@ class MessageIO extends EventEmitter {
  * message) and the error is re-thrown. Errors from the stream itself are
  * thrown as-is.
  *
+ * If the given `cancelSignal` is aborted, the remaining payload is discarded
+ * and the message is terminated with the `IGNORE` flag set, telling the
+ * server to disregard it. This is a normal protocol outcome: the returned
+ * promise resolves, the TDS stream stays aligned, and the server will send a
+ * (short) response to the ignored message. Callers can check
+ * `cancelSignal.aborted` to distinguish this from a fully sent message.
+ *
  * If the given `signal` is aborted, writing stops and the signal's abort
  * reason is thrown. Note that this can leave a partially written message on
  * the stream, so it must only be used when the connection is being torn down
- * anyway. To cancel a message in a way that keeps the TDS stream aligned,
- * throw from the `payload` iterable instead.
+ * anyway. When both signals are aborted, `signal` wins.
  *
  * @param stream The stream to write the message to.
  * @param packetSize The maximum packet size to use.
@@ -216,10 +222,11 @@ class MessageIO extends EventEmitter {
  * @param payload The payload to write.
  * @param options.debug A debug instance to log packets to.
  * @param options.resetConnection Whether the server should reset the connection when processing the message.
- * @param options.signal An abort signal to stop writing the message.
+ * @param options.cancelSignal An abort signal to cancel the message while keeping the connection usable.
+ * @param options.signal An abort signal to stop writing the message during connection teardown.
  */
-export async function writeMessage(stream: Writable, packetSize: number, type: number, payload: AsyncIterable<Buffer> | Iterable<Buffer>, options: { debug?: Debug, resetConnection?: boolean, signal?: AbortSignal } = {}): Promise<void> {
-  const { debug, resetConnection = false, signal } = options;
+export async function writeMessage(stream: Writable, packetSize: number, type: number, payload: AsyncIterable<Buffer> | Iterable<Buffer>, options: { debug?: Debug, resetConnection?: boolean, cancelSignal?: AbortSignal, signal?: AbortSignal } = {}): Promise<void> {
+  const { debug, resetConnection = false, cancelSignal, signal } = options;
 
   signal?.throwIfAborted();
 
@@ -260,9 +267,38 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
     signal.addEventListener('abort', onAbort, { once: true });
   }
 
+  const CANCEL = Symbol('cancel');
+
+  let canceled = cancelSignal?.aborted ?? false;
+  let cancelPromise: Promise<typeof CANCEL> | null = null;
+  let onCancel: (() => void) | null = null;
+
+  if (cancelSignal && !canceled) {
+    const { promise, resolve } = Promise.withResolvers<typeof CANCEL>();
+
+    cancelPromise = promise;
+    onCancel = () => {
+      canceled = true;
+      resolve(CANCEL);
+    };
+    cancelSignal.addEventListener('abort', onCancel, { once: true });
+  }
+
   const waitForDrain = () => {
     drain = Promise.withResolvers();
-    return abortPromise ? Promise.race([drain.promise, abortPromise]) : drain.promise;
+
+    if (abortPromise || cancelPromise) {
+      const contenders: Promise<unknown>[] = [drain.promise];
+      if (abortPromise) {
+        contenders.push(abortPromise);
+      }
+      if (cancelPromise) {
+        contenders.push(cancelPromise);
+      }
+      return Promise.race(contenders);
+    }
+
+    return drain.promise;
   };
 
   stream.on('drain', onDrain);
@@ -290,11 +326,30 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
       iterator = (payload as Iterable<Buffer>)[Symbol.iterator]();
     }
 
-    while (true) {
+    while (!canceled) {
       let value, done;
       try {
         const result = iterator.next();
-        ({ value, done } = abortPromise ? await Promise.race([Promise.resolve(result), abortPromise]) : await result);
+
+        let raceResult: IteratorResult<Buffer> | typeof CANCEL;
+        if (abortPromise || cancelPromise) {
+          const contenders: Promise<IteratorResult<Buffer> | typeof CANCEL>[] = [Promise.resolve(result)];
+          if (abortPromise) {
+            contenders.push(abortPromise);
+          }
+          if (cancelPromise) {
+            contenders.push(cancelPromise);
+          }
+          raceResult = await Promise.race(contenders);
+        } else {
+          raceResult = await result;
+        }
+
+        if (raceResult === CANCEL) {
+          break;
+        }
+
+        ({ value, done } = raceResult);
       } catch (err) {
         // The payload errored while being iterated. If the stream is still
         // writable, terminate the message with the `IGNORE` flag set so the
@@ -320,7 +375,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
 
       bl.append(value);
 
-      while (bl.length > length) {
+      while (!canceled && bl.length > length) {
         const data = bl.slice(0, length);
         bl.consume(length);
 
@@ -333,13 +388,16 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
       }
     }
 
-    const data = bl.slice();
-    bl.consume(data.length);
+    // On cancellation, any buffered payload data is discarded and the final
+    // packet is flagged so the server ignores the whole message.
+    const data = canceled ? Buffer.alloc(0) : bl.slice();
+    bl.consume(bl.length);
 
     const packet = new Packet(type);
     packet.packetId(packetNumber += 1);
     packet.resetConnection(resetConnection);
     packet.last(true);
+    packet.ignore(canceled);
     packet.addData(data);
 
     await writePacket(packet);
@@ -350,6 +408,10 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
 
     if (signal && onAbort) {
       signal.removeEventListener('abort', onAbort);
+    }
+
+    if (cancelSignal && onCancel) {
+      cancelSignal.removeEventListener('abort', onCancel);
     }
   }
 }

@@ -270,6 +270,110 @@ describe('writeMessage', function() {
     assert(hadError);
   });
 
+  it('terminates the message with the ignore flag set when the given cancel signal is aborted while writing', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort();
+    }, 20);
+
+    await writeMessage(stream, packetSize, packetType, (async function*() {
+      yield payload;
+
+      // Stall forever, waiting for more data that never arrives.
+      await new Promise(() => {});
+    })(), { cancelSignal: controller.signal });
+
+    const [firstPacket, lastPacket, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    // The part of the payload that filled a whole packet was sent before the
+    // cancellation, the rest is discarded and the message is terminated with
+    // the `IGNORE` flag set.
+    assert.isFalse(firstPacket.isLast());
+    assert.deepEqual(firstPacket.data(), payload.subarray(0, 4));
+
+    assert.isTrue(lastPacket.isLast());
+    assert.include(lastPacket.statusAsString(), 'IGNORE');
+    assert.deepEqual(lastPacket.data(), Buffer.alloc(0));
+
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('writes an ignored message without consuming the payload when the given cancel signal is already aborted', async function() {
+    const stream = new BufferListStream();
+    const cancelSignal = AbortSignal.abort();
+
+    let payloadConsumed = false;
+
+    await writeMessage(stream, packetSize, packetType, (async function*() {
+      payloadConsumed = true;
+      yield Buffer.from([1, 2, 3]);
+    })(), { cancelSignal });
+
+    assert.isFalse(payloadConsumed);
+
+    const [packet, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    assert.isTrue(packet.isLast());
+    assert.include(packet.statusAsString(), 'IGNORE');
+    assert.deepEqual(packet.data(), Buffer.alloc(0));
+
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('stops waiting for the stream to drain when the given cancel signal is aborted', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      controller.abort();
+    }, 20);
+
+    // Resolves normally: the remaining payload is discarded and the
+    // `IGNORE`-flagged terminator is written without further drain waits.
+    await writeMessage(stream, packetSize, packetType, [payload, payload, payload], { cancelSignal: controller.signal });
+
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('prefers teardown over cancellation when both signals are aborted', async function() {
+    const stream = new BufferListStream();
+    const signal = AbortSignal.abort(new Error('teardown'));
+    const cancelSignal = AbortSignal.abort();
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [Buffer.from([1, 2, 3])], { cancelSignal, signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'teardown');
+    }
+
+    assert(hadError);
+
+    // Nothing was written.
+    assert.isNull(stream.read());
+    assertNoDanglingEventListeners(stream);
+  });
+
   it('throws when the given signal is already aborted', async function() {
     const stream = new BufferListStream();
     const signal = AbortSignal.abort(new Error('canceled'));
