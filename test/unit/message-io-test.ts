@@ -3,7 +3,7 @@ import { once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
-import { TLSSocket } from 'tls';
+import { checkServerIdentity, type PeerCertificate, TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
 import { Duplex } from 'stream';
 
@@ -339,7 +339,9 @@ describe('MessageIO', function() {
   });
 
   describe('#startTls', function() {
-    let securePair: { encrypted: Duplex, cleartext: TLSSocket };
+    // `@types/node` does not declare the server-side `servername` getter
+    // on `TLSSocket`, so widen the type here.
+    let securePair: { encrypted: Duplex, cleartext: TLSSocket & { servername?: string } };
 
     beforeEach(function() {
       const duplexpair = new DuplexPair();
@@ -361,6 +363,30 @@ describe('MessageIO', function() {
       securePair.cleartext.destroy();
       securePair.encrypted.destroy();
     });
+
+    /**
+     * Forwards TLS handshake data between the given `MessageIO` and the
+     * server side of the secure pair, unwrapping it from / wrapping it into
+     * `PRELOGIN` messages.
+     */
+    async function forwardTlsHandshake(io: MessageIO, rounds: number) {
+      for (let i = 0; i < rounds; i++) {
+        const message = await io.readMessage();
+        for await (const chunk of message) {
+          securePair.encrypted.write(chunk);
+        }
+
+        await once(securePair.encrypted, 'readable');
+
+        const chunks = [];
+        let chunk;
+        while (chunk = securePair.encrypted.read()) {
+          chunks.push(chunk);
+        }
+
+        io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+      }
+    }
 
     it('performs TLS negotiation', async function() {
       await Promise.all([
@@ -515,6 +541,119 @@ describe('MessageIO', function() {
           }
         })()
       ]);
+    });
+
+    it('sends the hostname via the SNI extension', async function() {
+      await Promise.all([
+        // Client side
+        (async () => {
+          const io = new MessageIO(clientConnection, packetSize, debug);
+
+          await io.startTls({}, 'localhost', true);
+
+          assert(io.tlsNegotiationComplete);
+        })(),
+
+        // Server side
+        (async () => {
+          const io = new MessageIO(serverConnection, packetSize, debug);
+
+          const onSecure = once(securePair.cleartext, 'secure');
+
+          await forwardTlsHandshake(io, 2);
+
+          await onSecure;
+
+          assert.strictEqual(securePair.cleartext.servername, 'localhost');
+        })()
+      ]);
+    });
+
+    describe('when connecting to an IP address', function() {
+      beforeEach(function() {
+        // Replace the server side of the secure pair with one that uses a
+        // certificate that carries IP address SANs (and no DNS SANs).
+        securePair.cleartext.destroy();
+        securePair.encrypted.destroy();
+
+        const duplexpair = new DuplexPair();
+
+        securePair = {
+          cleartext: new TLSSocket(duplexpair.socket1 as Socket, {
+            key: readFileSync('./test/fixtures/loopback-ip.key'),
+            cert: readFileSync('./test/fixtures/loopback-ip.crt'),
+            isServer: true,
+            ciphers: 'ECDHE-RSA-AES128-GCM-SHA256',
+            // TDS 7.x only supports TLS versions up to TLS v1.2
+            maxVersion: 'TLSv1.2'
+          }),
+          encrypted: duplexpair.socket2
+        };
+      });
+
+      it('omits the SNI extension and validates the certificate against the IPv4 address', async function() {
+        await Promise.all([
+          // Client side
+          (async () => {
+            const io = new MessageIO(clientConnection, packetSize, debug);
+
+            await io.startTls({
+              ca: [readFileSync('./test/fixtures/loopback-ip.crt')]
+            }, '127.0.0.1', false);
+
+            assert(io.tlsNegotiationComplete);
+          })(),
+
+          // Server side
+          (async () => {
+            const io = new MessageIO(serverConnection, packetSize, debug);
+
+            const onSecure = once(securePair.cleartext, 'secure');
+
+            await forwardTlsHandshake(io, 2);
+
+            await onSecure;
+
+            assert.notOk(securePair.cleartext.servername);
+          })()
+        ]);
+      });
+
+      it('omits the SNI extension and validates the certificate against the IPv6 address', async function() {
+        // Some Node.js versions are affected by an upstream regression that
+        // prevents IPv6 addresses from being matched against `IP Address`
+        // SANs. See https://github.com/nodejs/node/issues/64144
+        const cert = { subject: { CN: 'dummy' }, subjectaltname: 'IP Address:0:0:0:0:0:0:0:1' };
+        if (checkServerIdentity('::1', cert as PeerCertificate) !== undefined) {
+          this.skip();
+        }
+
+        await Promise.all([
+          // Client side
+          (async () => {
+            const io = new MessageIO(clientConnection, packetSize, debug);
+
+            await io.startTls({
+              ca: [readFileSync('./test/fixtures/loopback-ip.crt')]
+            }, '::1', false);
+
+            assert(io.tlsNegotiationComplete);
+          })(),
+
+          // Server side
+          (async () => {
+            const io = new MessageIO(serverConnection, packetSize, debug);
+
+            const onSecure = once(securePair.cleartext, 'secure');
+
+            await forwardTlsHandshake(io, 2);
+
+            await onSecure;
+
+            assert.notOk(securePair.cleartext.servername);
+          })()
+        ]);
+      });
     });
 
     it('handles errors happening before TLS negotiation has sent any data', async function() {
