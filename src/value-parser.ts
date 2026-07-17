@@ -410,6 +410,10 @@ function isPLPStream(metadata: Metadata) {
     case 'UDT': {
       return true;
     }
+
+    case 'Json': {
+      return true;
+    }
   }
 }
 

@@ -1070,6 +1070,15 @@ class Connection extends EventEmitter {
   declare databaseCollation: Collation | undefined;
 
   /**
+   * Whether the server acknowledged the JSON_SUPPORT feature extension,
+   * i.e. whether the `json` data type can be sent to and received from
+   * the server.
+   *
+   * @private
+   */
+  declare serverSupportsJson: boolean;
+
+  /**
    * @private
    */
   declare _onSocketClose: (hadError: boolean) => void;
@@ -1805,6 +1814,7 @@ class Connection extends EventEmitter {
     this.state = this.STATE.INITIALIZED;
 
     this.attentionSent = false;
+    this.serverSupportsJson = false;
 
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
@@ -2476,6 +2486,10 @@ class Connection extends EventEmitter {
    * @private
    */
   sendLogin7Packet() {
+    // A new login attempt (e.g. after a transient failure or rerouting)
+    // must re-negotiate JSON support from scratch.
+    this.serverSupportsJson = false;
+
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -3208,6 +3222,12 @@ class Connection extends EventEmitter {
     } else if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
+      });
+    } else if (payload instanceof RpcRequestPayload && !this.serverSupportsJson && payload.parameters.some((parameter) => parameter.type === TYPES.Json)) {
+      const message = 'The server does not support the `json` data type. `TYPES.Json` parameters require SQL Server 2025 (or newer) or Azure SQL with JSON support enabled.';
+      this.debug.log(message);
+      process.nextTick(() => {
+        request.callback(new RequestError(message, 'EJSONNOTSUPPORTED'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {

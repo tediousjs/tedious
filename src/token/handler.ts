@@ -310,13 +310,17 @@ export class Login7TokenHandler extends TokenHandler {
   onFeatureExtAck(token: FeatureExtAckToken) {
     const { authentication } = this.connection.config;
 
+    if (token.jsonSupport !== undefined) {
+      this.connection.serverSupportsJson = token.jsonSupport;
+    }
+
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
       if (token.fedAuth === undefined) {
         this.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
       } else if (token.fedAuth.length !== 0) {
         this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
       }
-    } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
+    } else if (token.fedAuth === undefined && token.utf8Support === undefined && token.jsonSupport === undefined) {
       this.loginError = new ConnectionError('Received acknowledgement for unknown feature');
     } else if (token.fedAuth) {
       this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
