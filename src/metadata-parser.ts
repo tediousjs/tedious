@@ -272,7 +272,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       }, offset);
     }
 
-    case 'Json':
+    case 'JSON':
       // The `json` TYPE_INFO carries no additional metadata — no length
       // and no collation (the collation is fixed to UTF-8 per RFC 8259).
       return new Result({

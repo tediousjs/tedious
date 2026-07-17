@@ -136,7 +136,7 @@ describe('Colmetadata Token Parser', function() {
     buffer.writeUInt16LE(numberOfColumns);
     buffer.writeUInt32LE(userType);
     buffer.writeUInt16LE(flags);
-    buffer.writeUInt8(typeByName.Json.id);
+    buffer.writeUInt8(typeByName.JSON.id);
     buffer.writeBVarchar(columnName);
 
     const parser = StreamParser.parseTokens([buffer.data], debug, options);
@@ -147,7 +147,7 @@ describe('Colmetadata Token Parser', function() {
 
     assert.instanceOf(token, ColMetadataToken);
     assert.strictEqual(token.columns.length, 1);
-    assert.strictEqual(token.columns[0].type.name, 'Json');
+    assert.strictEqual(token.columns[0].type.name, 'JSON');
     assert.strictEqual(token.columns[0].colName, 'col1');
     assert.isUndefined(token.columns[0].collation);
     assert.isUndefined(token.columns[0].dataLength);

@@ -541,7 +541,7 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>json</code></td>
- *     <td><code>[[TYPES.Json]]</code></td>
+ *     <td><code>[[TYPES.JSON]]</code></td>
  *     <td><code>string|object</code></td>
  *     <td>✓</td>
  *     <td>-</td>
@@ -614,7 +614,7 @@ export const TYPES = {
   UDT,
   TVP,
   Variant,
-  Json
+  JSON: Json
 };
 
 export const typeByName = TYPES;

@@ -51,7 +51,7 @@ describe('json data type', function() {
       });
 
       request.on('row', (columns) => {
-        assert.strictEqual(columns[0].metadata.type.name, 'Json');
+        assert.strictEqual(columns[0].metadata.type.name, 'JSON');
         assert.isString(columns[0].value);
         assert.deepEqual(JSON.parse(columns[0].value), { a: [1, 'ü'] });
       });
@@ -65,7 +65,7 @@ describe('json data type', function() {
       });
 
       request.on('row', (columns) => {
-        assert.strictEqual(columns[0].metadata.type.name, 'Json');
+        assert.strictEqual(columns[0].metadata.type.name, 'JSON');
         assert.isNull(columns[0].value);
       });
 
@@ -78,7 +78,7 @@ describe('json data type', function() {
       const request = new Request('SELECT @p', (err) => {
         done(err);
       });
-      request.addParameter('p', TYPES.Json, value);
+      request.addParameter('p', TYPES.JSON, value);
 
       request.on('row', (columns) => {
         assert.deepEqual(JSON.parse(columns[0].value), JSON.parse(value));
@@ -93,7 +93,7 @@ describe('json data type', function() {
       const request = new Request('SELECT @p', (err) => {
         done(err);
       });
-      request.addParameter('p', TYPES.Json, value);
+      request.addParameter('p', TYPES.JSON, value);
 
       request.on('row', (columns) => {
         assert.deepEqual(JSON.parse(columns[0].value), value);
@@ -106,7 +106,7 @@ describe('json data type', function() {
       const request = new Request('SELECT @p', (err) => {
         done(err);
       });
-      request.addParameter('p', TYPES.Json, null);
+      request.addParameter('p', TYPES.JSON, null);
 
       request.on('row', (columns) => {
         assert.isNull(columns[0].value);
@@ -129,7 +129,7 @@ describe('json data type', function() {
         assert.strictEqual((err as any).code, 'EJSONNOTSUPPORTED');
         done();
       });
-      request.addParameter('p', TYPES.Json, '{"a":1}');
+      request.addParameter('p', TYPES.JSON, '{"a":1}');
 
       connection.execSql(request);
     });

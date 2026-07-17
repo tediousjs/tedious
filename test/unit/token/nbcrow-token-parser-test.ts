@@ -68,7 +68,7 @@ describe('NBCRow Token Parser', function() {
       dataLength: undefined,
       schema: undefined,
       udtInfo: undefined,
-      type: dataTypeByName.Json,
+      type: dataTypeByName.JSON,
       collation: undefined
     }];
     const value = '{"a":"\u00fc"}';
