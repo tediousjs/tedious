@@ -61,6 +61,57 @@ describe('Row Token Parser', function() {
     });
   });
 
+  describe('parsing a row delivered one byte at a time', function() {
+    it('should parse it correctly', async function() {
+      const debug = new Debug();
+      const colMetadata: ColumnMetadata[] = [
+        {
+          colName: 'col0',
+          userType: 0,
+          flags: 0,
+          precision: undefined,
+          scale: undefined,
+          dataLength: undefined,
+          schema: undefined,
+          udtInfo: undefined,
+          type: dataTypeByName.VarChar,
+          collation: new Collation(1033, 0, 0, 52)
+        },
+        {
+          colName: 'col1',
+          userType: 0,
+          flags: 0,
+          precision: undefined,
+          scale: undefined,
+          dataLength: undefined,
+          schema: undefined,
+          udtInfo: undefined,
+          type: dataTypeByName.Int,
+          collation: undefined
+        }
+      ];
+
+      const buffer = new WritableTrackingBuffer(0, 'ascii');
+      buffer.writeUInt8(0xd1);
+      buffer.writeUsVarchar('hello world');
+      buffer.writeUInt32LE(1234);
+
+      const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
+
+      const parser = Parser.parseTokens(chunks, debug, options, colMetadata);
+      const result = await parser.next();
+      assert.isFalse(result.done);
+      const token = result.value;
+
+      assert.instanceOf(token, RowToken);
+      assert.strictEqual(token.columns.length, 2);
+      assert.strictEqual(token.columns[0].value, 'hello world');
+      assert.strictEqual(token.columns[1].value, 1234);
+
+      assert.isTrue((await parser.next()).done);
+    });
+  });
+
   it('should parse int', async function() {
     const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
