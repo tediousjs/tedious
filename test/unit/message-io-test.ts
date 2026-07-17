@@ -1,5 +1,5 @@
 import { type AddressInfo, createConnection, createServer, Server, Socket } from 'net';
-import { once } from 'events';
+import { getEventListeners, once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
@@ -275,6 +275,97 @@ describe('MessageIO.writeMessage', function() {
 
     assert(hadError);
   });
+
+  it('throws when the given signal is already aborted', async function() {
+    const stream = new BufferListStream();
+    const signal = AbortSignal.abort(new Error('canceled'));
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [Buffer.from([1, 2, 3])], { signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+
+    // Nothing was written.
+    assert.isNull(stream.read());
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('stops writing when the given signal is aborted while waiting for the stream to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload, payload, payload], { signal: controller.signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('stops writing when the given signal is aborted while waiting for more payload data', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Stall forever, waiting for more data that never arrives.
+        await new Promise(() => {});
+      })(), { signal: controller.signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+
+    // The part of the payload that filled a whole packet was written, but
+    // no `IGNORE` terminator: the message is intentionally left unterminated
+    // as the connection is being torn down.
+    const packets = splitPackets(stream.read());
+    assert.lengthOf(packets, 1);
+    assert.isFalse(packets[0].isLast());
+
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
 });
 
 describe('MessageIO.readMessage', function() {
@@ -439,6 +530,115 @@ describe('MessageIO.readMessage', function() {
     }
 
     assert(hadError);
+  });
+
+  it('throws when the given signal is already aborted', async function() {
+    const stream = new BufferListStream();
+    const signal = AbortSignal.abort(new Error('canceled'));
+
+    let hadError = false;
+    try {
+      const message = MessageIO.readMessage(stream, debug, { signal });
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('stops reading when the given signal is aborted while waiting for data on a quiet stream', async function() {
+    // A stream that stays open but never produces data, like a connection
+    // to a server that accepted the connection but never responds.
+    const stream = new Readable({ read() {} });
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      const message = MessageIO.readMessage(stream, debug, { signal: controller.signal });
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('stops reading when the given signal is aborted after a partial message was read', async function() {
+    const firstPacket = new Packet(packetType);
+    firstPacket.addData(Buffer.from([1, 2, 3]));
+
+    const stream = new Readable({ read() {} });
+    stream.push(firstPacket.buffer);
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    const chunks = [];
+    let hadError = false;
+    try {
+      for await (const chunk of MessageIO.readMessage(stream, debug, { signal: controller.signal })) {
+        chunks.push(chunk);
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assert.deepEqual(chunks, [Buffer.from([1, 2, 3])]);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('settles pending reads when the given signal is aborted, instead of deadlocking on `.return()`', async function() {
+    // Regression test: calling `.return()` on the generator while it is
+    // suspended waiting for stream data is queued behind the pending
+    // `.next()` call and would deadlock. Aborting the signal settles the
+    // pending read, after which `.return()` resolves normally.
+    const stream = new Readable({ read() {} });
+
+    const controller = new AbortController();
+    const message = MessageIO.readMessage(stream, debug, { signal: controller.signal });
+
+    const pendingRead = message.next();
+
+    controller.abort(new Error('canceled'));
+
+    let hadError = false;
+    try {
+      await pendingRead;
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+
+    // The generator has completed; `.return()` settles immediately.
+    assert.deepEqual(await message.return(), { value: undefined, done: true });
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
   });
 
   it('throws when receiving a packet with an invalid length', async function() {

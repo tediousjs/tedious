@@ -2097,7 +2097,7 @@ class Connection extends EventEmitter {
           this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
 
           try {
-            await this.sendPreLogin(socket);
+            await this.sendPreLogin(socket, signal);
           } catch (err: any) {
             signal.throwIfAborted();
 
@@ -2471,7 +2471,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async sendPreLogin(socket: net.Socket) {
+  async sendPreLogin(socket: net.Socket, signal: AbortSignal) {
     const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
       // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
@@ -2481,7 +2481,7 @@ class Connection extends EventEmitter {
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
-    await MessageIO.writeMessage(socket, this.debug, this.config.options.packetSize, TYPE.PRELOGIN, [payload.data]);
+    await MessageIO.writeMessage(socket, this.debug, this.config.options.packetSize, TYPE.PRELOGIN, [payload.data], { signal });
     this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -3383,26 +3383,9 @@ class Connection extends EventEmitter {
   async readPreloginResponse(socket: net.Socket, signal: AbortSignal): Promise<PreloginPayload> {
     let messageBuffer = Buffer.alloc(0);
 
-    await withAbortRace(signal, async (signalAborted) => {
-      const iterator = MessageIO.readMessage(socket, this.debug);
-
-      try {
-        while (true) {
-          const { done, value } = await Promise.race([
-            iterator.next(),
-            signalAborted
-          ]);
-
-          if (done) {
-            break;
-          }
-
-          messageBuffer = Buffer.concat([messageBuffer, value]);
-        }
-      } finally {
-        await iterator.return();
-      }
-    });
+    for await (const data of MessageIO.readMessage(socket, this.debug, { signal })) {
+      messageBuffer = Buffer.concat([messageBuffer, data]);
+    }
 
     const preloginPayload = new PreloginPayload(messageBuffer);
     this.debug.payload(function() {

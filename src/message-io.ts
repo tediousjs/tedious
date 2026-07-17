@@ -203,14 +203,25 @@ class MessageIO extends EventEmitter {
    * message) and the error is re-thrown. Errors from the stream itself are
    * thrown as-is.
    *
+   * If the given `signal` is aborted, writing stops and the signal's abort
+   * reason is thrown. Note that this can leave a partially written message on
+   * the stream, so it must only be used when the connection is being torn down
+   * anyway. To cancel a message in a way that keeps the TDS stream aligned,
+   * throw from the `payload` iterable instead.
+   *
    * @param stream The stream to write the message to.
    * @param debug The debug instance to use for logging.
    * @param packetSize The maximum packet size to use.
    * @param type The type of the message to write.
    * @param payload The payload to write.
-   * @param resetConnection Whether the server should reset the connection when processing the message.
+   * @param options.resetConnection Whether the server should reset the connection when processing the message.
+   * @param options.signal An abort signal to stop writing the message.
    */
-  static async writeMessage(stream: Writable, debug: Debug, packetSize: number, type: number, payload: AsyncIterable<Buffer> | Iterable<Buffer>, resetConnection = false): Promise<void> {
+  static async writeMessage(stream: Writable, debug: Debug, packetSize: number, type: number, payload: AsyncIterable<Buffer> | Iterable<Buffer>, options: { resetConnection?: boolean, signal?: AbortSignal } = {}): Promise<void> {
+    const { resetConnection = false, signal } = options;
+
+    signal?.throwIfAborted();
+
     if (!stream.writable) {
       throw new Error('Premature close');
     }
@@ -233,9 +244,24 @@ class MessageIO extends EventEmitter {
       }
     };
 
+    let abortPromise: Promise<never> | null = null;
+    let onAbort: (() => void) | null = null;
+
+    if (signal) {
+      const { promise, reject } = Promise.withResolvers<never>();
+
+      // Prevent unhandled rejections if the signal is aborted while
+      // nothing is currently racing against `abortPromise`.
+      promise.catch(() => {});
+
+      abortPromise = promise;
+      onAbort = () => { reject(signal.reason); };
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+
     const waitForDrain = () => {
       drain = Promise.withResolvers();
-      return drain.promise;
+      return abortPromise ? Promise.race([drain.promise, abortPromise]) : drain.promise;
     };
 
     stream.on('drain', onDrain);
@@ -266,12 +292,15 @@ class MessageIO extends EventEmitter {
       while (true) {
         let value, done;
         try {
-          ({ value, done } = await iterator.next());
+          const result = iterator.next();
+          ({ value, done } = abortPromise ? await Promise.race([Promise.resolve(result), abortPromise]) : await result);
         } catch (err) {
           // The payload errored while being iterated. If the stream is still
           // writable, terminate the message with the `IGNORE` flag set so the
-          // server disregards everything sent so far.
-          if (stream.writable) {
+          // server disregards everything sent so far. If the signal was
+          // aborted instead, the connection is being torn down and the
+          // message is left unterminated.
+          if (stream.writable && !signal?.aborted) {
             const packet = new Packet(type);
             packet.packetId(packetNumber += 1);
             packet.resetConnection(resetConnection);
@@ -317,6 +346,10 @@ class MessageIO extends EventEmitter {
       stream.removeListener('drain', onDrain);
       stream.removeListener('close', onDrain);
       stream.removeListener('error', onError);
+
+      if (signal && onAbort) {
+        signal.removeEventListener('abort', onAbort);
+      }
     }
   }
 
@@ -330,10 +363,20 @@ class MessageIO extends EventEmitter {
    * Any bytes following the message's last packet (e.g. the start of the next
    * message) are pushed back onto the stream, to be consumed by the next read.
    *
+   * If the given `signal` is aborted, reading stops and the signal's abort
+   * reason is thrown. This also interrupts waiting for more data on a quiet
+   * stream, which an external `.return()` or `.throw()` call can not do (it
+   * would be queued behind the pending read).
+   *
    * @param stream The stream to read the message from.
    * @param debug The debug instance to use for logging.
+   * @param options.signal An abort signal to stop reading the message.
    */
-  static async *readMessage(stream: Readable, debug: Debug): AsyncGenerator<Buffer, void, undefined> {
+  static async *readMessage(stream: Readable, debug: Debug, options: { signal?: AbortSignal } = {}): AsyncGenerator<Buffer, void, undefined> {
+    const { signal } = options;
+
+    signal?.throwIfAborted();
+
     if (!stream.readable) {
       throw new Error('Premature close');
     }
@@ -371,6 +414,20 @@ class MessageIO extends EventEmitter {
         reject(new Error('Premature close'));
       }
     };
+
+    let onAbort: (() => void) | null = null;
+    if (signal) {
+      onAbort = () => {
+        error ??= signal.reason;
+
+        if (waiting) {
+          const { reject } = waiting;
+          waiting = null;
+          reject(signal.reason);
+        }
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
 
     stream.on('readable', onReadable);
     stream.on('error', onError);
@@ -438,6 +495,10 @@ class MessageIO extends EventEmitter {
       stream.removeListener('readable', onReadable);
       stream.removeListener('error', onError);
       stream.removeListener('close', onClose);
+
+      if (signal && onAbort) {
+        signal.removeEventListener('abort', onAbort);
+      }
     }
   }
 }
