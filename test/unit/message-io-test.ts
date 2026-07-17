@@ -339,9 +339,9 @@ describe('MessageIO', function() {
   });
 
   describe('#startTls', function() {
-    // `@types/node` does not declare the server-side `servername` getter
-    // on `TLSSocket`, so widen the type here.
-    let securePair: { encrypted: Duplex, cleartext: TLSSocket & { servername?: string } };
+    // Older versions of `@types/node` do not declare the server-side
+    // `servername` getter on `TLSSocket`, so widen the type here.
+    let securePair: { encrypted: Duplex, cleartext: TLSSocket & { servername?: string | false | null } };
 
     beforeEach(function() {
       const duplexpair = new DuplexPair();
