@@ -272,6 +272,21 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       }, offset);
     }
 
+    case 'Json':
+      // The `json` TYPE_INFO carries no additional metadata — no length
+      // and no collation (the collation is fixed to UTF-8 per RFC 8259).
+      return new Result({
+        userType: userType,
+        flags: flags,
+        type: type,
+        collation: undefined,
+        precision: undefined,
+        scale: undefined,
+        dataLength: undefined,
+        schema: undefined,
+        udtInfo: undefined
+      }, offset);
+
     case 'Xml': {
       let schema;
       ({ offset, value: schema } = readSchema(buf, offset));
