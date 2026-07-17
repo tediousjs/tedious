@@ -122,4 +122,34 @@ describe('Colmetadata Token Parser', function() {
     assert.strictEqual(token.columns[0].colName, 'name');
     assert.strictEqual(token.columns[0].dataLength, length);
   });
+
+  it('should parse json column metadata', async function() {
+    const debug = new Debug();
+    const numberOfColumns = 1;
+    const userType = 0;
+    const flags = 0;
+    const columnName = 'col1';
+
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0x81);
+    buffer.writeUInt16LE(numberOfColumns);
+    buffer.writeUInt32LE(userType);
+    buffer.writeUInt16LE(flags);
+    buffer.writeUInt8(typeByName.Json.id);
+    buffer.writeBVarchar(columnName);
+
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, ColMetadataToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].type.name, 'Json');
+    assert.strictEqual(token.columns[0].colName, 'col1');
+    assert.isUndefined(token.columns[0].collation);
+    assert.isUndefined(token.columns[0].dataLength);
+  });
 });

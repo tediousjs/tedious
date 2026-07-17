@@ -56,4 +56,41 @@ describe('NBCRow Token Parser', function() {
       assert.isTrue((await parser.next()).done);
     });
   });
+
+  it('should parse json', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Json,
+      collation: undefined
+    }];
+    const value = '{"a":"\u00fc"}';
+    const payload = Buffer.from(value, 'utf8');
+
+    const buffer = new WritableTrackingBuffer(0);
+    buffer.writeUInt8(0xd2);
+    buffer.writeUInt8(0x00); // null bitmap - column is not null
+    buffer.writeUInt64LE(payload.length); // PLP total length
+    buffer.writeUInt32LE(payload.length); // chunk length
+    buffer.writeBuffer(payload);
+    buffer.writeUInt32LE(0); // PLP terminator
+
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, NBCRowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
+  });
 });

@@ -58,6 +58,31 @@ describe('Feature Ext Parser', () => {
     assert.instanceOf(token, FeatureExtAckToken);
     assert.strictEqual(token.utf8Support, true); // feature ext ack for UTF8_SUPPORT was positive
     assert.isUndefined(token.fedAuth); // fed auth not ack'd
+    assert.isUndefined(token.jsonSupport); // feature ext ack for JSON_SUPPORT was not received
+
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse JSON support token', async function() {
+    const debug = new Debug();
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x0D); // JSON_SUPPORT feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen
+    buffer.writeUInt8(0x01); // version 1
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.strictEqual(token.jsonSupport, true); // feature ext ack for JSON_SUPPORT was positive
+    assert.isUndefined(token.utf8Support); // feature ext ack for UTF8_SUPPORT was not received
+    assert.isUndefined(token.fedAuth); // fed auth not ack'd
 
     assert.isTrue((await parser.next()).done);
   });
