@@ -2,7 +2,7 @@ version: '3'
 
 services:
   app:
-    image: "mcr.microsoft.com/devcontainers/javascript-node:16"
+    image: "mcr.microsoft.com/devcontainers/javascript-node:22"
 
     volumes:
       - "..:/workspace:cached"
@@ -15,7 +15,7 @@ services:
       - mssql
 
   mssql:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2025-latest
 
     restart: unless-stopped
 

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/mssql/server:2022-latest
+FROM mcr.microsoft.com/mssql/server:2025-latest
 
 USER mssql
 COPY --chown=mssql:root ./fixtures/mssql.conf /var/opt/mssql/mssql.conf

@@ -14,7 +14,8 @@ const TVP: DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
-    return value.name + ' readonly';
+    const schema = value.schema ? value.schema + '.' : '';
+    return schema + value.name + ' readonly';
   },
 
   generateTypeInfo(parameter) {

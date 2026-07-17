@@ -1,0 +1,64 @@
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
+import { FeatureExtAckToken } from '../../../src/token/token';
+import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import Debug from '../../../src/debug';
+import { assert } from 'chai';
+
+const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
+
+describe('Feature Ext Parser', () => {
+  it('should parse federated authentication token', async function() {
+    const debug = new Debug();
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+
+    buffer.writeUInt8(0x01); // SESSIONRECOVERY
+    buffer.writeUInt32LE(1);
+    buffer.writeBuffer(Buffer.from('a'));
+
+    buffer.writeUInt8(0x02); // FEDAUTH
+    buffer.writeUInt32LE(2);
+    buffer.writeBuffer(Buffer.from('bc'));
+
+    buffer.writeUInt8(0x03); // made-up feature ext
+    buffer.writeUInt32LE(0);
+    buffer.writeBuffer(Buffer.from(''));
+
+    buffer.writeUInt8(0xFF); // terminator
+
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.isDefined(token.fedAuth);
+    assert.deepEqual(token.fedAuth, Buffer.from('bc'));
+    assert.isUndefined(token.utf8Support); // feature ext ack for UTF8_SUPPORT was not received
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse UTF-8 support token', async function() {
+    const debug = new Debug();
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x0A); // UTF8_SUPPORT feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen
+    buffer.writeUInt8(0x01); // supported
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.strictEqual(token.utf8Support, true); // feature ext ack for UTF8_SUPPORT was positive
+    assert.isUndefined(token.fedAuth); // fed auth not ack'd
+
+    assert.isTrue((await parser.next()).done);
+  });
+});

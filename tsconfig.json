@@ -2,12 +2,14 @@
   "compilerOptions": {
     "target": "esnext",
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "types": [ "node", "mocha" ],
     "allowJs": true,
     "noEmit": true,
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "lib": [ "esnext" ],
+    "lib": [ "ES2024" ],
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "exactOptionalPropertyTypes": true,
@@ -19,6 +21,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "test/**/*.js",
+    "eslint.config.mjs"
   ],
 
   "typedocOptions": {

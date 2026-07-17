@@ -2,7 +2,7 @@ import DuplexPair from 'native-duplexpair';
 
 import { Duplex } from 'stream';
 import * as tls from 'tls';
-import { Socket } from 'net';
+import { isIP, Socket } from 'net';
 import { EventEmitter } from 'events';
 
 import Debug from './debug';
@@ -73,7 +73,13 @@ class MessageIO extends EventEmitter {
       const securePair = this.securePair = {
         cleartext: tls.connect({
           socket: duplexpair.socket1 as Socket,
-          servername: hostname,
+          // The `host` is used to verify the server's certificate identity.
+          // It is not used to establish a connection as a `socket` is
+          // specified.
+          host: hostname,
+          // RFC 6066 does not allow IP addresses to be used as the server
+          // name, so omit the SNI extension in that case.
+          servername: isIP(hostname) ? '' : hostname,
           secureContext: secureContext,
           rejectUnauthorized: !trustServerCertificate
         }),
@@ -162,7 +168,7 @@ class MessageIO extends EventEmitter {
   }
 
   // TODO listen for 'drain' event when socket.write returns false.
-  // TODO implement incomplete request cancelation (2.2.1.6)
+  // TODO implement incomplete request cancellation (2.2.1.6)
   sendMessage(packetType: number, data?: Buffer, resetConnection?: boolean) {
     const message = new Message({ type: packetType, resetConnection: resetConnection });
     message.end(data);

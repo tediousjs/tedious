@@ -384,7 +384,7 @@ class BulkLoad extends EventEmitter {
     this.firstRowWritten = false;
     this.streamingMode = false;
 
-    this.rowToPacketTransform = new RowTransform(this); // eslint-disable-line no-use-before-define
+    this.rowToPacketTransform = new RowTransform(this);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }

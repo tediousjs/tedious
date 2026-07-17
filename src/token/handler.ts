@@ -246,14 +246,17 @@ export class Login7TokenHandler extends TokenHandler {
   declare connection: Connection;
 
   declare fedAuthInfoToken: FedAuthInfoToken | undefined;
-  declare routingData: { server: string, port: number } | undefined;
+  declare routingData: { server: string, port: number, instance: string } | undefined;
 
   declare loginAckReceived: boolean;
+
+  declare loginError: ConnectionError | undefined;
 
   constructor(connection: Connection) {
     super();
     this.loginAckReceived = false;
     this.connection = connection;
+    this.loginError = undefined;
   }
 
   onInfoMessage(token: InfoMessageToken) {
@@ -270,7 +273,7 @@ export class Login7TokenHandler extends TokenHandler {
       error.isTransient = true;
     }
 
-    this.connection.loginError = error;
+    this.loginError = error;
   }
 
   onSSPI(token: SSPIToken) {
@@ -282,6 +285,10 @@ export class Login7TokenHandler extends TokenHandler {
 
   onDatabaseChange(token: DatabaseEnvChangeToken) {
     this.connection.emit('databaseChange', token.newValue);
+  }
+
+  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
+    this.connection.emit('databaseMirroringPartner', token.newValue);
   }
 
   onLanguageChange(token: LanguageEnvChangeToken) {
@@ -305,27 +312,27 @@ export class Login7TokenHandler extends TokenHandler {
 
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
       if (token.fedAuth === undefined) {
-        this.connection.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
+        this.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
       } else if (token.fedAuth.length !== 0) {
-        this.connection.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+        this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
       }
     } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
-      this.connection.loginError = new ConnectionError('Received acknowledgement for unknown feature');
+      this.loginError = new ConnectionError('Received acknowledgement for unknown feature');
     } else if (token.fedAuth) {
-      this.connection.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+      this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
     }
   }
 
   onLoginAck(token: LoginAckToken) {
     if (!token.tdsVersion) {
       // unsupported TDS version
-      this.connection.loginError = new ConnectionError('Server responded with unknown TDS version.', 'ETDS');
+      this.loginError = new ConnectionError('Server responded with unknown TDS version.', 'ETDS');
       return;
     }
 
     if (!token.interface) {
       // unsupported interface
-      this.connection.loginError = new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
+      this.loginError = new ConnectionError('Server responded with unsupported interface.', 'EINTERFACENOTSUPP');
       return;
     }
 
@@ -336,11 +343,11 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onRoutingChange(token: RoutingEnvChangeToken) {
-    // Removes instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> redirect.db.net
-    const [ server ] = token.newValue.server.split('\\');
+    // Splits instance name attached to the redirect url. E.g., redirect.db.net\instance1 --> [redirect.db.net, instance1]
+    const [ server, instance ] = token.newValue.server.split('\\');
 
     this.routingData = {
-      server, port: token.newValue.port
+      server, port: token.newValue.port, instance
     };
   }
 
@@ -354,10 +361,6 @@ export class Login7TokenHandler extends TokenHandler {
 
   onPacketSizeChange(token: PacketSizeEnvChangeToken) {
     this.connection.messageIo.packetSize(token.newValue);
-  }
-
-  onDatabaseMirroringPartner(token: DatabaseMirroringPartnerEnvChangeToken) {
-    // Do nothing
   }
 }
 

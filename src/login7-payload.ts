@@ -134,7 +134,7 @@ class Login7Payload {
 
   toBuffer() {
     const fixedData = Buffer.alloc(94);
-    const buffers = [fixedData];
+    const buffers: Buffer[] = [fixedData];
 
     let offset = 0;
     let dataOffset = fixedData.length;
@@ -251,15 +251,28 @@ class Login7Payload {
     }
 
     // (ibUnused / ibExtension): 2-byte
+    // For TDS 7.4+, this points to a 4-byte offset (ibFeatureExtLong) in the data section.
+    // The actual FeatureExt data is placed at the END of the packet per MS-TDS spec.
     offset = fixedData.writeUInt16LE(dataOffset, offset);
 
     // (cchUnused / cbExtension): 2-byte
-    const extensions = this.buildFeatureExt();
-    offset = fixedData.writeUInt16LE(4, offset);
-    const extensionOffset = Buffer.alloc(4);
-    extensionOffset.writeUInt32LE(dataOffset += 4, 0);
-    dataOffset += extensions.length;
-    buffers.push(extensionOffset, extensions);
+    // For TDS 7.4+, this is the size of the ibFeatureExtLong offset pointer (4 bytes).
+    // The actual FeatureExt data is appended at the end of the packet, not here.
+    // We'll store the FeatureExt data to append at the end after all other variable data.
+    let featureExtData: Buffer | undefined;
+    let extensionOffsetBuffer: Buffer | undefined;
+    if (this.tdsVersion >= versions['7_4']) {
+      featureExtData = this.buildFeatureExt();
+      // cbExtension = 4 (size of the ibFeatureExtLong pointer, not the FeatureExt data)
+      offset = fixedData.writeUInt16LE(4, offset);
+      // Reserve space for the 4-byte offset pointer; we'll fill in the actual offset later
+      extensionOffsetBuffer = Buffer.alloc(4);
+      buffers.push(extensionOffsetBuffer);
+      dataOffset += 4;
+    } else {
+      // For TDS < 7.4, these are unused fields
+      offset = fixedData.writeUInt16LE(0, offset);
+    }
 
     // ibCltIntName: 2-byte
     offset = fixedData.writeUInt16LE(dataOffset, offset);
@@ -324,6 +337,7 @@ class Login7Payload {
       }
 
       buffers.push(this.sspi);
+      dataOffset += this.sspi.length;
     } else {
       offset = fixedData.writeUInt16LE(0, offset);
     }
@@ -363,6 +377,15 @@ class Login7Payload {
       fixedData.writeUInt32LE(this.sspi.length, offset);
     } else {
       fixedData.writeUInt32LE(0, offset);
+    }
+
+    // Per MS-TDS spec, FeatureExt data must be at the END of the packet,
+    // after all other variable-length data.
+    if (featureExtData && extensionOffsetBuffer) {
+      // Update the ibFeatureExtLong offset to point to where FeatureExt will be
+      extensionOffsetBuffer.writeUInt32LE(dataOffset, 0);
+      // Append FeatureExt data at the end
+      buffers.push(featureExtData);
     }
 
     const data = Buffer.concat(buffers);
@@ -412,16 +435,14 @@ class Login7Payload {
       }
     }
 
-    if (this.tdsVersion >= versions['7_4']) {
-      // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
-      const UTF8_SUPPORT_FEATURE_ID = 0x0a;
-      const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
-      const buf = Buffer.alloc(6);
-      buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
-      buf.writeUInt32LE(1, 1);
-      buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
-      buffers.push(buf);
-    }
+    // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.
+    const UTF8_SUPPORT_FEATURE_ID = 0x0a;
+    const UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8 = 0x01;
+    const buf = Buffer.alloc(6);
+    buf.writeUInt8(UTF8_SUPPORT_FEATURE_ID, 0);
+    buf.writeUInt32LE(1, 1);
+    buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
+    buffers.push(buf);
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 

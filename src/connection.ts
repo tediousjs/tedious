@@ -201,10 +201,10 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
   options: {
     /**
-     * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` associate to their created identity.
+     * If you want to connect to an Azure app service using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieve token from azure web app service
+     * This is optional for retrieving a token from Azure web app service.
      */
     clientId?: string;
   };
@@ -214,10 +214,10 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
-     * If you want to connect using a specific client account
-     * they need to provide `clientId` associated to their created identity.
+     * If you want to connect using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieve a token
+     * This is optional for retrieving a token.
      */
     clientId?: string;
   };
@@ -227,10 +227,10 @@ interface AzureActiveDirectoryDefaultAuthentication {
   type: 'azure-active-directory-default';
   options: {
     /**
-     * If you want to connect using a specific client account
-     * they need to provide `clientId` associated to their created identity.
+     * If you want to connect using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieving a token
+     * This is optional for retrieving a token.
      */
     clientId?: string;
   };
@@ -241,8 +241,8 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
-     * A user need to provide `token` which they retrieved else where
-     * to forming the connection.
+     * A user needs to provide a `token` which they retrieved elsewhere
+     * to form the connection.
      */
     token: string;
   };
@@ -252,12 +252,12 @@ interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
-     * A user need to provide `userName` associate to their account.
+     * A user needs to provide a `userName` associated with their account.
      */
     userName: string;
 
     /**
-     * A user need to provide `password` associate to their account.
+     * A user needs to provide a `password` associated with their account.
      */
     password: string;
 
@@ -573,13 +573,13 @@ export interface ConnectionOptions {
    * * `SERIALIZABLE`
    * * `SNAPSHOT`
    *
-   * (default: `READ_COMMITED`).
+   * (default: `READ_COMMITTED`).
    */
   connectionIsolationLevel?: number;
 
   /**
    * When encryption is used, an object may be supplied that will be used
-   * for the first argument when calling [`tls.createSecurePair`](http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized)
+   * for the first argument when calling [`tls.createSecureContext`](https://nodejs.org/docs/latest/api/tls.html#tlscreatesecurecontextoptions).
    *
    * (default: `{}`)
    */
@@ -667,7 +667,7 @@ export interface ConnectionOptions {
   enableImplicitTransactions?: boolean;
 
   /**
-   * If false, error is not generated during loss of precession.
+   * If false, error is not generated during loss of precision.
    *
    * (default: `false`)
    */
@@ -718,7 +718,7 @@ export interface ConnectionOptions {
    * * `SERIALIZABLE`
    * * `SNAPSHOT`
    *
-   * (default: `READ_COMMITED`).
+   * (default: `READ_COMMITTED`).
    */
   isolationLevel?: number;
 
@@ -742,7 +742,7 @@ export interface ConnectionOptions {
   lowerCaseGuids?: boolean;
 
   /**
-   * The maximum number of connection retries for transient errors.、
+   * The maximum number of connection retries for transient errors.
    *
    * (default: `3`).
    */
@@ -873,23 +873,36 @@ export interface ConnectionOptions {
 interface RoutingData {
   server: string;
   port: number;
+  instance: string;
 }
 
 /**
- * Helper function, equivalent to `Promise.withResolvers()`.
+ * Runs the given function, providing it with a promise that will reject
+ * with the given signal's abort reason once the signal is aborted.
  *
- * @returns An object with the properties `promise`, `resolve`, and `reject`.
+ * The function can race this promise against any asynchronous work it
+ * performs (potentially multiple times) to make itself abortable.
+ *
+ * The rejection is always considered handled, and the signal's abort
+ * listener is removed once the function settles.
  */
-function withResolvers<T>() {
-  let resolve: (value: T | PromiseLike<T>) => void;
-  let reject: (reason?: any) => void;
+async function withAbortRace<T>(signal: AbortSignal, func: (signalAborted: Promise<never>) => Promise<T>): Promise<T> {
+  signal.throwIfAborted();
 
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
+  const { promise: signalAborted, reject } = Promise.withResolvers<never>();
 
-  return { promise, resolve: resolve!, reject: reject! };
+  // Prevent unhandled rejections if the signal is aborted while
+  // `func` is not currently racing against `signalAborted`.
+  signalAborted.catch(() => {});
+
+  const onAbort = () => { reject(signal.reason); };
+  signal.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    return await func(signalAborted);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
 /**
@@ -953,10 +966,6 @@ class Connection extends EventEmitter {
    * @private
    */
   declare closed: boolean;
-  /**
-   * @private
-   */
-  declare loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
@@ -1033,6 +1042,22 @@ class Connection extends EventEmitter {
    * @private
    */
   declare requestTimer: undefined | NodeJS.Timeout;
+
+  /**
+   * Controller used to abort the connection establishment process
+   * when the connection is closed before it was fully established.
+   *
+   * @private
+   */
+  declare closeController: undefined | AbortController;
+
+  /**
+   * Whether an attention message was sent to the server to cancel the
+   * currently active request.
+   *
+   * @private
+   */
+  declare attentionSent: boolean;
 
   /**
    * @private
@@ -1779,8 +1804,11 @@ class Connection extends EventEmitter {
 
     this.state = this.STATE.INITIALIZED;
 
+    this.attentionSent = false;
+
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
+      this.attentionSent = true;
       this.createCancelTimer();
     };
 
@@ -1820,6 +1848,8 @@ class Connection extends EventEmitter {
       this.once('error', onError);
     }
 
+    this.closeController = new AbortController();
+
     this.transitionTo(this.STATE.CONNECTING);
     this.initialiseConnection().then(() => {
       process.nextTick(() => {
@@ -1827,14 +1857,12 @@ class Connection extends EventEmitter {
       });
     }, (err) => {
       this.transitionTo(this.STATE.FINAL);
-      this.closed = true;
 
       process.nextTick(() => {
         this.emit('connect', err);
       });
-      process.nextTick(() => {
-        this.emit('end');
-      });
+
+      this.cleanupConnection();
     });
   }
 
@@ -1849,7 +1877,7 @@ class Connection extends EventEmitter {
   on(
     event: 'connect',
     /**
-     * @param err If successfully connected, will be falsey. If there was a
+     * @param err If successfully connected, will be falsy. If there was a
      *   problem (with either connecting or validation), will be an [[Error]] object.
      */
     listener: (err: Error | undefined) => void
@@ -1923,6 +1951,10 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
+  emit(event: 'databaseMirroringPartner', partnerInstanceName: string): boolean
+  /**
+   * @private
+   */
   emit(event: 'debug', messageText: string): boolean
   /**
    * @private
@@ -1975,6 +2007,8 @@ class Connection extends EventEmitter {
    * The [[Event_end]] will be emitted once the connection has been closed.
    */
   close() {
+    this.closeController?.abort(new ConnectionError('Connection closed before the connection was established.', 'ECLOSE'));
+
     this.transitionTo(this.STATE.FINAL);
     this.cleanupConnection();
   }
@@ -2000,7 +2034,7 @@ class Connection extends EventEmitter {
     }, this.config.options.connectTimeout);
 
     try {
-      let signal = timeoutController.signal;
+      let signal = AbortSignal.any([timeoutController.signal, this.closeController!.signal]);
 
       let port = this.config.options.port;
 
@@ -2051,6 +2085,11 @@ class Connection extends EventEmitter {
         try {
           signal = AbortSignal.any([signal, controller.signal]);
 
+          // The connection may have been closed while we were waiting for the
+          // socket to connect. Adding an abort listener to an already aborted
+          // signal will not call the listener, so we need to check here.
+          signal.throwIfAborted();
+
           socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
           this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
@@ -2058,7 +2097,6 @@ class Connection extends EventEmitter {
 
           this.socket = socket;
 
-          this.closed = false;
           this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
 
           this.sendPreLogin();
@@ -2135,20 +2173,24 @@ class Connection extends EventEmitter {
   cleanupConnection() {
     if (!this.closed) {
       this.clearRequestTimer();
+      this.clearCancelTimer();
       this.closeConnection();
 
       process.nextTick(() => {
         this.emit('end');
       });
 
+      // Mark the connection as closed and detach the active request
+      // before invoking its callback, so that a callback that synchronously
+      // calls `close` does not re-enter this cleanup logic.
       const request = this.request;
-      if (request) {
-        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
-        request.callback(err);
-        this.request = undefined;
-      }
-
+      this.request = undefined;
+      this.attentionSent = false;
       this.closed = true;
+
+      if (request) {
+        request.callback(new RequestError('Connection closed before request completed.', 'ECLOSE'));
+      }
     }
   }
 
@@ -2186,7 +2228,7 @@ class Connection extends EventEmitter {
       servername: this.config.options.serverName ? this.config.options.serverName : serverName,
     };
 
-    const { promise, resolve, reject } = withResolvers<tls.TLSSocket>();
+    const { promise, resolve, reject } = Promise.withResolvers<tls.TLSSocket>();
     const encryptsocket = tls.connect(encryptOptions);
 
     try {
@@ -2484,7 +2526,9 @@ class Connection extends EventEmitter {
     }
 
     payload.hostname = this.config.options.workstationId || os.hostname();
-    payload.serverName = this.routingData ? this.routingData.server : this.config.server;
+    payload.serverName = this.routingData ?
+      `${this.routingData.server}${this.routingData.instance ? '\\' + this.routingData.instance : ''}` :
+      this.config.server;
     payload.appName = this.config.options.appName || 'Tedious';
     payload.libraryName = libraryName;
     payload.language = this.config.options.language;
@@ -2623,10 +2667,10 @@ class Connection extends EventEmitter {
 
   /**
    * Execute the SQL batch represented by [[Request]].
-   * There is no param support, and unlike [[Request.execSql]],
+   * There is no param support, and unlike [[execSql]],
    * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
    *
-   * In almost all cases, [[Request.execSql]] will be a better choice.
+   * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
    */
@@ -3153,6 +3197,10 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+    // Clear any error left over from a previous execution of this request,
+    // even if the request is rejected before being sent.
+    request.error = undefined;
+
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3169,6 +3217,7 @@ class Connection extends EventEmitter {
       }
 
       this.request = request;
+      this.attentionSent = false;
       request.connection! = this;
       request.rowCount! = 0;
       request.rows! = [];
@@ -3176,11 +3225,21 @@ class Connection extends EventEmitter {
 
       const onCancel = () => {
         payloadStream.unpipe(message);
-        payloadStream.destroy(new RequestError('Canceled.', 'ECANCEL'));
+        payloadStream.destroy();
+
+        // The request error might already be set, e.g. if the payload
+        // stream errored before the cancellation.
+        request.error ??= new RequestError('Canceled.', 'ECANCEL');
 
         // set the ignore bit and end the message.
         message.ignore = true;
         message.end();
+
+        // The server responds to the ignored message like to any other
+        // request message. If that response never arrives (e.g. because
+        // the server has become unresponsive), the cancel timer ensures
+        // the canceled request still completes.
+        this.createCancelTimer();
 
         if (request instanceof Request && request.paused) {
           // resume the request if it was paused so we can read the remaining tokens
@@ -3198,7 +3257,11 @@ class Connection extends EventEmitter {
 
       message.once('finish', () => {
         request.removeListener('cancel', onCancel);
-        request.once('cancel', this._cancelAfterRequestSent);
+        // Prepend the listener so it always runs before the
+        // `SentClientRequest` state's `cancel` handler, regardless of the
+        // order in which the two were registered. The latter relies on
+        // `attentionSent` already being set, which only this listener does.
+        request.prependOnceListener('cancel', this._cancelAfterRequestSent);
 
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
@@ -3282,14 +3345,7 @@ class Connection extends EventEmitter {
    * @private
    */
   async performTlsNegotiation(preloginPayload: PreloginPayload, signal: AbortSignal) {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       if (preloginPayload.fedAuthRequired === 1) {
         this.fedAuthRequired = true;
       }
@@ -3306,22 +3362,13 @@ class Connection extends EventEmitter {
           signalAborted
         ]);
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   async readPreloginResponse(signal: AbortSignal): Promise<PreloginPayload> {
-    signal.throwIfAborted();
-
     let messageBuffer = Buffer.alloc(0);
 
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3348,9 +3395,7 @@ class Connection extends EventEmitter {
           await iterator.return();
         }
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
 
     const preloginPayload = new PreloginPayload(messageBuffer);
     this.debug.payload(function() {
@@ -3395,9 +3440,21 @@ class Connection extends EventEmitter {
     const port = this.routingData ? this.routingData.port : this.config.options.port;
     this.debug.log('Retry after transient failure connecting to ' + server + ':' + port);
 
-    const { promise, resolve } = withResolvers<void>();
-    setTimeout(resolve, this.config.options.connectionRetryInterval);
-    await promise;
+    const closeSignal = this.closeController!.signal;
+    closeSignal.throwIfAborted();
+
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+    const onAbort = () => { reject(closeSignal.reason); };
+    closeSignal.addEventListener('abort', onAbort, { once: true });
+
+    const retryTimer = setTimeout(resolve, this.config.options.connectionRetryInterval);
+    try {
+      await promise;
+    } finally {
+      clearTimeout(retryTimer);
+      closeSignal.removeEventListener('abort', onAbort);
+    }
 
     this.emit('retry');
     this.transitionTo(this.STATE.CONNECTING);
@@ -3408,14 +3465,7 @@ class Connection extends EventEmitter {
    * @private
    */
   async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3425,33 +3475,26 @@ class Connection extends EventEmitter {
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      await once(tokenStreamParser, 'end');
+      await Promise.race([
+        once(tokenStreamParser, 'end'),
+        signalAborted
+      ]);
 
       if (handler.loginAckReceived) {
         return handler.routingData;
-      } else if (this.loginError) {
-        throw this.loginError;
+      } else if (handler.loginError) {
+        throw handler.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       while (true) {
         const message = await Promise.race([
           this.messageIo.readMessage().catch((err) => {
@@ -3485,30 +3528,20 @@ class Connection extends EventEmitter {
           });
 
           this.ntlmpacket = undefined;
-        } else if (this.loginError) {
-          throw this.loginError;
+        } else if (handler.loginError) {
+          throw handler.loginError;
         } else {
           throw new ConnectionError('Login failed.', 'ELOGIN');
         }
       }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3530,7 +3563,7 @@ class Connection extends EventEmitter {
       const fedAuthInfoToken = handler.fedAuthInfoToken;
 
       if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-        /** Federated authentication configation. */
+        /** Federated authentication configuration. */
         const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
         /** Permission scope to pass to Entra ID when requesting an authentication token. */
         const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
@@ -3593,29 +3626,19 @@ class Connection extends EventEmitter {
         // sent the fedAuth token message, the rest is similar to standard login 7
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
         return await this.performSentLogin7WithStandardLogin(signal);
-      } else if (this.loginError) {
-        throw this.loginError;
+      } else if (handler.loginError) {
+        throw handler.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performLoggedInSendingInitialSql(signal: AbortSignal) {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       this.sendInitialSql();
 
       const message = await Promise.race([
@@ -3630,9 +3653,7 @@ class Connection extends EventEmitter {
         once(tokenStreamParser, 'end'),
         signalAborted
       ]);
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 }
 
@@ -3715,15 +3736,15 @@ Connection.prototype.STATE = {
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
-        // If the request was canceled and we have a `cancelTimer`
-        // defined, we send a attention message after the
-        // request message was fully sent off.
+        // If the request was canceled after the request message was
+        // fully sent off, an attention message was sent to the server.
         //
-        // We already started consuming the current message
-        // (but all the token handlers should be no-ops), and
-        // need to ensure the next message is handled by the
-        // `SENT_ATTENTION` state.
-        if (this.request?.canceled && this.cancelTimer) {
+        // We already started consuming the current message (the response
+        // to the canceled request, with all the token handlers being
+        // no-ops), and need to ensure the next message (containing the
+        // attention acknowledgement) is handled by the `SENT_ATTENTION`
+        // state.
+        if (this.request?.canceled && this.attentionSent) {
           return this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
@@ -3743,6 +3764,14 @@ Connection.prototype.STATE = {
         }
 
         const onCancel = () => {
+          // If the request was canceled before the request message was
+          // fully sent, the message was terminated with the `IGNORE` bit
+          // set and no attention message was sent. The server's response
+          // to the ignored message is handled like a regular response.
+          if (!this.attentionSent) {
+            return;
+          }
+
           tokenStreamParser.removeListener('end', onEndOfMessage);
 
           if (this.request instanceof Request && this.request.paused) {
@@ -3765,6 +3794,12 @@ Connection.prototype.STATE = {
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
+
+          // If the request was canceled before its request message was
+          // fully sent, this response belongs to the ignored message and
+          // a cancel timer is running - the response's arrival is what
+          // completes the cancellation.
+          this.clearCancelTimer();
 
           this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
@@ -3798,6 +3833,15 @@ Connection.prototype.STATE = {
     name: 'SentAttention',
     enter: function() {
       (async () => {
+        // TDS is a request-response protocol at the message level: every
+        // client message - including the attention message - receives
+        // exactly one response message. By the time we enter this state,
+        // the response to the canceled request itself was already consumed
+        // in the `SentClientRequest` state, so the single message read here
+        // is the attention message's own response, containing the attention
+        // acknowledgement. Reading more than one message would consume the
+        // response belonging to the next request and desynchronize the
+        // message stream - so don't turn this into a loop.
         let message;
         try {
           message = await this.messageIo.readMessage();
@@ -3816,6 +3860,7 @@ Connection.prototype.STATE = {
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (handler.attentionReceived) {
+          this.attentionSent = false;
           this.clearCancelTimer();
 
           const sqlRequest = this.request!;

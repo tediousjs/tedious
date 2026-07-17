@@ -5,3 +5,4 @@ scripts/
 todo
 .*
 /scratch
+benchmarks/

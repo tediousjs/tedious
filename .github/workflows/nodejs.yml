@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v4.0.3
+    - name: Use Node.js 22
+      uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -34,15 +34,15 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 21.x]
+        node-version: [22.x, 24.x, 26.x]
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4.0.3
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -64,7 +64,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -73,7 +73,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -82,7 +82,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -91,7 +91,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -100,7 +100,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -109,7 +109,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -121,7 +121,7 @@ jobs:
     strategy:
       matrix:
         mssql-version: [2016, 2017, 2019, 2022]
-        node-version: [18.x, 20.x, 21.x]
+        node-version: [22.x, 24.x, 26.x]
       fail-fast: false
 
     steps:
@@ -131,24 +131,18 @@ jobs:
         sqlserver-version: ${{ matrix.mssql-version }}
         install-updates: true
 
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4.0.3
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
 
-    - name: Install dbatools
-      shell: powershell
-      run: Install-Module dbatools -Force
-
     - name: Set up TLS Key and Certificate
       shell: powershell
       run: |
-        Import-Module dbatools
-
         $certificate = New-SelfSignedCertificate `
           -Type SSLServerAuthentication `
           -Subject "CN=$env:COMPUTERNAME" -FriendlyName 'SQL Server RSA2048 G1' `
@@ -160,8 +154,17 @@ jobs:
           -Provider 'Microsoft RSA SChannel Cryptographic Provider' `
           -CertStoreLocation Cert:\LocalMachine\My `
 
-        $sqlinstance = Find-DbaInstance -ComputerName localhost
-        $sqlinstance | Set-DbaNetworkCertificate -Thumbprint ($certificate.Thumbprint).ToUpper()
+        # Grant the SQL Server service account read access to the certificate's private key
+        $serviceAccount = (Get-CimInstance Win32_Service -Filter "Name='MSSQLSERVER'").StartName
+        $keyContainerName = $certificate.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+        $keyPath = Join-Path "$env:ProgramData\Microsoft\Crypto\RSA\MachineKeys" $keyContainerName
+        $acl = Get-Acl $keyPath
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($serviceAccount, 'Read', 'Allow')))
+        Set-Acl $keyPath $acl
+
+        # Register the certificate with the SQL Server instance
+        $instanceId = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL').MSSQLSERVER
+        Set-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instanceId\MSSQLServer\SuperSocketNetLib" -Name Certificate -Value $certificate.Thumbprint.ToLower()
 
         Restart-Service MSSQLSERVER
 
@@ -183,7 +186,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -192,7 +195,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -201,7 +204,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -210,7 +213,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -219,7 +222,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -228,12 +231,12 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-sql-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -241,12 +244,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v4.0.3
+    - name: Use Node.js 22
+      uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -262,12 +265,12 @@ jobs:
         AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   azure-ad-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -275,12 +278,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v4.0.3
+    - name: Use Node.js 22
+      uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -298,12 +301,12 @@ jobs:
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
   token-credential-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -311,12 +314,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v4.0.3
+    - name: Use Node.js 22
+      uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -334,13 +337,13 @@ jobs:
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
 
   azure-ad-service-principal-auth:
-    name: Azure SQL Server / Node.js 18.x
+    name: Azure SQL Server / Node.js 22.x
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -348,12 +351,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v4.0.3
+    - name: Use Node.js 22
+      uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
@@ -370,7 +373,7 @@ jobs:
         AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -387,12 +390,12 @@ jobs:
       id-token: write # to enable use of OIDC for npm provenance
 
     steps:
-    - uses: actions/checkout@v4.1.7
+    - uses: actions/checkout@v6
 
-    - name: Use Node.js 18
-      uses: actions/setup-node@v4.0.3
+    - name: Use Node.js 22
+      uses: actions/setup-node@v6
       with:
-        node-version: 18
+        node-version: 22
         cache: 'npm'
 
     - run: npm ci
