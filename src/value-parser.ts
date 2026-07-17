@@ -3,6 +3,7 @@ import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
+import { isAscii } from 'node:buffer';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
@@ -568,12 +569,45 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
   return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
 }
 
+const asciiCompatibleCodepages = new Map<string, boolean>();
+
+// Checks (once per codepage) whether a codepage decodes the 7-bit ASCII
+// range identically to ASCII itself, allowing a fast path in `readChars`.
+function isAsciiCompatible(codepage: string): boolean {
+  let result = asciiCompatibleCodepages.get(codepage);
+
+  if (result === undefined) {
+    const probe = Buffer.alloc(128);
+    for (let i = 0; i < 128; i++) {
+      probe[i] = i;
+    }
+
+    try {
+      result = iconv.decode(probe, codepage) === probe.toString('latin1');
+    } catch {
+      result = false;
+    }
+
+    asciiCompatibleCodepages.set(codepage, result);
+  }
+
+  return result;
+}
+
 function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
 
-  return new Result(iconv.decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  const data = buf.slice(offset, offset + dataLength);
+
+  // Fast path: pure ASCII data in an ASCII compatible codepage can be
+  // decoded natively, skipping the (much slower) `iconv` decoding.
+  if (isAsciiCompatible(codepage ?? DEFAULT_ENCODING) && isAscii(data)) {
+    return new Result(data.toString('latin1'), offset + dataLength);
+  }
+
+  return new Result(iconv.decode(data, codepage ?? DEFAULT_ENCODING), offset + dataLength);
 }
 
 function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
