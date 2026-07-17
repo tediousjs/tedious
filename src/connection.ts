@@ -2172,15 +2172,17 @@ class Connection extends EventEmitter {
         this.emit('end');
       });
 
+      // Mark the connection as closed and detach the active request
+      // before invoking its callback, so that a callback that synchronously
+      // calls `close` does not re-enter this cleanup logic.
       const request = this.request;
-      if (request) {
-        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
-        request.callback(err);
-        this.request = undefined;
-      }
-
+      this.request = undefined;
       this.attentionSent = false;
       this.closed = true;
+
+      if (request) {
+        request.callback(new RequestError('Connection closed before request completed.', 'ECLOSE'));
+      }
     }
   }
 
@@ -3225,6 +3227,12 @@ class Connection extends EventEmitter {
         message.ignore = true;
         message.end();
 
+        // The server responds to the ignored message like to any other
+        // request message. If that response never arrives (e.g. because
+        // the server has become unresponsive), the cancel timer ensures
+        // the canceled request still completes.
+        this.createCancelTimer();
+
         if (request instanceof Request && request.paused) {
           // resume the request if it was paused so we can read the remaining tokens
           request.resume();
@@ -3836,6 +3844,12 @@ Connection.prototype.STATE = {
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
 
+          // If the request was canceled before its request message was
+          // fully sent, this response belongs to the ignored message and
+          // a cancel timer is running - the response's arrival is what
+          // completes the cancellation.
+          this.clearCancelTimer();
+
           this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
           this.request = undefined;
@@ -3868,6 +3882,15 @@ Connection.prototype.STATE = {
     name: 'SentAttention',
     enter: function() {
       (async () => {
+        // TDS is a request-response protocol at the message level: every
+        // client message - including the attention message - receives
+        // exactly one response message. By the time we enter this state,
+        // the response to the canceled request itself was already consumed
+        // in the `SentClientRequest` state, so the single message read here
+        // is the attention message's own response, containing the attention
+        // acknowledgement. Reading more than one message would consume the
+        // response belonging to the next request and desynchronize the
+        // message stream - so don't turn this into a loop.
         let message;
         try {
           message = await this.messageIo.readMessage();
