@@ -11,11 +11,6 @@ const Json: DataType = {
   declaration: (parameter) => {
     return 'json';
   },
-  resolveLength: (parameter) => {
-    if ((parameter.value instanceof String || typeof (parameter.value) == 'string'))
-      return parameter.value.length;
-    else return JSON.stringify(parameter.value).length;
-  },
 
   generateTypeInfo(parameter) {
     return Buffer.from([this.id]);
@@ -50,11 +45,21 @@ const Json: DataType = {
       return null;
     }
 
-    if (!(value instanceof String || typeof (value) == 'string'))
-      value = JSON.stringify(value);
-    else JSON.parse(value as string); // validate parsing
+    if (typeof value === 'string') {
+      JSON.parse(value);
+      return Buffer.from(value, 'utf-8');
+    }
 
-    return Buffer.from(value, 'utf-8');
+    if (Buffer.isBuffer(value)) {
+      throw new TypeError('Invalid JSON value.');
+    }
+
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) {
+      throw new TypeError('Invalid JSON value.');
+    }
+
+    return Buffer.from(serialized, 'utf-8');
   }
 };
 
