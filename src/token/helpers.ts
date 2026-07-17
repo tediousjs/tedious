@@ -8,12 +8,17 @@ export class Result<T> {
   }
 }
 
-export class NotEnoughDataError extends Error {
+// This error is thrown and caught as part of normal parsing control flow:
+// whenever a parser encounters an incomplete value, it throws this error,
+// and the caller waits for more data to arrive before retrying.
+//
+// It deliberately does not extend `Error` - capturing a stack trace on
+// every construction is expensive, and the stack is never used as this
+// error never escapes the parsing internals.
+export class NotEnoughDataError {
   byteCount: number;
 
   constructor(byteCount: number) {
-    super();
-
     this.byteCount = byteCount;
   }
 }
