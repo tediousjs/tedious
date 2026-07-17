@@ -539,7 +539,7 @@ export const TYPE = {
  *     <td>✓</td>
  *     <td>-</td>
  *   </tr>
- *  <tr>
+ *   <tr>
  *     <td><code>json</code></td>
  *     <td><code>[[TYPES.Json]]</code></td>
  *     <td><code>string|object</code></td>
