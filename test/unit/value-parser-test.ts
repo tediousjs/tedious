@@ -4,6 +4,8 @@ import { readValue } from '../../src/value-parser';
 import { type Metadata } from '../../src/metadata-parser';
 import { type ParserOptions } from '../../src/token/stream-parser';
 import { type DataType, typeByName as dataTypeByName } from '../../src/data-type';
+import { codepageByLanguageId, codepageBySortId } from '../../src/collation';
+import iconv from 'iconv-lite';
 
 const utcOptions = { useUTC: true } as ParserOptions;
 const localOptions = { useUTC: false } as ParserOptions;
@@ -375,6 +377,28 @@ describe('readValue', function() {
 
       assert.strictEqual(result.value, 'あA');
       assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should decode ASCII bytes natively for every codepage a collation can produce', function() {
+      // The native fast path in `readChars` is gated on a hardcoded list of
+      // ASCII compatible codepages. Verify that every codepage that can come
+      // out of the collation tables (plus the `utf8` fallback encoding)
+      // actually decodes the 7-bit ASCII range identically to ASCII, and
+      // that `readValue` takes the same result either way.
+      const codepages = new Set([...Object.values(codepageByLanguageId), ...Object.values(codepageBySortId), 'utf-8', 'utf8']);
+
+      const probe = Buffer.alloc(128);
+      for (let i = 0; i < 128; i++) {
+        probe[i] = i;
+      }
+
+      for (const codepage of codepages) {
+        assert.strictEqual(iconv.decode(probe, codepage), probe.toString('latin1'), codepage);
+
+        const buf = buildCharBuffer(Buffer.from('plain ASCII value', 'latin1'));
+        const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, codepage), utcOptions);
+        assert.strictEqual(result.value, 'plain ASCII value', codepage);
+      }
     });
 
     it('should parse ASCII values in codepages that do not decode ASCII bytes as ASCII', function() {

@@ -569,30 +569,19 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
   return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
 }
 
-const asciiCompatibleCodepages = new Map<string, boolean>();
-
-// Checks (once per codepage) whether a codepage decodes the 7-bit ASCII
-// range identically to ASCII itself, allowing a fast path in `readChars`.
-function isAsciiCompatible(codepage: string): boolean {
-  let result = asciiCompatibleCodepages.get(codepage);
-
-  if (result === undefined) {
-    const probe = Buffer.alloc(128);
-    for (let i = 0; i < 128; i++) {
-      probe[i] = i;
-    }
-
-    try {
-      result = iconv.decode(probe, codepage) === probe.toString('latin1');
-    } catch {
-      result = false;
-    }
-
-    asciiCompatibleCodepages.set(codepage, result);
-  }
-
-  return result;
-}
+// Codepages that decode the 7-bit ASCII range identically to ASCII,
+// allowing a fast path in `readChars`. This covers every codepage that a
+// `Collation` can produce (see `codepageByLanguageId` / `codepageBySortId`),
+// plus both spellings of UTF-8, as `DEFAULT_ENCODING` is `'utf8'`.
+//
+// A codepage missing from this list only loses the fast path - decoding
+// still works correctly via `iconv`.
+const asciiCompatibleCodepages = new Set([
+  'CP437', 'CP850', 'CP874',
+  'CP932', 'CP936', 'CP949', 'CP950',
+  'CP1250', 'CP1251', 'CP1252', 'CP1253', 'CP1254', 'CP1255', 'CP1256', 'CP1257', 'CP1258',
+  'utf-8', 'utf8'
+]);
 
 function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
   if (buf.length < offset + dataLength) {
@@ -603,7 +592,7 @@ function readChars(buf: Buffer, offset: number, dataLength: number, codepage: st
 
   // Fast path: pure ASCII data in an ASCII compatible codepage can be
   // decoded natively, skipping the (much slower) `iconv` decoding.
-  if (isAsciiCompatible(codepage ?? DEFAULT_ENCODING) && isAscii(data)) {
+  if (asciiCompatibleCodepages.has(codepage ?? DEFAULT_ENCODING) && isAscii(data)) {
     return new Result(data.toString('latin1'), offset + dataLength);
   }
 
