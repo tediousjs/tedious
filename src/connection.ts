@@ -29,7 +29,7 @@ import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
-import MessageIO from './message-io';
+import MessageIO, { readMessage, writeMessage } from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
@@ -2481,7 +2481,7 @@ class Connection extends EventEmitter {
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
-    await MessageIO.writeMessage(socket, this.debug, this.config.options.packetSize, TYPE.PRELOGIN, [payload.data], { signal });
+    await writeMessage(socket, this.config.options.packetSize, TYPE.PRELOGIN, [payload.data], { debug: this.debug, signal });
     this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -3383,7 +3383,7 @@ class Connection extends EventEmitter {
   async readPreloginResponse(socket: net.Socket, signal: AbortSignal): Promise<PreloginPayload> {
     let messageBuffer = Buffer.alloc(0);
 
-    for await (const data of MessageIO.readMessage(socket, this.debug, { signal })) {
+    for await (const data of readMessage(socket, { debug: this.debug, signal })) {
       messageBuffer = Buffer.concat([messageBuffer, data]);
     }
 

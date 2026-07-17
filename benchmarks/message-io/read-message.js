@@ -2,7 +2,7 @@ const { createBenchmark } = require('../common');
 const { Readable } = require('stream');
 
 const Debug = require('tedious/lib/debug');
-const MessageIO = require('tedious/lib/message-io');
+const { readMessage } = require('tedious/lib/message-io');
 const { Packet } = require('tedious/lib/packet');
 
 const bench = createBenchmark(main, {
@@ -28,7 +28,7 @@ function main({ n }) {
     let total = 0;
 
     for (let i = 0; i < n; i++) {
-      for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      for await (const chunk of readMessage(stream, { debug })) {
         total += chunk.length;
       }
     }

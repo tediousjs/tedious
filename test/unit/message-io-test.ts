@@ -9,7 +9,7 @@ import { Duplex, Readable } from 'stream';
 import BufferListStream from 'bl';
 
 import Debug from '../../src/debug';
-import MessageIO from '../../src/message-io';
+import MessageIO, { readMessage, writeMessage } from '../../src/message-io';
 import Message from '../../src/message';
 import { Packet, TYPE } from '../../src/packet';
 import { ConnectionError } from '../../src/errors';
@@ -38,18 +38,12 @@ function splitPackets(data: Buffer): Packet[] {
   return packets;
 }
 
-describe('MessageIO.writeMessage', function() {
-  let debug: Debug;
-
-  beforeEach(function() {
-    debug = new Debug();
-  });
-
+describe('writeMessage', function() {
   it('wraps the given payload into a TDS packet and writes it to the given stream', async function() {
     const payload = Buffer.from([1, 2, 3]);
     const stream = new BufferListStream();
 
-    await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload]);
+    await writeMessage(stream, packetSize, packetType, [payload]);
 
     const buf = stream.read();
     assert.instanceOf(buf, Buffer);
@@ -69,7 +63,7 @@ describe('MessageIO.writeMessage', function() {
     const stream = new BufferListStream();
 
     // `packetSize` allows for 4 bytes of data per packet
-    await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload]);
+    await writeMessage(stream, packetSize, packetType, [payload]);
 
     const [firstPacket, secondPacket, ...rest] = splitPackets(stream.read());
     assert.lengthOf(rest, 0);
@@ -86,7 +80,7 @@ describe('MessageIO.writeMessage', function() {
   it('writes an empty final packet for an empty payload', async function() {
     const stream = new BufferListStream();
 
-    await MessageIO.writeMessage(stream, debug, packetSize, packetType, []);
+    await writeMessage(stream, packetSize, packetType, []);
 
     const packet = new Packet(stream.read());
     assert.isTrue(packet.isLast());
@@ -101,7 +95,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
         yield payload;
         throw new Error('iteration error');
       })());
@@ -146,7 +140,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
         yield payload;
 
         // Simulate draining the stream after the exception was thrown
@@ -181,7 +175,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload]);
+      await writeMessage(stream, packetSize, packetType, [payload]);
     } catch (err: any) {
       hadError = true;
 
@@ -212,7 +206,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload, payload, payload]);
+      await writeMessage(stream, packetSize, packetType, [payload, payload, payload]);
     } catch (err: any) {
       hadError = true;
 
@@ -243,7 +237,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
         yield payload;
         yield payload;
         yield payload;
@@ -265,7 +259,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, []);
+      await writeMessage(stream, packetSize, packetType, []);
     } catch (err: any) {
       hadError = true;
 
@@ -282,7 +276,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [Buffer.from([1, 2, 3])], { signal });
+      await writeMessage(stream, packetSize, packetType, [Buffer.from([1, 2, 3])], { signal });
     } catch (err: any) {
       hadError = true;
 
@@ -317,7 +311,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload, payload, payload], { signal: controller.signal });
+      await writeMessage(stream, packetSize, packetType, [payload, payload, payload], { signal: controller.signal });
     } catch (err: any) {
       hadError = true;
 
@@ -341,7 +335,7 @@ describe('MessageIO.writeMessage', function() {
 
     let hadError = false;
     try {
-      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
         yield payload;
 
         // Stall forever, waiting for more data that never arrives.
@@ -368,13 +362,7 @@ describe('MessageIO.writeMessage', function() {
   });
 });
 
-describe('MessageIO.readMessage', function() {
-  let debug: Debug;
-
-  beforeEach(function() {
-    debug = new Debug();
-  });
-
+describe('readMessage', function() {
   it('reads a message consisting of a single TDS packet from the given stream', async function() {
     const payload = Buffer.from([1, 2, 3]);
     const packet = new Packet(packetType);
@@ -385,7 +373,7 @@ describe('MessageIO.readMessage', function() {
     stream.write(packet.buffer);
 
     const chunks = [];
-    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+    for await (const chunk of readMessage(stream)) {
       chunks.push(chunk);
     }
 
@@ -408,7 +396,7 @@ describe('MessageIO.readMessage', function() {
     stream.write(lastPacket.buffer);
 
     const chunks = [];
-    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+    for await (const chunk of readMessage(stream)) {
       chunks.push(chunk);
     }
 
@@ -437,7 +425,7 @@ describe('MessageIO.readMessage', function() {
     }
 
     const chunks = [];
-    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+    for await (const chunk of readMessage(stream)) {
       chunks.push(chunk);
     }
 
@@ -456,7 +444,7 @@ describe('MessageIO.readMessage', function() {
     stream.write(Buffer.concat([packet.buffer, trailingBytes]));
 
     const chunks = [];
-    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+    for await (const chunk of readMessage(stream)) {
       chunks.push(chunk);
     }
 
@@ -471,7 +459,7 @@ describe('MessageIO.readMessage', function() {
 
     let hadError = false;
     try {
-      const message = MessageIO.readMessage(stream, debug);
+      const message = readMessage(stream);
       while (!(await message.next()).done) {
         // Discard the message contents.
       }
@@ -498,7 +486,7 @@ describe('MessageIO.readMessage', function() {
 
     let hadError = false;
     try {
-      const message = MessageIO.readMessage(stream, debug);
+      const message = readMessage(stream);
       while (!(await message.next()).done) {
         // Discard the message contents.
       }
@@ -518,7 +506,7 @@ describe('MessageIO.readMessage', function() {
 
     let hadError = false;
     try {
-      const message = MessageIO.readMessage(stream, debug);
+      const message = readMessage(stream);
       while (!(await message.next()).done) {
         // Discard the message contents.
       }
@@ -538,7 +526,7 @@ describe('MessageIO.readMessage', function() {
 
     let hadError = false;
     try {
-      const message = MessageIO.readMessage(stream, debug, { signal });
+      const message = readMessage(stream, { signal });
       while (!(await message.next()).done) {
         // Discard the message contents.
       }
@@ -565,7 +553,7 @@ describe('MessageIO.readMessage', function() {
 
     let hadError = false;
     try {
-      const message = MessageIO.readMessage(stream, debug, { signal: controller.signal });
+      const message = readMessage(stream, { signal: controller.signal });
       while (!(await message.next()).done) {
         // Discard the message contents.
       }
@@ -595,7 +583,7 @@ describe('MessageIO.readMessage', function() {
     const chunks = [];
     let hadError = false;
     try {
-      for await (const chunk of MessageIO.readMessage(stream, debug, { signal: controller.signal })) {
+      for await (const chunk of readMessage(stream, { signal: controller.signal })) {
         chunks.push(chunk);
       }
     } catch (err: any) {
@@ -618,7 +606,7 @@ describe('MessageIO.readMessage', function() {
     const stream = new Readable({ read() {} });
 
     const controller = new AbortController();
-    const message = MessageIO.readMessage(stream, debug, { signal: controller.signal });
+    const message = readMessage(stream, { signal: controller.signal });
 
     const pendingRead = message.next();
 
@@ -650,7 +638,7 @@ describe('MessageIO.readMessage', function() {
 
     let hadError = false;
     try {
-      const message = MessageIO.readMessage(stream, debug);
+      const message = readMessage(stream);
       while (!(await message.next()).done) {
         // Discard the message contents.
       }

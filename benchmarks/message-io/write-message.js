@@ -2,7 +2,7 @@ const { createBenchmark } = require('../common');
 const { Duplex } = require('stream');
 
 const Debug = require('tedious/lib/debug');
-const MessageIO = require('tedious/lib/message-io');
+const { writeMessage } = require('tedious/lib/message-io');
 
 const bench = createBenchmark(main, {
   n: [100, 1000, 10000, 100000]
@@ -33,7 +33,7 @@ function main({ n }) {
     bench.start();
 
     for (let i = 0; i < n; i++) {
-      await MessageIO.writeMessage(stream, debug, 8 + 1024, 2, payload);
+      await writeMessage(stream, 8 + 1024, 2, payload, { debug });
     }
 
     bench.end(n);
