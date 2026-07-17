@@ -5,17 +5,466 @@ import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
 import { checkServerIdentity, type PeerCertificate, TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
-import { Duplex } from 'stream';
+import { Duplex, Readable } from 'stream';
+import BufferListStream from 'bl';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
 import Message from '../../src/message';
 import { Packet, TYPE } from '../../src/packet';
+import { ConnectionError } from '../../src/errors';
 
 const packetType = 2;
 const packetSize = 8 + 4;
 
 const delay = promisify(setTimeout);
+
+function assertNoDanglingEventListeners(stream: Duplex) {
+  assert.strictEqual(stream.listenerCount('error'), 0);
+  assert.strictEqual(stream.listenerCount('drain'), 0);
+  assert.strictEqual(stream.listenerCount('readable'), 0);
+}
+
+function splitPackets(data: Buffer): Packet[] {
+  const packets = [];
+
+  let offset = 0;
+  while (offset < data.length) {
+    const length = data.readUInt16BE(offset + 2);
+    packets.push(new Packet(data.subarray(offset, offset + length)));
+    offset += length;
+  }
+
+  return packets;
+}
+
+describe('MessageIO.writeMessage', function() {
+  let debug: Debug;
+
+  beforeEach(function() {
+    debug = new Debug();
+  });
+
+  it('wraps the given payload into a TDS packet and writes it to the given stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload]);
+
+    const buf = stream.read();
+    assert.instanceOf(buf, Buffer);
+
+    const packet = new Packet(buf);
+    assert.strictEqual(packet.type(), packetType);
+    assert.strictEqual(packet.length(), payload.length + 8);
+    assert.isTrue(packet.isLast());
+    assert.deepEqual(packet.data(), payload);
+
+    assert.isNull(stream.read());
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('splits payloads that are larger than the packet size across multiple packets', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    // `packetSize` allows for 4 bytes of data per packet
+    await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload]);
+
+    const [firstPacket, secondPacket, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    assert.strictEqual(firstPacket.packetId(), 1);
+    assert.isFalse(firstPacket.isLast());
+    assert.deepEqual(firstPacket.data(), payload.subarray(0, 4));
+
+    assert.strictEqual(secondPacket.packetId(), 2);
+    assert.isTrue(secondPacket.isLast());
+    assert.deepEqual(secondPacket.data(), payload.subarray(4));
+  });
+
+  it('writes an empty final packet for an empty payload', async function() {
+    const stream = new BufferListStream();
+
+    await MessageIO.writeMessage(stream, debug, packetSize, packetType, []);
+
+    const packet = new Packet(stream.read());
+    assert.isTrue(packet.isLast());
+    assert.deepEqual(packet.data(), Buffer.alloc(0));
+
+    assert.isNull(stream.read());
+  });
+
+  it('terminates the message with the ignore flag set when iterating the payload errors', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'iteration error');
+    }
+
+    assert(hadError);
+
+    const [firstPacket, lastPacket, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    // The part of the payload that filled a whole packet was sent before the
+    // error occurred, the rest is discarded.
+    assert.isFalse(firstPacket.isLast());
+    assert.deepEqual(firstPacket.data(), payload.subarray(0, 4));
+
+    assert.isTrue(lastPacket.isLast());
+    assert.include(lastPacket.statusAsString(), 'IGNORE');
+    assert.deepEqual(lastPacket.data(), Buffer.alloc(0));
+
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors from the payload while the stream is waiting for drain', async function() {
+    const payload = Buffer.from([1, 2, 3, 4]);
+
+    const callbacks: Array<() => void> = [];
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // Collect all callbacks so that we can simulate draining the stream later
+        callbacks.push(callback);
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Simulate draining the stream after the exception was thrown
+        setTimeout(() => {
+          let cb;
+          while (cb = callbacks.shift()) {
+            cb();
+          }
+        }, 20);
+
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'iteration error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream during writing', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        callback(new Error('write error'));
+      },
+      read() {}
+    });
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while waiting for the stream to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, [payload, payload, payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while waiting for more payload data', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, (async function*() {
+        yield payload;
+        yield payload;
+        yield payload;
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the given stream is not writable', async function() {
+    const stream = new BufferListStream();
+    stream.end();
+
+    let hadError = false;
+    try {
+      await MessageIO.writeMessage(stream, debug, packetSize, packetType, []);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+});
+
+describe('MessageIO.readMessage', function() {
+  let debug: Debug;
+
+  beforeEach(function() {
+    debug = new Debug();
+  });
+
+  it('reads a message consisting of a single TDS packet from the given stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+
+    const stream = new BufferListStream();
+    stream.write(packet.buffer);
+
+    const chunks = [];
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, [payload]);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('reads a message that spans multiple TDS packets', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+
+    const firstPacket = new Packet(packetType);
+    firstPacket.addData(payload.subarray(0, 2));
+
+    const lastPacket = new Packet(packetType);
+    lastPacket.last(true);
+    lastPacket.addData(payload.subarray(2));
+
+    const stream = new BufferListStream();
+    stream.write(firstPacket.buffer);
+    stream.write(lastPacket.buffer);
+
+    const chunks = [];
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(Buffer.concat(chunks), payload);
+  });
+
+  it('reads packets that arrive in chunks that do not align with packet boundaries', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+
+    const firstPacket = new Packet(packetType);
+    firstPacket.addData(payload.subarray(0, 2));
+
+    const lastPacket = new Packet(packetType);
+    lastPacket.last(true);
+    lastPacket.addData(payload.subarray(2));
+
+    const data = Buffer.concat([firstPacket.buffer, lastPacket.buffer]);
+
+    const stream = new Readable({ read() {} });
+
+    // Deliver the data byte by byte.
+    for (let i = 0; i < data.length; i++) {
+      setTimeout(() => {
+        stream.push(data.subarray(i, i + 1));
+      }, i);
+    }
+
+    const chunks = [];
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(Buffer.concat(chunks), payload);
+  });
+
+  it('pushes bytes that follow the last packet of a message back onto the stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+
+    const trailingBytes = Buffer.from([9, 9, 9, 9]);
+
+    const stream = new BufferListStream();
+    stream.write(Buffer.concat([packet.buffer, trailingBytes]));
+
+    const chunks = [];
+    for await (const chunk of MessageIO.readMessage(stream, debug)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, [payload]);
+    assert.deepEqual(stream.read(), trailingBytes);
+  });
+
+  it('handles errors while reading from the stream', async function() {
+    const stream = Readable.from((async function*(): AsyncGenerator<Buffer> {
+      throw new Error('read error');
+    })());
+
+    let hadError = false;
+    try {
+      const message = MessageIO.readMessage(stream, debug);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'read error');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the stream is closed before the message was fully read', async function() {
+    const packet = new Packet(packetType);
+    packet.addData(Buffer.from([1, 2, 3]));
+
+    const stream = new Readable({ read() {} });
+    stream.push(packet.buffer);
+
+    setTimeout(() => {
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      const message = MessageIO.readMessage(stream, debug);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the given stream is not readable', async function() {
+    const stream = new Readable({ read() {} });
+    stream.destroy();
+
+    let hadError = false;
+    try {
+      const message = MessageIO.readMessage(stream, debug);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when receiving a packet with an invalid length', async function() {
+    const invalidPacket = Buffer.alloc(8);
+    invalidPacket.writeUInt16BE(4, 2);
+
+    const stream = new BufferListStream();
+    stream.write(invalidPacket);
+
+    let hadError = false;
+    try {
+      const message = MessageIO.readMessage(stream, debug);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(err.message, 'Unable to process incoming packet');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+});
 
 describe('MessageIO', function() {
   let server: Server;

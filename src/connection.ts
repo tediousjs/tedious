@@ -2092,17 +2092,32 @@ class Connection extends EventEmitter {
 
           socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
-          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
-          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
-
           this.socket = socket;
 
           this.debug.log('connected to ' + this.config.server + ':' + this.config.options.port);
 
-          this.sendPreLogin();
+          try {
+            await this.sendPreLogin(socket);
+          } catch (err: any) {
+            signal.throwIfAborted();
+
+            throw this.wrapSocketError(err);
+          }
 
           this.transitionTo(this.STATE.SENT_PRELOGIN);
-          const preloginResponse = await this.readPreloginResponse(signal);
+
+          let preloginResponse;
+          try {
+            preloginResponse = await this.readPreloginResponse(socket, signal);
+          } catch (err: any) {
+            signal.throwIfAborted();
+
+            throw this.wrapSocketError(err);
+          }
+
+          this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
+          this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
+
           await this.performTlsNegotiation(preloginResponse, signal);
 
           this.sendLogin7Packet();
@@ -2456,7 +2471,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  sendPreLogin() {
+  async sendPreLogin(socket: net.Socket) {
     const [, major, minor, build] = /^(\d+)\.(\d+)\.(\d+)/.exec(version) ?? ['0.0.0', '0', '0', '0'];
     const payload = new PreloginPayload({
       // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
@@ -2466,7 +2481,7 @@ class Connection extends EventEmitter {
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
-    this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
+    await MessageIO.writeMessage(socket, this.debug, this.config.options.packetSize, TYPE.PRELOGIN, [payload.data]);
     this.debug.payload(function() {
       return payload.toString('  ');
     });
@@ -3365,18 +3380,12 @@ class Connection extends EventEmitter {
     });
   }
 
-  async readPreloginResponse(signal: AbortSignal): Promise<PreloginPayload> {
+  async readPreloginResponse(socket: net.Socket, signal: AbortSignal): Promise<PreloginPayload> {
     let messageBuffer = Buffer.alloc(0);
 
     await withAbortRace(signal, async (signalAborted) => {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
+      const iterator = MessageIO.readMessage(socket, this.debug);
 
-      const iterator = message[Symbol.asyncIterator]();
       try {
         while (true) {
           const { done, value } = await Promise.race([
@@ -3391,9 +3400,7 @@ class Connection extends EventEmitter {
           messageBuffer = Buffer.concat([messageBuffer, value]);
         }
       } finally {
-        if (iterator.return) {
-          await iterator.return();
-        }
+        await iterator.return();
       }
     });
 
