@@ -31,6 +31,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
+import StreamParser from './token/stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
@@ -2212,6 +2213,33 @@ class Connection extends EventEmitter {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
+  /**
+   * Parse the tokens in the given message and dispatch each token to the
+   * given handler, until the message ends or the given abort promise
+   * rejects.
+   *
+   * @private
+   */
+  async processTokens(message: Message, handler: TokenHandler, signalAborted: Promise<never>) {
+    const tokens = StreamParser.parseTokens(message, this.debug, this.config.options);
+
+    while (true) {
+      const result = await Promise.race([tokens.next(), signalAborted]);
+
+      if (result.done) {
+        break;
+      }
+
+      const token = result.value;
+      if (token === undefined) {
+        continue;
+      }
+
+      this.debug.token(token);
+      handler[token.handlerName as keyof TokenHandler](token as any);
+    }
+  }
+
   async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
     signal.throwIfAborted();
 
@@ -3474,11 +3502,7 @@ class Connection extends EventEmitter {
       ]);
 
       const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      await Promise.race([
-        once(tokenStreamParser, 'end'),
-        signalAborted
-      ]);
+      await this.processTokens(message, handler, signalAborted);
 
       if (handler.loginAckReceived) {
         return handler.routingData;
@@ -3504,11 +3528,7 @@ class Connection extends EventEmitter {
         ]);
 
         const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-        await Promise.race([
-          once(tokenStreamParser, 'end'),
-          signalAborted
-        ]);
+        await this.processTokens(message, handler, signalAborted);
 
         if (handler.loginAckReceived) {
           return handler.routingData;
@@ -3550,11 +3570,7 @@ class Connection extends EventEmitter {
       ]);
 
       const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      await Promise.race([
-        once(tokenStreamParser, 'end'),
-        signalAborted
-      ]);
+      await this.processTokens(message, handler, signalAborted);
 
       if (handler.loginAckReceived) {
         return handler.routingData;
@@ -3648,11 +3664,7 @@ class Connection extends EventEmitter {
         signalAborted
       ]);
 
-      const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
-      await Promise.race([
-        once(tokenStreamParser, 'end'),
-        signalAborted
-      ]);
+      await this.processTokens(message, new InitialSqlTokenHandler(this), signalAborted);
     });
   }
 }
