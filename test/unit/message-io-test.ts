@@ -77,6 +77,21 @@ describe('writeMessage', function() {
     assert.deepEqual(secondPacket.data(), payload.subarray(4));
   });
 
+  it('sets the reset connection status bit on every packet', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    // `packetSize` allows for 4 bytes of data per packet
+    await writeMessage(stream, packetSize, packetType, [payload], { resetConnection: true });
+
+    const packets = splitPackets(stream.read());
+    assert.lengthOf(packets, 2);
+
+    for (const packet of packets) {
+      assert.include(packet.statusAsString(), 'RESETCONNECTION');
+    }
+  });
+
   it('writes an empty final packet for an empty payload', async function() {
     const stream = new BufferListStream();
 
