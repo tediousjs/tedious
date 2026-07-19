@@ -277,19 +277,21 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
     signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  const CANCEL = Symbol('cancel');
-
+  // Cancellation follows the same pattern as the other signals: the promise
+  // is only a wakeup for pending waits, while the `canceled` flag carries the
+  // state. `onCancel` sets the flag before resolving, so whenever the wakeup
+  // wins a race, the flag is already observable.
   let canceled = cancelSignal?.aborted ?? false;
-  let cancelPromise: Promise<typeof CANCEL> | null = null;
+  let cancelPromise: Promise<void> | null = null;
   let onCancel: (() => void) | null = null;
 
   if (cancelSignal && !canceled) {
-    const { promise, resolve } = Promise.withResolvers<typeof CANCEL>();
+    const { promise, resolve } = Promise.withResolvers<void>();
 
     cancelPromise = promise;
     onCancel = () => {
       canceled = true;
-      resolve(CANCEL);
+      resolve();
     };
     cancelSignal.addEventListener('abort', onCancel, { once: true });
   }
@@ -373,7 +375,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
         } else {
           const result = (iterator as AsyncIterator<Buffer>).next();
 
-          const contenders: Promise<IteratorResult<Buffer> | typeof CANCEL>[] = [Promise.resolve(result), failurePromise];
+          const contenders: Promise<unknown>[] = [Promise.resolve(result), failurePromise];
           if (abortPromise) {
             contenders.push(abortPromise);
           }
@@ -382,11 +384,17 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
           }
           const raceResult = await Promise.race(contenders);
 
-          if (raceResult === CANCEL) {
+          // Cancellation may have fired while we were waiting - either its
+          // wakeup won the race, or a chunk arrived in the same tick and
+          // would be discarded anyway.
+          if (canceled) {
             break;
           }
 
-          ({ value, done } = raceResult);
+          // The only resolving contenders are the iterator result and the
+          // cancel wakeup, and the latter implies `canceled` - so at this
+          // point, the race result is always an iterator result.
+          ({ value, done } = raceResult as IteratorResult<Buffer>);
         }
       } catch (err) {
         // The payload errored while being iterated. If the stream is still
