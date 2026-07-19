@@ -459,6 +459,12 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
  * Any bytes following the message's last packet (e.g. the start of the next
  * message) are pushed back onto the stream, to be consumed by the next read.
  *
+ * The generator must be consumed until the message's last packet: stopping
+ * iteration early discards any bytes buffered beyond the last yielded chunk
+ * and leaves the TDS stream misaligned. This is also why there is no
+ * `cancelSignal` option here - a canceled request still has to read the
+ * server's response to its end to keep the stream aligned.
+ *
  * If the given `signal` is aborted, reading stops and the signal's abort
  * reason is thrown. This also interrupts waiting for more data on a quiet
  * stream, which an external `.return()` or `.throw()` call can not do (it
