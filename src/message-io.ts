@@ -311,6 +311,9 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
   stream.on('close', onClose);
   stream.on('error', onError);
 
+  let iterator: Iterator<Buffer> | AsyncIterator<Buffer> | null = null;
+  let payloadConsumed = false;
+
   try {
     const bl = new BufferList();
     const length = packetSize - HEADER_LENGTH;
@@ -351,7 +354,6 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
       }
     };
 
-    let iterator: Iterator<Buffer> | AsyncIterator<Buffer>;
     let isAsync;
     if ((payload as AsyncIterable<Buffer>)[Symbol.asyncIterator]) {
       isAsync = true;
@@ -400,6 +402,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
       }
 
       if (done) {
+        payloadConsumed = true;
         break;
       }
 
@@ -418,6 +421,20 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
       await writePacket(buildPacket(bl.length, baseStatus | STATUS.EOM));
     }
   } finally {
+    // If the payload was not fully consumed (cancellation, teardown, or a
+    // stream failure), close its iterator so `finally` blocks in generator
+    // payloads can release their resources. This is deliberately not
+    // awaited: if the payload is currently suspended on a pending `next()`,
+    // the `return()` call is queued behind it and only settles once that
+    // read settles - awaiting it here could block forever.
+    if (iterator && !payloadConsumed && iterator.return) {
+      try {
+        Promise.resolve(iterator.return()).catch(() => {});
+      } catch {
+        // Ignore errors from closing the payload iterator.
+      }
+    }
+
     stream.removeListener('drain', onDrain);
     stream.removeListener('close', onClose);
     stream.removeListener('error', onError);

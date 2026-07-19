@@ -448,6 +448,79 @@ describe('writeMessage', function() {
     assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
   });
 
+  it('closes the payload iterator when the given cancel signal is aborted', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort();
+    }, 20);
+
+    let cleanedUp = false;
+
+    await writeMessage(stream, packetSize, packetType, (async function*() {
+      try {
+        yield payload;
+
+        // Stall on something that eventually settles, so the deferred
+        // `.return()` call can be processed by the generator.
+        await delay(40);
+
+        yield payload;
+      } finally {
+        cleanedUp = true;
+      }
+    })(), { cancelSignal: controller.signal });
+
+    // The message write finished at cancellation time, ...
+    assert.isFalse(cleanedUp);
+
+    // ... while the payload iterator is closed once it becomes settleable.
+    await delay(40);
+    assert.isTrue(cleanedUp);
+  });
+
+  it('closes the payload iterator when the given signal is aborted', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('teardown'));
+    }, 20);
+
+    let cleanedUp = false;
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        try {
+          yield payload;
+
+          // Stall on something that eventually settles, so the deferred
+          // `.return()` call can be processed by the generator.
+          await delay(40);
+
+          yield payload;
+        } finally {
+          cleanedUp = true;
+        }
+      })(), { signal: controller.signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'teardown');
+    }
+
+    assert(hadError);
+    assert.isFalse(cleanedUp);
+
+    await delay(40);
+    assert.isTrue(cleanedUp);
+  });
+
   it('prefers teardown over cancellation when both signals are aborted', async function() {
     const stream = new BufferListStream();
     const signal = AbortSignal.abort(new Error('teardown'));
