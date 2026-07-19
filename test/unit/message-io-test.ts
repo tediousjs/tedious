@@ -464,6 +464,26 @@ describe('writeMessage', function() {
     assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
   });
 
+  it('does not wait for the stream to drain when the given cancel signal is already aborted', async function() {
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    const cancelSignal = AbortSignal.abort();
+
+    // Resolves normally even though the terminator write is backpressured:
+    // nothing further will be written for this message.
+    await writeMessage(stream, packetSize, packetType, [Buffer.from([1, 2, 3])], { cancelSignal });
+
+    assertNoDanglingEventListeners(stream);
+  });
+
   it('closes the payload iterator when the given cancel signal is aborted', async function() {
     const payload = Buffer.from([1, 2, 3]);
     const stream = new BufferListStream();

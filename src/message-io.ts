@@ -285,15 +285,21 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
   let cancelPromise: Promise<void> | null = null;
   let onCancel: (() => void) | null = null;
 
-  if (cancelSignal && !canceled) {
-    const { promise, resolve } = Promise.withResolvers<void>();
+  if (cancelSignal) {
+    if (canceled) {
+      // Already canceled when called: use a settled wakeup so that waits
+      // behave the same as when the cancellation happens mid-write.
+      cancelPromise = Promise.resolve();
+    } else {
+      const { promise, resolve } = Promise.withResolvers<void>();
 
-    cancelPromise = promise;
-    onCancel = () => {
-      canceled = true;
-      resolve();
-    };
-    cancelSignal.addEventListener('abort', onCancel, { once: true });
+      cancelPromise = promise;
+      onCancel = () => {
+        canceled = true;
+        resolve();
+      };
+      cancelSignal.addEventListener('abort', onCancel, { once: true });
+    }
   }
 
   const waitForDrain = () => {
