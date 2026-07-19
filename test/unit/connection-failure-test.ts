@@ -429,6 +429,73 @@ describe('Connection failure handling', function() {
     });
   });
 
+  it('should fail cleanly when the Login7 response contains an invalid token', function(done) {
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          // Respond with data that is not a valid token stream.
+          // `0x00` is not a valid token type.
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(Buffer.from([0x00, 0x01, 0x02, 0x03]));
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    connection.connect((err) => {
+      connection.close();
+
+      assert.instanceOf(err, Error);
+      assert.match(err!.message, /Unknown type/);
+
+      done();
+    });
+  });
+
   it('should fail correctly when the connection is aborted after the initial SQL message is sent', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
