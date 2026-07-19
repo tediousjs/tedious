@@ -199,6 +199,55 @@ describe('json data type', function() {
 
       connection.execSqlBatch(createType);
     });
+
+    it('returns json values for output parameters', function(done) {
+      let returnValueReceived = false;
+
+      const request = new Request('SET @out = @in', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.isTrue(returnValueReceived);
+        done();
+      });
+
+      request.addParameter('in', TYPES.JSON, '{"a":[1,"ü"]}');
+      request.addOutputParameter('out', TYPES.JSON);
+
+      request.on('returnValue', (name, value, metadata) => {
+        assert.strictEqual(name, 'out');
+        assert.deepEqual(JSON.parse(value as string), { a: [1, 'ü'] });
+        assert.strictEqual(metadata.type.name, 'JSON');
+        returnValueReceived = true;
+      });
+
+      connection.execSql(request);
+    });
+
+    it('returns `null` for json output parameters set to `null`', function(done) {
+      let returnValueReceived = false;
+
+      const request = new Request('SET @out = NULL', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.isTrue(returnValueReceived);
+        done();
+      });
+
+      request.addOutputParameter('out', TYPES.JSON);
+
+      request.on('returnValue', (name, value, metadata) => {
+        assert.strictEqual(name, 'out');
+        assert.isNull(value);
+        assert.strictEqual(metadata.type.name, 'JSON');
+        returnValueReceived = true;
+      });
+
+      connection.execSql(request);
+    });
   });
 
   describe('on servers that do not support the json data type', function() {
