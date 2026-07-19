@@ -9,7 +9,7 @@ import { EventEmitter } from 'events';
 import Debug from './debug';
 
 import Message from './message';
-import { HEADER_LENGTH, Packet, TYPE } from './packet';
+import { HEADER_LENGTH, OFFSET, Packet, STATUS, TYPE } from './packet';
 import { ConnectionError } from './errors';
 
 import IncomingMessageStream from './incoming-message-stream';
@@ -310,46 +310,81 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
     const length = packetSize - HEADER_LENGTH;
     let packetNumber = 0;
 
-    const writePacket = async (packet: Packet) => {
-      debug?.packet('Sent', packet);
-      debug?.data(packet);
+    const baseStatus = resetConnection ? STATUS.RESETCONNECTION : STATUS.NORMAL;
 
-      if (stream.write(packet.buffer) === false) {
+    // Build a packet buffer in a single allocation, copying the packet data
+    // directly out of the buffered payload. This avoids the double copy
+    // (buffer list -> data buffer -> packet buffer) and the extra allocations
+    // that building a header-only `Packet` and appending data to it incur.
+    const buildPacket = (dataLength: number, status: number) => {
+      const buffer = Buffer.allocUnsafe(HEADER_LENGTH + dataLength);
+      buffer[OFFSET.Type] = type;
+      buffer[OFFSET.Status] = status;
+      buffer.writeUInt16BE(HEADER_LENGTH + dataLength, OFFSET.Length);
+      buffer.writeUInt16BE(0, OFFSET.SPID);
+      buffer[OFFSET.PacketID] = (packetNumber += 1) % 256;
+      buffer[OFFSET.Window] = 0;
+
+      if (dataLength) {
+        bl.copy(buffer, HEADER_LENGTH, 0, dataLength);
+        bl.consume(dataLength);
+      }
+
+      return buffer;
+    };
+
+    const writePacket = async (buffer: Buffer) => {
+      if (debug) {
+        const packet = new Packet(buffer);
+        debug.packet('Sent', packet);
+        debug.data(packet);
+      }
+
+      if (stream.write(buffer) === false) {
         await waitForDrain();
       }
     };
 
-    let iterator;
+    let iterator: Iterator<Buffer> | AsyncIterator<Buffer>;
+    let isAsync;
     if ((payload as AsyncIterable<Buffer>)[Symbol.asyncIterator]) {
+      isAsync = true;
       iterator = (payload as AsyncIterable<Buffer>)[Symbol.asyncIterator]();
     } else {
+      isAsync = false;
       iterator = (payload as Iterable<Buffer>)[Symbol.iterator]();
     }
 
     while (!canceled) {
       let value, done;
       try {
-        const result = iterator.next();
-
-        let raceResult: IteratorResult<Buffer> | typeof CANCEL;
-        if (abortPromise || cancelPromise) {
-          const contenders: Promise<IteratorResult<Buffer> | typeof CANCEL>[] = [Promise.resolve(result)];
-          if (abortPromise) {
-            contenders.push(abortPromise);
-          }
-          if (cancelPromise) {
-            contenders.push(cancelPromise);
-          }
-          raceResult = await Promise.race(contenders);
+        if (!isAsync) {
+          // Synchronous payloads can neither stall nor interleave with
+          // signal events between chunks, so skip the promise machinery.
+          ({ value, done } = (iterator as Iterator<Buffer>).next());
         } else {
-          raceResult = await result;
-        }
+          const result = (iterator as AsyncIterator<Buffer>).next();
 
-        if (raceResult === CANCEL) {
-          break;
-        }
+          let raceResult: IteratorResult<Buffer> | typeof CANCEL;
+          if (abortPromise || cancelPromise) {
+            const contenders: Promise<IteratorResult<Buffer> | typeof CANCEL>[] = [Promise.resolve(result)];
+            if (abortPromise) {
+              contenders.push(abortPromise);
+            }
+            if (cancelPromise) {
+              contenders.push(cancelPromise);
+            }
+            raceResult = await Promise.race(contenders);
+          } else {
+            raceResult = await result;
+          }
 
-        ({ value, done } = raceResult);
+          if (raceResult === CANCEL) {
+            break;
+          }
+
+          ({ value, done } = raceResult);
+        }
       } catch (err) {
         // The payload errored while being iterated. If the stream is still
         // writable, terminate the message with the `IGNORE` flag set so the
@@ -357,13 +392,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
         // aborted instead, the connection is being torn down and the
         // message is left unterminated.
         if (stream.writable && !signal?.aborted) {
-          const packet = new Packet(type);
-          packet.packetId(packetNumber += 1);
-          packet.resetConnection(resetConnection);
-          packet.last(true);
-          packet.ignore(true);
-
-          await writePacket(packet);
+          await writePacket(buildPacket(0, baseStatus | STATUS.EOM | STATUS.IGNORE));
         }
 
         throw err;
@@ -376,31 +405,17 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
       bl.append(value);
 
       while (!canceled && bl.length > length) {
-        const data = bl.slice(0, length);
-        bl.consume(length);
-
-        const packet = new Packet(type);
-        packet.packetId(packetNumber += 1);
-        packet.resetConnection(resetConnection);
-        packet.addData(data);
-
-        await writePacket(packet);
+        await writePacket(buildPacket(length, baseStatus));
       }
     }
 
     // On cancellation, any buffered payload data is discarded and the final
     // packet is flagged so the server ignores the whole message.
-    const data = canceled ? Buffer.alloc(0) : bl.slice();
-    bl.consume(bl.length);
-
-    const packet = new Packet(type);
-    packet.packetId(packetNumber += 1);
-    packet.resetConnection(resetConnection);
-    packet.last(true);
-    packet.ignore(canceled);
-    packet.addData(data);
-
-    await writePacket(packet);
+    if (canceled) {
+      await writePacket(buildPacket(0, baseStatus | STATUS.EOM | STATUS.IGNORE));
+    } else {
+      await writePacket(buildPacket(bl.length, baseStatus | STATUS.EOM));
+    }
   } finally {
     stream.removeListener('drain', onDrain);
     stream.removeListener('close', onDrain);
@@ -525,11 +540,13 @@ export async function* readMessage(stream: Readable, options: { debug?: Debug, s
           const data = bl.slice(0, length);
           bl.consume(length);
 
-          const packet = new Packet(data);
-          debug?.packet('Received', packet);
-          debug?.data(packet);
+          if (debug) {
+            const packet = new Packet(data);
+            debug.packet('Received', packet);
+            debug.data(packet);
+          }
 
-          yield packet.data();
+          yield data.subarray(HEADER_LENGTH);
 
           // Did the stream error out or close while we yielded? The events
           // have already fired, so the wait below would never settle.
@@ -541,7 +558,7 @@ export async function* readMessage(stream: Readable, options: { debug?: Debug, s
             throw new Error('Premature close');
           }
 
-          if (packet.isLast()) {
+          if (data[OFFSET.Status] & STATUS.EOM) {
             // This was the last packet of the message. Any data left in the
             // buffer belongs to the next message (e.g. the response to an
             // `ATTENTION` message sent by the client while reading an
