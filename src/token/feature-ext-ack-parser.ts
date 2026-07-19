@@ -17,7 +17,7 @@ const FEATURE_ID = {
 function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
-  let jsonSupport: boolean | undefined;
+  let jsonSupport: Buffer | undefined;
 
   while (true) {
     let featureId;
@@ -46,7 +46,9 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
         break;
       case FEATURE_ID.JSON_SUPPORT:
         // The single data byte is the JSON version chosen by the server.
-        jsonSupport = featureData[0] === 0x01;
+        // Whether that version is one this client supports is decided by the
+        // Login7TokenHandler.
+        jsonSupport = featureData;
         break;
     }
   }
