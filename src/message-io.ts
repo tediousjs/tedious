@@ -299,7 +299,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
   const waitForDrain = () => {
     drain = Promise.withResolvers();
 
-    const contenders: Promise<unknown>[] = [drain.promise, failurePromise];
+    const contenders: Promise<void>[] = [drain.promise, failurePromise];
     if (abortPromise) {
       contenders.push(abortPromise);
     }
@@ -375,7 +375,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
         } else {
           const result = (iterator as AsyncIterator<Buffer>).next();
 
-          const contenders: Promise<unknown>[] = [Promise.resolve(result), failurePromise];
+          const contenders: Promise<IteratorResult<Buffer> | void>[] = [Promise.resolve(result), failurePromise];
           if (abortPromise) {
             contenders.push(abortPromise);
           }
