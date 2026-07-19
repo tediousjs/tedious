@@ -261,6 +261,15 @@ describe('json data type', function() {
       const request = new Request('SELECT @p', (err) => {
         assert.instanceOf(err, Error);
         assert.strictEqual((err as any).code, 'EJSONNOTSUPPORTED');
+
+        if (config.options.tdsVersion && config.options.tdsVersion < '7_4') {
+          // JSON support was never negotiated because of the configured TDS
+          // version - the error should point at that, not at the server.
+          assert.include((err as Error).message, 'tdsVersion');
+        } else {
+          assert.include((err as Error).message, 'SQL Server 2025');
+        }
+
         done();
       });
       request.addParameter('p', TYPES.JSON, '{"a":1}');

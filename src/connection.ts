@@ -3224,7 +3224,14 @@ class Connection extends EventEmitter {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else if (payload instanceof RpcRequestPayload && !this.serverSupportsJson && payload.parameters.some((parameter) => parameter.type === TYPES.JSON)) {
-      const message = 'The server does not support the `json` data type. `TYPES.JSON` parameters require SQL Server 2025 (or newer) or Azure SQL with JSON support enabled.';
+      let message;
+      if (versions[this.config.options.tdsVersion] < versions['7_4']) {
+        // JSON support was never requested at login - feature extensions
+        // (and with them the JSONSUPPORT negotiation) require TDS 7.4.
+        message = 'JSON support was not negotiated with the server because the configured `tdsVersion` (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.JSON` parameters require TDS version `7_4`.';
+      } else {
+        message = 'The server does not support the `json` data type. `TYPES.JSON` parameters require SQL Server 2025 (or newer) or Azure SQL with JSON support enabled.';
+      }
       this.debug.log(message);
       process.nextTick(() => {
         request.callback(new RequestError(message, 'EJSONNOTSUPPORTED'));
