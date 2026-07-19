@@ -6,7 +6,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { TYPES, type DataType, type Parameter } from './data-type';
 import { InputError } from './errors';
-import { Collation } from './collation';
+import { Collation, JSON_COLLATION } from './collation';
 
 /**
  * @private
@@ -446,11 +446,15 @@ class BulkLoad extends EventEmitter {
         if (c.type === TYPES.JSON) {
           // The server rejects the `json` data type (0xF4) in bulk load column
           // metadata ("Invalid column type from bcp client"), even when
-          // JSONSUPPORT was negotiated. Substitute `varchar(max)` with a zeroed
-          // collation instead - the values are PLP-encoded UTF-8 either way,
-          // and the server converts them to `json` based on the column's type
-          // in the `insert bulk` statement. This matches what SqlClient does.
-          TYPES.VarChar.writeTypeInfo(tBuf, { length: Infinity, collation: undefined, value: null }, this.options);
+          // JSONSUPPORT was negotiated. Substitute `varchar(max)` with the
+          // fixed `json` collation instead - the values are PLP-encoded UTF-8
+          // either way, and the server converts them to `json` based on the
+          // column's type in the `insert bulk` statement. SqlClient performs
+          // the same substitution, but with a zeroed collation - the server
+          // ignores the collation here (the `insert bulk` statement pins the
+          // interpretation to UTF-8), so send the truthful one for consistency
+          // with the TVP substitution, where it is required.
+          TYPES.VarChar.writeTypeInfo(tBuf, { length: Infinity, collation: JSON_COLLATION, value: null }, this.options);
         } else {
           c.type.writeTypeInfo(tBuf, c, this.options);
         }
