@@ -531,9 +531,14 @@ export async function* readMessage(stream: Readable, options: { debug?: Debug, s
 
           yield packet.data();
 
-          // Did the stream error while we yielded?
+          // Did the stream error out or close while we yielded? The events
+          // have already fired, so the wait below would never settle.
           if (error) {
             throw error;
+          }
+
+          if (closed) {
+            throw new Error('Premature close');
           }
 
           if (packet.isLast()) {

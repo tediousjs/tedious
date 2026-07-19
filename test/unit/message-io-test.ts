@@ -604,6 +604,37 @@ describe('readMessage', function() {
     assert(hadError);
   });
 
+  it('throws when the stream is closed while a yielded chunk is being processed', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.addData(payload);
+
+    const stream = new Readable({ read() {} });
+    stream.push(packet.buffer);
+
+    const message = readMessage(stream);
+
+    const { value } = await message.next();
+    assert.deepEqual(value, payload);
+
+    // The generator is now suspended at `yield`. Close the stream without
+    // an error while the consumer is processing the chunk.
+    stream.destroy();
+    await once(stream, 'close');
+
+    let hadError = false;
+    try {
+      await message.next();
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
   it('throws when the given stream is not readable', async function() {
     const stream = new Readable({ read() {} });
     stream.destroy();
