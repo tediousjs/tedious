@@ -1451,6 +1451,32 @@ describe('TVP', function() {
       const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
+
+    it('substitutes `varchar(max)` type info for `json` columns', function() {
+      const value = {
+        columns: [{ name: 'value', type: TYPES.JSON }],
+        rows: [['{"a":1}']]
+      };
+
+      const expected = Buffer.concat([
+        Buffer.from('000000000000', 'hex'), // user type + flags
+        // The `json` data type (0xF4) is substituted with `varchar(max)`
+        // and the Latin1_General_100_BIN2_UTF8 collation.
+        Buffer.from('a7ffff0904002600', 'hex'),
+        Buffer.from('00', 'hex'), // column name (always zero length)
+        Buffer.from('00', 'hex'), // end of column metadata
+        Buffer.from('01', 'hex'), // row token
+        Buffer.from('feffffffffffffff', 'hex'), // unknown PLP length
+        Buffer.from('07000000', 'hex'), // PLP chunk length
+        Buffer.from('{"a":1}', 'utf8'),
+        Buffer.from('00000000', 'hex'), // PLP terminator
+        Buffer.from('00', 'hex') // end of rows
+      ]);
+      const parameterValue = { value };
+
+      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      assert.deepEqual(buffer, expected);
+    });
   });
 
   describe('.generateTypeInfo', function() {

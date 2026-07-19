@@ -1,6 +1,9 @@
 import { type DataType } from '../data-type';
 import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
+import { JSON_COLLATION } from '../collation';
+import Json from './json';
+import VarChar from './varchar';
 
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
 const TVP_END_TOKEN = Buffer.from([0x00]);
@@ -69,7 +72,19 @@ const TVP: DataType = {
       yield buff;
 
       // TYPE_INFO
-      yield column.type.generateTypeInfo(column);
+      if (column.type === Json) {
+        // The server can not handle the `json` data type (0xF4) in TVP column
+        // metadata - it kills the session. Substitute `varchar(max)` with the
+        // fixed `json` collation instead - the values are PLP-encoded UTF-8
+        // either way, and the server converts them to `json` based on the
+        // table type's column definition. This matches the substitution
+        // performed for bulk loads. The collation is required here: with a
+        // zeroed collation, the server decodes the data using its default
+        // codepage instead of UTF-8.
+        yield VarChar.generateTypeInfo({ length: Infinity, collation: JSON_COLLATION, value: null }, options);
+      } else {
+        yield column.type.generateTypeInfo(column);
+      }
 
       // ColName
       yield Buffer.from([0x00]);
