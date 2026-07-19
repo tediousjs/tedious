@@ -24,8 +24,9 @@ describe('BulkLoad', function() {
         Buffer.from([0x00, 0x00, 0x00, 0x00]), // user type
         Buffer.from([0x05, 0x00]), // flags (updateableReadWrite | nullable)
         // The `json` data type (0xF4) is rejected by the server in bulk
-        // loads - `varchar(max)` with a zeroed collation is sent instead.
-        Buffer.from([0xA7, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        // loads - `varchar(max)` with the Latin1_General_100_BIN2_UTF8
+        // collation is sent instead.
+        Buffer.from([0xA7, 0xFF, 0xFF, 0x09, 0x04, 0x00, 0x26, 0x00]),
         Buffer.from('\x05v\0a\0l\0u\0e\0', 'binary') // column name
       ]);
 
