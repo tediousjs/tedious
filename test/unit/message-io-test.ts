@@ -23,6 +23,7 @@ function assertNoDanglingEventListeners(stream: Duplex) {
   assert.strictEqual(stream.listenerCount('error'), 0);
   assert.strictEqual(stream.listenerCount('drain'), 0);
   assert.strictEqual(stream.listenerCount('readable'), 0);
+  assert.strictEqual(stream.listenerCount('close'), 0);
 }
 
 function splitPackets(data: Buffer): Packet[] {
