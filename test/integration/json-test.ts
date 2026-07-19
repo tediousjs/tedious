@@ -114,6 +114,51 @@ describe('json data type', function() {
 
       connection.execSql(request);
     });
+
+    it('bulk loads json values', function(done) {
+      const bulkLoad = connection.newBulkLoad('#tedious_json_bulk', (err, rowCount) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.strictEqual(rowCount, 3);
+
+        const values: unknown[] = [];
+        const request = new Request('SELECT [value] FROM #tedious_json_bulk ORDER BY [id]', (err) => {
+          if (err) {
+            return done(err);
+          }
+
+          assert.deepEqual(JSON.parse(values[0] as string), { a: [1, 'ü'] });
+          assert.deepEqual(JSON.parse(values[1] as string), { b: 2 });
+          assert.isNull(values[2]);
+          done();
+        });
+
+        request.on('row', (columns) => {
+          values.push(columns[0].value);
+        });
+
+        connection.execSqlBatch(request);
+      });
+
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('value', TYPES.JSON, { nullable: true });
+
+      const createTable = new Request('CREATE TABLE #tedious_json_bulk ([id] int NOT NULL, [value] json NULL)', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        connection.execBulkLoad(bulkLoad, [
+          [1, '{"a":[1,"ü"]}'],
+          [2, { b: 2 }],
+          [3, null]
+        ]);
+      });
+
+      connection.execSqlBatch(createTable);
+    });
   });
 
   describe('on servers that do not support the json data type', function() {

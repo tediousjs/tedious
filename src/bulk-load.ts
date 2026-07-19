@@ -5,7 +5,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter } from './data-type';
+import { TYPES, type DataType, type Parameter } from './data-type';
 import { Collation } from './collation';
 
 /**
@@ -563,7 +563,17 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      if (c.type === TYPES.JSON) {
+        // The server rejects the `json` data type (0xF4) in bulk load column
+        // metadata ("Invalid column type from bcp client"), even when
+        // JSONSUPPORT was negotiated. Substitute `varchar(max)` with a zeroed
+        // collation instead - the values are PLP-encoded UTF-8 either way,
+        // and the server converts them to `json` based on the column's type
+        // in the `insert bulk` statement. This matches what SqlClient does.
+        tBuf.writeBuffer(TYPES.VarChar.generateTypeInfo({ length: Infinity, collation: undefined, value: null }, this.options));
+      } else {
+        tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      }
 
       // TableName
       if (c.type.hasTableName) {
