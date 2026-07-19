@@ -159,6 +159,46 @@ describe('json data type', function() {
 
       connection.execSqlBatch(createTable);
     });
+
+    it('round-trips json values in table-valued parameters', function(done) {
+      const createType = new Request('DROP TYPE IF EXISTS [__tediousJsonTvpType]; CREATE TYPE [__tediousJsonTvpType] AS TABLE ([value] json NULL)', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const values: unknown[] = [];
+        const request = new Request('SELECT [value] FROM @tvp', (err) => {
+          const dropType = new Request('DROP TYPE IF EXISTS [__tediousJsonTvpType]', (dropErr) => {
+            if (err ?? dropErr) {
+              return done(err ?? dropErr);
+            }
+
+            assert.deepEqual(JSON.parse(values[0] as string), { a: [1, 'ü'] });
+            assert.isNull(values[1]);
+            done();
+          });
+
+          connection.execSqlBatch(dropType);
+        });
+
+        request.on('row', (columns) => {
+          values.push(columns[0].value);
+        });
+
+        request.addParameter('tvp', TYPES.TVP, {
+          name: '__tediousJsonTvpType',
+          columns: [{ name: 'value', type: TYPES.JSON }],
+          rows: [
+            ['{"a":[1,"ü"]}'],
+            [null]
+          ]
+        });
+
+        connection.execSql(request);
+      });
+
+      connection.execSqlBatch(createType);
+    });
   });
 
   describe('on servers that do not support the json data type', function() {

@@ -1,9 +1,11 @@
 import { type DataType, type ParameterData } from '../data-type';
 import { type InternalConnectionOptions } from '../connection';
-import { type Collation } from '../collation';
+import { type Collation, JSON_COLLATION } from '../collation';
 import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { isAsyncIterable } from './plp-stream';
+import Json from './json';
+import VarChar from './varchar';
 
 const TVP_TYPE_ID = 0xF3;
 
@@ -77,7 +79,19 @@ function writeColumns(buffer: WritableTrackingBuffer, columns: TvpColumn[], opti
     // Flags
     buffer.writeUInt16LE(0x0000);
     // TYPE_INFO
-    column.type.writeTypeInfo(buffer, { value: undefined, length: column.length, precision: column.precision, scale: column.scale }, options);
+    if (column.type === Json) {
+      // The server can not handle the `json` data type (0xF4) in TVP column
+      // metadata - it kills the session. Substitute `varchar(max)` with the
+      // fixed `json` collation instead - the values are PLP-encoded UTF-8
+      // either way, and the server converts them to `json` based on the
+      // table type's column definition. This matches the substitution
+      // performed for bulk loads. The collation is required here: with a
+      // zeroed collation, the server decodes the data using its default
+      // codepage instead of UTF-8.
+      VarChar.writeTypeInfo(buffer, { value: undefined, length: Infinity, collation: JSON_COLLATION }, options);
+    } else {
+      column.type.writeTypeInfo(buffer, { value: undefined, length: column.length, precision: column.precision, scale: column.scale }, options);
+    }
     // ColName
     buffer.writeUInt8(0x00);
   }
