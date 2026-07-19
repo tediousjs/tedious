@@ -311,7 +311,15 @@ export class Login7TokenHandler extends TokenHandler {
     const { authentication } = this.connection.config;
 
     if (token.jsonSupport !== undefined) {
-      this.connection.serverSupportsJson = token.jsonSupport;
+      if (token.jsonSupport.length === 1 && token.jsonSupport[0] === 0x01) {
+        this.connection.serverSupportsJson = true;
+      } else {
+        // The server acknowledged a JSON version this client did not offer.
+        // It will use that version's wire format for `json` values, which
+        // this client can not safely parse - fail the login instead of
+        // continuing on a connection whose data can not be trusted.
+        this.loginError = new ConnectionError('Received invalid JSON support acknowledgement');
+      }
     }
 
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
