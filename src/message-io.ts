@@ -244,12 +244,22 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
     }
   };
 
+  // A promise that rejects when the stream errors out or is closed before
+  // the message was fully written. It is raced against every wait below, so
+  // that a stream failure can neither leave the writer stuck nor let it
+  // resolve successfully with an incompletely written message.
+  const { promise: failurePromise, reject: rejectWithFailure } = Promise.withResolvers<never>();
+
+  // Prevent unhandled rejections if the stream fails while nothing is
+  // currently racing against `failurePromise`.
+  failurePromise.catch(() => {});
+
   const onError = (err: Error) => {
-    if (drain) {
-      const { reject } = drain;
-      drain = null;
-      reject(err);
-    }
+    rejectWithFailure(err);
+  };
+
+  const onClose = () => {
+    rejectWithFailure(new Error('Premature close'));
   };
 
   let abortPromise: Promise<never> | null = null;
@@ -287,22 +297,18 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
   const waitForDrain = () => {
     drain = Promise.withResolvers();
 
-    if (abortPromise || cancelPromise) {
-      const contenders: Promise<unknown>[] = [drain.promise];
-      if (abortPromise) {
-        contenders.push(abortPromise);
-      }
-      if (cancelPromise) {
-        contenders.push(cancelPromise);
-      }
-      return Promise.race(contenders);
+    const contenders: Promise<unknown>[] = [drain.promise, failurePromise];
+    if (abortPromise) {
+      contenders.push(abortPromise);
     }
-
-    return drain.promise;
+    if (cancelPromise) {
+      contenders.push(cancelPromise);
+    }
+    return Promise.race(contenders);
   };
 
   stream.on('drain', onDrain);
-  stream.on('close', onDrain);
+  stream.on('close', onClose);
   stream.on('error', onError);
 
   try {
@@ -365,19 +371,14 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
         } else {
           const result = (iterator as AsyncIterator<Buffer>).next();
 
-          let raceResult: IteratorResult<Buffer> | typeof CANCEL;
-          if (abortPromise || cancelPromise) {
-            const contenders: Promise<IteratorResult<Buffer> | typeof CANCEL>[] = [Promise.resolve(result)];
-            if (abortPromise) {
-              contenders.push(abortPromise);
-            }
-            if (cancelPromise) {
-              contenders.push(cancelPromise);
-            }
-            raceResult = await Promise.race(contenders);
-          } else {
-            raceResult = await result;
+          const contenders: Promise<IteratorResult<Buffer> | typeof CANCEL>[] = [Promise.resolve(result), failurePromise];
+          if (abortPromise) {
+            contenders.push(abortPromise);
           }
+          if (cancelPromise) {
+            contenders.push(cancelPromise);
+          }
+          const raceResult = await Promise.race(contenders);
 
           if (raceResult === CANCEL) {
             break;
@@ -418,7 +419,7 @@ export async function writeMessage(stream: Writable, packetSize: number, type: n
     }
   } finally {
     stream.removeListener('drain', onDrain);
-    stream.removeListener('close', onDrain);
+    stream.removeListener('close', onClose);
     stream.removeListener('error', onError);
 
     if (signal && onAbort) {

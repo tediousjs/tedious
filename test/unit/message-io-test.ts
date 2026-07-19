@@ -270,6 +270,102 @@ describe('writeMessage', function() {
     assert(hadError);
   });
 
+  it('throws when the stream is closed while waiting for the final packet to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+
+      // Close the stream without an error.
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      // A single small payload: the only drain wait is the one for the
+      // final packet, after which the message would be considered sent.
+      await writeMessage(stream, packetSize, packetType, [payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the stream is closed while waiting for an intermediate packet to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+
+      // Close the stream without an error.
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [payload, payload, payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the stream is closed while waiting for more payload data', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    setTimeout(() => {
+      // Close the stream without an error.
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Stall forever, waiting for more data that never arrives.
+        await new Promise(() => {});
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
   it('terminates the message with the ignore flag set when the given cancel signal is aborted while writing', async function() {
     const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
     const stream = new BufferListStream();
