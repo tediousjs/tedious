@@ -3,6 +3,7 @@ import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
+import { isAscii } from 'node:buffer';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
@@ -13,7 +14,7 @@ const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
-const DEFAULT_ENCODING = 'utf8';
+const DEFAULT_ENCODING = 'utf-8';
 
 function readTinyInt(buf: Buffer, offset: number): Result<number> {
   return readUInt8(buf, offset);
@@ -568,12 +569,63 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
   return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
 }
 
+// Codepages that decode the 7-bit ASCII range identically to ASCII,
+// allowing a fast path in `readChars`. This covers every codepage that a
+// `Collation` can produce (see `codepageByLanguageId` / `codepageBySortId`),
+// plus `DEFAULT_ENCODING`.
+//
+// A codepage missing from this list only loses the fast path - decoding
+// still works correctly via `iconv`.
+const asciiCompatibleCodepages = new Set([
+  'CP437', 'CP850', 'CP874',
+  'CP932', 'CP936', 'CP949', 'CP950',
+  'CP1250', 'CP1251', 'CP1252', 'CP1253', 'CP1254', 'CP1255', 'CP1256', 'CP1257', 'CP1258',
+  'utf-8'
+]);
+
 function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
 
-  return new Result(iconv.decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  const data = buf.slice(offset, offset + dataLength);
+
+  // Fast path: pure ASCII data in an ASCII compatible codepage can be
+  // decoded natively, skipping the (much slower) `iconv` decoding.
+  if (asciiCompatibleCodepages.has(codepage ?? DEFAULT_ENCODING) && isAscii(data)) {
+    return new Result(data.toString('latin1'), offset + dataLength);
+  }
+
+  return new Result(decodeChars(data, codepage ?? DEFAULT_ENCODING), offset + dataLength);
+}
+
+const decodersByCodepage = new Map<string, ReturnType<typeof iconv.getDecoder>>();
+
+// Decodes a complete value, treating the bytes as pure character data: a
+// leading byte order mark is *not* stripped, matching how `nvarchar` values
+// and other SQL Server drivers handle it. (`iconv.decode` would strip it.)
+//
+// UTF-8 values are decoded natively. Everything else is decoded via
+// `iconv`, reusing one decoder per codepage instead of letting `iconv`
+// create a fresh one for every value. This is safe because a decoder that
+// has fully consumed its input via `write` + `end` is back in its initial
+// state, and `stripBOM: false` avoids iconv's BOM wrapper, which is the
+// only decoder layer that carries state from one value to the next.
+function decodeChars(data: Buffer, codepage: string): string {
+  if (codepage === 'utf-8') {
+    return data.toString('utf8');
+  }
+
+  let decoder = decodersByCodepage.get(codepage);
+  if (decoder === undefined) {
+    decoder = iconv.getDecoder(codepage, { stripBOM: false });
+    decodersByCodepage.set(codepage, decoder);
+  }
+
+  const result = decoder.write(data);
+  const trailer = decoder.end();
+
+  return trailer ? result + trailer : result;
 }
 
 function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
@@ -787,5 +839,6 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
+module.exports.decodeChars = decodeChars;
 
-export { readValue, isPLPStream, readPLPStream };
+export { readValue, isPLPStream, readPLPStream, decodeChars };
