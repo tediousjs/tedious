@@ -332,11 +332,18 @@ export class FeatureExtAckToken extends Token {
    * undefined when UTF8_SUPPORT not included in token. */
   declare utf8Support: boolean | undefined;
 
-  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined) {
+  /** Raw data of the JSON_SUPPORT acknowledgement. Contains the JSON version
+   * chosen by the server as its single byte.
+   *
+   * undefined when JSON_SUPPORT not included in token. */
+  declare jsonSupport: Buffer | undefined;
+
+  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined, jsonSupport: Buffer | undefined) {
     super('FEATUREEXTACK', 'onFeatureExtAck');
 
     this.fedAuth = fedAuth;
     this.utf8Support = utf8Support;
+    this.jsonSupport = jsonSupport;
   }
 }
 

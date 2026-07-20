@@ -1070,6 +1070,15 @@ class Connection extends EventEmitter {
   declare databaseCollation: Collation | undefined;
 
   /**
+   * Whether the server acknowledged the JSON_SUPPORT feature extension,
+   * i.e. whether the `json` data type can be sent to and received from
+   * the server.
+   *
+   * @private
+   */
+  declare serverSupportsJson: boolean;
+
+  /**
    * @private
    */
   declare _onSocketClose: (hadError: boolean) => void;
@@ -1805,6 +1814,7 @@ class Connection extends EventEmitter {
     this.state = this.STATE.INITIALIZED;
 
     this.attentionSent = false;
+    this.serverSupportsJson = false;
 
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
@@ -2476,6 +2486,10 @@ class Connection extends EventEmitter {
    * @private
    */
   sendLogin7Packet() {
+    // A new login attempt (e.g. after a transient failure or rerouting)
+    // must re-negotiate JSON support from scratch.
+    this.serverSupportsJson = false;
+
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -3208,6 +3222,19 @@ class Connection extends EventEmitter {
     } else if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
+      });
+    } else if (payload instanceof RpcRequestPayload && !this.serverSupportsJson && payload.parameters.some((parameter) => parameter.type === TYPES.JSON)) {
+      let message;
+      if (versions[this.config.options.tdsVersion] < versions['7_4']) {
+        // JSON support was never requested at login - feature extensions
+        // (and with them the JSONSUPPORT negotiation) require TDS 7.4.
+        message = 'JSON support was not negotiated with the server because the configured `tdsVersion` (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.JSON` parameters require TDS version `7_4`.';
+      } else {
+        message = 'The server does not support the `json` data type. `TYPES.JSON` parameters require SQL Server 2025 (or newer) or Azure SQL with JSON support enabled.';
+      }
+      this.debug.log(message);
+      process.nextTick(() => {
+        request.callback(new RequestError(message, 'EJSONNOTSUPPORTED'));
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {
