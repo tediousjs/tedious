@@ -1559,7 +1559,7 @@ describe('BulkLoad', function() {
       '#tmpTestTable',
       (err, rowCount) => {
         assert.instanceOf(err, RangeError);
-        assert.strictEqual(err.message, 'The value of "value" is out of range. It must be >= 0 and <= 4294967295. Received 3_.40_282_346_638_528_86e_+42');
+        assert.strictEqual(err.message, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
         assert.strictEqual(rowCount, 0);
         done();
       });
