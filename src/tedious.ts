@@ -8,6 +8,16 @@ import { ConnectionError, RequestError } from './errors';
 import { TYPES } from './data-type';
 import { ISOLATION_LEVEL } from './transaction';
 import { versions as TDS_VERSION } from './tds-versions';
+import {
+  CHANNELS,
+  type ConnectMessage,
+  type LogMessage,
+  type PacketMessage,
+  type PayloadMessage,
+  type RequestMessage,
+  type StateChangeMessage,
+  type TokenMessage
+} from './diagnostics';
 
 const library = { name: name };
 
@@ -26,11 +36,19 @@ export {
   RequestError,
   TYPES,
   ISOLATION_LEVEL,
-  TDS_VERSION
+  TDS_VERSION,
+  CHANNELS
 };
 
 export type {
   ConnectionAuthentication,
   ConnectionConfiguration,
-  ConnectionOptions
+  ConnectionOptions,
+  ConnectMessage,
+  LogMessage,
+  PacketMessage,
+  PayloadMessage,
+  RequestMessage,
+  StateChangeMessage,
+  TokenMessage
 };

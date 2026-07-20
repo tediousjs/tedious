@@ -40,6 +40,7 @@ import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { connectTracingChannel, connectionStateChannel, requestTracingChannel, type RequestMessage } from './diagnostics';
 
 import { type Parameter, TYPES } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
@@ -451,6 +452,11 @@ export interface ConnectionConfiguration {
   authentication?: AuthenticationOptions;
 }
 
+/**
+ * @deprecated The `debug` events and the options controlling them are
+ *   deprecated. Subscribe to the diagnostics channels published by `tedious`
+ *   via the `node:diagnostics_channel` module instead.
+ */
 interface DebugOptions {
   /**
    * A boolean, controlling whether [[debug]] events will be emitted with text describing packet data details
@@ -1851,7 +1857,9 @@ class Connection extends EventEmitter {
     this.closeController = new AbortController();
 
     this.transitionTo(this.STATE.CONNECTING);
-    this.initialiseConnection().then(() => {
+    connectTracingChannel.tracePromise(() => {
+      return this.initialiseConnection();
+    }, { connection: this }).then(() => {
       process.nextTick(() => {
         this.emit('connect');
       });
@@ -1891,6 +1899,10 @@ class Connection extends EventEmitter {
 
   /**
    * A debug message is available. It may be logged or ignored.
+   *
+   * @deprecated The `debug` event is deprecated. Subscribe to the diagnostics
+   *   channels published by `tedious` via the `node:diagnostics_channel`
+   *   module instead.
    */
   on(event: 'debug', listener: (messageText: string) => void): this
 
@@ -2198,7 +2210,7 @@ class Connection extends EventEmitter {
    * @private
    */
   createDebug() {
-    const debug = new Debug(this.config.options.debug);
+    const debug = new Debug(this.config.options.debug, this);
     debug.on('debug', (message) => {
       this.emit('debug', message);
     });
@@ -2373,6 +2385,10 @@ class Connection extends EventEmitter {
       this.state.exit.call(this, newState);
     }
 
+    if (connectionStateChannel.hasSubscribers) {
+      connectionStateChannel.publish({ connection: this, oldState: this.state ? this.state.name : undefined, newState: newState.name });
+    }
+
     this.debug.log('State change: ' + (this.state ? this.state.name : 'undefined') + ' -> ' + newState.name);
     this.state = newState;
 
@@ -2469,7 +2485,7 @@ class Connection extends EventEmitter {
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);
     this.debug.payload(function() {
       return payload.toString('  ');
-    });
+    }, payload);
   }
 
   /**
@@ -2543,7 +2559,7 @@ class Connection extends EventEmitter {
 
     this.debug.payload(function() {
       return payload.toString('  ');
-    });
+    }, payload);
   }
 
   /**
@@ -3197,6 +3213,44 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+    if (!requestTracingChannel.hasSubscribers) {
+      return this.performRequest(request, packetType, payload);
+    }
+
+    const ctx: RequestMessage = { connection: this, request, packetType };
+
+    const originalCallback = request.callback as (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
+    request.callback = (error: Error | null | undefined, rowCount?: number, rows?: any) => {
+      ctx.rowCount = rowCount;
+
+      if (error != null) {
+        ctx.error = error;
+        requestTracingChannel.error.publish(ctx);
+      }
+
+      requestTracingChannel.asyncStart.runStores(ctx, () => {
+        try {
+          originalCallback.call(request, error, rowCount, rows);
+        } finally {
+          requestTracingChannel.asyncEnd.publish(ctx);
+          request.callback = originalCallback;
+        }
+      });
+    };
+
+    requestTracingChannel.start.runStores(ctx, () => {
+      try {
+        this.performRequest(request, packetType, payload);
+      } finally {
+        requestTracingChannel.end.publish(ctx);
+      }
+    });
+  }
+
+  /**
+   * @private
+   */
+  performRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
@@ -3266,7 +3320,7 @@ class Connection extends EventEmitter {
         this.resetConnectionOnNextRequest = false;
         this.debug.payload(function() {
           return payload!.toString('  ');
-        });
+        }, payload);
       });
 
       const payloadStream = Readable.from(payload);
@@ -3400,7 +3454,7 @@ class Connection extends EventEmitter {
     const preloginPayload = new PreloginPayload(messageBuffer);
     this.debug.payload(function() {
       return preloginPayload.toString('  ');
-    });
+    }, preloginPayload, 'Received');
     return preloginPayload;
   }
 
@@ -3525,7 +3579,7 @@ class Connection extends EventEmitter {
           this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
           this.debug.payload(function() {
             return payload.toString('  ');
-          });
+          }, payload);
 
           this.ntlmpacket = undefined;
         } else if (handler.loginError) {
