@@ -123,4 +123,3 @@ class RpcRequestPayload implements Iterable<Buffer> {
 }
 
 export default RpcRequestPayload;
-module.exports = RpcRequestPayload;

@@ -11,4 +11,3 @@ function returnStatusParser(buf: Buffer, offset: number, _options: ParserOptions
 }
 
 export default returnStatusParser;
-module.exports = returnStatusParser;

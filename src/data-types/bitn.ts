@@ -27,4 +27,3 @@ const BitN: DataType = {
 };
 
 export default BitN;
-module.exports = BitN;

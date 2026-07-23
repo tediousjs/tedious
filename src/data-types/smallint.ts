@@ -57,4 +57,3 @@ const SmallInt: DataType = {
 };
 
 export default SmallInt;
-module.exports = SmallInt;

@@ -147,4 +147,3 @@ const NVarChar: { maximumLength: number } & DataType = {
 };
 
 export default NVarChar;
-module.exports = NVarChar;

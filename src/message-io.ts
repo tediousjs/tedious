@@ -191,4 +191,3 @@ class MessageIO extends EventEmitter {
 }
 
 export default MessageIO;
-module.exports = MessageIO;

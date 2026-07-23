@@ -129,4 +129,3 @@ const VarChar: { maximumLength: number } & DataType = {
 };
 
 export default VarChar;
-module.exports = VarChar;

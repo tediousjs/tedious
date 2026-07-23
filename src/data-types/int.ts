@@ -57,4 +57,3 @@ const Int: DataType = {
 };
 
 export default Int;
-module.exports = Int;

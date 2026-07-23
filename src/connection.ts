@@ -3665,7 +3665,6 @@ function isTransientError(error: AggregateError | ConnectionError): boolean {
 }
 
 export default Connection;
-module.exports = Connection;
 
 Connection.prototype.STATE = {
   INITIALIZED: {

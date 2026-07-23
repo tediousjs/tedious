@@ -56,4 +56,3 @@ function sspiParser(buf: Buffer, offset: number, _options: ParserOptions): Resul
 }
 
 export default sspiParser;
-module.exports = sspiParser;

@@ -94,4 +94,3 @@ const SmallDateTime: DataType = {
 };
 
 export default SmallDateTime;
-module.exports = SmallDateTime;

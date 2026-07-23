@@ -57,4 +57,3 @@ const TinyInt: DataType = {
 };
 
 export default TinyInt;
-module.exports = TinyInt;

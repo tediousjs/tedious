@@ -102,4 +102,3 @@ class IncomingMessageStream extends Transform {
 }
 
 export default IncomingMessageStream;
-module.exports = IncomingMessageStream;

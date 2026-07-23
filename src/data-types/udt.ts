@@ -27,4 +27,3 @@ const UDT: DataType = {
 };
 
 export default UDT;
-module.exports = UDT;

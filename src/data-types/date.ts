@@ -80,4 +80,3 @@ const Date: DataType = {
 };
 
 export default Date;
-module.exports = Date;

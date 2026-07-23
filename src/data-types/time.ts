@@ -105,4 +105,3 @@ const Time: DataType = {
 
 
 export default Time;
-module.exports = Time;

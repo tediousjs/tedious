@@ -518,4 +518,3 @@ class Request extends EventEmitter {
 }
 
 export default Request;
-module.exports = Request;

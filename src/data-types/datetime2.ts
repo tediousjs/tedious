@@ -133,4 +133,3 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
 };
 
 export default DateTime2;
-module.exports = DateTime2;

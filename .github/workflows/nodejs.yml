@@ -62,7 +62,7 @@ jobs:
     - run: npm ci
 
     - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test
+      run: npx c8 --reporter=lcov npm run test
 
     - uses: codecov/codecov-action@v5
       with:
@@ -71,7 +71,7 @@ jobs:
     - name: run integration tests (TDS 7.4)
       env:
         TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -80,7 +80,7 @@ jobs:
     - name: run integration tests (TDS 7.3B)
       env:
         TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -89,7 +89,7 @@ jobs:
     - name: run integration tests (TDS 7.3A)
       env:
         TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -98,7 +98,7 @@ jobs:
     - name: run integration tests (TDS 7.2)
       env:
         TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -107,7 +107,7 @@ jobs:
     - name: run integration tests (TDS 7.1)
       env:
         TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -184,7 +184,7 @@ jobs:
     - run: npm ci
 
     - name: run unit tests
-      run: npx nyc --reporter=lcov npm run test
+      run: npx c8 --reporter=lcov npm run test
 
     - uses: codecov/codecov-action@v5
       with:
@@ -193,7 +193,7 @@ jobs:
     - name: run integration tests (TDS 7.4)
       env:
         TEDIOUS_TDS_VERSION: 7_4
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -202,7 +202,7 @@ jobs:
     - name: run integration tests (TDS 7.3B)
       env:
         TEDIOUS_TDS_VERSION: 7_3_B
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -211,7 +211,7 @@ jobs:
     - name: run integration tests (TDS 7.3A)
       env:
         TEDIOUS_TDS_VERSION: 7_3_A
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -220,7 +220,7 @@ jobs:
     - name: run integration tests (TDS 7.2)
       env:
         TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -229,7 +229,7 @@ jobs:
     - name: run integration tests (TDS 7.1)
       env:
         TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -263,7 +263,7 @@ jobs:
         AZURE_SERVER: ${{ secrets.AZURE_SERVER }}
         AZURE_USERNAME: ${{ secrets.AZURE_USERNAME }}
         AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -299,7 +299,7 @@ jobs:
         AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
         AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -335,7 +335,7 @@ jobs:
         AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
         AZURE_AD_USERNAME: ${{ secrets.AZURE_AD_USERNAME }}
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:
@@ -371,7 +371,7 @@ jobs:
         AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
         AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
         AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
-      run: npx nyc --reporter=lcov npm run test-integration
+      run: npx c8 --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5
       with:

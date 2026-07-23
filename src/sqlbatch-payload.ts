@@ -34,4 +34,3 @@ class SqlBatchPayload implements Iterable<Buffer> {
 }
 
 export default SqlBatchPayload;
-module.exports = SqlBatchPayload;

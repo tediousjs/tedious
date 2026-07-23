@@ -27,4 +27,3 @@ const Null: DataType = {
 };
 
 export default Null;
-module.exports = Null;

@@ -285,4 +285,3 @@ class WritableTrackingBuffer {
 }
 
 export default WritableTrackingBuffer;
-module.exports = WritableTrackingBuffer;

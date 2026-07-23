@@ -55,4 +55,3 @@ const UniqueIdentifier: DataType = {
 };
 
 export default UniqueIdentifier;
-module.exports = UniqueIdentifier;

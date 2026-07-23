@@ -277,6 +277,9 @@ export default defineConfig([
         allowedNames: ['self'],
       }],
 
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-redeclare': 'error',
+
       'no-unused-vars': 'off',
 
       '@typescript-eslint/no-unused-vars': ['error', {

@@ -198,4 +198,3 @@ function envChangeParser(buf: Buffer, offset: number, _options: ParserOptions): 
 }
 
 export default envChangeParser;
-module.exports = envChangeParser;

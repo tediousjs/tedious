@@ -402,4 +402,3 @@ class Parser {
 }
 
 export default Parser;
-module.exports = Parser;
