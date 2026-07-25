@@ -90,8 +90,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'IntN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       switch (dataLength) {
         case 0:
@@ -120,8 +124,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'FloatN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       switch (dataLength) {
         case 0:
@@ -145,8 +153,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       return readMoney(buf, offset);
 
     case 'MoneyN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       switch (dataLength) {
         case 0:
@@ -167,8 +179,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'BitN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       switch (dataLength) {
         case 0:
@@ -186,8 +202,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     case 'Char': {
       const codepage = metadata.collation!.codepage!;
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      if (buf.length < offset + 2) {
+        throw new NotEnoughDataError(offset + 2);
+      }
+
+      const dataLength = buf.readUInt16LE(offset);
+      offset += 2;
 
       if (dataLength === NULL) {
         return new Result(null, offset);
@@ -198,8 +218,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'NVarChar':
     case 'NChar': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      if (buf.length < offset + 2) {
+        throw new NotEnoughDataError(offset + 2);
+      }
+
+      const dataLength = buf.readUInt16LE(offset);
+      offset += 2;
 
       if (dataLength === NULL) {
         return new Result(null, offset);
@@ -210,8 +234,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'VarBinary':
     case 'Binary': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+      if (buf.length < offset + 2) {
+        throw new NotEnoughDataError(offset + 2);
+      }
+
+      const dataLength = buf.readUInt16LE(offset);
+      offset += 2;
 
       if (dataLength === NULL) {
         return new Result(null, offset);
@@ -221,61 +249,76 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Text': {
-      let textPointerLength;
-      ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const textPointerLength = buf[offset];
+      offset += 1;
 
       if (textPointerLength === 0) {
         return new Result(null, offset);
       }
 
-      // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      // Textpointer and timestamp, neither of which is used.
+      offset = skipBytes(buf, offset, textPointerLength + 8);
 
-      // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      if (buf.length < offset + 4) {
+        throw new NotEnoughDataError(offset + 4);
+      }
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = buf.readUInt32LE(offset);
+      offset += 4;
 
       return readChars(buf, offset, dataLength, metadata.collation!.codepage!);
     }
 
     case 'NText': {
-      let textPointerLength;
-      ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const textPointerLength = buf[offset];
+      offset += 1;
 
       if (textPointerLength === 0) {
         return new Result(null, offset);
       }
 
-      // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      // Textpointer and timestamp, neither of which is used.
+      offset = skipBytes(buf, offset, textPointerLength + 8);
 
-      // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      if (buf.length < offset + 4) {
+        throw new NotEnoughDataError(offset + 4);
+      }
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = buf.readUInt32LE(offset);
+      offset += 4;
 
       return readNChars(buf, offset, dataLength);
     }
 
     case 'Image': {
-      let textPointerLength;
-      ({ offset, value: textPointerLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const textPointerLength = buf[offset];
+      offset += 1;
 
       if (textPointerLength === 0) {
         return new Result(null, offset);
       }
 
-      // Textpointer
-      ({ offset } = readBinary(buf, offset, textPointerLength));
+      // Textpointer and timestamp, neither of which is used.
+      offset = skipBytes(buf, offset, textPointerLength + 8);
 
-      // Timestamp
-      ({ offset } = readBinary(buf, offset, 8));
+      if (buf.length < offset + 4) {
+        throw new NotEnoughDataError(offset + 4);
+      }
 
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      const dataLength = buf.readUInt32LE(offset);
+      offset += 4;
 
       return readBinary(buf, offset, dataLength);
     }
@@ -289,8 +332,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'DateTimeN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       switch (dataLength) {
         case 0:
@@ -307,8 +354,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Time': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -318,8 +369,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Date': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -329,8 +384,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'DateTime2': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -340,8 +399,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'DateTimeOffset': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -352,8 +415,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'NumericN':
     case 'DecimalN': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -363,8 +430,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'UniqueIdentifier': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt8(buf, offset));
+      if (buf.length < offset + 1) {
+        throw new NotEnoughDataError(offset + 1);
+      }
+
+      const dataLength = buf[offset];
+      offset += 1;
 
       switch (dataLength) {
         case 0:
@@ -379,8 +450,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'Variant': {
-      let dataLength;
-      ({ offset, value: dataLength } = readUInt32LE(buf, offset));
+      if (buf.length < offset + 4) {
+        throw new NotEnoughDataError(offset + 4);
+      }
+
+      const dataLength = buf.readUInt32LE(offset);
+      offset += 4;
 
       if (dataLength === 0) {
         return new Result(null, offset);
@@ -558,6 +633,15 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
     default:
       throw new Error('Invalid type!');
   }
+}
+
+// Advances past `byteLength` bytes without materializing them.
+function skipBytes(buf: Buffer, offset: number, byteLength: number): number {
+  if (buf.length < offset + byteLength) {
+    throw new NotEnoughDataError(offset + byteLength);
+  }
+
+  return offset + byteLength;
 }
 
 function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buffer> {

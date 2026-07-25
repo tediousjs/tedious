@@ -4,6 +4,7 @@ import { readValue } from '../../src/value-parser';
 import { type Metadata } from '../../src/metadata-parser';
 import { type ParserOptions } from '../../src/token/stream-parser';
 import { type DataType, typeByName as dataTypeByName } from '../../src/data-type';
+import { Collation } from '../../src/collation';
 
 const utcOptions = { useUTC: true } as ParserOptions;
 const localOptions = { useUTC: false } as ParserOptions;
@@ -61,6 +62,23 @@ function buildDateTimeOffsetBuffer(timeValue: number, timeByteLength: number, da
 }
 
 type DateWithNanosecondsDelta = Date & { nanosecondsDelta: number };
+
+// `text`, `ntext` and `image` values are prefixed with a text pointer and a
+// timestamp, both of which the parser skips over.
+function buildTextPointerPrefix(textPointerLength: number): Buffer {
+  const buf = Buffer.alloc(1 + textPointerLength + 8, 0xAB);
+  buf.writeUInt8(textPointerLength, 0);
+  return buf;
+}
+
+function buildLegacyLobBuffer(textPointerLength: number, data: Buffer): Buffer {
+  const dataLength = Buffer.alloc(4);
+  dataLength.writeUInt32LE(data.length, 0);
+
+  return Buffer.concat([buildTextPointerPrefix(textPointerLength), dataLength, data]);
+}
+
+const CP1252_COLLATION = Collation.fromBuffer(Buffer.from('0904D00034', 'hex'));
 
 describe('readValue', function() {
   describe('for `time` values', function() {
@@ -333,6 +351,60 @@ describe('readValue', function() {
       const value = result.value as Date;
 
       assert.strictEqual(value.getTime(), new Date(1900, 0, 3, 0, 0, 45).getTime());
+    });
+  });
+  describe('for `text`, `ntext` and `image` values', function() {
+    it('should parse `text` values past the text pointer and timestamp', function() {
+      const metadata = buildMetadata(dataTypeByName.Text);
+      metadata.collation = CP1252_COLLATION;
+
+      const buf = buildLegacyLobBuffer(16, Buffer.from('caf\u00e9', 'latin1'));
+      const result = readValue(buf, 0, metadata, utcOptions);
+
+      assert.strictEqual(result.value, 'caf\u00e9');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse `ntext` values past the text pointer and timestamp', function() {
+      const buf = buildLegacyLobBuffer(16, Buffer.from('caf\u00e9', 'ucs2'));
+      const result = readValue(buf, 0, buildMetadata(dataTypeByName.NText), utcOptions);
+
+      assert.strictEqual(result.value, 'caf\u00e9');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse `image` values past the text pointer and timestamp', function() {
+      const data = Buffer.from([0x01, 0x02, 0x03, 0x04]);
+      const buf = buildLegacyLobBuffer(16, data);
+      const result = readValue(buf, 0, buildMetadata(dataTypeByName.Image), utcOptions);
+
+      assert.deepEqual(result.value, data);
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should handle text pointers of other lengths', function() {
+      const buf = buildLegacyLobBuffer(1, Buffer.from('ab', 'ucs2'));
+      const result = readValue(buf, 0, buildMetadata(dataTypeByName.NText), utcOptions);
+
+      assert.strictEqual(result.value, 'ab');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse `NULL` values', function() {
+      for (const type of [dataTypeByName.Text, dataTypeByName.NText, dataTypeByName.Image]) {
+        const result = readValue(Buffer.from([0x00]), 0, buildMetadata(type), utcOptions);
+
+        assert.isNull(result.value, type.name);
+        assert.strictEqual(result.offset, 1);
+      }
+    });
+
+    it('should report missing data for a truncated text pointer', function() {
+      const buf = buildLegacyLobBuffer(16, Buffer.from('ab', 'ucs2'));
+
+      assert.throws(() => {
+        readValue(buf.subarray(0, 10), 0, buildMetadata(dataTypeByName.NText), utcOptions);
+      });
     });
   });
 });
