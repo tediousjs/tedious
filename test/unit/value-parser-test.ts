@@ -108,10 +108,13 @@ describe('readValue', function() {
       const result = readValue(buildTimeBuffer(863999999999, 5), 0, buildMetadata(dataTypeByName.Time, 7), utcOptions);
       const value = result.value as DateWithNanosecondsDelta;
 
-      const descriptor = Object.getOwnPropertyDescriptor(value, 'nanosecondsDelta');
-      assert.isDefined(descriptor);
-      assert.isFalse(descriptor!.enumerable);
+      assert.isNumber(value.nanosecondsDelta);
       assert.notInclude(Object.keys(value), 'nanosecondsDelta');
+      assert.notInclude(JSON.stringify({ value }), 'nanosecondsDelta');
+
+      for (const key in value) {
+        assert.notStrictEqual(key, 'nanosecondsDelta');
+      }
     });
 
     it('should parse `NULL` values', function() {

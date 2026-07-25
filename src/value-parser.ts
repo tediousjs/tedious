@@ -678,8 +678,23 @@ function readDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date
   return new Result(value, offset);
 }
 
-interface DateWithNanosecondsDelta extends Date {
-  nanosecondsDelta: number;
+// `Date` subclass that carries the sub-millisecond remainder of `time`,
+// `datetime2` and `datetimeoffset` values.
+//
+// The remainder is held in a private field and exposed through a prototype
+// accessor, which keeps it off `Object.keys()` and `JSON.stringify()` just
+// like the previous per-instance `Object.defineProperty` call did - but
+// without paying for a property definition on every single value read.
+class DateWithNanosecondsDelta extends Date {
+  #nanosecondsDelta = 0;
+
+  get nanosecondsDelta(): number {
+    return this.#nanosecondsDelta;
+  }
+
+  set nanosecondsDelta(value: number) {
+    this.#nanosecondsDelta = value;
+  }
 }
 
 // Reads a `time` value, returned in units of 100 nanoseconds since midnight.
@@ -722,14 +737,11 @@ function readTime(buf: Buffer, offset: number, dataLength: number, scale: number
 
   let date;
   if (useUTC) {
-    date = new Date(value / 10000) as DateWithNanosecondsDelta;
+    date = new DateWithNanosecondsDelta(value / 10000);
   } else {
-    date = new Date(1970, 0, 1, 0, 0, 0, value / 10000) as DateWithNanosecondsDelta;
+    date = new DateWithNanosecondsDelta(1970, 0, 1, 0, 0, 0, value / 10000);
   }
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (value % 10000) / 1e7
-  });
+  date.nanosecondsDelta = (value % 10000) / 1e7;
 
   return new Result(date, offset);
 }
@@ -754,14 +766,11 @@ function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: n
 
   let date;
   if (useUTC) {
-    date = new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000)) as DateWithNanosecondsDelta;
+    date = new DateWithNanosecondsDelta(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000));
   } else {
-    date = new Date(2000, 0, days - 730118, 0, 0, 0, time / 10000) as DateWithNanosecondsDelta;
+    date = new DateWithNanosecondsDelta(2000, 0, days - 730118, 0, 0, 0, time / 10000);
   }
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (time % 10000) / 1e7
-  });
+  date.nanosecondsDelta = (time % 10000) / 1e7;
 
   return new Result(date, offset);
 }
@@ -776,11 +785,8 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
   // time offset?
   ({ offset } = readUInt16LE(buf, offset));
 
-  const date = new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000)) as DateWithNanosecondsDelta;
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (time % 10000) / 1e7
-  });
+  const date = new DateWithNanosecondsDelta(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000));
+  date.nanosecondsDelta = (time % 10000) / 1e7;
   return new Result(date, offset);
 }
 
