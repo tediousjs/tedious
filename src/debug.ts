@@ -52,7 +52,9 @@ class Debug extends EventEmitter {
   }
 
   haveListeners() {
-    return this.listeners('debug').length > 0;
+    // `listeners()` copies the handler array. This runs once per token and
+    // twice per packet, so ask for the count instead.
+    return this.listenerCount('debug') > 0;
   }
 
   log(text: string) {
