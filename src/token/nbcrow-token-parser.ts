@@ -4,8 +4,8 @@ import Parser from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { NBCRowToken } from './token';
-import * as iconv from 'iconv-lite';
 
+import { decodeChars } from '../charset-decoder';
 import { isPLPStream, readPLPStream, readValue } from '../value-parser';
 import { NotEnoughDataError } from './helpers';
 
@@ -56,7 +56,8 @@ async function nbcRowParser(parser: Parser): Promise<NBCRowToken> {
         } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
           columns.push({ value: Buffer.concat(chunks).toString('ucs2'), metadata });
         } else if (metadata.type.name === 'VarChar') {
-          columns.push({ value: iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
+          const buffer = chunks.length === 1 ? chunks[0] : Buffer.concat(chunks);
+          columns.push({ value: decodeChars(buffer, 0, buffer.length, metadata.collation?.codepage ?? 'utf8'), metadata });
         } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
           columns.push({ value: Buffer.concat(chunks), metadata });
         }
