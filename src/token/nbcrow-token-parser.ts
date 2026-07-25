@@ -103,17 +103,17 @@ function nbcRowParser(parser: Parser): NBCRowToken | Promise<NBCRowToken> {
     return nbcRowParserSlow(parser);
   }
 
-  const columns: Column[] = [];
+  const columns: Column[] = new Array(length);
 
+  let index = 0;
   let offset = bitmapOffset + bitmapLength;
 
   try {
-    while (columns.length < length) {
-      const index = columns.length;
+    while (index < length) {
       const metadata = colMetadata[index];
 
       if (isNull(buffer, bitmapOffset, index)) {
-        columns.push({ value: null, metadata });
+        columns[index++] = { value: null, metadata };
         continue;
       }
 
@@ -124,7 +124,7 @@ function nbcRowParser(parser: Parser): NBCRowToken | Promise<NBCRowToken> {
       const result = readValue(buffer, offset, metadata, options);
 
       offset = result.offset;
-      columns.push({ value: result.value, metadata });
+      columns[index++] = { value: result.value, metadata };
     }
   } catch (err) {
     if (!(err instanceof NotEnoughDataError)) {
@@ -134,11 +134,12 @@ function nbcRowParser(parser: Parser): NBCRowToken | Promise<NBCRowToken> {
 
   parser.position = offset;
 
-  if (columns.length < length) {
+  if (index < length) {
+    columns.length = index;
     // `parser.buffer` is replaced when more data arrives, so the bitmap has to
     // be copied out before handing over to the asynchronous path.
     const bitmap = Buffer.from(buffer.subarray(bitmapOffset, bitmapOffset + bitmapLength));
-    return nbcRowParserAsync(parser, bitmap, columns, columns.length);
+    return nbcRowParserAsync(parser, bitmap, columns, index);
   }
 
   return buildToken(columns, options);

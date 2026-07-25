@@ -88,19 +88,20 @@ function rowParser(parser: Parser): RowToken | Promise<RowToken> {
   const buffer = parser.buffer;
   const options = parser.options;
 
-  // `columns.length` doubles as the index of the column being read, so the
-  // loop needs no separate counter and the async fallback can pick up exactly
-  // where this left off.
-  const columns: Column[] = [];
+  // Sized up front - growing an array by pushing costs noticeably more than
+  // filling one that is already the right size, even accounting for the holey
+  // elements kind that `new Array()` produces.
+  const columns: Column[] = new Array(length);
 
+  let index = 0;
   let offset = parser.position;
 
-  // One `try` around the whole row rather than one per column. `offset` only
-  // advances after a column was read in full, so a column running out of data
-  // leaves both it and `columns` pointing at the column to resume from.
+  // One `try` around the whole row rather than one per column. `offset` and
+  // `index` only advance after a column was read in full, so a column running
+  // out of data leaves both pointing at the column to resume from.
   try {
-    while (columns.length < length) {
-      const metadata = colMetadata[columns.length];
+    while (index < length) {
+      const metadata = colMetadata[index];
 
       if (isPLPStream(metadata)) {
         break;
@@ -109,7 +110,7 @@ function rowParser(parser: Parser): RowToken | Promise<RowToken> {
       const result = readValue(buffer, offset, metadata, options);
 
       offset = result.offset;
-      columns.push({ value: result.value, metadata });
+      columns[index++] = { value: result.value, metadata };
     }
   } catch (err) {
     if (!(err instanceof NotEnoughDataError)) {
@@ -119,8 +120,10 @@ function rowParser(parser: Parser): RowToken | Promise<RowToken> {
 
   parser.position = offset;
 
-  if (columns.length < length) {
-    return rowParserAsync(parser, columns, columns.length);
+  if (index < length) {
+    // Trim the unfilled tail so the asynchronous path can keep pushing.
+    columns.length = index;
+    return rowParserAsync(parser, columns, index);
   }
 
   return buildToken(columns, options);
