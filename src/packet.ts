@@ -64,6 +64,26 @@ export class Packet {
     }
   }
 
+  /**
+   * Creates a packet with room for `dataLength` bytes of payload, so the
+   * payload can be copied straight into the packet buffer instead of being
+   * built separately and then concatenated onto the header.
+   *
+   * The payload area is left uninitialized - callers must fill all
+   * `dataLength` bytes.
+   */
+  static withDataLength(type: number, dataLength: number) {
+    const buffer = Buffer.allocUnsafe(HEADER_LENGTH + dataLength);
+    buffer.writeUInt8(type, OFFSET.Type);
+    buffer.writeUInt8(STATUS.NORMAL, OFFSET.Status);
+    buffer.writeUInt16BE(buffer.length, OFFSET.Length);
+    buffer.writeUInt16BE(DEFAULT_SPID, OFFSET.SPID);
+    buffer.writeUInt8(DEFAULT_PACKETID, OFFSET.PacketID);
+    buffer.writeUInt8(DEFAULT_WINDOW, OFFSET.Window);
+
+    return new Packet(buffer);
+  }
+
   setLength() {
     this.buffer.writeUInt16BE(this.buffer.length, OFFSET.Length);
   }

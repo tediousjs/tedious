@@ -39,14 +39,15 @@ class OutgoingMessageStream extends Duplex {
       this.bl.append(data);
 
       while (this.bl.length > length) {
-        const data = this.bl.slice(0, length);
+        // Copy the payload directly into the packet buffer, instead of
+        // slicing it out of the buffer list and concatenating it onto the
+        // header afterwards.
+        const packet = Packet.withDataLength(message.type, length);
+        this.bl.copy(packet.buffer, HEADER_LENGTH, 0, length);
         this.bl.consume(length);
 
-        // TODO: Get rid of creating `Packet` instances here.
-        const packet = new Packet(message.type);
         packet.packetId(packetNumber += 1);
         packet.resetConnection(message.resetConnection);
-        packet.addData(data);
 
         this.debug.packet('Sent', packet);
         this.debug.data(packet);
@@ -58,16 +59,16 @@ class OutgoingMessageStream extends Duplex {
     });
 
     this.currentMessage.on('end', () => {
-      const data = this.bl.slice();
-      this.bl.consume(data.length);
+      const remaining = this.bl.length;
 
-      // TODO: Get rid of creating `Packet` instances here.
-      const packet = new Packet(message.type);
+      const packet = Packet.withDataLength(message.type, remaining);
+      this.bl.copy(packet.buffer, HEADER_LENGTH, 0, remaining);
+      this.bl.consume(remaining);
+
       packet.packetId(packetNumber += 1);
       packet.resetConnection(message.resetConnection);
       packet.last(true);
       packet.ignore(message.ignore);
-      packet.addData(data);
 
       this.debug.packet('Sent', packet);
       this.debug.data(packet);
