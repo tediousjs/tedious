@@ -122,4 +122,29 @@ describe('Token Stream Parser', () => {
 
     parser.on('end', done);
   });
+
+  it('should yield the event loop while parsing a long token stream', async function() {
+    this.timeout(10000);
+
+    // Enough tokens that parsing cannot plausibly finish inside one slice.
+    const buffer = createDbChangeBuffer();
+    const chunks = new Array(200000).fill(buffer);
+
+    let timerRan = false;
+    const parser = new Parser(
+      chunks as unknown as Message,
+      new Debug(),
+      new TestDatabaseChangeHandler(),
+      options
+    );
+
+    // A macrotask queued before parsing starts. If parsing holds the loop
+    // through microtasks alone, this cannot run until parsing has finished.
+    const timer = setTimeout(() => { timerRan = true; }, 0);
+
+    await new Promise<void>((resolve) => parser.on('end', resolve));
+    clearTimeout(timer);
+
+    assert.isTrue(timerRan, 'parsing starved the event loop');
+  });
 });

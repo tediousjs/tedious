@@ -20,6 +20,13 @@ import { NotEnoughDataError } from './helpers';
 
 export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
 
+// How long token parsing may hold on to the event loop before handing it back.
+const MAX_SLICE_MS = 0.5;
+
+// How many tokens to parse between deadline checks. Reading the clock per
+// token would cost more than the yielding saves.
+const TOKENS_PER_DEADLINE_CHECK = 64;
+
 class Parser {
   debug: Debug;
   colMetadata: ColumnMetadata[];
@@ -44,6 +51,15 @@ class Parser {
     const parser = new Parser(iterable, debug, options);
     parser.colMetadata = colMetadata;
 
+    // Every `await` in this loop resolves on the microtask queue whenever the
+    // data is already buffered, and microtasks run to exhaustion before the
+    // event loop advances. Parsing a large result set would therefore hold the
+    // loop for as long as it took to parse - timers and I/O callbacks could not
+    // run in between. Yield a real macrotask once the current slice has used up
+    // its budget so the rest of the process gets a turn.
+    let sliceDeadline = performance.now() + MAX_SLICE_MS;
+    let sinceCheck = 0;
+
     while (true) {
       try {
         await parser.waitForChunk();
@@ -64,13 +80,26 @@ class Parser {
           token = await token;
         }
 
-        if (token === undefined) {
-          continue;
+        if (token !== undefined) {
+          const pending = onToken(token);
+          if (pending !== undefined) {
+            await pending;
+          }
         }
 
-        const pending = onToken(token);
-        if (pending !== undefined) {
-          await pending;
+        // The budget is time rather than a token count because token costs
+        // vary by orders of magnitude - a `DONE` and a hundred column row are
+        // both one token.
+        if (++sinceCheck >= TOKENS_PER_DEADLINE_CHECK) {
+          sinceCheck = 0;
+
+          if (performance.now() >= sliceDeadline) {
+            await new Promise<void>((resolve) => {
+              setImmediate(resolve);
+            });
+
+            sliceDeadline = performance.now() + MAX_SLICE_MS;
+          }
         }
       }
     }
