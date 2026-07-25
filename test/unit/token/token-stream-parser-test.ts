@@ -56,6 +56,61 @@ describe('Token Stream Parser', () => {
     parser.on('end', done);
   });
 
+  it('should stop handing over tokens while paused', async function() {
+    const buffer = createDbChangeBuffer();
+    const handled: string[] = [];
+
+    let parser: Parser;
+
+    class CountingHandler extends TokenHandler {
+      onDatabaseChange(token: DatabaseEnvChangeToken) {
+        handled.push(token.newValue);
+
+        if (handled.length === 1) {
+          parser.pause();
+        }
+      }
+    }
+
+    const ended = new Promise<void>((resolve) => {
+      parser = new Parser(
+        [buffer, buffer, buffer] as unknown as Message,
+        new Debug(),
+        new CountingHandler(),
+        options
+      );
+      parser.on('end', resolve);
+    });
+
+    // Give the parser plenty of opportunity to run ahead.
+    for (let i = 0; i < 20; i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    assert.lengthOf(handled, 1);
+
+    parser!.resume();
+    await ended;
+
+    assert.lengthOf(handled, 3);
+  });
+
+  it('should emit `error` for an unparseable token stream', async function() {
+    const parser = new Parser(
+      [Buffer.from([0x99])] as unknown as Message,
+      new Debug(),
+      new TestDatabaseChangeHandler(),
+      options
+    );
+
+    const err = await new Promise<Error>((resolve) => {
+      parser.on('error', resolve);
+      parser.on('end', () => resolve(new Error('unexpectedly ended without an error')));
+    });
+
+    assert.match(err.message, /Unknown type: 153/);
+  });
+
   it('should parse token delivered one byte at a time', function(done) {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();

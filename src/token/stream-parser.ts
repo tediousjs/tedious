@@ -29,6 +29,53 @@ class Parser {
   buffer: Buffer;
   position: number;
 
+  /**
+   * Parses `iterable` to completion, handing every token to `onToken`.
+   *
+   * This is the shape the connection uses. Handing tokens to a callback
+   * instead of yielding them means a token that could be read straight out of
+   * the buffer - which is nearly every token of a result set - reaches its
+   * handler without a promise or a microtask in between.
+   *
+   * `onToken` may return a promise to suspend parsing, which is how the
+   * consumer applies backpressure.
+   */
+  static async parseAll(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, onToken: (token: Token) => void | Promise<void>, colMetadata: ColumnMetadata[] = []) {
+    const parser = new Parser(iterable, debug, options);
+    parser.colMetadata = colMetadata;
+
+    while (true) {
+      try {
+        await parser.waitForChunk();
+      } catch (err: unknown) {
+        if (parser.position === parser.buffer.length) {
+          return;
+        }
+
+        throw err;
+      }
+
+      while (parser.buffer.length >= parser.position + 1) {
+        const type = parser.buffer.readUInt8(parser.position);
+        parser.position += 1;
+
+        let token = parser.readToken(type);
+        if (token instanceof Promise) {
+          token = await token;
+        }
+
+        if (token === undefined) {
+          continue;
+        }
+
+        const pending = onToken(token);
+        if (pending !== undefined) {
+          await pending;
+        }
+      }
+    }
+  }
+
   static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
     const parser = new Parser(iterable, debug, options);
     parser.colMetadata = colMetadata;
