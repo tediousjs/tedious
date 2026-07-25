@@ -41,6 +41,40 @@ class Parser {
   buffer: Buffer;
   position: number;
 
+  #sliceDeadline: number;
+  #tokensSinceCheck: number;
+
+  /**
+   * Hands the event loop back if the current slice has used up its budget.
+   *
+   * Returns a promise to await in that case, and `undefined` otherwise, so
+   * the common path costs a comparison rather than a promise.
+   *
+   * Every token loop over a `Parser` needs to call this. `await` alone does
+   * not do it: awaiting data that is already buffered continues on the
+   * microtask queue, and microtasks run to exhaustion before the event loop
+   * advances a phase - so a loop full of `await`s can still hold the loop for
+   * the entire length of a result set.
+   */
+  yieldIfSliceExpired(): Promise<void> | undefined {
+    if (++this.#tokensSinceCheck < TOKENS_PER_DEADLINE_CHECK) {
+      return undefined;
+    }
+
+    this.#tokensSinceCheck = 0;
+
+    if (performance.now() < this.#sliceDeadline) {
+      return undefined;
+    }
+
+    return new Promise<void>((resolve) => {
+      setImmediate(() => {
+        this.#sliceDeadline = performance.now() + MAX_SLICE_MS;
+        resolve();
+      });
+    });
+  }
+
   /**
    * Parses `iterable` to completion, handing every token to `onToken`.
    *
@@ -55,15 +89,6 @@ class Parser {
   static async parseAll(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, onToken: (token: Token) => void | Promise<void>, colMetadata: ColumnMetadata[] = []) {
     const parser = new Parser(iterable, debug, options);
     parser.colMetadata = colMetadata;
-
-    // Every `await` in this loop resolves on the microtask queue whenever the
-    // data is already buffered, and microtasks run to exhaustion before the
-    // event loop advances. Parsing a large result set would therefore hold the
-    // loop for as long as it took to parse - timers and I/O callbacks could not
-    // run in between. Yield a real macrotask once the current slice has used up
-    // its budget so the rest of the process gets a turn.
-    let sliceDeadline = performance.now() + MAX_SLICE_MS;
-    let sinceCheck = 0;
 
     while (true) {
       try {
@@ -92,19 +117,9 @@ class Parser {
           }
         }
 
-        // The budget is time rather than a token count because token costs
-        // vary by orders of magnitude - a `DONE` and a hundred column row are
-        // both one token.
-        if (++sinceCheck >= TOKENS_PER_DEADLINE_CHECK) {
-          sinceCheck = 0;
-
-          if (performance.now() >= sliceDeadline) {
-            await new Promise<void>((resolve) => {
-              setImmediate(resolve);
-            });
-
-            sliceDeadline = performance.now() + MAX_SLICE_MS;
-          }
+        const yielding = parser.yieldIfSliceExpired();
+        if (yielding !== undefined) {
+          await yielding;
         }
       }
     }
@@ -132,6 +147,11 @@ class Parser {
         const token = parser.readToken(type);
         if (token !== undefined) {
           yield token;
+        }
+
+        const yielding = parser.yieldIfSliceExpired();
+        if (yielding !== undefined) {
+          await yielding;
         }
       }
     }
@@ -464,6 +484,9 @@ class Parser {
 
     this.buffer = Buffer.alloc(0);
     this.position = 0;
+
+    this.#sliceDeadline = performance.now() + MAX_SLICE_MS;
+    this.#tokensSinceCheck = 0;
   }
 
   async waitForChunk() {

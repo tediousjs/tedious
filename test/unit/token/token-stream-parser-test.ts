@@ -1,7 +1,7 @@
 import Debug from '../../../src/debug';
 import { Parser } from '../../../src/token/token-stream-parser';
 import { TYPE, DatabaseEnvChangeToken } from '../../../src/token/token';
-import { type ParserOptions } from '../../../src/token/stream-parser';
+import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { TokenHandler } from '../../../src/token/handler';
 import type Message from '../../../src/message';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
@@ -145,6 +145,30 @@ describe('Token Stream Parser', () => {
     await new Promise<void>((resolve) => parser.on('end', resolve));
     clearTimeout(timer);
 
+    assert.isTrue(timerRan, 'parsing starved the event loop');
+  });
+
+  it('should yield the event loop when consumed as an async iterable too', async function() {
+    this.timeout(10000);
+
+    // `parseTokens` is the async iterable form. A consumer driving it with
+    // `for await` gets no event loop availability from those `await`s alone -
+    // they resolve on the microtask queue - so it has to yield for itself.
+    const chunks = new Array(200000).fill(createDbChangeBuffer());
+
+    let timerRan = false;
+    const timer = setTimeout(() => { timerRan = true; }, 0);
+
+    let tokens = 0;
+    for await (const token of StreamParser.parseTokens(chunks, new Debug(), options)) {
+      if (token !== undefined) {
+        tokens++;
+      }
+    }
+
+    clearTimeout(timer);
+
+    assert.isAbove(tokens, 0);
     assert.isTrue(timerRan, 'parsing starved the event loop');
   });
 });
