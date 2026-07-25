@@ -1,6 +1,6 @@
 // s2.2.7.17
 
-import Parser from './stream-parser';
+import Parser, { type ParserOptions } from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
 import { RowToken } from './token';
@@ -14,10 +14,31 @@ interface Column {
   metadata: ColumnMetadata;
 }
 
-async function rowParser(parser: Parser): Promise<RowToken> {
-  const columns: Column[] = [];
+function buildToken(columns: Column[], options: ParserOptions): RowToken {
+  if (options.useColumnNames) {
+    const columnsMap: { [key: string]: Column } = Object.create(null);
 
-  for (const metadata of parser.colMetadata) {
+    columns.forEach((column) => {
+      const colName = column.metadata.colName;
+      if (columnsMap[colName] == null) {
+        columnsMap[colName] = column;
+      }
+    });
+
+    return new RowToken(columnsMap);
+  } else {
+    return new RowToken(columns);
+  }
+}
+
+// Reads the remaining columns of a row, starting at `index`, waiting for more
+// data whenever the current buffer runs out.
+async function rowParserAsync(parser: Parser, columns: Column[], index: number): Promise<RowToken> {
+  const colMetadata = parser.colMetadata;
+
+  for (let i = index; i < colMetadata.length; i++) {
+    const metadata = colMetadata[i];
+
     while (true) {
       if (isPLPStream(metadata)) {
         const chunks = await readPLPStream(parser);
@@ -53,20 +74,49 @@ async function rowParser(parser: Parser): Promise<RowToken> {
     }
   }
 
-  if (parser.options.useColumnNames) {
-    const columnsMap: { [key: string]: Column } = Object.create(null);
+  return buildToken(columns, parser.options);
+}
 
-    columns.forEach((column) => {
-      const colName = column.metadata.colName;
-      if (columnsMap[colName] == null) {
-        columnsMap[colName] = column;
+// Rows are by far the most frequent token in a result set, so the common case -
+// the whole row being available in the buffer already, and none of its columns
+// needing a PLP stream - is handled without entering an `async` function at
+// all. That saves a promise and a microtask per row. As soon as a column needs
+// to wait for more data, parsing continues asynchronously from that column on.
+function rowParser(parser: Parser): RowToken | Promise<RowToken> {
+  const colMetadata = parser.colMetadata;
+  const buffer = parser.buffer;
+  const options = parser.options;
+  const columns: Column[] = [];
+
+  let offset = parser.position;
+
+  for (let i = 0; i < colMetadata.length; i++) {
+    const metadata = colMetadata[i];
+
+    if (isPLPStream(metadata)) {
+      parser.position = offset;
+      return rowParserAsync(parser, columns, i);
+    }
+
+    let result;
+    try {
+      result = readValue(buffer, offset, metadata, options);
+    } catch (err) {
+      if (err instanceof NotEnoughDataError) {
+        parser.position = offset;
+        return rowParserAsync(parser, columns, i);
       }
-    });
 
-    return new RowToken(columnsMap);
-  } else {
-    return new RowToken(columns);
+      throw err;
+    }
+
+    offset = result.offset;
+    columns.push({ value: result.value, metadata });
   }
+
+  parser.position = offset;
+
+  return buildToken(columns, options);
 }
 
 export default rowParser;
