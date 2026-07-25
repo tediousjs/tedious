@@ -470,22 +470,24 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
   }
 }
 
+// Data type ids of the types that can arrive as a PLP stream. `xml` and UDTs
+// always do; `varchar`, `nvarchar` and `varbinary` only when declared as
+// `MAX`. Compared by id rather than by name because this runs once per column
+// of every single row.
+const XML_ID = 0xF1;
+const UDT_ID = 0xF0;
+const VARCHAR_ID = 0xA7;
+const NVARCHAR_ID = 0xE7;
+const VARBINARY_ID = 0xA5;
+
 function isPLPStream(metadata: Metadata) {
-  switch (metadata.type.name) {
-    case 'VarChar':
-    case 'NVarChar':
-    case 'VarBinary': {
-      return metadata.dataLength === MAX;
-    }
+  const id = metadata.type.id;
 
-    case 'Xml': {
-      return true;
-    }
-
-    case 'UDT': {
-      return true;
-    }
+  if (id === VARCHAR_ID || id === NVARCHAR_ID || id === VARBINARY_ID) {
+    return metadata.dataLength === MAX;
   }
+
+  return id === XML_ID || id === UDT_ID;
 }
 
 function readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOptions): Result<string> {

@@ -84,37 +84,44 @@ async function rowParserAsync(parser: Parser, columns: Column[], index: number):
 // to wait for more data, parsing continues asynchronously from that column on.
 function rowParser(parser: Parser): RowToken | Promise<RowToken> {
   const colMetadata = parser.colMetadata;
+  const length = colMetadata.length;
   const buffer = parser.buffer;
   const options = parser.options;
+
+  // `columns.length` doubles as the index of the column being read, so the
+  // loop needs no separate counter and the async fallback can pick up exactly
+  // where this left off.
   const columns: Column[] = [];
 
   let offset = parser.position;
 
-  for (let i = 0; i < colMetadata.length; i++) {
-    const metadata = colMetadata[i];
+  // One `try` around the whole row rather than one per column. `offset` only
+  // advances after a column was read in full, so a column running out of data
+  // leaves both it and `columns` pointing at the column to resume from.
+  try {
+    while (columns.length < length) {
+      const metadata = colMetadata[columns.length];
 
-    if (isPLPStream(metadata)) {
-      parser.position = offset;
-      return rowParserAsync(parser, columns, i);
-    }
-
-    let result;
-    try {
-      result = readValue(buffer, offset, metadata, options);
-    } catch (err) {
-      if (err instanceof NotEnoughDataError) {
-        parser.position = offset;
-        return rowParserAsync(parser, columns, i);
+      if (isPLPStream(metadata)) {
+        break;
       }
 
+      const result = readValue(buffer, offset, metadata, options);
+
+      offset = result.offset;
+      columns.push({ value: result.value, metadata });
+    }
+  } catch (err) {
+    if (!(err instanceof NotEnoughDataError)) {
       throw err;
     }
-
-    offset = result.offset;
-    columns.push({ value: result.value, metadata });
   }
 
   parser.position = offset;
+
+  if (columns.length < length) {
+    return rowParserAsync(parser, columns, columns.length);
+  }
 
   return buildToken(columns, options);
 }
