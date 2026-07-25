@@ -21,7 +21,12 @@ import { NotEnoughDataError } from './helpers';
 export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
 
 // How long token parsing may hold on to the event loop before handing it back.
-const MAX_SLICE_MS = 0.5;
+//
+// Measured against SQL Server with 50k row result sets, p99 loop delay tracks
+// this budget almost exactly, while throughput is flat from 1ms upwards and
+// starts to give a little back below it - yielding more often than once a
+// millisecond costs more than it buys. 1ms sits on that knee.
+const MAX_SLICE_MS = 1;
 
 // How many tokens to parse between deadline checks. Reading the clock per
 // token would cost more than the yielding saves.
