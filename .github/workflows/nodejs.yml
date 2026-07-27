@@ -120,13 +120,13 @@ jobs:
 
     strategy:
       matrix:
-        mssql-version: [2016, 2017, 2019, 2022]
+        mssql-version: [2016, 2017, 2019, 2022, 2025]
         node-version: [22.x, 24.x, 26.x]
       fail-fast: false
 
     steps:
     - name: Install SQL Server ${{ matrix.mssql-version }}
-      uses: tediousjs/setup-sqlserver@v2
+      uses: tediousjs/setup-sqlserver@v4
       with:
         sqlserver-version: ${{ matrix.mssql-version }}
         install-updates: true

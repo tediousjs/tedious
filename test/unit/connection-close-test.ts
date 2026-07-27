@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 import * as net from 'net';
-import { Connection, ConnectionError } from '../../src/tedious';
+import { Connection, ConnectionError, Request, RequestError } from '../../src/tedious';
 import IncomingMessageStream from '../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
@@ -181,6 +181,141 @@ describe('Closing a connection while connecting', function() {
 
       // Ensure no additional `end` event is emitted afterwards.
       setImmediate(() => {
+        assert.strictEqual(endCount, 1);
+
+        done();
+      });
+    });
+  });
+});
+
+describe('Closing a connection with an active request', function() {
+  let server: net.Server;
+  let _connections: net.Socket[];
+
+  beforeEach(function(done) {
+    _connections = [];
+    server = net.createServer((connection) => {
+      _connections.push(connection);
+    });
+    server.listen(0, '127.0.0.1', done);
+  });
+
+  afterEach(function(done) {
+    _connections.forEach((connection) => {
+      connection.destroy();
+    });
+
+    server.close(done);
+  });
+
+  it('should complete the request with `ECLOSE` exactly once, even when the request callback calls `close` again', function(done) {
+    // A server that responds to the full login sequence, but not to any
+    // requests made afterwards.
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message, done } = await messageIterator.next();
+          if (done) {
+            return;
+          }
+          assert.strictEqual(message.type, 0x12);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message, done } = await messageIterator.next();
+          if (done) {
+            return;
+          }
+          assert.strictEqual(message.type, 0x10);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildLoginAckToken());
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (Initial SQL)
+        {
+          const { value: message, done } = await messageIterator.next();
+          if (done) {
+            return;
+          }
+          assert.strictEqual(message.type, 0x01);
+
+          const chunks: Buffer[] = [];
+          for await (const data of message) {
+            chunks.push(data);
+          }
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    let endCount = 0;
+    connection.on('end', () => {
+      endCount += 1;
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      let callCount = 0;
+      const request = new Request('select 1', (err) => {
+        callCount += 1;
+
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual((err as RequestError).code, 'ECLOSE');
+
+        // Calling `close` from a request callback that is invoked as part
+        // of the connection cleanup must not re-enter the cleanup logic
+        // and complete the request a second time.
+        connection.close();
+      });
+
+      connection.execSqlBatch(request);
+      connection.close();
+
+      setImmediate(() => {
+        assert.strictEqual(callCount, 1);
         assert.strictEqual(endCount, 1);
 
         done();

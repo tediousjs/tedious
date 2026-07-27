@@ -55,4 +55,16 @@ describe('Token Stream Parser', () => {
 
     parser.on('end', done);
   });
+
+  it('should parse token delivered one byte at a time', function(done) {
+    const debug = new Debug({ token: true });
+    const buffer = createDbChangeBuffer();
+
+    const chunks = Array.from(buffer, (byte) => Buffer.from([byte]));
+
+    // Cast to Message since tests use a simplified input instead of full Message
+    const parser = new Parser(chunks as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
+
+    parser.on('end', done);
+  });
 });

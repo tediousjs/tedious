@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 import * as net from 'net';
-import { Connection, Request, RequestError, TYPES } from '../../src/tedious';
+import { Connection, ConnectionError, Request, RequestError, TYPES } from '../../src/tedious';
 import IncomingMessageStream from '../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
@@ -393,6 +393,271 @@ describe('Canceling a request', function() {
 
     connection.on('end', () => {
       done();
+    });
+  });
+
+  it('should complete the canceled request within `cancelTimeout` when canceled before the request message was fully sent and the server never responds', function(done) {
+    // A request that is canceled before its request message was fully sent
+    // is terminated by setting the `IGNORE` bit on the message's final
+    // packet. The client then waits for the server's response to the
+    // ignored message. If the server never sends that response, the
+    // `cancelTimeout` backstop must kick in and fail the request - the
+    // request must not be left waiting indefinitely.
+    this.timeout(2000);
+
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          await drainMessage(message);
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (Initial SQL)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`select 1`) - the request message was canceled while
+        // it was being sent, so its final packet carries the `IGNORE` bit.
+        // The message is received but never responded to, like a server
+        // that has become unresponsive.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false,
+        cancelTimeout: 300
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      let failure: Error | undefined;
+
+      // If the request is still pending well after `cancelTimeout` has
+      // elapsed, the backstop did not kick in - fail the test and close
+      // the connection ourselves so it can be torn down cleanly.
+      const guardTimer = setTimeout(() => {
+        failure = new Error('Canceled request was not completed within `cancelTimeout`');
+        connection.close();
+      }, 1000);
+
+      const request = new Request('select 1', (err) => {
+        clearTimeout(guardTimer);
+
+        try {
+          // The cancel timer tears down the connection via a synthetic
+          // socket error.
+          assert.instanceOf(err, ConnectionError);
+          assert.strictEqual((err as ConnectionError).code, 'ETIMEOUT');
+        } catch (assertionError: any) {
+          failure ??= assertionError;
+        }
+
+        connection.close();
+      });
+
+      connection.execSqlBatch(request);
+
+      // Cancel the request immediately, before the request message
+      // was fully sent off.
+      connection.cancel();
+
+      connection.on('end', () => {
+        done(failure);
+      });
+    });
+  });
+
+  it('should complete the request within `cancelTimeout` when the request timeout expires while the request message is being sent and the server never responds', function(done) {
+    // When the request timeout expires, the request is canceled. If the
+    // request message was not fully sent yet at that point, it is
+    // terminated with the `IGNORE` bit set and the client waits for the
+    // server's response to the ignored message. If the server never sends
+    // that response, the `cancelTimeout` backstop must kick in and fail
+    // the request - the request timeout must not leave the request
+    // pending indefinitely.
+    this.timeout(3000);
+
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // PRELOGIN
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x12);
+
+          await drainMessage(message);
+
+          const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 1, minor: 2, build: 3, subbuild: 0 } });
+          const responseMessage = new Message({ type: 0x12 });
+          responseMessage.end(responsePayload.data);
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // LOGIN7
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x10);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (Initial SQL)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`insert bulk ...`)
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end();
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // Bulk Load - the request timeout expires while the bulk load
+        // message is still being sent, so its final packet carries the
+        // `IGNORE` bit. The message is received but never responded to,
+        // like a server that has become unresponsive.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x07);
+
+          await drainMessage(message);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false,
+        requestTimeout: 200,
+        cancelTimeout: 300
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      let failure: Error | undefined;
+
+      // If the request is still pending well after `requestTimeout` plus
+      // `cancelTimeout` have elapsed, the backstop did not kick in - fail
+      // the test and close the connection ourselves so it can be torn
+      // down cleanly.
+      const guardTimer = setTimeout(() => {
+        failure = new Error('Timed out request was not completed within `cancelTimeout`');
+        connection.close();
+      }, 1500);
+
+      const bulkLoad = connection.newBulkLoad('#tmp', (err) => {
+        clearTimeout(guardTimer);
+
+        try {
+          // The cancel timer tears down the connection via a synthetic
+          // socket error.
+          assert.instanceOf(err, ConnectionError);
+          assert.strictEqual((err as ConnectionError).code, 'ETIMEOUT');
+        } catch (assertionError: any) {
+          failure ??= assertionError;
+        }
+
+        connection.close();
+      });
+
+      bulkLoad.addColumn('a', TYPES.VarBinary, { length: 8000, nullable: false });
+
+      // A row stream that never completes, so the bulk load message is
+      // still being sent when the request timeout expires. The first row
+      // is large enough to fill a packet, so the server starts receiving
+      // the bulk load message right away.
+      connection.execBulkLoad(bulkLoad, (async function*() {
+        yield [Buffer.alloc(8000)];
+
+        await new Promise<unknown>(() => {
+          // This promise never resolves.
+        });
+      })());
+
+      connection.on('end', () => {
+        done(failure);
+      });
     });
   });
 

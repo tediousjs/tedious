@@ -201,10 +201,10 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
   options: {
     /**
-     * If you user want to connect to an Azure app service using a specific client account
-     * they need to provide `clientId` associate to their created identity.
+     * If you want to connect to an Azure app service using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieve token from azure web app service
+     * This is optional for retrieving a token from Azure web app service.
      */
     clientId?: string;
   };
@@ -214,10 +214,10 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
-     * If you want to connect using a specific client account
-     * they need to provide `clientId` associated to their created identity.
+     * If you want to connect using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieve a token
+     * This is optional for retrieving a token.
      */
     clientId?: string;
   };
@@ -227,10 +227,10 @@ interface AzureActiveDirectoryDefaultAuthentication {
   type: 'azure-active-directory-default';
   options: {
     /**
-     * If you want to connect using a specific client account
-     * they need to provide `clientId` associated to their created identity.
+     * If you want to connect using a specific client account,
+     * you need to provide the `clientId` associated with your created identity.
      *
-     * This is optional for retrieving a token
+     * This is optional for retrieving a token.
      */
     clientId?: string;
   };
@@ -241,8 +241,8 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
-     * A user need to provide `token` which they retrieved else where
-     * to forming the connection.
+     * A user needs to provide a `token` which they retrieved elsewhere
+     * to form the connection.
      */
     token: string;
   };
@@ -252,12 +252,12 @@ interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
-     * A user need to provide `userName` associate to their account.
+     * A user needs to provide a `userName` associated with their account.
      */
     userName: string;
 
     /**
-     * A user need to provide `password` associate to their account.
+     * A user needs to provide a `password` associated with their account.
      */
     password: string;
 
@@ -573,13 +573,13 @@ export interface ConnectionOptions {
    * * `SERIALIZABLE`
    * * `SNAPSHOT`
    *
-   * (default: `READ_COMMITED`).
+   * (default: `READ_COMMITTED`).
    */
   connectionIsolationLevel?: number;
 
   /**
    * When encryption is used, an object may be supplied that will be used
-   * for the first argument when calling [`tls.createSecurePair`](http://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurepair_credentials_isserver_requestcert_rejectunauthorized)
+   * for the first argument when calling [`tls.createSecureContext`](https://nodejs.org/docs/latest/api/tls.html#tlscreatesecurecontextoptions).
    *
    * (default: `{}`)
    */
@@ -667,7 +667,7 @@ export interface ConnectionOptions {
   enableImplicitTransactions?: boolean;
 
   /**
-   * If false, error is not generated during loss of precession.
+   * If false, error is not generated during loss of precision.
    *
    * (default: `false`)
    */
@@ -718,7 +718,7 @@ export interface ConnectionOptions {
    * * `SERIALIZABLE`
    * * `SNAPSHOT`
    *
-   * (default: `READ_COMMITED`).
+   * (default: `READ_COMMITTED`).
    */
   isolationLevel?: number;
 
@@ -742,7 +742,7 @@ export interface ConnectionOptions {
   lowerCaseGuids?: boolean;
 
   /**
-   * The maximum number of connection retries for transient errors.、
+   * The maximum number of connection retries for transient errors.
    *
    * (default: `3`).
    */
@@ -838,7 +838,7 @@ export interface ConnectionOptions {
    * the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly
    * matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed.
    *
-   * (default: `true`)
+   * (default: `false`)
    */
   trustServerCertificate?: boolean;
 
@@ -877,20 +877,32 @@ interface RoutingData {
 }
 
 /**
- * Helper function, equivalent to `Promise.withResolvers()`.
+ * Runs the given function, providing it with a promise that will reject
+ * with the given signal's abort reason once the signal is aborted.
  *
- * @returns An object with the properties `promise`, `resolve`, and `reject`.
+ * The function can race this promise against any asynchronous work it
+ * performs (potentially multiple times) to make itself abortable.
+ *
+ * The rejection is always considered handled, and the signal's abort
+ * listener is removed once the function settles.
  */
-function withResolvers<T>() {
-  let resolve: (value: T | PromiseLike<T>) => void;
-  let reject: (reason?: any) => void;
+async function withAbortRace<T>(signal: AbortSignal, func: (signalAborted: Promise<never>) => Promise<T>): Promise<T> {
+  signal.throwIfAborted();
 
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
+  const { promise: signalAborted, reject } = Promise.withResolvers<never>();
 
-  return { promise, resolve: resolve!, reject: reject! };
+  // Prevent unhandled rejections if the signal is aborted while
+  // `func` is not currently racing against `signalAborted`.
+  signalAborted.catch(() => {});
+
+  const onAbort = () => { reject(signal.reason); };
+  signal.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    return await func(signalAborted);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
 }
 
 /**
@@ -954,10 +966,6 @@ class Connection extends EventEmitter {
    * @private
    */
   declare closed: boolean;
-  /**
-   * @private
-   */
-  declare loginError: undefined | AggregateError | ConnectionError;
   /**
    * @private
    */
@@ -1869,7 +1877,7 @@ class Connection extends EventEmitter {
   on(
     event: 'connect',
     /**
-     * @param err If successfully connected, will be falsey. If there was a
+     * @param err If successfully connected, will be falsy. If there was a
      *   problem (with either connecting or validation), will be an [[Error]] object.
      */
     listener: (err: Error | undefined) => void
@@ -2172,15 +2180,17 @@ class Connection extends EventEmitter {
         this.emit('end');
       });
 
+      // Mark the connection as closed and detach the active request
+      // before invoking its callback, so that a callback that synchronously
+      // calls `close` does not re-enter this cleanup logic.
       const request = this.request;
-      if (request) {
-        const err = new RequestError('Connection closed before request completed.', 'ECLOSE');
-        request.callback(err);
-        this.request = undefined;
-      }
-
+      this.request = undefined;
       this.attentionSent = false;
       this.closed = true;
+
+      if (request) {
+        request.callback(new RequestError('Connection closed before request completed.', 'ECLOSE'));
+      }
     }
   }
 
@@ -2218,7 +2228,7 @@ class Connection extends EventEmitter {
       servername: this.config.options.serverName ? this.config.options.serverName : serverName,
     };
 
-    const { promise, resolve, reject } = withResolvers<tls.TLSSocket>();
+    const { promise, resolve, reject } = Promise.withResolvers<tls.TLSSocket>();
     const encryptsocket = tls.connect(encryptOptions);
 
     try {
@@ -2657,10 +2667,10 @@ class Connection extends EventEmitter {
 
   /**
    * Execute the SQL batch represented by [[Request]].
-   * There is no param support, and unlike [[Request.execSql]],
+   * There is no param support, and unlike [[execSql]],
    * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
    *
-   * In almost all cases, [[Request.execSql]] will be a better choice.
+   * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
    */
@@ -3187,6 +3197,10 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+    // Clear any error left over from a previous execution of this request,
+    // even if the request is rejected before being sent.
+    request.error = undefined;
+
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3220,6 +3234,12 @@ class Connection extends EventEmitter {
         // set the ignore bit and end the message.
         message.ignore = true;
         message.end();
+
+        // The server responds to the ignored message like to any other
+        // request message. If that response never arrives (e.g. because
+        // the server has become unresponsive), the cancel timer ensures
+        // the canceled request still completes.
+        this.createCancelTimer();
 
         if (request instanceof Request && request.paused) {
           // resume the request if it was paused so we can read the remaining tokens
@@ -3325,14 +3345,7 @@ class Connection extends EventEmitter {
    * @private
    */
   async performTlsNegotiation(preloginPayload: PreloginPayload, signal: AbortSignal) {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       if (preloginPayload.fedAuthRequired === 1) {
         this.fedAuthRequired = true;
       }
@@ -3349,22 +3362,13 @@ class Connection extends EventEmitter {
           signalAborted
         ]);
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   async readPreloginResponse(signal: AbortSignal): Promise<PreloginPayload> {
-    signal.throwIfAborted();
-
     let messageBuffer = Buffer.alloc(0);
 
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3391,9 +3395,7 @@ class Connection extends EventEmitter {
           await iterator.return();
         }
       }
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
 
     const preloginPayload = new PreloginPayload(messageBuffer);
     this.debug.payload(function() {
@@ -3441,7 +3443,7 @@ class Connection extends EventEmitter {
     const closeSignal = this.closeController!.signal;
     closeSignal.throwIfAborted();
 
-    const { promise, resolve, reject } = withResolvers<void>();
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
 
     const onAbort = () => { reject(closeSignal.reason); };
     closeSignal.addEventListener('abort', onAbort, { once: true });
@@ -3463,14 +3465,7 @@ class Connection extends EventEmitter {
    * @private
    */
   async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3487,29 +3482,19 @@ class Connection extends EventEmitter {
 
       if (handler.loginAckReceived) {
         return handler.routingData;
-      } else if (this.loginError) {
-        throw this.loginError;
+      } else if (handler.loginError) {
+        throw handler.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       while (true) {
         const message = await Promise.race([
           this.messageIo.readMessage().catch((err) => {
@@ -3543,30 +3528,20 @@ class Connection extends EventEmitter {
           });
 
           this.ntlmpacket = undefined;
-        } else if (this.loginError) {
-          throw this.loginError;
+        } else if (handler.loginError) {
+          throw handler.loginError;
         } else {
           throw new ConnectionError('Login failed.', 'ELOGIN');
         }
       }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    return await withAbortRace(signal, async (signalAborted) => {
       const message = await Promise.race([
         this.messageIo.readMessage().catch((err) => {
           throw this.wrapSocketError(err);
@@ -3588,7 +3563,7 @@ class Connection extends EventEmitter {
       const fedAuthInfoToken = handler.fedAuthInfoToken;
 
       if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-        /** Federated authentication configation. */
+        /** Federated authentication configuration. */
         const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
         /** Permission scope to pass to Entra ID when requesting an authentication token. */
         const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
@@ -3651,29 +3626,19 @@ class Connection extends EventEmitter {
         // sent the fedAuth token message, the rest is similar to standard login 7
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
         return await this.performSentLogin7WithStandardLogin(signal);
-      } else if (this.loginError) {
-        throw this.loginError;
+      } else if (handler.loginError) {
+        throw handler.loginError;
       } else {
         throw new ConnectionError('Login failed.', 'ELOGIN');
       }
-    } finally {
-      this.loginError = undefined;
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 
   /**
    * @private
    */
   async performLoggedInSendingInitialSql(signal: AbortSignal) {
-    signal.throwIfAborted();
-
-    const { promise: signalAborted, reject } = withResolvers<never>();
-
-    const onAbort = () => { reject(signal.reason); };
-    signal.addEventListener('abort', onAbort, { once: true });
-
-    try {
+    await withAbortRace(signal, async (signalAborted) => {
       this.sendInitialSql();
 
       const message = await Promise.race([
@@ -3688,9 +3653,7 @@ class Connection extends EventEmitter {
         once(tokenStreamParser, 'end'),
         signalAborted
       ]);
-    } finally {
-      signal.removeEventListener('abort', onAbort);
-    }
+    });
   }
 }
 
@@ -3832,6 +3795,12 @@ Connection.prototype.STATE = {
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
 
+          // If the request was canceled before its request message was
+          // fully sent, this response belongs to the ignored message and
+          // a cancel timer is running - the response's arrival is what
+          // completes the cancellation.
+          this.clearCancelTimer();
+
           this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
           this.request = undefined;
@@ -3864,6 +3833,15 @@ Connection.prototype.STATE = {
     name: 'SentAttention',
     enter: function() {
       (async () => {
+        // TDS is a request-response protocol at the message level: every
+        // client message - including the attention message - receives
+        // exactly one response message. By the time we enter this state,
+        // the response to the canceled request itself was already consumed
+        // in the `SentClientRequest` state, so the single message read here
+        // is the attention message's own response, containing the attention
+        // acknowledgement. Reading more than one message would consume the
+        // response belonging to the next request and desynchronize the
+        // message stream - so don't turn this into a loop.
         let message;
         try {
           message = await this.messageIo.readMessage();
