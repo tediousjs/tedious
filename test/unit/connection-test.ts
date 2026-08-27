@@ -89,7 +89,25 @@ describe('Using `strict` encryption', function() {
     // login carrying an Entra ID access token, which routinely exceeds one 4KB packet)
     // would then be sent as one oversized TLS record, which Azure SQL's TDS 8.0
     // gateway rejects by resetting the connection.
-    const setMaxSendFragmentSpy = sinon.spy(tls.TLSSocket.prototype, 'setMaxSendFragment');
+    //
+    // `wrapWithTls` ignores `trustServerCertificate` (TDS 8.0 mandates real certificate
+    // validation), so the fake server here uses `test/fixtures/loopback-ip.crt`, which
+    // carries an `IP Address:127.0.0.1` SAN, and the client trusts it via `ca` — the
+    // handshake succeeds through genuine certificate validation, not a bypass.
+    //
+    // `wrapWithTls` doesn't route through `MessageIO`'s `secure` event (that only fires
+    // for the classic path), so there's no connection-level event to wait on here.
+    // Instead of a fixed delay, react as soon as `setMaxSendFragment` is first called.
+    const originalSetMaxSendFragment = tls.TLSSocket.prototype.setMaxSendFragment;
+    const calls: number[] = [];
+    const { promise: onCalled, resolve: resolveOnCalled } = Promise.withResolvers<void>();
+
+    const setMaxSendFragmentStub = sinon.stub(tls.TLSSocket.prototype, 'setMaxSendFragment').callsFake(function(this: tls.TLSSocket, size: number) {
+      calls.push(size);
+      resolveOnCalled();
+      return originalSetMaxSendFragment.call(this, size);
+    });
+
     const serverSockets: net.Socket[] = [];
 
     server.on('connection', (rawSocket) => {
@@ -100,8 +118,8 @@ describe('Using `strict` encryption', function() {
       // care about what the client does immediately after the handshake completes.
       const tlsSocket = new tls.TLSSocket(rawSocket, {
         isServer: true,
-        key: readFileSync('./test/fixtures/localhost.key'),
-        cert: readFileSync('./test/fixtures/localhost.crt'),
+        key: readFileSync('./test/fixtures/loopback-ip.key'),
+        cert: readFileSync('./test/fixtures/loopback-ip.crt'),
         ALPNProtocols: ['tds/8.0']
       });
 
@@ -116,7 +134,9 @@ describe('Using `strict` encryption', function() {
       options: {
         port: addressInfo.port,
         encrypt: 'strict',
-        trustServerCertificate: true,
+        cryptoCredentialsDetails: {
+          ca: [readFileSync('./test/fixtures/loopback-ip.crt')]
+        },
         packetSize: 2048,
         connectTimeout: 3000
       }
@@ -124,22 +144,22 @@ describe('Using `strict` encryption', function() {
 
     // The fake server never completes PRELOGIN/LOGIN7, so the connection will time out
     // eventually — that's fine, we only need to observe what happens right after the
-    // TLS handshake, which happens well before the timeout fires.
+    // TLS handshake, which is what `setMaxSendFragment` is called for.
     connection.connect(() => {});
 
-    setTimeout(() => {
-      setMaxSendFragmentSpy.restore();
+    onCalled.then(() => {
+      setMaxSendFragmentStub.restore();
       connection.close();
       for (const socket of serverSockets) {
         socket.destroy();
       }
 
-      assert.isTrue(
-        setMaxSendFragmentSpy.calledWith(2048),
-        `expected setMaxSendFragment to be called with 2048, got calls: ${JSON.stringify(setMaxSendFragmentSpy.args)}`
+      assert.deepEqual(
+        calls, [2048],
+        `expected setMaxSendFragment to be called with 2048, got calls: ${JSON.stringify(calls)}`
       );
 
       done();
-    }, 500);
+    });
   });
 });

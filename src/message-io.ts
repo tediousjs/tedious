@@ -13,6 +13,9 @@ import { TYPE } from './packet';
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
+// Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
+const MAX_TLS_SEND_FRAGMENT_SIZE = 16384;
+
 class MessageIO extends EventEmitter {
   declare socket: Socket;
   declare debug: Debug;
@@ -53,8 +56,16 @@ class MessageIO extends EventEmitter {
       this.outgoingMessageStream.packetSize = packetSize;
     }
 
+    const maxSendFragment = Math.min(this.outgoingMessageStream.packetSize, MAX_TLS_SEND_FRAGMENT_SIZE);
+
     if (this.securePair) {
-      this.securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+      // Classic `encrypt: true` path: TLS is layered over a `DuplexPair`.
+      this.securePair.cleartext.setMaxSendFragment(maxSendFragment);
+    } else if (this.socket instanceof tls.TLSSocket) {
+      // `encrypt: "strict"` (TDS 8.0) path: the socket itself is the TLS socket. Without
+      // this, a server-initiated packet size change (ENVCHANGE) after login would leave
+      // the original cap in place, potentially allowing oversized TLS records again.
+      this.socket.setMaxSendFragment(maxSendFragment);
     }
 
     return this.outgoingMessageStream.packetSize;
@@ -104,7 +115,7 @@ class MessageIO extends EventEmitter {
 
         this.emit('secure', securePair.cleartext);
 
-        securePair.cleartext.setMaxSendFragment(this.outgoingMessageStream.packetSize);
+        securePair.cleartext.setMaxSendFragment(Math.min(this.outgoingMessageStream.packetSize, MAX_TLS_SEND_FRAGMENT_SIZE));
 
         this.outgoingMessageStream.unpipe(this.socket);
         this.socket.unpipe(this.incomingMessageStream);

@@ -173,6 +173,11 @@ const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
  */
 const DEFAULT_PACKET_SIZE = 4 * 1024;
 /**
+ * Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
+ * @private
+ */
+const MAX_TLS_SEND_FRAGMENT_SIZE = 16384;
+/**
  * @private
  */
 const DEFAULT_TEXTSIZE = 2147483647;
@@ -2250,7 +2255,11 @@ class Connection extends EventEmitter {
           // https://github.com/tediousjs/tedious/issues/1182. Single-packet logins
           // (e.g. plain SQL auth with short credentials) are unaffected either way,
           // which is why this bug reads as "FedAuth-specific" until you look closer.
-          encryptsocket.setMaxSendFragment(this.config.options.packetSize);
+          //
+          // `setMaxSendFragment` silently no-ops for values outside 512-16384, so a
+          // `packetSize` above that (e.g. 32767, commonly used for bulk load) has to be
+          // clamped or it would leave the cap unset and reintroduce the bug it fixes.
+          encryptsocket.setMaxSendFragment(Math.min(this.config.options.packetSize, MAX_TLS_SEND_FRAGMENT_SIZE));
           resolve(encryptsocket);
         };
 
@@ -2261,7 +2270,7 @@ class Connection extends EventEmitter {
           return await promise;
         } finally {
           encryptsocket.removeListener('error', onError);
-          encryptsocket.removeListener('connect', onConnect);
+          encryptsocket.removeListener('secureConnect', onConnect);
         }
       } finally {
         signal.removeEventListener('abort', onAbort);
