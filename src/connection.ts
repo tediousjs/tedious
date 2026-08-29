@@ -2237,7 +2237,26 @@ class Connection extends EventEmitter {
 
       try {
         const onError = reject;
-        const onConnect = () => { resolve(encryptsocket); };
+        const onConnect = () => {
+          // Without this, Node's TLS layer is free to coalesce multiple back-to-back
+          // TDS packet writes into a single, larger TLS record. The non-strict `startTls`
+          // path (message-io.ts) caps max send fragment to the TDS packet size for the
+          // same reason; `wrapWithTls` (TDS 8.0 / encrypt: "strict") must match it.
+          //
+          // Without this fix, a LOGIN7 spanning multiple TDS packets (e.g. any FedAuth
+          // login carrying an Entra ID access token, which routinely exceeds one 4KB
+          // packet) reliably fails with ECONNRESET against Azure SQL once TLS is
+          // negotiated but before LOGINACK — see
+          // https://github.com/tediousjs/tedious/issues/1182. Single-packet logins
+          // (e.g. plain SQL auth with short credentials) are unaffected either way,
+          // which is why this bug reads as "FedAuth-specific" until you look closer.
+          //
+          // `setMaxSendFragment` silently no-ops for values outside 512-16384, so a
+          // `packetSize` above that (e.g. 32767, commonly used for bulk load) has to be
+          // clamped or it would leave the cap unset and reintroduce the bug it fixes.
+          encryptsocket.setMaxSendFragment(Math.min(this.config.options.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
+          resolve(encryptsocket);
+        };
 
         encryptsocket.once('error', onError);
         encryptsocket.once('secureConnect', onConnect);
@@ -2246,7 +2265,7 @@ class Connection extends EventEmitter {
           return await promise;
         } finally {
           encryptsocket.removeListener('error', onError);
-          encryptsocket.removeListener('connect', onConnect);
+          encryptsocket.removeListener('secureConnect', onConnect);
         }
       } finally {
         signal.removeEventListener('abort', onAbort);
