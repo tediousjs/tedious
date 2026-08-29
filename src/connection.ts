@@ -173,11 +173,6 @@ const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
  */
 const DEFAULT_PACKET_SIZE = 4 * 1024;
 /**
- * Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
- * @private
- */
-const MAX_TLS_SEND_FRAGMENT_SIZE = 16384;
-/**
  * @private
  */
 const DEFAULT_TEXTSIZE = 2147483647;
@@ -2259,7 +2254,7 @@ class Connection extends EventEmitter {
           // `setMaxSendFragment` silently no-ops for values outside 512-16384, so a
           // `packetSize` above that (e.g. 32767, commonly used for bulk load) has to be
           // clamped or it would leave the cap unset and reintroduce the bug it fixes.
-          encryptsocket.setMaxSendFragment(Math.min(this.config.options.packetSize, MAX_TLS_SEND_FRAGMENT_SIZE));
+          encryptsocket.setMaxSendFragment(Math.min(this.config.options.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
           resolve(encryptsocket);
         };
 

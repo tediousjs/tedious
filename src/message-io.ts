@@ -13,10 +13,12 @@ import { TYPE } from './packet';
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
-// Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
-const MAX_TLS_SEND_FRAGMENT_SIZE = 16384;
-
 class MessageIO extends EventEmitter {
+  // Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
+  // (A static class property rather than a named export, as the `module.exports`
+  // assignment at the bottom of this file would clobber named exports for CJS consumers.)
+  static readonly MAX_TLS_SEND_FRAGMENT_SIZE = 16384;
+
   declare socket: Socket;
   declare debug: Debug;
 
@@ -56,7 +58,7 @@ class MessageIO extends EventEmitter {
       this.outgoingMessageStream.packetSize = packetSize;
     }
 
-    const maxSendFragment = Math.min(this.outgoingMessageStream.packetSize, MAX_TLS_SEND_FRAGMENT_SIZE);
+    const maxSendFragment = Math.min(this.outgoingMessageStream.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE);
 
     if (this.securePair) {
       // Classic `encrypt: true` path: TLS is layered over a `DuplexPair`.
@@ -115,7 +117,7 @@ class MessageIO extends EventEmitter {
 
         this.emit('secure', securePair.cleartext);
 
-        securePair.cleartext.setMaxSendFragment(Math.min(this.outgoingMessageStream.packetSize, MAX_TLS_SEND_FRAGMENT_SIZE));
+        securePair.cleartext.setMaxSendFragment(Math.min(this.outgoingMessageStream.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
 
         this.outgoingMessageStream.unpipe(this.socket);
         this.socket.unpipe(this.incomingMessageStream);
