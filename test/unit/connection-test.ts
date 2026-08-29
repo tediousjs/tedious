@@ -142,24 +142,41 @@ describe('Using `strict` encryption', function() {
       }
     });
 
-    // The fake server never completes PRELOGIN/LOGIN7, so the connection will time out
-    // eventually — that's fine, we only need to observe what happens right after the
-    // TLS handshake, which is what `setMaxSendFragment` is called for.
-    connection.connect(() => {});
+    let finished = false;
+    const finish = (err?: Error) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
 
-    onCalled.then(() => {
       setMaxSendFragmentStub.restore();
       connection.close();
       for (const socket of serverSockets) {
         socket.destroy();
       }
 
-      assert.deepEqual(
-        calls, [2048],
-        `expected setMaxSendFragment to be called with 2048, got calls: ${JSON.stringify(calls)}`
-      );
+      done(err);
+    };
 
-      done();
+    // The fake server never completes PRELOGIN/LOGIN7, so the connection would time out
+    // eventually — that's fine, we only need to observe what happens right after the
+    // TLS handshake, which is what `setMaxSendFragment` is called for. If the handshake
+    // itself breaks, the connect callback reports the error, failing fast instead of
+    // hanging until the mocha timeout. (`finish` ignores the late timeout error that
+    // this callback reports after a successful run tears the connection down.)
+    connection.connect(finish);
+
+    onCalled.then(() => {
+      try {
+        assert.deepEqual(
+          calls, [2048],
+          `expected setMaxSendFragment to be called with 2048, got calls: ${JSON.stringify(calls)}`
+        );
+      } catch (err: any) {
+        return finish(err);
+      }
+
+      finish();
     });
   });
 });
