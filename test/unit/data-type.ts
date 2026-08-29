@@ -481,6 +481,31 @@ describe('Decimal', function() {
       const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
     });
+
+    it('serializes a scaled magnitude greater than 2^64 without throwing (#1733)', function() {
+      // 2^64 (= 18446744073709551616) is the smallest value that overflowed the
+      // previous 64-bit write path and threw an uncatchable RangeError.
+      const value = 2 ** 64;
+      const expected = Buffer.from('0100000000000000000100000000000000', 'hex');
+      const precision = 38;
+
+      const type = TYPES.Decimal;
+      const parameterValue = { value, precision, scale: 0 };
+
+      let buffer!: Buffer;
+      assert.doesNotThrow(() => {
+        buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      });
+      assert.deepEqual(buffer, expected);
+    });
+
+    it('throws a RangeError when the scaled value overflows the field width', function() {
+      const parameterValue = { value: -3.4028234663852886e+38, precision: 7, scale: 4 };
+
+      assert.throws(() => {
+        Buffer.concat([...TYPES.Decimal.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      }, RangeError, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
+    });
   });
 
   describe('.generateTypeInfo', function() {
@@ -889,6 +914,31 @@ describe('Numeric', function() {
 
       const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
       assert.deepEqual(buffer, expected);
+    });
+
+    it('serializes a scaled magnitude greater than 2^64 without throwing (#1733)', function() {
+      // 2^64 (= 18446744073709551616) is the smallest value that overflowed the
+      // previous 64-bit write path and threw an uncatchable RangeError.
+      const value = 2 ** 64;
+      const expected = Buffer.from('0100000000000000000100000000000000', 'hex');
+      const precision = 38;
+
+      const type = TYPES.Numeric;
+      const parameterValue = { value, precision, scale: 0 };
+
+      let buffer!: Buffer;
+      assert.doesNotThrow(() => {
+        buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      });
+      assert.deepEqual(buffer, expected);
+    });
+
+    it('throws a RangeError when the scaled value overflows the field width', function() {
+      const parameterValue = { value: -3.4028234663852886e+38, precision: 7, scale: 4 };
+
+      assert.throws(() => {
+        Buffer.concat([...TYPES.Numeric.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      }, RangeError, 'Value -3.4028234663852886e+38 is out of range for NUMERIC(7, 4).');
     });
   });
 
