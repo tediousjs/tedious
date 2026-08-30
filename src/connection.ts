@@ -1878,8 +1878,9 @@ class Connection extends EventEmitter {
       // Stop the request timer: the abort is now the failure cause for
       // this request, and the timer firing later (it only stops once
       // response data arrives) would overwrite the abort reason with an
-      // `ETIMEOUT` error. If the timer fired first, its `ETIMEOUT` error
-      // is already recorded and kept by the `??=` above.
+      // `ETIMEOUT` error. (If the timer fired first, its cancellation
+      // already set `request.canceled`, and this handler returned early
+      // above - the `ETIMEOUT` error stands.)
       this.clearRequestTimer();
 
       request.cancel();

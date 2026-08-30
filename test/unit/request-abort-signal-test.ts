@@ -10,14 +10,14 @@ import PreloginPayload from '../../src/prelogin-payload';
 import Message from '../../src/message';
 import { Packet } from '../../src/packet';
 
-function buildLoginAckToken(): Buffer {
+function buildLoginAckToken(tdsVersion: number[] = [0x74, 0x00, 0x00, 0x04]): Buffer {
   const progname = 'Tedious SQL Server';
 
   const buffer = Buffer.from([
     0xAD, // Type
     0x00, 0x00, // Length
     0x00, // interface number - SQL
-    0x74, 0x00, 0x00, 0x04, // TDS version number
+    ...tdsVersion, // TDS version number
     Buffer.byteLength(progname, 'ucs2') / 2, ...Buffer.from(progname, 'ucs2'), // Progname
     0x00, // major
     0x00, // minor
@@ -31,15 +31,22 @@ function buildLoginAckToken(): Buffer {
 
 /**
  * Builds a final `DONE` token, optionally with a row count.
+ *
+ * The row count is 64 bits wide in TDS 7.2 and later, and 32 bits wide
+ * in earlier versions.
  */
-function buildDoneToken(rowCount?: number): Buffer {
-  const buffer = Buffer.alloc(13);
+function buildDoneToken(rowCount?: number, use64BitRowCount = true): Buffer {
+  const buffer = Buffer.alloc(use64BitRowCount ? 13 : 9);
 
   let offset = 0;
   offset = buffer.writeUInt8(0xFD, offset); // DONE
   offset = buffer.writeUInt16LE(rowCount !== undefined ? 0x0010 : 0x0000, offset); // status = DONE_COUNT or DONE_FINAL
   offset = buffer.writeUInt16LE(0x0000, offset); // curCmd
-  buffer.writeBigUInt64LE(BigInt(rowCount ?? 0), offset); // rowCount
+  if (use64BitRowCount) {
+    buffer.writeBigUInt64LE(BigInt(rowCount ?? 0), offset); // rowCount
+  } else {
+    buffer.writeUInt32LE(rowCount ?? 0, offset); // rowCount
+  }
 
   return buffer;
 }
@@ -97,7 +104,7 @@ async function drainMessage(message: Message): Promise<void> {
  * Handles the connection establishment sequence (`PRELOGIN`, `LOGIN7` and
  * the initial SQL batch) of the fake server.
  */
-async function performHandshake(messageIterator: AsyncIterator<Message>, outgoingMessageStream: OutgoingMessageStream): Promise<void> {
+async function performHandshake(messageIterator: AsyncIterator<Message>, outgoingMessageStream: OutgoingMessageStream, tdsVersion?: number[]): Promise<void> {
   // PRELOGIN
   {
     const { value: message } = await messageIterator.next();
@@ -118,8 +125,12 @@ async function performHandshake(messageIterator: AsyncIterator<Message>, outgoin
 
     await drainMessage(message);
 
+    // The `DONE` token's row count width depends on the TDS version that
+    // the `LOGINACK` token in the same message just negotiated.
+    const use64BitRowCount = tdsVersion === undefined || tdsVersion[0] >= 0x72;
+
     const responseMessage = new Message({ type: 0x04 });
-    responseMessage.end(Buffer.concat([buildLoginAckToken(), buildDoneToken()]));
+    responseMessage.end(Buffer.concat([buildLoginAckToken(tdsVersion), buildDoneToken(undefined, use64BitRowCount)]));
     outgoingMessageStream.write(responseMessage);
   }
 
@@ -625,6 +636,87 @@ describe('Aborting a request via an `AbortSignal`', function() {
         controller.abort(reason);
         signalAborted();
       });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('does not update the emulated transaction state when a legacy transaction request is aborted', function(done) {
+    // With TDS versions below 7.2, transactions are emulated with SQL
+    // batches and client-side `transactionDepth`/`inTransaction`
+    // bookkeeping. That bookkeeping must only be updated when the
+    // statement actually succeeded.
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        // Negotiate TDS 7.1, so the transaction methods take the legacy
+        // SQL batch path.
+        await performHandshake(messageIterator, outgoingMessageStream, [0x71, 0x00, 0x00, 0x01]);
+
+        // SQL Batch (`BEGIN TRAN`) - the successful transaction begin.
+        // The aborted transaction requests never reach the server.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken(undefined, false));
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const reason = new Error('transaction was abandoned');
+      const controller = new AbortController();
+      controller.abort(reason);
+
+      // An aborted `BEGIN TRAN` must leave the bookkeeping untouched.
+      connection.beginTransaction((err) => {
+        assert.strictEqual(err, reason);
+        assert.strictEqual(connection.transactionDepth, 0);
+        assert.strictEqual(connection.inTransaction, false);
+
+        // A successful `BEGIN TRAN` updates it.
+        connection.beginTransaction((err) => {
+          assert.isUndefined(err);
+          assert.strictEqual(connection.transactionDepth, 1);
+          assert.strictEqual(connection.inTransaction, true);
+
+          // An aborted `COMMIT TRAN` must leave it untouched as well.
+          connection.commitTransaction((err) => {
+            assert.strictEqual(err, reason);
+            assert.strictEqual(connection.transactionDepth, 1);
+            assert.strictEqual(connection.inTransaction, true);
+
+            connection.close();
+          }, '', { signal: controller.signal });
+        });
+      }, '', undefined, { signal: controller.signal });
     });
 
     connection.on('end', () => {
