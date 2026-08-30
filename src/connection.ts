@@ -2989,6 +2989,10 @@ class Connection extends EventEmitter {
    * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
   prepare(request: Request, options?: { signal?: AbortSignal }) {
+    // Validated up front, before the request is put into preparation mode -
+    // an invalid signal must not leave a half-prepared request behind.
+    validateAbortSignal(options?.signal);
+
     const parameters: Parameter[] = [];
 
     parameters.push({
@@ -3346,15 +3350,18 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    } else if (request.canceled) {
+      // Checked before the signal: an earlier cancellation is the failure
+      // cause, and attaching an (already aborted) signal must not change
+      // the outcome of an already-canceled request.
+      process.nextTick(() => {
+        request.callback(new RequestError('Canceled.', 'ECANCEL'));
+      });
     } else if (signal !== undefined && signal.aborted) {
       // The signal was already aborted - fail the request with the abort
       // reason without sending anything to the server.
       process.nextTick(() => {
         request.callback(errorForAbortedSignal(signal));
-      });
-    } else if (request.canceled) {
-      process.nextTick(() => {
-        request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
       if (signal !== undefined) {

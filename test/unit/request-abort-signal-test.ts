@@ -81,6 +81,33 @@ function buildColMetadataToken(): Buffer {
 }
 
 /**
+ * Builds an `ERROR` token, as a server would send when it encounters an
+ * error in the middle of processing a request.
+ */
+function buildErrorToken(message: string): Buffer {
+  const messageData = Buffer.from(message, 'ucs2');
+
+  const data = Buffer.alloc(4 + 1 + 1 + 2 + messageData.length + 1 + 1 + 4);
+
+  let offset = 0;
+  offset = data.writeUInt32LE(50000, offset); // number
+  offset = data.writeUInt8(1, offset); // state
+  offset = data.writeUInt8(16, offset); // class
+  offset = data.writeUInt16LE(message.length, offset); // message length (in characters)
+  offset += messageData.copy(data, offset); // message
+  offset = data.writeUInt8(0, offset); // server name length
+  offset = data.writeUInt8(0, offset); // proc name length
+  data.writeUInt32LE(0, offset); // line number (TDS 7.2+)
+
+  const buffer = Buffer.alloc(3 + data.length);
+  buffer.writeUInt8(0xAA, 0); // ERROR
+  buffer.writeUInt16LE(data.length, 1); // token length
+  data.copy(buffer, 3);
+
+  return buffer;
+}
+
+/**
  * Builds a `ROW` token for a single non-null `int` column.
  */
 function buildRowToken(value: number): Buffer {
@@ -213,6 +240,208 @@ describe('Aborting a request via an `AbortSignal`', function() {
     // the row iterable never consumed.
     assert.strictEqual(bulkLoad.executionStarted, false);
     assert.strictEqual(rowsConsumed, false);
+  });
+
+  it('throws a `TypeError` without putting the request into preparation mode when the `signal` option of `prepare` is invalid', function() {
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    const request = new Request('select 1', () => {
+      assert.fail('expected the request callback to not be called');
+    });
+
+    assert.throws(() => {
+      connection.prepare(request, { signal: {} as AbortSignal });
+    }, TypeError, 'The "options.signal" property must be an instance of AbortSignal');
+
+    // The request must be left untouched - in particular, it must not be
+    // stuck in preparation mode.
+    assert.strictEqual(request.preparing, false);
+  });
+
+  it('completes the request with `ECANCEL` when an already-canceled request is executed with an already-aborted signal', function(done) {
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        await performHandshake(messageIterator, outgoingMessageStream);
+
+        // SQL Batch (`select 2`) - the canceled request must never reach
+        // the server, so the next message is the follow-up request.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken(7));
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const reason = new Error('too late');
+      const controller = new AbortController();
+      controller.abort(reason);
+
+      const request = new Request('select 1', (err) => {
+        // The cancellation happened before the request was executed, so
+        // it wins over the already-aborted signal - attaching a signal
+        // must not change the outcome of an already-canceled request.
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual((err as RequestError).code, 'ECANCEL');
+        assert.notStrictEqual(err, reason);
+
+        // The connection was not affected: the next request must
+        // complete normally.
+        const secondRequest = new Request('select 2', (err, rowCount) => {
+          assert.isUndefined(err);
+          assert.strictEqual(rowCount, 7);
+
+          connection.close();
+        });
+
+        connection.execSqlBatch(secondRequest);
+      });
+
+      request.cancel();
+
+      connection.execSqlBatch(request, { signal: controller.signal });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('completes the request with the server error when the signal is aborted from within the `errorMessage` event', function(done) {
+    // Used by the client side to signal to the server side that the
+    // signal was aborted.
+    let signalAborted!: () => void;
+    const requestAborted = new Promise<void>((resolve) => {
+      signalAborted = resolve;
+    });
+
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        await performHandshake(messageIterator, outgoingMessageStream);
+
+        // SQL Batch (`select 1`) - the response starts with an `ERROR`
+        // token, but the response message is not finished before the
+        // abort happens.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const packet = new Packet(0x04);
+          packet.packetId(1);
+          packet.addData(buildErrorToken('boom'));
+          connection.write(packet.buffer);
+        }
+
+        // ATTENTION - sent when the client aborted the request from
+        // within the `errorMessage` event.
+        {
+          await requestAborted;
+
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x06);
+
+          await drainMessage(message);
+
+          // Finish the (cut short) response to the aborted request, then
+          // acknowledge the attention message in a separate message.
+          const finalPacket = new Packet(0x04);
+          finalPacket.packetId(2);
+          finalPacket.last(true);
+          finalPacket.addData(buildDoneToken());
+          connection.write(finalPacket.buffer);
+
+          const ackMessage = new Message({ type: 0x04 });
+          ackMessage.end(buildAttentionAckToken());
+          outgoingMessageStream.write(ackMessage);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false,
+        cancelTimeout: 0
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const reason = new Error('aborted on server error');
+      const controller = new AbortController();
+
+      const request = new Request('select 1', (err) => {
+        // The server error's token arrived before the abort, so it wins
+        // over the abort reason.
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual((err as RequestError).code, 'EREQUEST');
+        assert.strictEqual(err!.message, 'boom');
+        assert.notStrictEqual(err, reason);
+
+        connection.close();
+      });
+
+      // Abort the signal synchronously from within the `errorMessage`
+      // event - the server error must already be recorded at this point.
+      connection.on('errorMessage', () => {
+        controller.abort(reason);
+        signalAborted();
+      });
+
+      connection.execSqlBatch(request, { signal: controller.signal });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
   });
 
   it('accepts a cross-realm or ponyfilled `AbortSignal`-like object', function(done) {

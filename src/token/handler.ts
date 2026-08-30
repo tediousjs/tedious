@@ -386,8 +386,10 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onErrorMessage(token: ErrorMessageToken) {
-    this.connection.emit('errorMessage', token);
-
+    // Record the server error before emitting the event: a listener may
+    // react to it synchronously - e.g. by aborting the request's
+    // `AbortSignal` - and the server error, whose token arrived first,
+    // must win over the abort reason.
     if (!this.request.canceled) {
       const error = new RequestError(token.message, 'EREQUEST');
 
@@ -403,6 +405,8 @@ export class RequestTokenHandler extends TokenHandler {
         this.request.error = new AggregateError(this.errors);
       }
     }
+
+    this.connection.emit('errorMessage', token);
   }
 
   onDatabaseChange(token: DatabaseEnvChangeToken) {
