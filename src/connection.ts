@@ -175,14 +175,6 @@ const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
 const DEFAULT_PACKET_SIZE = 4 * 1024;
 
 /**
- * The error a request aborted via its `AbortSignal` completes with: the
- * signal's abort reason itself (e.g. an `AbortError` or a `TimeoutError`
- * from `AbortSignal.timeout()`), or a `RequestError` wrapping the reason
- * when the reason is not an `Error`.
- *
- * @private
- */
-/**
  * Duck-typed like Node core's `validateAbortSignal`, so cross-realm
  * `AbortSignal`s and ponyfills are accepted.
  *
@@ -194,6 +186,14 @@ function validateAbortSignal(signal: AbortSignal | undefined) {
   }
 }
 
+/**
+ * The error a request aborted via its `AbortSignal` completes with: the
+ * signal's abort reason itself (e.g. an `AbortError` or a `TimeoutError`
+ * from `AbortSignal.timeout()`), or a `RequestError` wrapping the reason
+ * when the reason is not an `Error`.
+ *
+ * @private
+ */
 function errorForAbortedSignal(signal: AbortSignal): Error {
   const reason = signal.reason;
   // `isNativeError` also recognizes `Error`s from other realms, which fail
@@ -201,6 +201,7 @@ function errorForAbortedSignal(signal: AbortSignal): Error {
   // merely have `Error.prototype` in their prototype chain.
   return reason instanceof Error || isNativeError(reason) ? reason : new RequestError('Aborted.', 'EABORT', { cause: reason });
 }
+
 /**
  * @private
  */
