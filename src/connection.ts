@@ -2794,6 +2794,10 @@ class Connection extends EventEmitter {
    * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
   execSql(request: Request, options?: { signal?: AbortSignal }) {
+    // Validated up front, so that an invalid signal throws synchronously
+    // even when parameter validation would fail the request first.
+    validateAbortSignal(options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation);
     } catch (error: any) {
@@ -3075,6 +3079,10 @@ class Connection extends EventEmitter {
    * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
   execute(request: Request, parameters?: { [key: string]: unknown }, options?: { signal?: AbortSignal }) {
+    // Validated up front, so that an invalid signal throws synchronously
+    // even when parameter validation would fail the request first.
+    validateAbortSignal(options?.signal);
+
     const executeParameters: Parameter[] = [];
 
     executeParameters.push({
@@ -3118,6 +3126,10 @@ class Connection extends EventEmitter {
    * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
   callProcedure(request: Request, options?: { signal?: AbortSignal }) {
+    // Validated up front, so that an invalid signal throws synchronously
+    // even when parameter validation would fail the request first.
+    validateAbortSignal(options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation);
     } catch (error: any) {

@@ -242,6 +242,34 @@ describe('Aborting a request via an `AbortSignal`', function() {
     assert.strictEqual(rowsConsumed, false);
   });
 
+  it('throws a `TypeError` for an invalid `signal` even when parameter validation would fail the request', function(done) {
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    const request = new Request('select @p', (err) => {
+      done(err ?? new Error('expected the request callback to not be called'));
+    });
+    request.addParameter('p', TYPES.Int, { not: 'a number' });
+
+    // The invalid signal must win over the invalid parameter: a
+    // synchronous `TypeError` instead of an asynchronous `EPARAM`
+    // completion.
+    assert.throws(() => {
+      connection.execSql(request, { signal: {} as AbortSignal });
+    }, TypeError, 'The "options.signal" property must be an instance of AbortSignal');
+
+    // The `EPARAM` completion would be delivered on a later tick - give
+    // it the chance to (incorrectly) fire before finishing the test.
+    setImmediate(() => {
+      done();
+    });
+  });
+
   it('throws a `TypeError` without putting the request into preparation mode when the `signal` option of `prepare` is invalid', function() {
     const connection = new Connection({
       server: (server.address() as net.AddressInfo).address,
