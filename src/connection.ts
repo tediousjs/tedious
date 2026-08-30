@@ -3418,6 +3418,16 @@ class Connection extends EventEmitter {
 
   /**
    * Cancel currently executed request.
+   *
+   * The canceled request completes with a [[RequestError]] with code
+   * `ECANCEL`.
+   *
+   * For new code, prefer passing an `AbortSignal` when executing the
+   * request (see [[execSqlBatch]]): a signal targets one specific
+   * execution rather than "whatever request happens to be in flight",
+   * composes with `AbortSignal.timeout()` and `AbortSignal.any()`, and
+   * completes the request with the signal's abort reason instead of a
+   * generic `ECANCEL` error.
    */
   cancel() {
     if (!this.request) {

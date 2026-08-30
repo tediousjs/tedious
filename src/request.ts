@@ -494,6 +494,15 @@ class Request extends EventEmitter {
 
   /**
    * Cancels a request while waiting for a server response.
+   *
+   * The request completes with a [[RequestError]] with code `ECANCEL`.
+   *
+   * For new code, prefer passing an `AbortSignal` when executing the
+   * request (see [[Connection.execSqlBatch]]): a signal composes with
+   * `AbortSignal.timeout()` and `AbortSignal.any()`, and completes the
+   * request with the signal's abort reason instead of a generic `ECANCEL`
+   * error. `cancel` remains as the imperative convenience for canceling a
+   * request without having set up a signal beforehand.
    */
   cancel() {
     if (this.canceled) {
