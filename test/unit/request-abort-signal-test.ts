@@ -174,6 +174,36 @@ describe('Aborting a request via an `AbortSignal`', function() {
     }, TypeError, 'The "options.signal" property must be an instance of AbortSignal');
   });
 
+  it('throws a `TypeError` without starting a bulk load when its `signal` option is invalid', function() {
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    const bulkLoad = connection.newBulkLoad('#tmp', () => {
+      assert.fail('expected the bulk load callback to not be called');
+    });
+
+    bulkLoad.addColumn('a', TYPES.Int, { nullable: false });
+
+    let rowsConsumed = false;
+
+    assert.throws(() => {
+      connection.execBulkLoad(bulkLoad, (function*() {
+        rowsConsumed = true;
+        yield { a: 1 };
+      })(), { signal: 42 as unknown as AbortSignal });
+    }, TypeError, 'The "options.signal" property must be an instance of AbortSignal');
+
+    // The bulk load must be left untouched: not marked as started, and
+    // the row iterable never consumed.
+    assert.strictEqual(bulkLoad.executionStarted, false);
+    assert.strictEqual(rowsConsumed, false);
+  });
+
   it('accepts a cross-realm or ponyfilled `AbortSignal`-like object', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
@@ -1363,6 +1393,9 @@ describe('Aborting a request via an `AbortSignal`', function() {
       signalRequestReceived = resolve;
     });
 
+    let rowsStarted = false;
+    let rowsFinalized = false;
+
     server.on('connection', async (connection) => {
       const debug = new Debug();
       const incomingMessageStream = new IncomingMessageStream(debug);
@@ -1453,7 +1486,20 @@ describe('Aborting a request via an `AbortSignal`', function() {
 
       bulkLoad.addColumn('a', TYPES.Int, { nullable: false });
 
-      connection.execBulkLoad(bulkLoad, [{ a: 1 }], { signal: controller.signal });
+      // A row generator that produces rows until backpressure suspends it
+      // at a `yield`. Aborting during the `insert bulk` statement must
+      // tear down the row pipeline and finalize the generator (running
+      // its `finally` block) instead of leaving it paused indefinitely.
+      connection.execBulkLoad(bulkLoad, (function*() {
+        try {
+          while (true) {
+            rowsStarted = true;
+            yield { a: 1 };
+          }
+        } finally {
+          rowsFinalized = true;
+        }
+      })(), { signal: controller.signal });
 
       // Abort the bulk load once the server received the `insert bulk`
       // statement, before the bulk load message itself was sent.
@@ -1463,7 +1509,14 @@ describe('Aborting a request via an `AbortSignal`', function() {
     });
 
     connection.on('end', () => {
-      done();
+      setImmediate(() => {
+        // The row pipeline was already running when the abort happened,
+        // and must have been torn down and finalized.
+        assert.strictEqual(rowsStarted, true);
+        assert.strictEqual(rowsFinalized, true);
+
+        done();
+      });
     });
   });
 

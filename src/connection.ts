@@ -182,6 +182,18 @@ const DEFAULT_PACKET_SIZE = 4 * 1024;
  *
  * @private
  */
+/**
+ * Duck-typed like Node core's `validateAbortSignal`, so cross-realm
+ * `AbortSignal`s and ponyfills are accepted.
+ *
+ * @private
+ */
+function validateAbortSignal(signal: AbortSignal | undefined) {
+  if (signal !== undefined && (signal === null || typeof signal !== 'object' || !('aborted' in signal))) {
+    throw new TypeError('The "options.signal" property must be an instance of AbortSignal');
+  }
+}
+
 function errorForAbortedSignal(signal: AbortSignal): Error {
   const reason = signal.reason;
   // `isNativeError` also recognizes `Error`s from other realms, which fail
@@ -2755,6 +2767,9 @@ class Connection extends EventEmitter {
    *   `DOMException`, which carries a legacy *numeric* `code` property - match abort outcomes
    *   on `err.name` (`'AbortError'`, `'TimeoutError'`) or on the signal's state, not on a
    *   tedious-style string `code`. The connection remains usable after an aborted request.
+   *   If the connection fails while the cancellation is in flight (e.g. the server does not
+   *   acknowledge it within [[ConnectionOptions.cancelTimeout]]), the request completes with
+   *   that connection error instead, like any other request on a failed connection.
    */
   execSqlBatch(request: Request, options?: { signal?: AbortSignal }) {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options), options);
@@ -2880,7 +2895,14 @@ class Connection extends EventEmitter {
   execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, options?: { signal?: AbortSignal }): void
 
   execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, options?: { signal?: AbortSignal }) {
+    // Validated up front, before the bulk load is marked as started or the
+    // row stream is set up - an invalid signal must not leave a partially
+    // started bulk load behind.
+    validateAbortSignal(options?.signal);
+
     bulkLoad.executionStarted = true;
+
+    let rowStream: Readable | undefined;
 
     if (rows) {
       if (bulkLoad.streamingMode) {
@@ -2895,21 +2917,22 @@ class Connection extends EventEmitter {
       // away in `makeRequest` - don't start consuming the row iterable
       // for a bulk load that will never be sent.
       if (options?.signal?.aborted !== true) {
-        const rowStream = Readable.from(rows);
+        rowStream = Readable.from(rows);
+        const stream = rowStream;
 
         // Destroy the packet transform if an error happens in the row stream,
         // e.g. if an error is thrown from within a generator or stream.
-        rowStream.on('error', (err) => {
+        stream.on('error', (err) => {
           bulkLoad.rowToPacketTransform.destroy(err);
         });
 
         // Destroy the row stream if an error happens in the packet transform,
         // e.g. if the bulk load is cancelled.
         bulkLoad.rowToPacketTransform.on('error', (err) => {
-          rowStream.destroy(err);
+          stream.destroy(err);
         });
 
-        rowStream.pipe(bulkLoad.rowToPacketTransform);
+        stream.pipe(bulkLoad.rowToPacketTransform);
       }
     } else if (!bulkLoad.streamingMode) {
       // If the bulkload was not put into streaming mode by the user,
@@ -2933,6 +2956,13 @@ class Connection extends EventEmitter {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
+
+        // The bulk load message will never be sent - tear down the row
+        // pipeline, so that an already-started row source stops producing
+        // rows and is finalized, instead of remaining paused indefinitely.
+        rowStream?.destroy();
+        bulkLoad.rowToPacketTransform.destroy();
+
         bulkLoad.error = error;
         bulkLoad.callback(error);
         return;
@@ -3304,11 +3334,7 @@ class Connection extends EventEmitter {
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, options?: { signal?: AbortSignal }) {
     const { signal } = options ?? {};
 
-    // Duck-typed like Node core's `validateAbortSignal`, so cross-realm
-    // `AbortSignal`s and ponyfills are accepted.
-    if (signal !== undefined && (signal === null || typeof signal !== 'object' || !('aborted' in signal))) {
-      throw new TypeError('The "options.signal" property must be an instance of AbortSignal');
-    }
+    validateAbortSignal(signal);
 
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
