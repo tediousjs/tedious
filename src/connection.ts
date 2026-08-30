@@ -3750,10 +3750,41 @@ Connection.prototype.STATE = {
           });
           return;
         }
-        // request timer is stopped on first data package
-        this.clearRequestTimer();
+        // The request timer was armed when the request was made and would
+        // otherwise fire even while the response is being consumed. Now that
+        // the first response packet has arrived, re-arm it on every further
+        // chunk of socket data instead, so that `requestTimeout` bounds
+        // *inactivity* rather than only time-to-first-packet: a response that
+        // stops making progress mid-message (or an incoming pipeline that
+        // stops consuming — its backpressure pauses the socket within one
+        // `highWaterMark`) fails the request through the existing timeout
+        // path instead of leaving it pending forever. The timer is cleared
+        // for real when this state is exited.
+        this.createRequestTimer();
+
+        const onSocketData = () => {
+          if (this.request) {
+            this.createRequestTimer();
+          }
+        };
+        this.socket?.on('data', onSocketData);
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+
+        // A token parse failure leaves the connection at an undefined
+        // position in the TDS stream, so it cannot be recovered at the
+        // request level — treat it like a socket error. Without a listener
+        // here, a parse failure would surface as an unhandled `'error'`
+        // event on the parser's internal stream and crash the process.
+        const onParserError = (err: Error) => {
+          this.socket?.removeListener('data', onSocketData);
+
+          this.dispatchEvent('socketError', err);
+          process.nextTick(() => {
+            this.emit('error', this.wrapSocketError(err));
+          });
+        };
+        tokenStreamParser.on('error', onParserError);
 
         // If the request was canceled after the request message was
         // fully sent off, an attention message was sent to the server.
@@ -3764,6 +3795,10 @@ Connection.prototype.STATE = {
         // attention acknowledgement) is handled by the `SENT_ATTENTION`
         // state.
         if (this.request?.canceled && this.attentionSent) {
+          // The cancel timer bounds the rest of this exchange — stop
+          // re-arming the request timer. The parser error listener stays
+          // attached: the canceled response is still being drained.
+          this.socket?.removeListener('data', onSocketData);
           return this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
@@ -3791,6 +3826,11 @@ Connection.prototype.STATE = {
             return;
           }
 
+          // The cancel timer bounds the rest of this exchange — stop
+          // re-arming the request timer. The parser error listener stays
+          // attached: the canceled response is still being drained.
+          this.socket?.removeListener('data', onSocketData);
+
           tokenStreamParser.removeListener('end', onEndOfMessage);
 
           if (this.request instanceof Request && this.request.paused) {
@@ -3809,6 +3849,9 @@ Connection.prototype.STATE = {
         };
 
         const onEndOfMessage = () => {
+          this.socket?.removeListener('data', onSocketData);
+          tokenStreamParser.removeListener('error', onParserError);
+
           this.request?.removeListener('cancel', this._cancelAfterRequestSent);
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
