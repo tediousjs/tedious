@@ -1,6 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { getEventListeners } from 'events';
+import { runInNewContext } from 'vm';
 import { Connection, Request, RequestError, TYPES } from '../../src/tedious';
 import IncomingMessageStream from '../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
@@ -441,6 +442,166 @@ describe('Aborting a request via an `AbortSignal`', function() {
     });
   });
 
+  it('preserves the abort reason of an `Error` created in another realm', function(done) {
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        await performHandshake(messageIterator, outgoingMessageStream);
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      // An `Error` from another realm fails an `instanceof Error` check,
+      // but must still be recognized as an `Error` reason and passed
+      // through unchanged instead of being wrapped in an `EABORT` error.
+      const reason = runInNewContext('new Error("cross-realm failure")');
+      assert.notInstanceOf(reason, Error);
+
+      const controller = new AbortController();
+      controller.abort(reason);
+
+      const request = new Request('select 1', (err) => {
+        assert.strictEqual(err, reason);
+
+        connection.close();
+      });
+
+      connection.execSqlBatch(request, { signal: controller.signal });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
+  it('completes the request with `ECANCEL` when the request was canceled before the signal was aborted', function(done) {
+    // Used by the server side to signal to the client side that the
+    // request message was fully received.
+    let signalRequestReceived!: () => void;
+    const requestReceived = new Promise<void>((resolve) => {
+      signalRequestReceived = resolve;
+    });
+
+    // Used by the client side to signal to the server side that the
+    // signal was aborted (after the request was already canceled).
+    let signalAborted!: () => void;
+    const requestAborted = new Promise<void>((resolve) => {
+      signalAborted = resolve;
+    });
+
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        await performHandshake(messageIterator, outgoingMessageStream);
+
+        // SQL Batch (`select 1`) - no response is sent before
+        // the attention message arrives.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          signalRequestReceived();
+        }
+
+        // ATTENTION - sent by the manual cancellation. The
+        // acknowledgement is withheld until the signal was aborted, so
+        // the abort is guaranteed to happen while the cancellation is
+        // still waiting for its acknowledgement.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x06);
+
+          await drainMessage(message);
+
+          await requestAborted;
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken());
+          outgoingMessageStream.write(responseMessage);
+
+          const ackMessage = new Message({ type: 0x04 });
+          ackMessage.end(buildAttentionAckToken());
+          outgoingMessageStream.write(ackMessage);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false,
+        cancelTimeout: 0
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const reason = new Error('too late');
+      const controller = new AbortController();
+
+      const request = new Request('select 1', (err) => {
+        // The manual cancellation happened first, so the request
+        // completes with the established `ECANCEL` error - attaching a
+        // signal must not change the outcome of an earlier cancellation.
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual((err as RequestError).code, 'ECANCEL');
+        assert.notStrictEqual(err, reason);
+
+        connection.close();
+      });
+
+      connection.execSqlBatch(request, { signal: controller.signal });
+
+      // Cancel the request once the server received the request message,
+      // then abort the signal while the cancellation is waiting for the
+      // attention acknowledgement.
+      requestReceived.then(() => {
+        connection.cancel();
+
+        controller.abort(reason);
+        signalAborted();
+      });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
   it('completes the request with the abort reason when aborted after the request was sent', function(done) {
     // Used by the server side to signal to the client side that the request
     // message was fully received. Aborting after this point guarantees the
@@ -686,8 +847,15 @@ describe('Aborting a request via an `AbortSignal`', function() {
       const controller = new AbortController();
       controller.abort(reason);
 
+      let rowsConsumed = false;
+
       const bulkLoad = connection.newBulkLoad('#tmp', (err) => {
         assert.strictEqual(err, reason);
+
+        // The row iterable of an already-aborted bulk load must never be
+        // started - e.g. a resource-owning generator must not be left
+        // paused without finalization.
+        assert.strictEqual(rowsConsumed, false);
 
         // The connection was not affected by the aborted bulk load: the
         // next request must complete normally.
@@ -703,7 +871,10 @@ describe('Aborting a request via an `AbortSignal`', function() {
 
       bulkLoad.addColumn('a', TYPES.Int, { nullable: false });
 
-      connection.execBulkLoad(bulkLoad, [{ a: 1 }], { signal: controller.signal });
+      connection.execBulkLoad(bulkLoad, (function*() {
+        rowsConsumed = true;
+        yield { a: 1 };
+      })(), { signal: controller.signal });
     });
 
     connection.on('end', () => {

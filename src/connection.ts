@@ -20,6 +20,7 @@ import { type AccessToken, type TokenCredential, isTokenCredential } from '@azur
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
+import { isNativeError } from 'util/types';
 import { instanceLookup } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
@@ -183,7 +184,10 @@ const DEFAULT_PACKET_SIZE = 4 * 1024;
  */
 function errorForAbortedSignal(signal: AbortSignal): Error {
   const reason = signal.reason;
-  return reason instanceof Error ? reason : new RequestError('Aborted.', 'EABORT', { cause: reason });
+  // `isNativeError` also recognizes `Error`s from other realms, which fail
+  // the `instanceof` check; `instanceof` also recognizes objects that
+  // merely have `Error.prototype` in their prototype chain.
+  return reason instanceof Error || isNativeError(reason) ? reason : new RequestError('Aborted.', 'EABORT', { cause: reason });
 }
 /**
  * @private
@@ -1845,6 +1849,13 @@ class Connection extends EventEmitter {
     this._onRequestAbort = () => {
       const request = this.request!;
 
+      // If the request was already canceled - by `request.cancel()` or by
+      // the request timeout - that cancellation is the failure cause, and
+      // the abort arriving later must not change the reported outcome.
+      if (request.canceled) {
+        return;
+      }
+
       // Pre-set the request's error to the abort reason, so the request
       // completes with that reason instead of a generic `ECANCEL` error.
       // An error that was recorded earlier (e.g. a server error or a
@@ -2880,21 +2891,26 @@ class Connection extends EventEmitter {
         throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
       }
 
-      const rowStream = Readable.from(rows);
+      // If the signal is already aborted, the bulk load will fail right
+      // away in `makeRequest` - don't start consuming the row iterable
+      // for a bulk load that will never be sent.
+      if (options?.signal?.aborted !== true) {
+        const rowStream = Readable.from(rows);
 
-      // Destroy the packet transform if an error happens in the row stream,
-      // e.g. if an error is thrown from within a generator or stream.
-      rowStream.on('error', (err) => {
-        bulkLoad.rowToPacketTransform.destroy(err);
-      });
+        // Destroy the packet transform if an error happens in the row stream,
+        // e.g. if an error is thrown from within a generator or stream.
+        rowStream.on('error', (err) => {
+          bulkLoad.rowToPacketTransform.destroy(err);
+        });
 
-      // Destroy the row stream if an error happens in the packet transform,
-      // e.g. if the bulk load is cancelled.
-      bulkLoad.rowToPacketTransform.on('error', (err) => {
-        rowStream.destroy(err);
-      });
+        // Destroy the row stream if an error happens in the packet transform,
+        // e.g. if the bulk load is cancelled.
+        bulkLoad.rowToPacketTransform.on('error', (err) => {
+          rowStream.destroy(err);
+        });
 
-      rowStream.pipe(bulkLoad.rowToPacketTransform);
+        rowStream.pipe(bulkLoad.rowToPacketTransform);
+      }
     } else if (!bulkLoad.streamingMode) {
       // If the bulkload was not put into streaming mode by the user,
       // we end the rowToPacketTransform here for them.
@@ -3108,9 +3124,11 @@ class Connection extends EventEmitter {
 
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
-        if (this.transactionDepth === 1) {
-          this.inTransaction = true;
+        if (!err) {
+          this.transactionDepth++;
+          if (this.transactionDepth === 1) {
+            this.inTransaction = true;
+          }
         }
         callback(err);
       }), options);
@@ -3137,9 +3155,11 @@ class Connection extends EventEmitter {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+        if (!err) {
+          this.transactionDepth--;
+          if (this.transactionDepth === 0) {
+            this.inTransaction = false;
+          }
         }
 
         callback(err);
@@ -3165,9 +3185,11 @@ class Connection extends EventEmitter {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+        if (!err) {
+          this.transactionDepth--;
+          if (this.transactionDepth === 0) {
+            this.inTransaction = false;
+          }
         }
         callback(err);
       }), options);
@@ -3192,7 +3214,9 @@ class Connection extends EventEmitter {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
+        if (!err) {
+          this.transactionDepth++;
+        }
         callback(err);
       }), options);
     }
@@ -3305,6 +3329,20 @@ class Connection extends EventEmitter {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
+      if (signal !== undefined) {
+        // An abort is performed as a cancellation (see `_onRequestAbort`).
+        // The listener is removed when the request completes, via
+        // `clearRequestAbortListener`.
+        //
+        // This is done before any connection state is mutated: the
+        // duck-typed signal validation above matches Node core's
+        // `validateAbortSignal` and doesn't check for the listener
+        // methods, so if `addEventListener` throws here, the error
+        // surfaces to the caller with the connection left untouched.
+        signal.addEventListener('abort', this._onRequestAbort, { once: true });
+        this.requestAbortSignal = signal;
+      }
+
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
       } else {
@@ -3343,14 +3381,6 @@ class Connection extends EventEmitter {
       };
 
       request.once('cancel', onCancel);
-
-      if (signal !== undefined) {
-        // An abort is performed as a cancellation (see `_onRequestAbort`).
-        // The listener is removed when the request completes, via
-        // `clearRequestAbortListener`.
-        signal.addEventListener('abort', this._onRequestAbort, { once: true });
-        this.requestAbortSignal = signal;
-      }
 
       this.createRequestTimer();
 
