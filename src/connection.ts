@@ -3049,9 +3049,11 @@ class Connection extends EventEmitter {
 
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
-        if (this.transactionDepth === 1) {
-          this.inTransaction = true;
+        if (!err) {
+          this.transactionDepth++;
+          if (this.transactionDepth === 1) {
+            this.inTransaction = true;
+          }
         }
         callback(err);
       }));
@@ -3077,9 +3079,11 @@ class Connection extends EventEmitter {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+        if (!err) {
+          this.transactionDepth--;
+          if (this.transactionDepth === 0) {
+            this.inTransaction = false;
+          }
         }
 
         callback(err);
@@ -3104,9 +3108,11 @@ class Connection extends EventEmitter {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+        if (!err) {
+          this.transactionDepth--;
+          if (this.transactionDepth === 0) {
+            this.inTransaction = false;
+          }
         }
         callback(err);
       }));
@@ -3130,7 +3136,9 @@ class Connection extends EventEmitter {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
+        if (!err) {
+          this.transactionDepth++;
+        }
         callback(err);
       }));
     }
