@@ -39,28 +39,6 @@ export class UnexpectedTokenError extends Error {
   }
 }
 
-/**
- * Emits a warning (once per process) when a connection is established
- * using TDS 7.1.
- *
- * @private
- */
-export const tds71DeprecationWarning = {
-  emitted: false,
-
-  emit() {
-    if (this.emitted) {
-      return;
-    }
-    this.emitted = true;
-
-    process.emitWarning(
-      'Support for TDS 7.1 (used by SQL Server 2000) is deprecated and will be removed in a future version of `tedious`.',
-      { type: 'DeprecationWarning', code: 'TEDIOUS_DEP_TDS71' }
-    );
-  }
-};
-
 export class TokenHandler {
   onInfoMessage(token: InfoMessageToken) {
     throw new UnexpectedTokenError(this, token);
@@ -360,10 +338,6 @@ export class Login7TokenHandler extends TokenHandler {
 
     // use negotiated version
     this.connection.config.options.tdsVersion = token.tdsVersion;
-
-    if (token.tdsVersion < '7_2') {
-      tds71DeprecationWarning.emit();
-    }
 
     this.loginAckReceived = true;
   }

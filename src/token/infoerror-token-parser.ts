@@ -40,7 +40,7 @@ function readToken(buf: Buffer, offset: number, options: ParserOptions): Result<
   ({ offset, value: procName } = readBVarChar(buf, offset));
 
   let lineNumber;
-  ({ offset, value: lineNumber } = options.tdsVersion < '7_2' ? readUInt16LE(buf, offset) : readUInt32LE(buf, offset));
+  ({ offset, value: lineNumber } = readUInt32LE(buf, offset));
 
   return new Result({
     'number': number,

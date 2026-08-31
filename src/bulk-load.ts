@@ -547,17 +547,13 @@ class BulkLoad extends EventEmitter {
     for (let j = 0, len = this.columns.length; j < len; j++) {
       const c = this.columns[j];
       // UserType
-      if (this.options.tdsVersion < '7_2') {
-        tBuf.writeUInt16LE(0);
-      } else {
-        tBuf.writeUInt32LE(0);
-      }
+      tBuf.writeUInt32LE(0);
 
       // Flags
       let flags = FLAGS.updateableReadWrite;
       if (c.nullable) {
         flags |= FLAGS.nullable;
-      } else if (c.nullable === undefined && this.options.tdsVersion >= '7_2') {
+      } else if (c.nullable === undefined) {
         flags |= FLAGS.nullableUnknown;
       }
       tBuf.writeUInt16LE(flags);
@@ -595,15 +591,13 @@ class BulkLoad extends EventEmitter {
    */
   createDoneToken() {
     // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
-    const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
+    const tBuf = new WritableTrackingBuffer(13);
     tBuf.writeUInt8(TOKEN_TYPE.DONE);
     const status = DONE_STATUS.FINAL;
     tBuf.writeUInt16LE(status);
     tBuf.writeUInt16LE(0); // CurCmd (TDS ignores this)
     tBuf.writeUInt32LE(0); // row count - doesn't really matter
-    if (this.options.tdsVersion >= '7_2') {
-      tBuf.writeUInt32LE(0); // row count is 64 bits in >= TDS 7.2
-    }
+    tBuf.writeUInt32LE(0); // row count is 64 bits
     return tBuf.data;
   }
 

@@ -10,16 +10,12 @@ export interface ColumnMetadata extends Metadata {
    */
   colName: string;
 
-  tableName?: string | string[] | undefined;
+  tableName?: string[] | undefined;
 }
 
-function readTableName(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<string | string[] | undefined> {
+function readTableName(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<string[] | undefined> {
   if (!metadata.type.hasTableName) {
     return new Result(undefined, offset);
-  }
-
-  if (options.tdsVersion < '7_2') {
-    return readUsVarChar(buf, offset);
   }
 
   let numberOfTableNameParts;

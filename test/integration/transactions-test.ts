@@ -135,9 +135,7 @@ GO`,
   beginTransaction(callback: (err?: Error | null) => void, transactionName?: string) {
     this.connection.beginTransaction((err, transactionDescriptor) => {
       assert.ifError(err);
-      if (config.options.tdsVersion! >= '7_2') {
-        assert.isDefined(transactionDescriptor);
-      }
+      assert.isDefined(transactionDescriptor);
 
       callback(err);
     }, transactionName);
@@ -258,15 +256,6 @@ describe('Transactions Test', function() {
   });
 
   it('should test first rollback transaction event with xact abort', function(done) {
-    // From 2.2.7.8, ENVCHANGE_TOKEN type Begin Transaction (8) is only supported
-    // in TDS version 7.2 and above. 'rollbackTransaction' event fires in response
-    // to that token type and hence won't be firing for lower versions.
-    if (config.options.tdsVersion! < '7_2') {
-      // test.expect(4);
-    } else {
-      // test.expect(5);
-    }
-
     const connection = new Connection(config);
     connection.on('end' as any, (info) => done());
     //  connection.on('errorMessage', (error) => console.log("#{error.number} : #{error.message}"))

@@ -486,10 +486,6 @@ describe('Ntlm Test', function() {
 
 describe('Encrypt Test', function() {
   function supportsTds8(config: any, callback: (err: Error | null, supportsTds8?: boolean) => void) {
-    if (config.options.tdsVersion < '7_2') {
-      return callback(null, false);
-    }
-
     const connection = new Connection(config);
 
     if (process.env.TEDIOUS_DEBUG) {
@@ -1324,8 +1320,7 @@ update #tab1 set name = 'a3' where name like 'a%'\
         testAnsiNullsOptionOff,
         function(callback) {
           connection.reset(function(err) {
-            // TDS 7_1 doesnt send RESETCONNECTION acknowledgement packet
-            // For 7_2+ the resetConnection event handler confirms receipt
+            // The resetConnection event handler confirms receipt
             callback(err);
           });
         },
