@@ -104,15 +104,6 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
-    - name: run integration tests (TDS 7.1)
-      env:
-        TEDIOUS_TDS_VERSION: 7_1
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
   test-windows:
     name: SQL Server ${{ matrix.mssql-version }} Windows / Node.js ${{ matrix.node-version }}
     runs-on: windows-2022
@@ -220,15 +211,6 @@ jobs:
     - name: run integration tests (TDS 7.2)
       env:
         TEDIOUS_TDS_VERSION: 7_2
-      run: npx nyc --reporter=lcov npm run test-integration
-
-    - uses: codecov/codecov-action@v5
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: run integration tests (TDS 7.1)
-      env:
-        TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@v5

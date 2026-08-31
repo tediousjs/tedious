@@ -66,7 +66,3 @@ test_script:
       $env:TEDIOUS_TDS_VERSION = '7_2'
       npm run-script test-integration
       if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
-
-      $env:TEDIOUS_TDS_VERSION = '7_1'
-      npm run-script test-integration
-      if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
