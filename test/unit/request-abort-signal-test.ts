@@ -1944,6 +1944,96 @@ describe('Aborting a request via an `AbortSignal`', function() {
     });
   });
 
+  it('keeps the signals of sequential executions of the same request isolated', function(done) {
+    server.on('connection', async (connection) => {
+      const debug = new Debug();
+      const incomingMessageStream = new IncomingMessageStream(debug);
+      const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
+
+      connection.pipe(incomingMessageStream);
+      outgoingMessageStream.pipe(connection);
+
+      try {
+        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+
+        await performHandshake(messageIterator, outgoingMessageStream);
+
+        // SQL Batch (`select 1`) - first execution.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken(3));
+          outgoingMessageStream.write(responseMessage);
+        }
+
+        // SQL Batch (`select 1`) - second execution of the same request.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(buildDoneToken(5));
+          outgoingMessageStream.write(responseMessage);
+        }
+      } catch (err: any) {
+        done(err);
+      }
+    });
+
+    const connection = new Connection({
+      server: (server.address() as net.AddressInfo).address,
+      options: {
+        port: (server.address() as net.AddressInfo).port,
+        encrypt: false
+      }
+    });
+
+    connection.connect((err) => {
+      assert.isUndefined(err);
+
+      const controllerA = new AbortController();
+      const controllerB = new AbortController();
+
+      let executions = 0;
+
+      const request = new Request('select 1', (err, rowCount) => {
+        executions += 1;
+
+        if (executions === 1) {
+          assert.isUndefined(err);
+          assert.strictEqual(rowCount, 3);
+
+          // The first execution's signal was disarmed on completion -
+          // aborting it now must not affect the request or the next
+          // execution, which is bound to a different signal.
+          assert.lengthOf(getEventListeners(controllerA.signal, 'abort'), 0);
+          controllerA.abort(new Error('stale abort'));
+
+          connection.execSqlBatch(request, { signal: controllerB.signal });
+        } else {
+          assert.isUndefined(err);
+          assert.strictEqual(rowCount, 5);
+
+          assert.lengthOf(getEventListeners(controllerB.signal, 'abort'), 0);
+
+          connection.close();
+        }
+      });
+
+      connection.execSqlBatch(request, { signal: controllerA.signal });
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+  });
+
   it('removes the `abort` listener from the signal when the request completes normally', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();

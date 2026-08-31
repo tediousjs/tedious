@@ -3052,6 +3052,10 @@ class Connection extends EventEmitter {
    * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
   unprepare(request: Request, options?: { signal?: AbortSignal }) {
+    // No state is mutated before `makeRequest` here - validated up front
+    // anyway, for consistency with the other execution methods.
+    validateAbortSignal(options?.signal);
+
     const parameters: Parameter[] = [];
 
     parameters.push({
@@ -3381,8 +3385,9 @@ class Connection extends EventEmitter {
         // The listener is removed when the request completes, via
         // `clearRequestAbortListener`.
         //
-        // This is done before any connection state is mutated: the
-        // duck-typed signal validation above matches Node core's
+        // This is done before any further state is mutated (only the
+        // `request.error` reset above runs earlier): the duck-typed
+        // signal validation above matches Node core's
         // `validateAbortSignal` and doesn't check for the listener
         // methods, so if `addEventListener` throws here, the error
         // surfaces to the caller with the connection left untouched.
