@@ -3832,7 +3832,12 @@ Connection.prototype.STATE = {
           const sqlRequest = this.request as Request;
           this.request = undefined;
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
+            // A batch error on these TDS versions aborts the entire
+            // transaction on the server - reset the emulated transaction
+            // state to match. (Previously only `inTransaction` was
+            // cleared, leaving a stale nonzero `transactionDepth`.)
             this.inTransaction = false;
+            this.transactionDepth = 0;
           }
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
         };

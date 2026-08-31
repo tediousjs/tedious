@@ -188,6 +188,19 @@ describe('Emulated transaction state with TDS versions before 7.2', function() {
           responseMessage.end(buildDoneToken());
           outgoingMessageStream.write(responseMessage);
         }
+
+        // SQL Batch (`COMMIT TRAN`) - fails with a server error, which
+        // aborts the entire transaction on these TDS versions.
+        {
+          const { value: message } = await messageIterator.next();
+          assert.strictEqual(message.type, 0x01);
+
+          await drainMessage(message);
+
+          const responseMessage = new Message({ type: 0x04 });
+          responseMessage.end(Buffer.concat([buildErrorToken('boom'), buildDoneToken()]));
+          outgoingMessageStream.write(responseMessage);
+        }
       } catch (err: any) {
         done(err);
       }
@@ -224,7 +237,17 @@ describe('Emulated transaction state with TDS versions before 7.2', function() {
           const request = new Request('select 1', (err) => {
             assert.isUndefined(err);
 
-            connection.close();
+            // A `COMMIT TRAN` that fails with a server error aborts the
+            // entire transaction on these TDS versions - both parts of
+            // the emulated state must be reset together.
+            connection.commitTransaction((err) => {
+              assert.instanceOf(err, RequestError);
+              assert.strictEqual((err as RequestError).code, 'EREQUEST');
+              assert.strictEqual(connection.transactionDepth, 0);
+              assert.strictEqual(connection.inTransaction, false);
+
+              connection.close();
+            });
           });
 
           connection.execSqlBatch(request);
