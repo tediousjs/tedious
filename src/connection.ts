@@ -814,7 +814,7 @@ export interface ConnectionOptions {
    * The version of TDS to use. If server doesn't support specified version, negotiated version is used instead.
    *
    * The versions are available from `require('tedious').TDS_VERSION`.
-   * * `7_1`
+   * * `7_1` (deprecated, support will be removed in a future version)
    * * `7_2`
    * * `7_3_A`
    * * `7_3_B`
