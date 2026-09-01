@@ -1,5 +1,7 @@
 import { assert } from 'chai';
 import BulkLoad from '../../src/bulk-load';
+import { InputError } from '../../src/errors';
+import { type DataType } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 // Test options - using type assertion since tests only exercise code paths
@@ -7,6 +9,72 @@ import { type InternalConnectionOptions } from '../../src/connection';
 const connectionOptions = { tdsVersion: '7_2' } as InternalConnectionOptions;
 
 describe('BulkLoad', function() {
+  describe('serialization errors', function() {
+    function buildType(overrides: Partial<DataType>): DataType {
+      return {
+        id: 0xA5,
+        type: 'STUB',
+        name: 'Stub',
+
+        declaration() {
+          return 'stub';
+        },
+
+        generateTypeInfo() {
+          return Buffer.alloc(1);
+        },
+
+        generateParameterLength() {
+          return Buffer.alloc(0);
+        },
+
+        * generateParameterData() { },
+
+        validate(value) {
+          return value;
+        },
+
+        ...overrides
+      };
+    }
+
+    function writeRow(type: DataType): Promise<Error> {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('foo', type, { nullable: true });
+
+      return new Promise((resolve) => {
+        request.rowToPacketTransform.on('error', resolve);
+        request.rowToPacketTransform.write([null]);
+      });
+    }
+
+    it('wraps errors thrown while generating the column metadata', async function() {
+      const cause = new RangeError('out of range');
+      const error = await writeRow(buildType({
+        generateTypeInfo() {
+          throw cause;
+        }
+      }));
+
+      assert.instanceOf(error, InputError);
+      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.cause, cause);
+    });
+
+    it('wraps errors thrown while generating row values', async function() {
+      const cause = new RangeError('out of range');
+      const error = await writeRow(buildType({
+        generateParameterLength() {
+          throw cause;
+        }
+      }));
+
+      assert.instanceOf(error, InputError);
+      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.cause, cause);
+    });
+  });
+
   it('starts out as not being canceled', function() {
     const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
     assert.strictEqual(request.canceled, false);

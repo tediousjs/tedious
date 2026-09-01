@@ -1558,8 +1558,10 @@ describe('BulkLoad', function() {
     const bulkLoad = connection.newBulkLoad(
       '#tmpTestTable',
       (err, rowCount) => {
-        assert.instanceOf(err, RangeError);
-        assert.strictEqual(err.message, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
+        assert.instanceOf(err, TypeError);
+        assert.match((err as Error).message, /Column 'value' could not be serialized/);
+        assert.instanceOf((err as Error).cause, RangeError);
+        assert.strictEqual(((err as Error).cause as Error).message, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
         assert.strictEqual(rowCount, 0);
         done();
       });

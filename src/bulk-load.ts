@@ -6,6 +6,7 @@ import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
+import { InputError } from './errors';
 import { Collation } from './collation';
 
 /**
@@ -171,7 +172,11 @@ class RowTransform extends Transform {
    */
   _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
     if (!this.columnMetadataWritten) {
-      this.push(this.bulkLoad.getColMetaData());
+      try {
+        this.push(this.bulkLoad.getColMetaData());
+      } catch (error: any) {
+        return callback(error);
+      }
       this.columnMetadataWritten = true;
     }
 
@@ -211,7 +216,7 @@ class RowTransform extends Transform {
           this.push(chunk);
         }
       } catch (error: any) {
-        return callback(error);
+        return callback(new InputError(`Column '${c.name}' could not be serialized`, { cause: error }));
       }
     }
 
@@ -563,7 +568,11 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      try {
+        tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      } catch (error) {
+        throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
+      }
 
       // TableName
       if (c.type.hasTableName) {
