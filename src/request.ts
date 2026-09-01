@@ -6,6 +6,7 @@ import Connection from './connection';
 import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
+import { type ColumnInfo } from './token/token';
 import { Collation } from './collation';
 
 /**
@@ -276,6 +277,39 @@ class Request extends EventEmitter {
       (orderColumns: number[]) => void
   ): this
 
+  /**
+   * This event gives the names of the base tables of the result set, if the query was
+   * executed in browse mode (e.g. with a `FOR BROWSE` clause or `SET NO_BROWSETABLE ON`).
+   */
+  on(
+    event: 'tabName',
+    listener:
+      /**
+       * @param tableNames
+       *   The names of the base tables referenced in the query, in the order the
+       *   `colInfo` event's `tableNum` values refer to them. On TDS 7.2 and newer,
+       *   each name is given as its individual parts (e.g. `['dbo', 'employees']`),
+       *   on older versions as a single string.
+       */
+      (tableNames: (string | string[])[]) => void
+  ): this
+
+  /**
+   * This event describes how the columns of the result set map back to the base tables
+   * given in the `tabName` event, if the query was executed in browse mode (e.g. with a
+   * `FOR BROWSE` clause or `SET NO_BROWSETABLE ON`).
+   */
+  on(
+    event: 'colInfo',
+    listener:
+      /**
+       * @param columns
+       *   One entry for each column in the result set, describing the base table
+       *   the column was derived from.
+       */
+      (columns: ColumnInfo[]) => void
+  ): this
+
   on(event: 'requestCompleted', listener: () => void): this
 
   on(event: 'cancel', listener: () => void): this
@@ -340,6 +374,14 @@ class Request extends EventEmitter {
    * @private
    */
   emit(event: 'order', orderColumns: number[]): boolean
+  /**
+   * @private
+   */
+  emit(event: 'tabName', tableNames: (string | string[])[]): boolean
+  /**
+   * @private
+   */
+  emit(event: 'colInfo', columns: ColumnInfo[]): boolean
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
   }

@@ -39,6 +39,55 @@ export abstract class Token {
   }
 }
 
+export interface ColumnInfo {
+  /**
+   * The column's ordinal position in the result set.
+   */
+  colNum: number;
+
+  /**
+   * The number of the base table this column was derived from, as a
+   * one-based index into the table list reported by the `TABNAME` token.
+   * `0` if the column is the result of an expression.
+   */
+  tableNum: number;
+
+  /**
+   * Whether the column was the result of an expression.
+   */
+  expression: boolean;
+
+  /**
+   * Whether the column is part of a key for the associated table.
+   */
+  key: boolean;
+
+  /**
+   * Whether the column was not requested, but was added because it was
+   * part of a key for the associated table.
+   */
+  hidden: boolean;
+
+  /**
+   * The column's name in the base table. Only set if it differs from the
+   * name in the result set (e.g. because a column alias was used).
+   */
+  colName: string | undefined;
+}
+
+export class ColInfoToken extends Token {
+  declare name: 'COLINFO';
+  declare handlerName: 'onColInfo';
+
+  declare columns: ColumnInfo[];
+
+  constructor(columns: ColumnInfo[]) {
+    super('COLINFO', 'onColInfo');
+
+    this.columns = columns;
+  }
+}
+
 export class ColMetadataToken extends Token {
   declare name: 'COLMETADATA';
   declare handlerName: 'onColMetadata';
@@ -492,6 +541,25 @@ export class RowToken extends Token {
     super('ROW', 'onRow');
 
     this.columns = columns;
+  }
+}
+
+export class TabNameToken extends Token {
+  declare name: 'TABNAME';
+  declare handlerName: 'onTabName';
+
+  /**
+   * The names of the base tables referenced in the query, in the order the
+   * `COLINFO` token's `tableNum` values refer to them. On TDS 7.2 and newer,
+   * each name is given as its individual parts (e.g. `['dbo', 'employees']`),
+   * on older versions as a single string.
+   */
+  declare tableNames: (string | string[])[];
+
+  constructor(tableNames: (string | string[])[]) {
+    super('TABNAME', 'onTabName');
+
+    this.tableNames = tableNames;
   }
 }
 

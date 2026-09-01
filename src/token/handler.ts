@@ -5,6 +5,7 @@ import { type ColumnMetadata } from './colmetadata-token-parser';
 import {
   BeginTransactionEnvChangeToken,
   CharsetEnvChangeToken,
+  ColInfoToken,
   CollationChangeToken,
   ColMetadataToken,
   CommitTransactionEnvChangeToken,
@@ -29,6 +30,7 @@ import {
   RoutingEnvChangeToken,
   RowToken,
   SSPIToken,
+  TabNameToken,
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
@@ -127,6 +129,14 @@ export class TokenHandler {
   }
 
   onColMetadata(token: ColMetadataToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onTabName(token: TabNameToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onColInfo(token: ColInfoToken) {
     throw new UnexpectedTokenError(this, token);
   }
 
@@ -484,6 +494,18 @@ export class RequestTokenHandler extends TokenHandler {
       } else {
         this.request.emit('columnMetadata', token.columns);
       }
+    }
+  }
+
+  onTabName(token: TabNameToken) {
+    if (!this.request.canceled) {
+      this.request.emit('tabName', token.tableNames);
+    }
+  }
+
+  onColInfo(token: ColInfoToken) {
+    if (!this.request.canceled) {
+      this.request.emit('colInfo', token.columns);
     }
   }
 
