@@ -112,9 +112,9 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.collation = this.collation;
     }
 
-    yield type.generateTypeInfo(param, this.options);
-    yield type.generateParameterLength(param, this.options);
     try {
+      yield type.generateTypeInfo(param, this.options);
+      yield type.generateParameterLength(param, this.options);
       yield * type.generateParameterData(param, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
