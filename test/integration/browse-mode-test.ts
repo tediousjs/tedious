@@ -18,6 +18,12 @@ const config = {
   }
 };
 
+// Table names are reported as their individual parts, with the table's own
+// name as the last part.
+function lastPart(tableName: string[]): string {
+  return tableName[tableName.length - 1];
+}
+
 describe('Browse mode', function() {
   let connection: Connection;
 
@@ -65,7 +71,7 @@ describe('Browse mode', function() {
       done();
     });
 
-    let tableNames: (string | string[])[] = [];
+    let tableNames: string[][] = [];
     request.on('tabName', (names) => {
       tableNames = names;
     });
@@ -89,8 +95,7 @@ describe('Browse mode', function() {
         return done(err);
       }
 
-      assert.strictEqual(tableNames.length, 2);
-      assert.sameDeepMembers(tableNames, [['#browse'], ['#other']]);
+      assert.sameMembers(tableNames.map(lastPart), ['#browse', '#other']);
 
       // The two selected columns map to the two different base tables.
       const visible = columnInfo.filter((column) => !column.hidden);
@@ -103,7 +108,7 @@ describe('Browse mode', function() {
       done();
     });
 
-    let tableNames: (string | string[])[] = [];
+    let tableNames: string[][] = [];
     request.on('tabName', (names) => {
       tableNames = names;
     });
@@ -158,7 +163,7 @@ describe('Browse mode', function() {
       assert.strictEqual(columnInfo.length, tableNames.length);
 
       for (const names of tableNames) {
-        assert.deepEqual(names, [['#browse']]);
+        assert.deepEqual(names.map(lastPart), ['#browse']);
       }
 
       for (const columns of columnInfo) {
@@ -168,7 +173,7 @@ describe('Browse mode', function() {
       done();
     });
 
-    const tableNames: (string | string[])[][] = [];
+    const tableNames: string[][][] = [];
     request.on('tabName', (names) => {
       tableNames.push(names);
     });
@@ -197,7 +202,7 @@ describe('Browse mode', function() {
       done();
     });
 
-    let tableNames: (string | string[])[] = [];
+    let tableNames: string[][] = [];
     request.on('tabName', (names) => {
       tableNames = names;
     });

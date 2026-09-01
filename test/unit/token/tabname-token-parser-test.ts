@@ -67,11 +67,14 @@ describe('TabName Token Parser', function() {
     assert.isTrue((await parser.next()).done);
   });
 
-  it('should parse a table name as a plain string on TDS 7.1', async function() {
+  it('should parse the multi-part table name format on TDS 7.1', async function() {
+    // Servers speaking TDS 7.1 already use the multi-part format, which was
+    // introduced in TDS 7.1 Revision 1.
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 
     buffer.writeUInt8(0xa4);
-    buffer.writeUInt16LE(2 + ('employees'.length * 2));
+    buffer.writeUInt16LE(1 + 2 + ('employees'.length * 2));
+    buffer.writeUInt8(1);
     buffer.writeUsVarchar('employees');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), { tdsVersion: '7_1' } as ParserOptions);
@@ -80,9 +83,30 @@ describe('TabName Token Parser', function() {
     const token = result.value;
 
     assert.instanceOf(token, TabNameToken);
-    assert.deepEqual(token.tableNames, ['employees']);
+    assert.deepEqual(token.tableNames, [['employees']]);
 
     assert.isTrue((await parser.next()).done);
+  });
+
+  it('should reject a token whose contents overrun its declared length', async function() {
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0xa4);
+    buffer.writeUInt16LE(1); // declared length only covers the part count
+    buffer.writeUInt8(1);
+    buffer.writeUsVarchar('employees');
+
+    const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
+
+    let error;
+    try {
+      await parser.next();
+    } catch (err: any) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Malformed TABNAME token');
   });
 
   it('should parse a token that arrives in single byte chunks', async function() {

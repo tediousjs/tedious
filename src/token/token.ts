@@ -550,13 +550,12 @@ export class TabNameToken extends Token {
 
   /**
    * The names of the base tables referenced in the query, in the order the
-   * `COLINFO` token's `tableNum` values refer to them. On TDS 7.2 and newer,
-   * each name is given as its individual parts (e.g. `['dbo', 'employees']`),
-   * on older versions as a single string.
+   * `COLINFO` token's `tableNum` values refer to them. Each name is given
+   * as its individual parts (e.g. `['dbo', 'employees']`).
    */
-  declare tableNames: (string | string[])[];
+  declare tableNames: string[][];
 
-  constructor(tableNames: (string | string[])[]) {
+  constructor(tableNames: string[][]) {
     super('TABNAME', 'onTabName');
 
     this.tableNames = tableNames;

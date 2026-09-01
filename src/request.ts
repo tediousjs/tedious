@@ -287,11 +287,10 @@ class Request extends EventEmitter {
       /**
        * @param tableNames
        *   The names of the base tables referenced in the query, in the order the
-       *   `colInfo` event's `tableNum` values refer to them. On TDS 7.2 and newer,
-       *   each name is given as its individual parts (e.g. `['dbo', 'employees']`),
-       *   on older versions as a single string.
+       *   `colInfo` event's `tableNum` values refer to them. Each name is given
+       *   as its individual parts (e.g. `['dbo', 'employees']`).
        */
-      (tableNames: (string | string[])[]) => void
+      (tableNames: string[][]) => void
   ): this
 
   /**
@@ -377,7 +376,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  emit(event: 'tabName', tableNames: (string | string[])[]): boolean
+  emit(event: 'tabName', tableNames: string[][]): boolean
   /**
    * @private
    */

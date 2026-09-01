@@ -86,6 +86,29 @@ describe('ColInfo Token Parser', function() {
     assert.isTrue((await parser.next()).done);
   });
 
+  it('should reject a token whose contents overrun its declared length', async function() {
+    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+
+    buffer.writeUInt8(0xa5);
+    buffer.writeUInt16LE(3); // declared length only covers the fixed fields
+    buffer.writeUInt8(1);
+    buffer.writeUInt8(1);
+    buffer.writeUInt8(0x20); // DIFFERENT_NAME
+    buffer.writeBVarchar('name');
+
+    const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
+
+    let error;
+    try {
+      await parser.next();
+    } catch (err: any) {
+      error = err;
+    }
+
+    assert.instanceOf(error, Error);
+    assert.strictEqual(error.message, 'Malformed COLINFO token');
+  });
+
   it('should parse a token that arrives in single byte chunks', async function() {
     const buffer = new WritableTrackingBuffer(50, 'ucs2');
 

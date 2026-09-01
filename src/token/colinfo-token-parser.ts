@@ -48,6 +48,10 @@ function colInfoParser(buf: Buffer, offset: number, _options: ParserOptions): Re
     });
   }
 
+  if (offset !== end) {
+    throw new Error('Malformed COLINFO token');
+  }
+
   return new Result(new ColInfoToken(columns), offset);
 }
 
