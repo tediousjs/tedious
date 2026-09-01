@@ -1,4 +1,4 @@
-// s2.2.7.23
+// s2.2.7.20
 import { type ParserOptions } from './stream-parser';
 
 import { TabNameToken } from './token';

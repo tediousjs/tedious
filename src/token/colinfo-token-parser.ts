@@ -1,4 +1,4 @@
-// s2.2.7.6
+// s2.2.7.3
 import { type ParserOptions } from './stream-parser';
 
 import { ColInfoToken, type ColumnInfo } from './token';
