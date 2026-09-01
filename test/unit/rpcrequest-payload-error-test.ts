@@ -84,6 +84,28 @@ describe('RpcRequestPayload', function() {
       assert.strictEqual(error.cause, cause);
     });
 
+    it('wraps errors thrown while constructing the parameter data iterator', function() {
+      // `generateParameterData` does not have to be implemented as a
+      // generator function - a plain function performing synchronous setup
+      // before returning an iterator throws at call time.
+      const cause = new TypeError('invalid value');
+      const type = buildType({
+        generateParameterData(): Generator<Buffer, void> {
+          throw cause;
+        }
+      });
+
+      let error;
+      try {
+        collect(type);
+      } catch (err: any) {
+        error = err;
+      }
+
+      assert.instanceOf(error, InputError);
+      assert.strictEqual(error.cause, cause);
+    });
+
     it('wraps errors thrown while generating the parameter data', function() {
       const cause = new TypeError('invalid value');
       const type = buildType({

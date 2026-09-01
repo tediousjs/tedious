@@ -127,7 +127,13 @@ class RpcRequestPayload implements Iterable<Buffer> {
     yield typeInfoBuffer;
     yield parameterLengthBuffer;
 
-    const parameterData = type.generateParameterData(param, this.options)[Symbol.iterator]();
+    let parameterData;
+    try {
+      parameterData = type.generateParameterData(param, this.options)[Symbol.iterator]();
+    } catch (error) {
+      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+    }
+
     while (true) {
       let result;
       try {
