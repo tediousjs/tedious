@@ -172,11 +172,14 @@ class RowTransform extends Transform {
    */
   _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
     if (!this.columnMetadataWritten) {
+      let colMetaData;
       try {
-        this.push(this.bulkLoad.getColMetaData());
+        colMetaData = this.bulkLoad.getColMetaData();
       } catch (error: any) {
         return callback(error);
       }
+
+      this.push(colMetaData);
       this.columnMetadataWritten = true;
     }
 
@@ -210,13 +213,21 @@ class RowTransform extends Transform {
         this.push(textPointerAndTimestampBuffer);
       }
 
+      // Only the type's serialization calls are wrapped, so that errors
+      // from stream internals (e.g. `this.push`) are not misattributed to
+      // the column.
+      let parameterLengthBuffer;
+      let parameterDataBuffers;
       try {
-        this.push(c.type.generateParameterLength(parameter, this.mainOptions));
-        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
-          this.push(chunk);
-        }
+        parameterLengthBuffer = c.type.generateParameterLength(parameter, this.mainOptions);
+        parameterDataBuffers = [...c.type.generateParameterData(parameter, this.mainOptions)];
       } catch (error: any) {
         return callback(new InputError(`Column '${c.name}' could not be serialized`, { cause: error }));
+      }
+
+      this.push(parameterLengthBuffer);
+      for (const chunk of parameterDataBuffers) {
+        this.push(chunk);
       }
     }
 

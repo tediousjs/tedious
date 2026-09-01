@@ -112,12 +112,35 @@ class RpcRequestPayload implements Iterable<Buffer> {
       param.collation = this.collation;
     }
 
+    // Only the type's serialization calls are wrapped, so that errors from
+    // elsewhere (e.g. the consumer of this generator) are not misattributed
+    // to the parameter.
+    let typeInfoBuffer;
+    let parameterLengthBuffer;
     try {
-      yield type.generateTypeInfo(param, this.options);
-      yield type.generateParameterLength(param, this.options);
-      yield * type.generateParameterData(param, this.options);
+      typeInfoBuffer = type.generateTypeInfo(param, this.options);
+      parameterLengthBuffer = type.generateParameterLength(param, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+    }
+
+    yield typeInfoBuffer;
+    yield parameterLengthBuffer;
+
+    const parameterData = type.generateParameterData(param, this.options)[Symbol.iterator]();
+    while (true) {
+      let result;
+      try {
+        result = parameterData.next();
+      } catch (error) {
+        throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+      }
+
+      if (result.done) {
+        break;
+      }
+
+      yield result.value;
     }
   }
 }
