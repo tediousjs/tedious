@@ -3755,6 +3755,19 @@ Connection.prototype.STATE = {
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
+        // A token parse failure leaves the connection at an undefined
+        // position in the TDS stream, so it cannot be recovered at the
+        // request level — treat it like a socket error. Without a listener
+        // here, a parse failure would surface as an unhandled `'error'`
+        // event on the parser's internal stream and crash the process.
+        const onParserError = (err: Error) => {
+          this.dispatchEvent('socketError', err);
+          process.nextTick(() => {
+            this.emit('error', this.wrapSocketError(err));
+          });
+        };
+        tokenStreamParser.on('error', onParserError);
+
         // If the request was canceled after the request message was
         // fully sent off, an attention message was sent to the server.
         //
@@ -3809,6 +3822,8 @@ Connection.prototype.STATE = {
         };
 
         const onEndOfMessage = () => {
+          tokenStreamParser.removeListener('error', onParserError);
+
           this.request?.removeListener('cancel', this._cancelAfterRequestSent);
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
