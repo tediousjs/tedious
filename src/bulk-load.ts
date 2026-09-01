@@ -435,6 +435,13 @@ class BulkLoad extends EventEmitter {
       }
     }
 
+    // A vector column's number of dimensions cannot be derived from anything,
+    // so it must be given explicitly for the bulk load's column metadata to
+    // agree with the row values.
+    if (type.name === 'Vector' && column.length == null) {
+      throw new Error('The number of dimensions of a vector column must be specified via the `length` option.');
+    }
+
     if (type.resolvePrecision && column.precision == null) {
       column.precision = type.resolvePrecision(column);
     }

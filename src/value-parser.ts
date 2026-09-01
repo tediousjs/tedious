@@ -3,24 +3,13 @@ import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
-import { endianness } from 'os';
 import { sprintf } from 'sprintf-js';
+import { VECTOR_HEADER_SIZE, VECTOR_LAYOUT_FORMAT, VECTOR_LAYOUT_VERSION, VECTOR_DIMENSION_TYPE_FLOAT32, isLittleEndianPlatform } from './data-types/vector';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
-
-// See MS-TDS s2.2.5.5.7 for the binary layout of vector values.
-const VECTOR_HEADER_SIZE = 8;
-const VECTOR_LAYOUT_FORMAT = 0xA9;
-const VECTOR_LAYOUT_VERSION = 0x01;
-const VECTOR_DIMENSION_TYPE_FLOAT32 = 0x00;
-
-// On little-endian platforms, vector values can be copied into the backing
-// storage of a `Float32Array` in bulk, instead of reading them one element
-// at a time.
-const isLittleEndianPlatform = endianness() === 'LE';
 const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;

@@ -18,6 +18,47 @@ const config = {
   }
 };
 
+describe('Vector data type without negotiated support', function() {
+  let connection: Connection;
+
+  beforeEach(function(done) {
+    connection = new Connection({
+      ...config,
+      options: { ...config.options, enableVectorSupport: false }
+    });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    connection.connect(done);
+  });
+
+  afterEach(function(done) {
+    if (!connection.closed) {
+      connection.on('end', done);
+      connection.close();
+    } else {
+      done();
+    }
+  });
+
+  it('fails vector parameters with a clear error', function(done) {
+    assert.isFalse(connection.serverSupportsVectorType);
+
+    const request = new Request('SELECT @v', function(err) {
+      assert.instanceOf(err, Error);
+      assert.match((err as Error).message, /require vector support to be negotiated/);
+
+      done();
+    });
+
+    request.addParameter('v', TYPES.Vector, new Float32Array([1, 2, 3]));
+
+    connection.execSql(request);
+  });
+});
+
 describe('Vector data type', function() {
   let connection: Connection;
 

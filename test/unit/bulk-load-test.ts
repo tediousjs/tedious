@@ -1,12 +1,25 @@
 import { assert } from 'chai';
 import BulkLoad from '../../src/bulk-load';
 import { type InternalConnectionOptions } from '../../src/connection';
+import { typeByName as TYPES } from '../../src/data-type';
 
 // Test options - using type assertion since tests only exercise code paths
 // that use a subset of the full InternalConnectionOptions
 const connectionOptions = { tdsVersion: '7_2' } as InternalConnectionOptions;
 
 describe('BulkLoad', function() {
+  describe('#addColumn', function() {
+    it('requires an explicit length for vector columns', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+
+      assert.throws(() => {
+        request.addColumn('v', TYPES.Vector, { nullable: true });
+      }, Error, /number of dimensions of a vector column must be specified/);
+
+      request.addColumn('v', TYPES.Vector, { nullable: true, length: 3 });
+    });
+  });
+
   it('starts out as not being canceled', function() {
     const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
     assert.strictEqual(request.canceled, false);

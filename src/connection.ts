@@ -2526,6 +2526,10 @@ class Connection extends EventEmitter {
    * @private
    */
   sendLogin7Packet() {
+    // A connection can go through multiple logins (e.g. when being rerouted),
+    // so reset any previously negotiated state.
+    this.serverSupportsVectorType = false;
+
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -2745,9 +2749,28 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
+
+  /**
+   * @private
+   */
+  assertVectorParameterSupport(request: Request) {
+    if (this.serverSupportsVectorType) {
+      return;
+    }
+
+    for (let i = 0, len = request.parameters.length; i < len; i++) {
+      const parameter = request.parameters[i];
+
+      if (parameter.type.name === 'Vector') {
+        throw new RequestError('Vector parameters require vector support to be negotiated with the server. Enable the `enableVectorSupport` connection option and connect to a server that supports the `vector` data type.', 'EPARAM');
+      }
+    }
+  }
+
   execSql(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
+      this.assertVectorParameterSupport(request);
     } catch (error: any) {
       request.error = error;
 
@@ -3021,6 +3044,8 @@ class Connection extends EventEmitter {
           value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
         });
       }
+
+      this.assertVectorParameterSupport(request);
     } catch (error: any) {
       request.error = error;
 
@@ -3043,6 +3068,7 @@ class Connection extends EventEmitter {
   callProcedure(request: Request) {
     try {
       request.validateParameters(this.databaseCollation);
+      this.assertVectorParameterSupport(request);
     } catch (error: any) {
       request.error = error;
 

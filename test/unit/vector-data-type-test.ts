@@ -121,6 +121,24 @@ describe('Vector parameter type', function() {
       const data = Buffer.concat([...TYPES.Vector.generateParameterData({ value: null, length: 3 }, options)]);
       assert.strictEqual(data.length, 0);
     });
+
+    it('prefers the value over a mismatched explicit length', function() {
+      // The type info and the value bytes must always agree.
+      const buffer = TYPES.Vector.generateTypeInfo({ value: new Float32Array(5), length: 3 }, options);
+      assert.deepEqual(buffer, Buffer.from([0xF5, 0x1C, 0x00, 0x00]));
+
+      assert.strictEqual(TYPES.Vector.declaration({ type: TYPES.Vector, name: 'v', value: new Float32Array(5), length: 3, output: false }), 'vector(5)');
+    });
+
+    it('rejects an out of range explicit length', function() {
+      assert.throws(() => {
+        TYPES.Vector.generateTypeInfo({ value: null, length: 20000 }, options);
+      }, TypeError, /between 1 and 1998 dimensions/);
+
+      assert.throws(() => {
+        TYPES.Vector.declaration({ type: TYPES.Vector, name: 'v', value: null, length: -1, output: false });
+      }, TypeError, /between 1 and 1998 dimensions/);
+    });
   });
 });
 

@@ -355,7 +355,15 @@ export class Login7TokenHandler extends TokenHandler {
     }
 
     if (token.vectorSupport !== undefined) {
-      this.connection.serverSupportsVectorType = token.vectorSupport >= 1;
+      if (!this.connection.config.options.enableVectorSupport) {
+        this.loginError = new ConnectionError('Did not request vector support, but received the acknowledgment');
+      } else if (token.vectorSupport === 1) {
+        this.connection.serverSupportsVectorType = true;
+      } else {
+        // The client requested (and can only parse) vector data type
+        // version 1 (float32).
+        this.loginError = new ConnectionError('Received acknowledgement for an unsupported vector data type version');
+      }
     }
   }
 
