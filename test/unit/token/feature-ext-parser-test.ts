@@ -61,4 +61,28 @@ describe('Feature Ext Parser', () => {
 
     assert.isTrue((await parser.next()).done);
   });
+
+  it('should parse vector support token', async function() {
+    const debug = new Debug();
+    const buffer = new WritableTrackingBuffer(8);
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x0E); // VECTORSUPPORT feature id
+    buffer.writeUInt32LE(0x00_00_00_01); // datalen
+    buffer.writeUInt8(0x01); // vector data type version 1 (float32)
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.strictEqual(token.vectorSupport, 1);
+    assert.isUndefined(token.fedAuth);
+    assert.isUndefined(token.utf8Support);
+
+    assert.isTrue((await parser.next()).done);
+  });
 });

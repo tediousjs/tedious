@@ -88,7 +88,9 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const type = parameter.type;
 
-    if ((type.id & 0x30) === 0x20) {
+    // `Vector` has a length even though its type id does not follow the
+    // legacy variable-length type id bit pattern.
+    if ((type.id & 0x30) === 0x20 || type.name === 'Vector') {
       if (parameter.length) {
         param.length = parameter.length;
       } else if (type.resolveLength) {

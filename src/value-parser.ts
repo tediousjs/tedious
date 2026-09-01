@@ -3,12 +3,24 @@ import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
+import { endianness } from 'os';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
+
+// See MS-TDS s2.2.5.5.7 for the binary layout of vector values.
+const VECTOR_HEADER_SIZE = 8;
+const VECTOR_LAYOUT_FORMAT = 0xA9;
+const VECTOR_LAYOUT_VERSION = 0x01;
+const VECTOR_DIMENSION_TYPE_FLOAT32 = 0x00;
+
+// On little-endian platforms, vector values can be copied into the backing
+// storage of a `Float32Array` in bulk, instead of reading them one element
+// at a time.
+const isLittleEndianPlatform = endianness() === 'LE';
 const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
@@ -218,6 +230,17 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       }
 
       return readBinary(buf, offset, dataLength);
+    }
+
+    case 'Vector': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+      if (dataLength === NULL) {
+        return new Result(null, offset);
+      }
+
+      return readVector(buf, offset, dataLength);
     }
 
     case 'Text': {
@@ -566,6 +589,50 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
   }
 
   return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
+}
+
+function readVector(buf: Buffer, offset: number, dataLength: number): Result<Float32Array> {
+  // Requesting the whole value once keeps the value parser from being
+  // re-entered for every element when a value straddles a packet boundary.
+  if (buf.length < offset + dataLength) {
+    throw new NotEnoughDataError(offset + dataLength);
+  }
+
+  if (dataLength < VECTOR_HEADER_SIZE) {
+    throw new Error(sprintf('Invalid vector value length %d', dataLength));
+  }
+
+  const layoutFormat = buf.readUInt8(offset);
+  const layoutVersion = buf.readUInt8(offset + 1);
+  if (layoutFormat !== VECTOR_LAYOUT_FORMAT || layoutVersion !== VECTOR_LAYOUT_VERSION) {
+    throw new Error(sprintf('Unsupported vector layout (format 0x%02X, version 0x%02X)', layoutFormat, layoutVersion));
+  }
+
+  const dimensions = buf.readUInt16LE(offset + 2);
+
+  const dimensionType = buf.readUInt8(offset + 4);
+  if (dimensionType !== VECTOR_DIMENSION_TYPE_FLOAT32) {
+    throw new Error(sprintf('Unsupported vector dimension type 0x%02X', dimensionType));
+  }
+
+  if (dataLength !== VECTOR_HEADER_SIZE + (dimensions * 4)) {
+    throw new Error(sprintf('Invalid vector value length %d for %d dimensions', dataLength, dimensions));
+  }
+
+  const value = new Float32Array(dimensions);
+
+  if (isLittleEndianPlatform) {
+    // Copy all elements at once into the array's backing storage. This is
+    // safe regardless of the alignment of `offset`, and about 3x as fast as
+    // reading the value element by element.
+    new Uint8Array(value.buffer).set(buf.subarray(offset + VECTOR_HEADER_SIZE, offset + dataLength));
+  } else {
+    for (let i = 0; i < dimensions; i++) {
+      value[i] = buf.readFloatLE(offset + VECTOR_HEADER_SIZE + (i * 4));
+    }
+  }
+
+  return new Result(value, offset + dataLength);
 }
 
 function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {

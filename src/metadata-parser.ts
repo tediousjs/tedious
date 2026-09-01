@@ -255,6 +255,28 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       }, offset);
     }
 
+    case 'Vector': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+      // The scale byte holds the vector's dimension type
+      // (0x00 = float32, 0x01 = float16).
+      let scale;
+      ({ offset, value: scale } = readUInt8(buf, offset));
+
+      return new Result({
+        userType: userType,
+        flags: flags,
+        type: type,
+        collation: undefined,
+        precision: undefined,
+        scale: scale,
+        dataLength: dataLength,
+        schema: undefined,
+        udtInfo: undefined
+      }, offset);
+    }
+
     case 'Image': {
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));

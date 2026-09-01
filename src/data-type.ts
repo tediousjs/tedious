@@ -37,6 +37,7 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
+import Vector from './data-types/vector';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
@@ -129,6 +130,7 @@ export const TYPE = {
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
+  [Vector.id]: Vector,
 };
 
 /**
@@ -467,7 +469,8 @@ export const TYPES = {
   DateTimeOffset,
   UDT,
   TVP,
-  Variant
+  Variant,
+  Vector
 };
 
 export const typeByName = TYPES;

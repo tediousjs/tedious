@@ -2,6 +2,37 @@ import { assert } from 'chai';
 import Login7Payload from '../../src/login7-payload';
 
 describe('Login7Payload', function() {
+  describe('#buildFeatureExt', function() {
+    function buildPayload() {
+      return new Login7Payload({
+        tdsVersion: 0x74000004,
+        packetSize: 1024,
+        clientProgVer: 0,
+        clientPid: 12345,
+        connectionId: 0,
+        clientTimeZone: 120,
+        clientLcid: 0x00000409
+      });
+    }
+
+    const VECTOR_SUPPORT_FEATURE_EXT = Buffer.from([0x0E, 0x01, 0x00, 0x00, 0x00, 0x01]);
+
+    it('does not include the VECTORSUPPORT feature by default', function() {
+      const featureExt = buildPayload().buildFeatureExt();
+
+      assert.strictEqual(featureExt.indexOf(VECTOR_SUPPORT_FEATURE_EXT), -1);
+    });
+
+    it('includes the VECTORSUPPORT feature when vector support is enabled', function() {
+      const payload = buildPayload();
+      payload.vectorSupport = true;
+      const featureExt = payload.buildFeatureExt();
+
+      assert.notStrictEqual(featureExt.indexOf(VECTOR_SUPPORT_FEATURE_EXT), -1);
+      assert.strictEqual(featureExt[featureExt.length - 1], 0xFF);
+    });
+  });
+
   describe('#toBuffer', function() {
 
     describe('for a login payload with a password', function() {

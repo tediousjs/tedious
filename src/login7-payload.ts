@@ -103,6 +103,7 @@ class Login7Payload {
   declare changePassword: string | undefined;
 
   declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
+  declare vectorSupport: boolean;
 
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
@@ -117,6 +118,7 @@ class Login7Payload {
     this.initDbFatal = false;
 
     this.fedAuth = undefined;
+    this.vectorSupport = false;
 
     this.userName = undefined;
     this.password = undefined;
@@ -443,6 +445,18 @@ class Login7Payload {
     buf.writeUInt32LE(1, 1);
     buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
     buffers.push(buf);
+
+    if (this.vectorSupport) {
+      // Request support for the `vector` data type. Value 0x0E, followed by
+      // the requested vector data type version (1 = float32). Added in TDS 7.4.
+      const VECTOR_SUPPORT_FEATURE_ID = 0x0e;
+      const VECTOR_SUPPORT_VERSION_FLOAT32 = 0x01;
+      const vectorBuf = Buffer.alloc(6);
+      vectorBuf.writeUInt8(VECTOR_SUPPORT_FEATURE_ID, 0);
+      vectorBuf.writeUInt32LE(1, 1);
+      vectorBuf.writeUInt8(VECTOR_SUPPORT_VERSION_FLOAT32, 5);
+      buffers.push(vectorBuf);
+    }
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 

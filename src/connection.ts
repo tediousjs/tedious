@@ -375,6 +375,7 @@ export interface InternalConnectionOptions {
   enableAnsiPadding: null | boolean;
   enableAnsiWarnings: null | boolean;
   enableArithAbort: null | boolean;
+  enableVectorSupport: boolean;
   enableConcatNullYieldsNull: null | boolean;
   enableCursorCloseOnCommit: null | boolean;
   enableImplicitTransactions: null | boolean;
@@ -642,6 +643,18 @@ export interface ConnectionOptions {
    * (default: `true`)
    */
   enableArithAbort?: boolean;
+
+  /**
+   * A boolean, that when true, negotiates native support for the `vector`
+   * data type with the server during login. When the server acknowledges
+   * support (SQL Server 2025 and newer), `vector` values are sent and
+   * received in their binary form and represented as [[Float32Array]]
+   * values. When disabled or not acknowledged, the server exposes `vector`
+   * values as JSON array strings instead.
+   *
+   * (default: `false`)
+   */
+  enableVectorSupport?: boolean;
 
   /**
    * A boolean, determines if concatenation with NULL should result in NULL or empty string value, more details in
@@ -974,6 +987,14 @@ class Connection extends EventEmitter {
    * @private
    */
   declare ntlmpacket: undefined | any;
+
+  /**
+   * Whether the server acknowledged native support for the `vector` data
+   * type during login. Only ever `true` when the
+   * [[ConnectionOptions.enableVectorSupport]] option is enabled and the
+   * server supports the data type.
+   */
+  declare serverSupportsVectorType: boolean;
   /**
    * @private
    */
@@ -1318,6 +1339,7 @@ class Connection extends EventEmitter {
         enableAnsiPadding: true,
         enableAnsiWarnings: true,
         enableArithAbort: true,
+        enableVectorSupport: false,
         enableConcatNullYieldsNull: true,
         enableCursorCloseOnCommit: null,
         enableImplicitTransactions: false,
@@ -1534,6 +1556,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.enableConcatNullYieldsNull = config.options.enableConcatNullYieldsNull;
+      }
+
+      if (config.options.enableVectorSupport !== undefined) {
+        if (typeof config.options.enableVectorSupport !== 'boolean') {
+          throw new TypeError('The "config.options.enableVectorSupport" property must be of type boolean.');
+        }
+
+        this.config.options.enableVectorSupport = config.options.enableVectorSupport;
       }
 
       if (config.options.enableCursorCloseOnCommit !== undefined) {
@@ -1787,6 +1817,7 @@ class Connection extends EventEmitter {
 
     this.debug = this.createDebug();
     this.inTransaction = false;
+    this.serverSupportsVectorType = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
 
     // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
@@ -2504,6 +2535,8 @@ class Connection extends EventEmitter {
       clientTimeZone: new Date().getTimezoneOffset(),
       clientLcid: 0x00000409
     });
+
+    payload.vectorSupport = this.config.options.enableVectorSupport;
 
     const { authentication } = this.config;
     switch (authentication.type) {
