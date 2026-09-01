@@ -1,6 +1,6 @@
 import { type ParserOptions } from './stream-parser';
 import { DoneToken, DoneInProcToken, DoneProcToken } from './token';
-import { Result, readBigUInt64LE, readUInt16LE, readUInt32LE } from './helpers';
+import { Result, readBigUInt64LE, readUInt16LE } from './helpers';
 
 // s2.2.7.5/6/7
 
@@ -37,7 +37,7 @@ function readToken(buf: Buffer, offset: number, options: ParserOptions): Result<
   ({ offset, value: curCmd } = readUInt16LE(buf, offset));
 
   let rowCount;
-  ({ offset, value: rowCount } = (options.tdsVersion < '7_2' ? readUInt32LE : readBigUInt64LE)(buf, offset));
+  ({ offset, value: rowCount } = readBigUInt64LE(buf, offset));
 
   return new Result({
     more: more,

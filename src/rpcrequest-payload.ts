@@ -41,10 +41,8 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
   * generateData() {
     const buffer = new WritableTrackingBuffer(500);
-    if (this.options.tdsVersion >= '7_2') {
-      const outstandingRequestCount = 1;
-      writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
-    }
+    const outstandingRequestCount = 1;
+    writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
 
     if (typeof this.procedure === 'string') {
       buffer.writeUsVarchar(this.procedure);

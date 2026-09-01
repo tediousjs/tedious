@@ -22,7 +22,7 @@ function getConfig() {
 }
 
 type DataType = typeof TYPES[keyof typeof TYPES];
-type TdsVersion = '7_0' | '7_1' | '7_2' | '7_3_A' | '7_4' | null | undefined;
+type TdsVersion = '7_2' | '7_3_A' | '7_4' | null | undefined;
 
 function execSql(
   done: Mocha.Done,

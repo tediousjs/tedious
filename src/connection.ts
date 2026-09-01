@@ -814,7 +814,6 @@ export interface ConnectionOptions {
    * The version of TDS to use. If server doesn't support specified version, negotiated version is used instead.
    *
    * The versions are available from `require('tedious').TDS_VERSION`.
-   * * `7_1` (deprecated, support will be removed in a future version)
    * * `7_2`
    * * `7_3_A`
    * * `7_3_B`
@@ -946,14 +945,6 @@ class Connection extends EventEmitter {
    * @private
    */
   declare transactionDescriptors: Buffer[];
-  /**
-   * @private
-   */
-  declare transactionDepth: number;
-  /**
-   * @private
-   */
-  declare isSqlBatch: boolean;
   /**
    * @private
    */
@@ -1706,6 +1697,10 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.options.tdsVersion" property must be of type string.');
         }
 
+        if (versions[config.options.tdsVersion] === undefined) {
+          throw new RangeError('The "config.options.tdsVersion" property must be one of ' + Object.keys(versions).map((version) => `"${version}"`).join(', ') + '. Received: ' + config.options.tdsVersion);
+        }
+
         this.config.options.tdsVersion = config.options.tdsVersion;
       }
 
@@ -1788,14 +1783,6 @@ class Connection extends EventEmitter {
     this.debug = this.createDebug();
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
-
-    // 'beginTransaction', 'commitTransaction' and 'rollbackTransaction'
-    // events are utilized to maintain inTransaction property state which in
-    // turn is used in managing transactions. These events are only fired for
-    // TDS version 7.2 and beyond. The properties below are used to emulate
-    // equivalent behavior for TDS versions before 7.2.
-    this.transactionDepth = 0;
-    this.isSqlBatch = false;
     this.closed = false;
     this.messageBuffer = Buffer.alloc(0);
 
@@ -3047,16 +3034,6 @@ class Connection extends EventEmitter {
 
     const transaction = new Transaction(name, isolationLevel);
 
-    if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
-        if (this.transactionDepth === 1) {
-          this.inTransaction = true;
-        }
-        callback(err);
-      }));
-    }
-
     const request = new Request(undefined, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
@@ -3075,16 +3052,6 @@ class Connection extends EventEmitter {
    */
   commitTransaction(callback: CommitTransactionCallback, name = '') {
     const transaction = new Transaction(name);
-    if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
-        }
-
-        callback(err);
-      }));
-    }
     const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
   }
@@ -3102,15 +3069,6 @@ class Connection extends EventEmitter {
    */
   rollbackTransaction(callback: RollbackTransactionCallback, name = '') {
     const transaction = new Transaction(name);
-    if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
-        }
-        callback(err);
-      }));
-    }
     const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
   }
@@ -3128,12 +3086,6 @@ class Connection extends EventEmitter {
    */
   saveTransaction(callback: SaveTransactionCallback, name: string) {
     const transaction = new Transaction(name);
-    if (this.config.options.tdsVersion < '7_2') {
-      return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
-        callback(err);
-      }));
-    }
     const request = new Request(undefined, callback);
     return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
   }
@@ -3176,9 +3128,6 @@ class Connection extends EventEmitter {
           done(err, ...args);
         }
       } else if (useSavepoint) {
-        if (this.config.options.tdsVersion < '7_2') {
-          this.transactionDepth--;
-        }
         done(null, ...args);
       } else {
         this.commitTransaction((txErr) => {
@@ -3229,12 +3178,6 @@ class Connection extends EventEmitter {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
     } else {
-      if (packetType === TYPE.SQL_BATCH) {
-        this.isSqlBatch = true;
-      } else {
-        this.isSqlBatch = false;
-      }
-
       this.request = request;
       this.attentionSent = false;
       request.connection! = this;
@@ -3326,9 +3269,6 @@ class Connection extends EventEmitter {
    */
   reset(callback: ResetCallback) {
     const request = new Request(this.getInitialSql(), (err) => {
-      if (this.config.options.tdsVersion < '7_2') {
-        this.inTransaction = false;
-      }
       callback(err);
     });
     this.resetConnectionOnNextRequest = true;
@@ -3823,9 +3763,6 @@ Connection.prototype.STATE = {
           this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
           this.request = undefined;
-          if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
-            this.inTransaction = false;
-          }
           sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
         };
 

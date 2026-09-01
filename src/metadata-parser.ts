@@ -115,7 +115,7 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
 
 function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<Metadata> {
   let userType;
-  ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
+  ({ offset, value: userType } = readUInt32LE(buf, offset));
 
   let flags;
   ({ offset, value: flags } = readUInt16LE(buf, offset));
