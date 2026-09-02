@@ -5,7 +5,8 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter, isAsyncIterable, resolveParameter, serializeTypeInfo, serializeValue } from './data-type';
+import { type DataType, type Parameter, isAsyncIterable, resolveParameter, typeInfoBuffer, writeValue } from './data-type';
+import WritableBufferList from './writable-buffer-list';
 import { Collation } from './collation';
 
 /**
@@ -175,7 +176,8 @@ class RowTransform extends Transform {
       this.columnMetadataWritten = true;
     }
 
-    this.push(rowTokenBuffer);
+    const sink = new WritableBufferList();
+    sink.append(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
@@ -191,27 +193,27 @@ class RowTransform extends Transform {
 
       if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
         if (value == null) {
-          this.push(textPointerNullBuffer);
+          sink.append(textPointerNullBuffer);
           continue;
         }
 
-        this.push(textPointerAndTimestampBuffer);
+        sink.append(textPointerAndTimestampBuffer);
       }
 
-      let chunks;
+      let steps;
       try {
-        chunks = serializeValue(c.type, { ...c.resolved!, value }, this.mainOptions);
+        steps = writeValue(c.type, sink, { ...c.resolved!, value }, this.mainOptions);
       } catch (error: any) {
         return callback(error);
       }
 
-      if (isAsyncIterable(chunks)) {
+      if (isAsyncIterable(steps)) {
         return callback(new Error(`Column '${c.name}' has a type whose values cannot be serialized synchronously`));
       }
+    }
 
-      for (const chunk of chunks) {
-        this.push(chunk);
-      }
+    for (const chunk of sink.getBuffers()) {
+      this.push(chunk);
     }
 
     process.nextTick(callback);
@@ -556,7 +558,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(serializeTypeInfo(c.type, c.resolved!, this.options));
+      tBuf.writeBuffer(typeInfoBuffer(c.type, c.resolved!, this.options));
 
       // TableName
       if (c.type.hasTableName) {

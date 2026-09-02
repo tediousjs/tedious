@@ -118,26 +118,31 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  serializeValue(parameter) {
+  writeValue(sink, parameter) {
     if (parameter.value == null) {
-      return [parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH];
+      sink.append(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
+      return;
     }
 
-    const value = Buffer.isBuffer(parameter.value) ? parameter.value : Buffer.from(parameter.value.toString(), 'ucs2');
+    const value = Buffer.isBuffer(parameter.value) ? parameter.value : parameter.value.toString();
+    const length = typeof value === 'string' ? value.length * 2 : value.length;
 
     if (parameter.length! <= this.maximumLength) {
-      const length = Buffer.alloc(2);
-      length.writeUInt16LE(value.length, 0);
-      return [length, value];
+      sink.writeUInt16LE(length);
+      sink.append(value, 'ucs2');
+      return;
     }
 
-    if (value.length === 0) {
-      return [UNKNOWN_PLP_LEN, PLP_TERMINATOR];
+    if (length === 0) {
+      sink.append(UNKNOWN_PLP_LEN);
+      sink.append(PLP_TERMINATOR);
+      return;
     }
 
-    const chunkLength = Buffer.alloc(4);
-    chunkLength.writeUInt32LE(value.length, 0);
-    return [UNKNOWN_PLP_LEN, chunkLength, value, PLP_TERMINATOR];
+    sink.append(UNKNOWN_PLP_LEN);
+    sink.writeUInt32LE(length);
+    sink.append(value, 'ucs2');
+    sink.append(PLP_TERMINATOR);
   },
 
   validate: function(value): Buffer | null {

@@ -1,6 +1,7 @@
 import { assert } from 'chai';
 
-import { typeByName as TYPES, type DataType, type Parameter, type ParameterData, resolveParameter, serializeTypeInfo, serializeValue, isAsyncIterable } from '../../src/data-type';
+import { typeByName as TYPES, type DataType, type Parameter, type ParameterData, resolveParameter, writeTypeInfo, writeValue } from '../../src/data-type';
+import WritableBufferList from '../../src/writable-buffer-list';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
@@ -14,11 +15,16 @@ function legacyBytes(type: DataType, resolved: ParameterData) {
 }
 
 function contractBytes(type: DataType, resolved: ParameterData) {
-  const value = serializeValue(type, resolved, options);
-  assert.isFalse(isAsyncIterable(value), 'scalar types serialize eagerly');
+  const typeInfo = new WritableBufferList();
+  writeTypeInfo(type, typeInfo, resolved, options);
+
+  const value = new WritableBufferList();
+  const steps = writeValue(type, value, resolved, options);
+  assert.isUndefined(steps, 'scalar types serialize synchronously');
+
   return {
-    typeInfo: serializeTypeInfo(type, resolved, options),
-    value: Buffer.concat([...value as Iterable<Buffer>])
+    typeInfo: typeInfo.slice(),
+    value: value.slice()
   };
 }
 
@@ -80,7 +86,7 @@ describe('Parameter serialization contract', function() {
 
   describe('legacy types are adapted', function() {
     it('serializes via the legacy methods', function() {
-      assert.isUndefined(TYPES.BigInt.serializeValue);
+      assert.isUndefined(TYPES.BigInt.writeValue);
 
       const resolved = resolveParameter({ type: TYPES.BigInt, name: 'p', value: 123456789, output: false }, undefined, options);
       assert.deepEqual(contractBytes(TYPES.BigInt, resolved), legacyBytes(TYPES.BigInt, resolved));

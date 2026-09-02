@@ -1,6 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type Parameter, isAsyncIterable, resolveParameter, serializeTypeInfo, serializeValue } from './data-type';
+import { type Parameter, resolveParameter, writeTypeInfo, writeValue } from './data-type';
+import WritableBufferList, { CHUNK_SIZE } from './writable-buffer-list';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import { InputError } from './errors';
@@ -15,65 +16,6 @@ const STATUS = {
   BY_REF_VALUE: 0x01,
   DEFAULT_VALUE: 0x02
 };
-
-// Buffers at least this large are passed through as-is instead of being
-// copied into a coalesced chunk. Large values (e.g. a varbinary(max) holding
-// a file) therefore cost no extra memory, while the many small pieces that
-// make up scalar parameters are still sent as a single chunk.
-const COALESCE_LIMIT = 8 * 1024;
-
-/**
- * Collects the pieces of a request. Small pieces are coalesced into a chunk
- * of at most `COALESCE_LIMIT` bytes; larger pieces are passed through without
- * being copied.
- */
-class ChunkQueue {
-  declare ready: Buffer[];
-  declare pending: Buffer[];
-  declare pendingLength: number;
-
-  constructor() {
-    this.ready = [];
-    this.pending = [];
-    this.pendingLength = 0;
-  }
-
-  push(buffer: Buffer) {
-    if (buffer.length >= COALESCE_LIMIT) {
-      this.flush();
-      this.ready.push(buffer);
-      return;
-    }
-
-    this.pending.push(buffer);
-    this.pendingLength += buffer.length;
-
-    if (this.pendingLength >= COALESCE_LIMIT) {
-      this.flush();
-    }
-  }
-
-  flush() {
-    const pending = this.pending;
-    if (pending.length === 1) {
-      this.ready.push(pending[0]);
-    } else if (pending.length > 1) {
-      this.ready.push(Buffer.concat(pending, this.pendingLength));
-    }
-    this.pending = [];
-    this.pendingLength = 0;
-  }
-
-  /**
-   * Returns the chunks that are ready to be sent, without flushing the
-   * pieces that are still being coalesced.
-   */
-  take(): Buffer[] {
-    const ready = this.ready;
-    this.ready = [];
-    return ready;
-  }
-}
 
 /*
   s2.2.6.5
@@ -120,40 +62,41 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
 
-    // Synchronously available data is coalesced into as few chunks as
-    // possible: every trip through the async iterator costs a promise
-    // resolution, which dominates the cost of small scalar parameters.
-    // Large pieces are passed through without being copied, and values that
-    // are produced asynchronously (e.g. streamed table-valued parameters)
-    // are yielded as they arrive.
-    const queue = new ChunkQueue();
-    queue.push(buffer.data);
+    // All data is written into a single sink, which coalesces small pieces
+    // into chunks (every trip through the async iterator costs a promise
+    // resolution, which would dominate the cost of small scalar parameters)
+    // and passes large values through without copying them. Chunks are taken
+    // out of the sink whenever a chunk's worth of data has been written, and
+    // between the steps of values that are produced asynchronously (e.g.
+    // streamed table-valued parameters).
+    const sink = new WritableBufferList();
+    sink.append(buffer.data);
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
       const parameter = this.parameters[i];
-      const value = this.generateParameterData(parameter, queue);
+      const steps = this.writeParameter(sink, parameter);
 
-      if (value !== undefined) {
-        queue.flush();
-      }
-
-      if (queue.ready.length) {
-        yield * queue.take();
-      }
-
-      if (value !== undefined) {
+      if (steps !== undefined) {
         // Streamed values can only report errors while being sent.
         try {
-          yield * value;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          for await (const _ of steps) {
+            if (sink.length >= CHUNK_SIZE) {
+              yield * take(sink);
+            }
+          }
         } catch (error) {
           throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
         }
       }
+
+      if (sink.length >= CHUNK_SIZE) {
+        yield * take(sink);
+      }
     }
 
-    queue.flush();
-    yield * queue.take();
+    yield * take(sink);
   }
 
   toString(indent = '') {
@@ -161,26 +104,19 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
   }
 
   /**
-   * Serializes a single parameter. Synchronously available data is pushed
-   * onto `queue`; if the parameter's value is produced asynchronously, the
-   * async iterable is returned so that the caller can stream it.
+   * Writes a single parameter into `sink`. If the parameter's value is
+   * produced asynchronously, the async iterable driving it is returned.
    */
-  generateParameterData(parameter: Parameter, queue: ChunkQueue): AsyncIterable<Buffer> | undefined {
-    const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
-
-    if (parameter.name) {
-      buffer.writeBVarchar('@' + parameter.name);
-    } else {
-      buffer.writeBVarchar('');
-    }
+  writeParameter(sink: WritableBufferList, parameter: Parameter): AsyncIterable<void> | undefined {
+    const name = parameter.name ? '@' + parameter.name : '';
+    sink.writeUInt8(name.length);
+    sink.append(name, 'ucs2');
 
     let statusFlags = 0;
     if (parameter.output) {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
-    buffer.writeUInt8(statusFlags);
-
-    queue.push(buffer.data);
+    sink.writeUInt8(statusFlags);
 
     const type = parameter.type;
 
@@ -189,30 +125,22 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     // serialization is wrapped, so that other errors are not misattributed.
     const resolved = parameter.resolved ?? resolveParameter(parameter, this.collation, this.options);
 
-    let value;
     try {
-      queue.push(serializeTypeInfo(type, resolved, this.options));
-      value = serializeValue(type, resolved, this.options);
+      writeTypeInfo(type, sink, resolved, this.options);
+      return writeValue(type, sink, resolved, this.options) ?? undefined;
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
     }
-
-    if (isAsyncIterable(value)) {
-      return value;
-    }
-
-    // Legacy `generateParameterData` implementations are generators that
-    // only run (and validate) when iterated, so draining them is wrapped too.
-    try {
-      for (const chunk of value) {
-        queue.push(chunk);
-      }
-    } catch (error) {
-      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-    }
-
-    return undefined;
   }
+}
+
+/**
+ * Takes all chunks out of the sink.
+ */
+function take(sink: WritableBufferList): Buffer[] {
+  const buffers = sink.getBuffers();
+  sink.consume(sink.length);
+  return buffers;
 }
 
 export default RpcRequestPayload;

@@ -1,4 +1,5 @@
-import { typeByName as TYPES, resolveParameter, serializeValue } from '../../src/data-type';
+import { typeByName as TYPES, resolveParameter, writeValue } from '../../src/data-type';
+import WritableBufferList from '../../src/writable-buffer-list';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 import { assert } from 'chai';
@@ -1482,11 +1483,15 @@ describe('TVP', function() {
   describe('.generateParameterData', function() {
     async function collect(value: unknown) {
       const resolved = resolveParameter({ type: TYPES.TVP, name: 'tvp', value, output: false }, undefined, optionsWithUTCFalse);
-      const chunks = [];
-      for await (const chunk of serializeValue(TYPES.TVP, resolved, optionsWithUTCFalse)) {
-        chunks.push(chunk);
+      const sink = new WritableBufferList();
+      const steps = writeValue(TYPES.TVP, sink, resolved, optionsWithUTCFalse);
+      if (steps) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of steps) {
+          // collect everything at the end
+        }
       }
-      return Buffer.concat(chunks);
+      return sink.slice();
     }
 
     it('correctly converts TVP table values', async function() {

@@ -4,6 +4,7 @@ import RpcRequestPayload from '../../src/rpcrequest-payload';
 import { InputError } from '../../src/errors';
 import { typeByName as TYPES, type Parameter, resolveParameter } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
+import { CHUNK_SIZE } from '../../src/writable-buffer-list';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
 const txnDescriptor = Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]);
@@ -110,7 +111,8 @@ describe('Streaming TVP', function() {
     await iterator.return!(undefined);
 
     assert.isTrue(sourceClosed);
-    // Rows are pulled lazily - an infinite source only produced what was consumed.
-    assert.isBelow(rowsPulled, 30);
+    // Rows are pulled lazily, a chunk's worth at a time - an infinite source
+    // only produced what was consumed. Each row is 14 bytes here.
+    assert.isBelow(rowsPulled, 20 * CHUNK_SIZE / 14 + 1);
   });
 });

@@ -36,19 +36,18 @@ const Int: DataType = {
     yield buffer;
   },
 
-  serializeTypeInfo() {
-    return TYPE_INFO;
+  writeTypeInfo(sink) {
+    sink.append(TYPE_INFO);
   },
 
-  serializeValue(parameter) {
+  writeValue(sink, parameter) {
     if (parameter.value == null) {
-      return [NULL_LENGTH];
+      sink.writeUInt8(0x00);
+      return;
     }
 
-    const buffer = Buffer.alloc(5);
-    buffer.writeUInt8(0x04, 0);
-    buffer.writeInt32LE(Number(parameter.value), 1);
-    return [buffer];
+    sink.writeUInt8(0x04);
+    sink.writeInt32LE(Number(parameter.value));
   },
 
   validate: function(value): number | null {

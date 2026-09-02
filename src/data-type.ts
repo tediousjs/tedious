@@ -1,4 +1,5 @@
 import Null from './data-types/null';
+import WritableBufferList from './writable-buffer-list';
 import TinyInt from './data-types/tinyint';
 import Bit from './data-types/bit';
 import SmallInt from './data-types/smallint';
@@ -95,7 +96,7 @@ export interface DataType {
   resolveScale?: (parameter: Parameter) => number;
 
   // SPIKE: the reshaped serialization contract. Types can implement these
-  // natively; `resolveParameter`, `serializeTypeInfo` and `serializeValue`
+  // natively; `resolveParameter`, `writeTypeInfo` and `writeValue`
   // fall back to the legacy `validate` / `resolve*` / `generate*` methods
   // for types that do not.
 
@@ -107,21 +108,23 @@ export interface DataType {
   resolve?(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ParameterData;
 
   /**
-   * The TYPE_INFO for a resolved parameter.
+   * Writes the TYPE_INFO for a resolved parameter.
    */
-  serializeTypeInfo?(resolved: ParameterData, options: InternalConnectionOptions): Buffer;
+  writeTypeInfo?(sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void;
 
   /**
-   * The value of a resolved parameter (length prefix and data). Returns an
-   * array for regular types; only types whose value is unbounded (e.g. rows
-   * streamed into a table-valued parameter) return a lazy (async) iterable,
-   * at the cost of deferring value errors into the send path.
+   * Writes the value of a resolved parameter (length prefix and data).
+   * Regular types write the whole value synchronously. Only types whose
+   * value is unbounded (e.g. rows streamed into a table-valued parameter)
+   * return an async iterable that writes the value in steps; the caller
+   * takes chunks out of the sink between steps. Errors from such values can
+   * only be reported while they are being sent.
    */
-  serializeValue?(resolved: ParameterData, options: InternalConnectionOptions): Iterable<Buffer> | AsyncIterable<Buffer>;
+  writeValue?(sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
 }
 
-export function isAsyncIterable<T>(value: Iterable<T> | AsyncIterable<T>): value is AsyncIterable<T> {
-  return typeof (value as AsyncIterable<T>)[Symbol.asyncIterator] === 'function';
+export function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
+  return value != null && typeof (value as AsyncIterable<T>)[Symbol.asyncIterator] === 'function';
 }
 
 /**
@@ -165,22 +168,35 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
   return resolved;
 }
 
-export function serializeTypeInfo(type: DataType, resolved: ParameterData, options: InternalConnectionOptions): Buffer {
-  if (type.serializeTypeInfo) {
-    return type.serializeTypeInfo(resolved, options);
+export function writeTypeInfo(type: DataType, sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void {
+  if (type.writeTypeInfo) {
+    type.writeTypeInfo(sink, resolved, options);
+  } else {
+    sink.append(type.generateTypeInfo(resolved, options));
   }
-
-  return type.generateTypeInfo(resolved, options);
 }
 
-export function serializeValue(type: DataType, resolved: ParameterData, options: InternalConnectionOptions): Iterable<Buffer> | AsyncIterable<Buffer> {
-  if (type.serializeValue) {
-    return type.serializeValue(resolved, options);
+export function writeValue(type: DataType, sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void> {
+  if (type.writeValue) {
+    return type.writeValue(sink, resolved, options);
   }
 
-  // Legacy types generate their value lazily; collecting it here gives
-  // callers eager error semantics regardless of how the type is implemented.
-  return [type.generateParameterLength(resolved, options), ...type.generateParameterData(resolved, options)];
+  // Legacy types generate their value lazily; draining the generator here
+  // gives callers eager error semantics regardless of how the type is
+  // implemented.
+  sink.append(type.generateParameterLength(resolved, options));
+  for (const chunk of type.generateParameterData(resolved, options)) {
+    sink.append(chunk);
+  }
+}
+
+/**
+ * The TYPE_INFO for a resolved parameter as a buffer.
+ */
+export function typeInfoBuffer(type: DataType, resolved: ParameterData, options: InternalConnectionOptions): Buffer {
+  const sink = new WritableBufferList();
+  writeTypeInfo(type, sink, resolved, options);
+  return sink.slice();
 }
 
 export const TYPE = {

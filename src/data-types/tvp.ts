@@ -1,4 +1,5 @@
-import { type DataType, type Parameter, type ParameterData, isAsyncIterable, resolveParameter, serializeTypeInfo, serializeValue } from '../data-type';
+import { type DataType, type Parameter, type ParameterData, isAsyncIterable, resolveParameter, writeTypeInfo, writeValue } from '../data-type';
+import WritableBufferList, { CHUNK_SIZE } from '../writable-buffer-list';
 import { type InternalConnectionOptions } from '../connection';
 import { Collation } from '../collation';
 import { InputError } from '../errors';
@@ -34,7 +35,7 @@ interface TvpValue {
 interface ResolvedTvpValue {
   name?: string | undefined;
   schema?: string | undefined;
-  columns: { name: string, type: DataType, resolved: ParameterData }[];
+  columns: { name: string, type: DataType, resolved: ParameterData, cell: ParameterData }[];
   rows: Iterable<TvpRow> | AsyncIterable<TvpRow>;
   validated: boolean;
 }
@@ -62,6 +63,34 @@ function validateRow(columns: ResolvedTvpValue['columns'], row: TvpRow, rowIndex
   return validated;
 }
 
+async function * writeRows(sink: WritableBufferList, columns: ResolvedTvpValue['columns'], rows: ResolvedTvpValue['rows'], validated: boolean, collation: Collation | undefined, options: InternalConnectionOptions): AsyncIterable<void> {
+  let rowIndex = 0;
+  for await (const sourceRow of rows) {
+    const row = validated ? sourceRow : validateRow(columns, sourceRow, rowIndex, collation, options);
+
+    sink.append(TVP_ROW_TOKEN);
+
+    for (let k = 0, len = row.length; k < len; k++) {
+      const column = columns[k];
+      column.cell.value = row[k];
+
+      if (isAsyncIterable(writeValue(column.type, sink, column.cell, options))) {
+        throw new InputError(`TVP column '${column.name}' has a type whose values cannot be serialized synchronously`);
+      }
+    }
+
+    // Hand control back to the caller once a chunk's worth of rows has been
+    // written, so that it can be sent while the next rows are produced.
+    if (sink.length >= CHUNK_SIZE) {
+      yield;
+    }
+
+    rowIndex++;
+  }
+
+  sink.append(TVP_END_TOKEN);
+}
+
 const TVP: DataType = {
   id: 0xF3,
   type: 'TVPTYPE',
@@ -81,7 +110,9 @@ const TVP: DataType = {
 
     const columns = value.columns.map((column) => {
       const columnParameter: Parameter = { type: column.type, name: column.name, value: null, output: false, length: column.length, precision: column.precision, scale: column.scale };
-      return { name: column.name, type: column.type, resolved: resolveParameter(columnParameter, collation, options) };
+      const resolved = resolveParameter(columnParameter, collation, options);
+      // A scratch struct that is reused for every cell of this column.
+      return { name: column.name, type: column.type, resolved, cell: { ...resolved } };
     });
 
     // The non-streaming case is built on top of the streaming one: rows
@@ -103,71 +134,41 @@ const TVP: DataType = {
     return { value: resolved, collation };
   },
 
-  serializeTypeInfo(parameter, options) {
-    return this.generateTypeInfo(parameter, options);
+  writeTypeInfo(sink, parameter, options) {
+    sink.append(this.generateTypeInfo(parameter, options));
   },
 
-  async * serializeValue(parameter, options) {
+  writeValue(sink, parameter, options) {
     if (parameter.value == null) {
-      yield NULL_LENGTH;
-      yield TVP_END_TOKEN;
-      yield TVP_END_TOKEN;
+      sink.append(NULL_LENGTH);
+      sink.append(TVP_END_TOKEN);
+      sink.append(TVP_END_TOKEN);
       return;
     }
 
     const { columns, rows, validated } = parameter.value as ResolvedTvpValue;
 
-    const columnCount = Buffer.alloc(2);
-    columnCount.writeUInt16LE(columns.length, 0);
-    yield columnCount;
+    sink.writeUInt16LE(columns.length);
 
     for (let i = 0, len = columns.length; i < len; i++) {
       const column = columns[i];
 
-      const buff = Buffer.alloc(6);
       // UserType
-      buff.writeUInt32LE(0x00000000, 0);
+      sink.writeUInt32LE(0x00000000);
 
       // Flags
-      buff.writeUInt16LE(0x0000, 4);
-      yield buff;
+      sink.writeUInt16LE(0x0000);
 
       // TYPE_INFO
-      yield serializeTypeInfo(column.type, column.resolved, options);
+      writeTypeInfo(column.type, sink, column.resolved, options);
 
       // ColName
-      yield Buffer.from([0x00]);
+      sink.writeUInt8(0x00);
     }
 
-    yield TVP_END_TOKEN;
+    sink.append(TVP_END_TOKEN);
 
-    let rowIndex = 0;
-    for await (const sourceRow of rows) {
-      const row = validated ? sourceRow : validateRow(columns, sourceRow, rowIndex, parameter.collation, options);
-
-      // One buffer per row: keeps the number of (asynchronous) yields
-      // proportional to the number of rows, not cells.
-      const rowBuffer = new WritableTrackingBuffer(64, null, true);
-      rowBuffer.writeBuffer(TVP_ROW_TOKEN);
-
-      for (let k = 0, len = row.length; k < len; k++) {
-        const column = columns[k];
-        const chunks = serializeValue(column.type, { ...column.resolved, value: row[k] }, options);
-        if (isAsyncIterable(chunks)) {
-          throw new InputError(`TVP column '${column.name}' has a type whose values cannot be serialized synchronously`);
-        }
-
-        for (const chunk of chunks) {
-          rowBuffer.writeBuffer(chunk);
-        }
-      }
-
-      yield rowBuffer.data;
-
-      rowIndex++;
-    }
-
-    yield TVP_END_TOKEN;
+    return writeRows(sink, columns, rows, validated, parameter.collation, options);
   },
 
   generateTypeInfo(parameter) {
@@ -203,7 +204,7 @@ const TVP: DataType = {
   * generateParameterData(): Generator<Buffer, void> {
     // Table-valued parameters stream their rows and can only be serialized
     // via `serializeValue`.
-    throw new Error('Table-valued parameters must be serialized via `serializeValue`');
+    throw new Error('Table-valued parameters must be serialized via `writeValue`');
   },
 
   validate: function(value): TvpValue | null {
