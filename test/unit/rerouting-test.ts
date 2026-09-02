@@ -16,12 +16,12 @@ function buildRoutingEnvChangeToken(hostname: string, port: number): Buffer {
 
   const envValueDataBuffer = new WritableTrackingBuffer();
   envValueDataBuffer.writeUInt8(20); // Type
-  envValueDataBuffer.writeUsVarbyte(valueBuffer.data, 'ucs2');
-  envValueDataBuffer.writeUsVarbyte(Buffer.alloc(0), 'ucs2');
+  envValueDataBuffer.writeUsVarbyte(valueBuffer.data);
+  envValueDataBuffer.writeUsVarbyte(Buffer.alloc(0));
 
   const envChangeBuffer = new WritableTrackingBuffer();
   envChangeBuffer.writeUInt8(0xE3); // TokenType
-  envChangeBuffer.writeUsVarbyte(envValueDataBuffer.data, 'ucs2'); // Length + EnvValueData
+  envChangeBuffer.writeUsVarbyte(envValueDataBuffer.data); // Length + EnvValueData
 
   return envChangeBuffer.data;
 }

@@ -1,6 +1,5 @@
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
-const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
 
 /**
  * The size of the chunks a `WritableTrackingBuffer` produces, and the size
@@ -335,42 +334,13 @@ class WritableTrackingBuffer {
     this.append(value, encoding);
   }
 
-  writeUsVarbyte(value: Buffer | string, encoding: Encoding) {
-    if (Buffer.isBuffer(value)) {
-      this.writeUInt16LE(value.length);
-      this.append(value);
-    } else {
-      this.writeUInt16LE(Buffer.byteLength(value, encoding));
-      this.append(value, encoding);
-    }
-  }
-
-  writePLPBody(value: Buffer | string, encoding: Encoding) {
-    const length = Buffer.isBuffer(value) ? value.length : Buffer.byteLength(value, encoding);
-
-    // Length of all chunks.
-    // this.writeUInt64LE(length);
-    // unknown seems to work better here - might revisit later.
-    this.append(UNKNOWN_PLP_LEN);
-
-    // In the UNKNOWN_PLP_LEN case, the data is represented as a series of zero or more chunks.
-    if (length > 0) {
-      // One chunk.
-      this.writeUInt32LE(length);
-      this.append(value, encoding);
-    }
-
-    // PLP_TERMINATOR (no more chunks).
-    this.writeUInt32LE(0);
+  writeUsVarbyte(value: Buffer) {
+    this.writeUInt16LE(value.length);
+    this.append(value);
   }
 
   writeBuffer(value: Buffer) {
     this.append(value);
-  }
-
-  writeMoney(value: number) {
-    this.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32));
-    this.writeInt32LE(value & -1);
   }
 }
 
