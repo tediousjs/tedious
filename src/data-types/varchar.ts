@@ -1,6 +1,7 @@
 import iconv from 'iconv-lite';
 
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import { isAsyncIterable, writePlpStream } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -17,6 +18,10 @@ const VarChar: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as Buffer | null;
+
+    if (isAsyncIterable(value)) {
+      return 'varchar(max)';
+    }
 
     let length;
     if (parameter.length) {
@@ -125,6 +130,44 @@ const VarChar: { maximumLength: number } & DataType = {
     }
 
     return iconv.encode(value, collation.codepage);
+  },
+
+  resolve(parameter, collation) {
+    if (isAsyncIterable(parameter.value)) {
+      // Read from its source while the request is written, and sent as
+      // `varchar(max)` since its length is not known up front.
+      const data: ParameterData = { value: parameter.value, length: MAX, streamed: true };
+      if (collation) {
+        data.collation = collation;
+      }
+      return data;
+    }
+
+    const value = this.validate(parameter.value, collation);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    if (collation) {
+      data.collation = collation;
+    }
+    return data;
+  },
+
+  writeValueStream(parameter) {
+    const collation = parameter.collation;
+    if (!collation) {
+      throw new Error('No collation was set by the server for the current connection.');
+    }
+    if (!collation.codepage) {
+      throw new Error('The collation set by the server has no associated encoding.');
+    }
+    const codepage = collation.codepage;
+
+    return writePlpStream(parameter.value as AsyncIterable<unknown>, (chunk) => {
+      if (typeof chunk !== 'string') {
+        throw new TypeError('Invalid string.');
+      }
+      return iconv.encode(chunk, codepage);
+    });
   }
 };
 
