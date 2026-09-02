@@ -243,6 +243,9 @@ const TVP: DataType = {
   resolve(parameter, collation) {
     const value = parameter.value as TvpValue | null | undefined;
 
+    // A TVP always serializes through `writeValueStream` (it has no
+    // synchronous `writeValue`), whether its rows are an array or an async
+    // iterable, so it is always `streamed`.
     const data: ParameterData<TvpValue | null> = { value: null, streamed: true };
     if (collation) {
       data.collation = collation;

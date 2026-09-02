@@ -70,6 +70,18 @@ describe('streaming parameters', function() {
       });
     }
 
+    for (const [name, type, expected] of [
+      ['VarBinary', TYPES.VarBinary, 'varbinary(max)'],
+      ['NVarChar', TYPES.NVarChar, 'nvarchar(max)'],
+      ['VarChar', TYPES.VarChar, 'varchar(max)']
+    ] as const) {
+      it(name + ' declaration is the max form for an async source', function() {
+        // This declaration is what `execSql` passes to `sp_executesql` as the
+        // parameter's type; it must be `max`, not the length of the source.
+        assert.strictEqual(type.declaration(param({ type, value: Readable.from([]) })), expected);
+      });
+    }
+
     it('leaves an in-memory value unstreamed', function() {
       const resolved = resolveParameter(param({ type: TYPES.VarBinary, value: Buffer.from([1, 2, 3]) }), undefined, options);
       assert.notStrictEqual(resolved.data.streamed, true);
@@ -142,6 +154,26 @@ describe('streaming parameters', function() {
     assert.instanceOf(error, InputError);
     assert.strictEqual((error as InputError).message, "Input parameter 'blob' could not be validated");
     assert.instanceOf((error as InputError).cause, RangeError);
+  });
+
+  it('surfaces a TVP async row validation failure as InputError', async function() {
+    const columns = [{ name: 'n', type: TYPES.TinyInt }];
+    async function * rows() {
+      yield [1];
+      yield [256]; // out of range for TinyInt
+    }
+    const resolved = resolveParameter(param({ type: TYPES.TVP, name: 'tvp', value: { name: 'T', columns, rows: rows() } }), collation, options);
+
+    let error: unknown;
+    try {
+      await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+    } catch (err) {
+      error = err;
+    }
+    assert.instanceOf(error, InputError);
+    assert.strictEqual((error as InputError).message, "Input parameter 'tvp' could not be validated");
+    assert.instanceOf((error as InputError).cause, InputError);
+    assert.include(((error as InputError).cause as InputError).message, "TVP column 'n'");
   });
 
   it('serializes a TVP from an async iterable of rows exactly as from an array', async function() {

@@ -177,7 +177,8 @@ const VarBinary: { maximumLength: number } & DataType = {
   resolve(parameter) {
     if (isAsyncIterable(parameter.value)) {
       // The value is read from its source while the request is written. Its
-      // length is not known up front, so it is sent as `varbinary(max)`.
+      // length is not known up front, so it is sent as `varbinary(max)`;
+      // an explicitly specified `length` is deliberately overridden.
       return { value: parameter.value, length: MAX, streamed: true };
     }
 
