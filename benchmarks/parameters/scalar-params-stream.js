@@ -1,8 +1,11 @@
-// Measures the serialization throughput of RPC requests with scalar parameters.
+// Measures the serialization throughput of RPC requests with scalar
+// parameters, consumed the way `Connection.makeRequest` consumes a payload
+// (through `Readable.from`).
 //
-//     node benchmarks/parameters/scalar-params.js
+//     node benchmarks/parameters/scalar-params-stream.js
 
 const { createBenchmark } = require('../common');
+const { Readable } = require('stream');
 
 const RpcRequestPayload = require('tedious/lib/rpcrequest-payload');
 const { typeByName: TYPES, resolveParameter } = require('tedious/lib/data-type');
@@ -26,24 +29,22 @@ function buildParameters() {
   return parameters;
 }
 
-async function main({ n }) {
+function main({ n }) {
   const parameters = buildParameters();
 
+  let i = 0;
   bench.start();
 
-  for (let i = 0; i < n; i++) {
-    // Resolution happens once per request, as `Request.validateParameters` does.
+  (function next() {
+    if (i++ === n) {
+      bench.end(n);
+      return;
+    }
+
     const resolved = parameters.map((parameter) => resolveParameter(parameter, undefined, options));
     const payload = new RpcRequestPayload('proc', resolved, txnDescriptor, options);
-
-    let bytes = 0;
-    for await (const chunk of payload) {
-      bytes += chunk.length;
-    }
-    if (bytes === 0) {
-      throw new Error('no data');
-    }
-  }
-
-  bench.end(n);
+    const stream = Readable.from(payload);
+    stream.on('data', () => {});
+    stream.on('end', next);
+  })();
 }

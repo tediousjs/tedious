@@ -76,8 +76,16 @@ function * legacyPayload(procedure: string | number, parameters: Parameter[], op
   }
 }
 
-function collect(iterable: Iterable<Buffer>) {
-  return Buffer.concat([...iterable]);
+async function chunks(iterable: Iterable<Buffer> | AsyncIterable<Buffer>) {
+  const result: Buffer[] = [];
+  for await (const chunk of iterable) {
+    result.push(chunk);
+  }
+  return result;
+}
+
+async function collect(iterable: Iterable<Buffer> | AsyncIterable<Buffer>) {
+  return Buffer.concat(await chunks(iterable));
 }
 
 function parameters(withCollation: boolean): Parameter[] {
@@ -136,14 +144,14 @@ describe('RpcRequestPayload', function() {
   for (const tdsVersion of ['7_4', '7_2'] as const) {
     for (const [label, useCollation] of [['without a collation', false], ['with a collation', true]] as const) {
       for (const procedure of ['sp_test', 10] as const) {
-        it(`serializes ${typeof procedure === 'string' ? 'a named procedure' : 'a procedure id'} on TDS ${tdsVersion} ${label} exactly as before`, function() {
+        it(`serializes ${typeof procedure === 'string' ? 'a named procedure' : 'a procedure id'} on TDS ${tdsVersion} ${label} exactly as before`, async function() {
           const options = { tdsVersion, useUTC: true } as InternalConnectionOptions;
           const params = parameters(useCollation);
 
-          const expected = collect(legacyPayload(procedure, params, options, useCollation ? collation : undefined));
+          const expected = await collect(legacyPayload(procedure, params, options, useCollation ? collation : undefined));
 
           const resolved = params.map((parameter) => resolveParameter(parameter, useCollation ? collation : undefined, options));
-          const actual = collect(new RpcRequestPayload(procedure, resolved, txnDescriptor, options));
+          const actual = await collect(new RpcRequestPayload(procedure, resolved, txnDescriptor, options));
 
           assert.deepEqual(actual, expected);
         });
@@ -151,26 +159,25 @@ describe('RpcRequestPayload', function() {
     }
   }
 
-  it('serializes each parameter individually exactly as before', function() {
+  it('serializes each parameter individually exactly as before', async function() {
     const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
 
     for (const parameter of parameters(true)) {
-      const expected = collect(legacyPayload('p', [parameter], options, collation));
-      const actual = collect(new RpcRequestPayload('p', [resolveParameter(parameter, collation, options)], txnDescriptor, options));
+      const expected = await collect(legacyPayload('p', [parameter], options, collation));
+      const actual = await collect(new RpcRequestPayload('p', [resolveParameter(parameter, collation, options)], txnDescriptor, options));
       assert.deepEqual(actual, expected, `parameter ${parameter.name || '(unnamed)'} of type ${parameter.type.name}`);
     }
   });
 
-  it('passes large values through by reference', function() {
+  it('passes large values through by reference', async function() {
     const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
     const value = Buffer.alloc(1024 * 1024, 0x42);
     const resolved = resolveParameter({ type: TYPES.VarBinary, name: 'blob', value, output: false }, undefined, options);
 
-    const chunks = [...new RpcRequestPayload('p', [resolved], txnDescriptor, options)];
-    assert.include(chunks, value);
+    assert.include(await chunks(new RpcRequestPayload('p', [resolved], txnDescriptor, options)), value);
   });
 
-  it('reports serialization errors as InputError naming the parameter', function() {
+  it('reports serialization errors as InputError naming the parameter', async function() {
     const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
     // A legacy-style type (no native `writeValue`) whose data generation fails.
     const type: DataType = {
@@ -183,8 +190,13 @@ describe('RpcRequestPayload', function() {
     delete type.writeTypeInfo;
     const resolved = resolveParameter({ type, name: 'broken', value: 1, output: false }, undefined, options);
 
-    assert.throws(() => {
-      collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
-    }, InputError, "Input parameter 'broken' could not be validated");
+    let error: unknown;
+    try {
+      await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+    } catch (e) {
+      error = e;
+    }
+    assert.instanceOf(error, InputError);
+    assert.strictEqual((error as Error).message, "Input parameter 'broken' could not be validated");
   });
 });

@@ -1,4 +1,5 @@
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -6,6 +7,10 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
+  return value != null && typeof (value as any)[Symbol.asyncIterator] === 'function';
+}
 
 const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
@@ -15,6 +20,10 @@ const VarBinary: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    if (isAsyncIterable(value)) {
+      return 'varbinary(max)';
+    }
+
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -167,6 +176,46 @@ const VarBinary: { maximumLength: number } & DataType = {
       throw new TypeError('Invalid buffer.');
     }
     return value;
+  },
+
+  resolve(parameter) {
+    if (isAsyncIterable(parameter.value)) {
+      // The value is read from its source while the request is written. Its
+      // length is not known up front, so it is sent as `varbinary(max)`.
+      return { value: parameter.value, length: MAX, streamed: true };
+    }
+
+    const value = this.validate(parameter.value, undefined);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    return data;
+  },
+
+  async * writeValueStream(parameter) {
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeBuffer(UNKNOWN_PLP_LEN);
+
+    for await (const chunk of parameter.value as AsyncIterable<unknown>) {
+      if (!Buffer.isBuffer(chunk)) {
+        throw new TypeError('Invalid buffer.');
+      }
+
+      // A PLP chunk of length zero would be read as the terminator.
+      if (chunk.length === 0) {
+        continue;
+      }
+
+      buffer.writeUInt32LE(chunk.length);
+      buffer.writeBuffer(chunk);
+
+      if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+        yield * buffer.getBuffers();
+        buffer.consume(buffer.length);
+      }
+    }
+
+    buffer.writeBuffer(PLP_TERMINATOR);
+    yield * buffer.getBuffers();
   }
 };
 

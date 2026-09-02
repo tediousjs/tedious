@@ -15,7 +15,7 @@ function main({ n, size }) {
   var table = {
     columns: [
       { name: 'user_id', type: TYPES.Int },
-      { name: 'user_name', type: TYPES.VarChar, length: 500 },
+      { name: 'user_name', type: TYPES.NVarChar, length: 500 },
       { name: 'user_enabled', type: TYPES.Bit }
     ],
     rows: []

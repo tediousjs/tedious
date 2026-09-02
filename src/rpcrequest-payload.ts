@@ -18,7 +18,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload implements Iterable<Buffer> {
+class RpcRequestPayload implements AsyncIterable<Buffer> {
   declare procedure: string | number;
   declare parameters: ResolvedParameter[];
 
@@ -32,11 +32,17 @@ class RpcRequestPayload implements Iterable<Buffer> {
     this.txnDescriptor = txnDescriptor;
   }
 
-  [Symbol.iterator]() {
+  [Symbol.asyncIterator]() {
     return this.generateData();
   }
 
-  * generateData() {
+  // The whole request is written into one buffer and handed out in as few
+  // chunks as possible: a request without streamed parameters is a single
+  // buffer (with large values referenced rather than copied). A streamed
+  // parameter's value is read from its source while it is written, so
+  // everything written so far is handed out before it, and later parameters
+  // are written into the emptied buffer after it.
+  async * generateData() {
     const buffer = new WritableTrackingBuffer();
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -52,43 +58,50 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
-    yield buffer.data;
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
-      yield * this.generateParameterData(this.parameters[i]);
+      const parameter = this.parameters[i];
+      const { type, data } = parameter;
+
+      if (parameter.name) {
+        buffer.writeBVarchar('@' + parameter.name, 'ucs2');
+      } else {
+        buffer.writeBVarchar('', 'ucs2');
+      }
+
+      let statusFlags = 0;
+      if (parameter.output) {
+        statusFlags |= STATUS.BY_REF_VALUE;
+      }
+      buffer.writeUInt8(statusFlags);
+
+      try {
+        writeTypeInfo(type, buffer, data, this.options);
+
+        if (!data.streamed) {
+          writeValue(type, buffer, data, this.options);
+          continue;
+        }
+      } catch (error) {
+        throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+      }
+
+      yield * buffer.getBuffers();
+      buffer.consume(buffer.length);
+
+      try {
+        yield * type.writeValueStream!(data, this.options);
+      } catch (error) {
+        throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+      }
     }
+
+    yield * buffer.getBuffers();
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
-  }
-
-  * generateParameterData(parameter: ResolvedParameter) {
-    const buffer = new WritableTrackingBuffer();
-
-    if (parameter.name) {
-      buffer.writeBVarchar('@' + parameter.name, 'ucs2');
-    } else {
-      buffer.writeBVarchar('', 'ucs2');
-    }
-
-    let statusFlags = 0;
-    if (parameter.output) {
-      statusFlags |= STATUS.BY_REF_VALUE;
-    }
-    buffer.writeUInt8(statusFlags);
-
-    try {
-      writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-      writeValue(parameter.type, buffer, parameter.data, this.options);
-    } catch (error) {
-      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-    }
-
-    // Large values are referenced by the buffer rather than copied; handing
-    // out its chunks keeps them that way.
-    yield * buffer.getBuffers();
   }
 }
 
