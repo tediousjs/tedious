@@ -1821,6 +1821,13 @@ class Connection extends EventEmitter {
     };
 
     this._onSocketError = (error) => {
+      // Nothing left to route once the connection is closed: `Final` has no
+      // `socketError` handler, and the error would only surface as noise
+      // after `close()`. (Mirrors `socketEnd()`.)
+      if (this.state === this.STATE.FINAL) {
+        return;
+      }
+
       this.dispatchEvent('socketError', error);
       process.nextTick(() => {
         this.emit('error', this.wrapSocketError(error));
@@ -3494,8 +3501,14 @@ class Connection extends EventEmitter {
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      // If the abort wins this race, the pending `once()` is left
+      // unobserved, and a parse error landing afterwards would reject it
+      // with nobody listening. Observe it so that cannot become an
+      // unhandled rejection (same idiom as `withAbortRace`).
+      const endOfMessage = once(tokenStreamParser, 'end');
+      endOfMessage.catch(() => {});
       await Promise.race([
-        once(tokenStreamParser, 'end'),
+        endOfMessage,
         signalAborted
       ]);
 
@@ -3524,8 +3537,14 @@ class Connection extends EventEmitter {
 
         const handler = new Login7TokenHandler(this);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        // If the abort wins this race, the pending `once()` is left
+        // unobserved, and a parse error landing afterwards would reject it
+        // with nobody listening. Observe it so that cannot become an
+        // unhandled rejection (same idiom as `withAbortRace`).
+        const endOfMessage = once(tokenStreamParser, 'end');
+        endOfMessage.catch(() => {});
         await Promise.race([
-          once(tokenStreamParser, 'end'),
+          endOfMessage,
           signalAborted
         ]);
 
@@ -3570,8 +3589,14 @@ class Connection extends EventEmitter {
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      // If the abort wins this race, the pending `once()` is left
+      // unobserved, and a parse error landing afterwards would reject it
+      // with nobody listening. Observe it so that cannot become an
+      // unhandled rejection (same idiom as `withAbortRace`).
+      const endOfMessage = once(tokenStreamParser, 'end');
+      endOfMessage.catch(() => {});
       await Promise.race([
-        once(tokenStreamParser, 'end'),
+        endOfMessage,
         signalAborted
       ]);
 
@@ -3668,8 +3693,14 @@ class Connection extends EventEmitter {
       ]);
 
       const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+      // If the abort wins this race, the pending `once()` is left
+      // unobserved, and a parse error landing afterwards would reject it
+      // with nobody listening. Observe it so that cannot become an
+      // unhandled rejection (same idiom as `withAbortRace`).
+      const endOfMessage = once(tokenStreamParser, 'end');
+      endOfMessage.catch(() => {});
       await Promise.race([
-        once(tokenStreamParser, 'end'),
+        endOfMessage,
         signalAborted
       ]);
     });
@@ -3744,16 +3775,32 @@ Connection.prototype.STATE = {
         try {
           message = await this.messageIo.readMessage();
         } catch (err: any) {
-          this.dispatchEvent('socketError', err);
-          process.nextTick(() => {
-            this.emit('error', this.wrapSocketError(err));
-          });
+          this._onSocketError(err);
           return;
         }
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+
+        // A token parse failure leaves the connection at an undefined
+        // position in the TDS stream, so it cannot be recovered at the
+        // request level — treat it like a socket error. Without a listener
+        // here, a parse failure would surface as an unhandled `'error'`
+        // event on the parser's internal stream and crash the process.
+        const onParserError = (err: Error) => {
+          // The request is about to fail through the socket error path, so
+          // detach its listeners first: a late `cancel()` must not write an
+          // attention packet to the destroyed socket. (On the canceled-drain
+          // path below these were never attached, and removal is a no-op.)
+          this.request?.removeListener('cancel', this._cancelAfterRequestSent);
+          this.request?.removeListener('cancel', onCancel);
+          this.request?.removeListener('pause', onPause);
+          this.request?.removeListener('resume', onResume);
+
+          this._onSocketError(err);
+        };
+        tokenStreamParser.on('error', onParserError);
 
         // If the request was canceled after the request message was
         // fully sent off, an attention message was sent to the server.
@@ -3809,6 +3856,8 @@ Connection.prototype.STATE = {
         };
 
         const onEndOfMessage = () => {
+          tokenStreamParser.removeListener('error', onParserError);
+
           this.request?.removeListener('cancel', this._cancelAfterRequestSent);
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
@@ -3865,17 +3914,23 @@ Connection.prototype.STATE = {
         try {
           message = await this.messageIo.readMessage();
         } catch (err: any) {
-          this.dispatchEvent('socketError', err);
-          process.nextTick(() => {
-            this.emit('error', this.wrapSocketError(err));
-          });
+          this._onSocketError(err);
           return;
         }
 
         const handler = new AttentionTokenHandler(this, this.request!);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
-        await once(tokenStreamParser, 'end');
+        try {
+          await once(tokenStreamParser, 'end');
+        } catch (err: any) {
+          // A token parse failure in the attention response rejects the
+          // `once()`. Treat it like a socket error - the request fails with
+          // the parse error and the connection is closed - instead of the
+          // process dying on an unhandled rejection.
+          this._onSocketError(err);
+          return;
+        }
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (handler.attentionReceived) {
