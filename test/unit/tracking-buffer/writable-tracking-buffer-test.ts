@@ -152,14 +152,21 @@ describe('Writable Tracking Buffer', () => {
     const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(1);
 
+    // A single chunk: `data` is a view of the chunk's own memory.
     const view = buffer.data;
     const [chunk] = buffer.getBuffers();
     assert.strictEqual(view.buffer, chunk.buffer);
     assert.strictEqual(view.byteOffset, chunk.byteOffset);
 
+    // Several chunks: `data` is a fresh copy, so modifying it does not
+    // affect the list. (Whether the copy shares an `ArrayBuffer` with a
+    // chunk is up to Node's allocation pool, so that is not asserted.)
     buffer.writeBuffer(Buffer.alloc(CHUNK_SIZE, 2));
-    assert.notStrictEqual(buffer.data, buffer.data);
-    assert.notStrictEqual(buffer.data.buffer, chunk.buffer);
+    const copy = buffer.data;
+    assert.notStrictEqual(copy, buffer.data);
+    copy[0] = 99;
+    assert.strictEqual(buffer.data[0], 1);
+    assert.strictEqual(chunk[0], 1);
   });
 
   it('returns stable data across later writes', () => {
