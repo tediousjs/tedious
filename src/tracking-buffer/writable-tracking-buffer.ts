@@ -1,12 +1,6 @@
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 
-/**
- * The size of the chunks a `WritableTrackingBuffer` produces, and the size
- * from which appended buffers are referenced rather than copied.
- */
-export const CHUNK_SIZE = 8 * 1024;
-
 // The first chunk starts small and doubles up to `CHUNK_SIZE`: most payloads
 // built through this class are a few dozen bytes.
 const MIN_CHUNK_SIZE = 64;
@@ -28,6 +22,12 @@ export type Encoding = 'utf8' | 'ucs2' | 'ascii';
  * that of `bl`'s `BufferList`.
  */
 class WritableTrackingBuffer {
+  /**
+   * The size of the chunks a `WritableTrackingBuffer` produces, and the size
+   * from which written buffers are referenced rather than copied.
+   */
+  static readonly CHUNK_SIZE = 8 * 1024;
+
   /**
    * The number of bytes appended and not yet consumed.
    */
@@ -61,7 +61,7 @@ class WritableTrackingBuffer {
   private _seal() {
     if (this._pos > 0) {
       this._bufs.push(this._open.subarray(0, this._pos));
-      this._open = Buffer.allocUnsafe(Math.min(this._open.length * 2, CHUNK_SIZE));
+      this._open = Buffer.allocUnsafe(Math.min(this._open.length * 2, WritableTrackingBuffer.CHUNK_SIZE));
       this._pos = 0;
     }
   }
@@ -284,7 +284,7 @@ class WritableTrackingBuffer {
    */
   writeBuffer(value: Buffer) {
     const length = value.length;
-    if (length >= CHUNK_SIZE) {
+    if (length >= WritableTrackingBuffer.CHUNK_SIZE) {
       this._seal();
       this._bufs.push(value);
     } else {
@@ -299,4 +299,3 @@ class WritableTrackingBuffer {
 
 export default WritableTrackingBuffer;
 module.exports = WritableTrackingBuffer;
-module.exports.CHUNK_SIZE = CHUNK_SIZE;

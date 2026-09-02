@@ -1,4 +1,6 @@
-import WritableTrackingBuffer, { CHUNK_SIZE, type Encoding } from '../../../src/tracking-buffer/writable-tracking-buffer';
+import WritableTrackingBuffer, { type Encoding } from '../../../src/tracking-buffer/writable-tracking-buffer';
+
+const { CHUNK_SIZE } = WritableTrackingBuffer;
 import { assert } from 'chai';
 
 function assertBuffer(actual: WritableTrackingBuffer, expected: number[]): void {
