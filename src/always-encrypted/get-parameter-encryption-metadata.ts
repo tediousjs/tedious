@@ -97,5 +97,7 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     resultRows.push(columns);
   });
 
+  // This request is built from raw `Parameter`s rather than a `Request`
+  // that has been through `validateParameters`, so they are resolved inline.
   connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest.sqlTextOrProcedure!, metadataRequest.parameters.map((parameter) => resolveParameter(parameter, connection.databaseCollation, connection.config.options)), connection.currentTransactionDescriptor(), connection.config.options));
 };
