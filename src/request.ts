@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
-import { type Parameter, type DataType } from './data-type';
+import { type Parameter, type DataType, type ResolvedParameter, resolveParameter } from './data-type';
 import { RequestError } from './errors';
 
-import Connection from './connection';
+import Connection, { type InternalConnectionOptions } from './connection';
 import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
@@ -66,6 +66,12 @@ class Request extends EventEmitter {
    * @private
    */
   declare parametersByName: { [key: string]: Parameter };
+  /**
+   * The parameters as resolved by the last call to `validateParameters`.
+   *
+   * @private
+   */
+  declare resolvedParameters: ResolvedParameter[];
   /**
    * @private
    */
@@ -497,16 +503,24 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  validateParameters(collation: Collation | undefined) {
+  validateParameters(collation: Collation | undefined, options: InternalConnectionOptions) {
+    const resolvedParameters: ResolvedParameter[] = [];
+
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
 
+      let resolved;
       try {
-        parameter.value = parameter.type.validate(parameter.value, collation);
+        resolved = resolveParameter(parameter, collation, options);
       } catch (error: any) {
         throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
       }
+
+      parameter.value = resolved.data.value;
+      resolvedParameters.push(resolved);
     }
+
+    this.resolvedParameters = resolvedParameters;
   }
 
   /**

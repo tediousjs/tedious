@@ -41,6 +41,7 @@ import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 
 export interface Parameter {
   type: DataType;
@@ -87,6 +88,109 @@ export interface DataType {
   resolveLength?: (parameter: Parameter) => number;
   resolvePrecision?: (parameter: Parameter) => number;
   resolveScale?: (parameter: Parameter) => number;
+
+  // The serialization contract below splits a parameter's handling into two
+  // phases: `resolve` validates the value and determines the declaration
+  // facts (length, precision, scale, collation) once, and `writeTypeInfo` /
+  // `writeValue` serialize the resolved parameter into a buffer. Types that
+  // do not implement these are adapted from their `validate` / `resolve*` /
+  // `generate*` methods by `resolveParameter`, `writeTypeInfo` and
+  // `writeValue` below.
+
+  /**
+   * Validates the parameter's value and resolves its declaration facts
+   * (length, precision, scale, collation) into a single struct that all
+   * serialization is derived from.
+   */
+  resolve?(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ParameterData;
+
+  /**
+   * Writes the TYPE_INFO of a resolved parameter.
+   */
+  writeTypeInfo?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
+
+  /**
+   * Writes the value of a resolved parameter (length prefix and data).
+   */
+  writeValue?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
+}
+
+/**
+ * A parameter whose value has been validated and whose declaration facts
+ * have been resolved: everything serialization needs.
+ */
+export interface ResolvedParameter {
+  name: string;
+  output: boolean;
+  type: DataType;
+  data: ParameterData;
+}
+
+/**
+ * Validates a parameter's value and resolves its declaration facts. This is
+ * the single place where a parameter's length, precision, scale and
+ * collation are determined.
+ */
+export function resolveParameter(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ResolvedParameter {
+  const type = parameter.type;
+
+  if (type.resolve) {
+    return { name: parameter.name, output: parameter.output, type, data: type.resolve(parameter, collation, options) };
+  }
+
+  const value = type.validate(parameter.value, collation, options);
+  const validated: Parameter = { ...parameter, value };
+  const data: ParameterData = { value };
+
+  if (parameter.length) {
+    data.length = parameter.length;
+  } else if (type.resolveLength) {
+    data.length = type.resolveLength(validated);
+  }
+
+  if (parameter.precision) {
+    data.precision = parameter.precision;
+  } else if (type.resolvePrecision) {
+    data.precision = type.resolvePrecision(validated);
+  }
+
+  if (parameter.scale) {
+    data.scale = parameter.scale;
+  } else if (type.resolveScale) {
+    data.scale = type.resolveScale(validated);
+  }
+
+  if (collation) {
+    data.collation = collation;
+  }
+
+  return { name: parameter.name, output: parameter.output, type, data };
+}
+
+/**
+ * Writes the TYPE_INFO of a resolved parameter.
+ */
+export function writeTypeInfo(type: DataType, buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void {
+  if (type.writeTypeInfo) {
+    type.writeTypeInfo(buffer, parameter, options);
+  } else {
+    buffer.writeBuffer(type.generateTypeInfo(parameter, options));
+  }
+}
+
+/**
+ * Writes the value of a resolved parameter (length prefix and data).
+ */
+export function writeValue(type: DataType, buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void {
+  if (type.writeValue) {
+    type.writeValue(buffer, parameter, options);
+    return;
+  }
+
+  buffer.writeBuffer(type.generateParameterLength(parameter, options));
+  for (const chunk of type.generateParameterData(parameter, options)) {
+    buffer.writeBuffer(chunk);
+  }
 }
 
 export const TYPE = {

@@ -5,7 +5,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter } from './data-type';
+import { type DataType, type Parameter, writeTypeInfo, writeValue } from './data-type';
 import { Collation } from './collation';
 
 /**
@@ -175,7 +175,8 @@ class RowTransform extends Transform {
       this.columnMetadataWritten = true;
     }
 
-    this.push(rowTokenBuffer);
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeBuffer(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
@@ -198,21 +199,22 @@ class RowTransform extends Transform {
 
       if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
         if (value == null) {
-          this.push(textPointerNullBuffer);
+          buffer.writeBuffer(textPointerNullBuffer);
           continue;
         }
 
-        this.push(textPointerAndTimestampBuffer);
+        buffer.writeBuffer(textPointerAndTimestampBuffer);
       }
 
       try {
-        this.push(c.type.generateParameterLength(parameter, this.mainOptions));
-        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
-          this.push(chunk);
-        }
+        writeValue(c.type, buffer, parameter, this.mainOptions);
       } catch (error: any) {
         return callback(error);
       }
+    }
+
+    for (const chunk of buffer.getBuffers()) {
+      this.push(chunk);
     }
 
     process.nextTick(callback);
@@ -563,7 +565,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      writeTypeInfo(c.type, tBuf, c, this.options);
 
       // TableName
       if (c.type.hasTableName) {
