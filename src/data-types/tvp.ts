@@ -42,6 +42,12 @@ function validateRow(columns: TvpColumn[], row: TvpRow, rowIndex: number, collat
     throw new InputError(`TVP row at index ${rowIndex} is not an array`);
   }
 
+  // Every declared column must have a value: the row metadata covers all
+  // columns, so a shorter or longer row would desync the server's parse.
+  if (row.length !== columns.length) {
+    throw new InputError(`TVP row at index ${rowIndex} has ${row.length} value(s), but ${columns.length} column(s) are declared`);
+  }
+
   const validated = new Array(row.length);
   for (let k = 0, len = row.length; k < len; k++) {
     const column = columns[k];

@@ -217,6 +217,27 @@ describe('streaming parameters', function() {
     assert.include(((error as InputError).cause as InputError).message, "TVP column 'n'");
   });
 
+  it('rejects a TVP row whose length does not match the columns', async function() {
+    const columns = [
+      { name: 'a', type: TYPES.Int },
+      { name: 'b', type: TYPES.Int }
+    ];
+    async function * rows() {
+      yield [1]; // one value, two columns declared
+    }
+    const resolved = resolveParameter(param({ type: TYPES.TVP, name: 'tvp', value: { name: 'T', columns, rows: rows() } }), collation, options);
+
+    let error: unknown;
+    try {
+      await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+    } catch (err) {
+      error = err;
+    }
+    assert.instanceOf(error, InputError);
+    assert.instanceOf((error as InputError).cause, InputError);
+    assert.include(((error as InputError).cause as InputError).message, 'has 1 value(s), but 2 column(s)');
+  });
+
   it('serializes a TVP from an async iterable of rows exactly as from an array', async function() {
     const columns = [
       { name: 'id', type: TYPES.Int },
