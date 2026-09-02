@@ -24,7 +24,7 @@ describe('Row Token Parser', function() {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
       const debug = new Debug();
-      const buffer = new WritableTrackingBuffer(0, 'ascii');
+      const buffer = new WritableTrackingBuffer();
       buffer.writeUInt8(0xd1);
 
       const colMetadata: ColumnMetadata[] = [];
@@ -41,7 +41,7 @@ describe('Row Token Parser', function() {
           type: dataTypeByName.VarChar,
           collation: new Collation(1033, 0, 0, 52)
         });
-        buffer.writeUsVarchar(i.toString());
+        buffer.writeUsVarchar(i.toString(), 'ascii');
       }
 
       const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
@@ -91,9 +91,9 @@ describe('Row Token Parser', function() {
         }
       ];
 
-      const buffer = new WritableTrackingBuffer(0, 'ascii');
+      const buffer = new WritableTrackingBuffer();
       buffer.writeUInt8(0xd1);
-      buffer.writeUsVarchar('hello world');
+      buffer.writeUsVarchar('hello world', 'ascii');
       buffer.writeUInt32LE(1234);
 
       const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
@@ -128,7 +128,7 @@ describe('Row Token Parser', function() {
     }];
     const value = 3;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
@@ -173,7 +173,7 @@ describe('Row Token Parser', function() {
       }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
@@ -207,7 +207,7 @@ describe('Row Token Parser', function() {
     }];
     const value = 9.5;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
@@ -240,7 +240,7 @@ describe('Row Token Parser', function() {
     }];
     const value = 9.5;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
@@ -281,7 +281,7 @@ describe('Row Token Parser', function() {
     const value = 123.456;
     const valueLarge = 123456789012345.11;
 
-    const buffer = new WritableTrackingBuffer(0);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x80, 0xd6, 0x12, 0x00]));
     buffer.writeBuffer(
@@ -330,9 +330,9 @@ describe('Row Token Parser', function() {
     ];
     const value = 'abcde';
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
-    buffer.writeUsVarchar(value);
+    buffer.writeUsVarchar(value, 'ascii');
     // console.log(buffer.data)
 
 
@@ -366,9 +366,9 @@ describe('Row Token Parser', function() {
     ];
     const value = 'abcdé';
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
-    buffer.writeUsVarchar(value);
+    buffer.writeUsVarchar(value, 'ascii');
     // console.log(buffer.data)
 
 
@@ -400,10 +400,10 @@ describe('Row Token Parser', function() {
     }];
     const value = 'abc';
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt16LE(value.length * 2);
-    buffer.writeString(value);
+    buffer.writeString(value, 'ucs2');
     // console.log(buffer.data)
 
     const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
@@ -434,7 +434,7 @@ describe('Row Token Parser', function() {
     }];
     const value = Buffer.from([0x12, 0x34]);
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt16LE(value.length);
     buffer.writeBuffer(Buffer.from(value));
@@ -468,7 +468,7 @@ describe('Row Token Parser', function() {
     }];
     const value = Buffer.from([0x12, 0x34]);
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt16LE(value.length);
     buffer.writeBuffer(Buffer.from(value));
@@ -503,7 +503,7 @@ describe('Row Token Parser', function() {
       }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
@@ -540,15 +540,15 @@ describe('Row Token Parser', function() {
     ];
     const value = 'abcdef';
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
     );
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(0, 3));
+    buffer.writeString(value.slice(0, 3), 'ascii');
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(3, 6));
+    buffer.writeString(value.slice(3, 6), 'ascii');
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
@@ -582,13 +582,13 @@ describe('Row Token Parser', function() {
     ];
     const value = 'abcdef';
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt64LE(value.length);
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(0, 3));
+    buffer.writeString(value.slice(0, 3), 'ascii');
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(3, 6));
+    buffer.writeString(value.slice(3, 6), 'ascii');
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
@@ -623,13 +623,13 @@ describe('Row Token Parser', function() {
     ];
     const value = 'abcdéf';
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt64LE(value.length);
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(0, 3));
+    buffer.writeString(value.slice(0, 3), 'ascii');
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(3, 6));
+    buffer.writeString(value.slice(3, 6), 'ascii');
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
@@ -663,13 +663,13 @@ describe('Row Token Parser', function() {
     ];
     const value = 'abcdef';
 
-    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt64LE(value.length + 1);
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(0, 3));
+    buffer.writeString(value.slice(0, 3), 'ascii');
     buffer.writeUInt32LE(3);
-    buffer.writeString(value.slice(3, 6));
+    buffer.writeString(value.slice(3, 6), 'ascii');
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
@@ -704,7 +704,7 @@ describe('Row Token Parser', function() {
       }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
@@ -741,7 +741,7 @@ describe('Row Token Parser', function() {
     ];
     const value = Buffer.from([0x12, 0x34, 0x56, 0x78]);
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
@@ -791,7 +791,7 @@ describe('Row Token Parser', function() {
       { ...baseMetadata, colName: 'col11', type: IntN }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([
@@ -938,7 +938,7 @@ describe('Row Token Parser', function() {
       { ...baseMetadata, colName: 'col1', type: dataTypeByName.UniqueIdentifier }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([
@@ -998,7 +998,7 @@ describe('Row Token Parser', function() {
       { ...baseMetadata, colName: 'col1', type: dataTypeByName.UniqueIdentifier }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([
@@ -1056,7 +1056,7 @@ describe('Row Token Parser', function() {
       { ...baseMetadata, colName: 'col2', type: FloatN }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(
       Buffer.from([
@@ -1110,7 +1110,7 @@ describe('Row Token Parser', function() {
     const days = 2; // 3rd January 1900
     const threeHundredthsOfSecond = 45 * 300; // 45 seconds
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeInt32LE(days);
@@ -1171,7 +1171,7 @@ describe('Row Token Parser', function() {
       collation: undefined
     }];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeUInt8(0);
@@ -1208,7 +1208,7 @@ describe('Row Token Parser', function() {
 
     const value = 9.3;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeUInt8(1 + 4);
@@ -1247,7 +1247,7 @@ describe('Row Token Parser', function() {
 
     const value = -9.3;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeUInt8(1 + 4);
@@ -1285,7 +1285,7 @@ describe('Row Token Parser', function() {
 
     const value = (0x100000000 + 93) / 10;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeUInt8(1 + 8);
@@ -1325,7 +1325,7 @@ describe('Row Token Parser', function() {
 
     const value = (0x100000000 * 0x100000000 + 0x200000000 + 93) / 10;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeUInt8(1 + 12);
@@ -1371,7 +1371,7 @@ describe('Row Token Parser', function() {
         93) /
       10;
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
 
     buffer.writeUInt8(1 + 16);
@@ -1411,7 +1411,7 @@ describe('Row Token Parser', function() {
       }
     ];
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt8(0);
     // console.log(buffer)

@@ -8,12 +8,12 @@ describe('TabName Token Parser', function() {
   const options = { tdsVersion: '7_4' } as ParserOptions;
 
   it('should parse a single one-part table name', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa4);
     buffer.writeUInt16LE(1 + 2 + ('employees'.length * 2));
     buffer.writeUInt8(1);
-    buffer.writeUsVarchar('employees');
+    buffer.writeUsVarchar('employees', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
     const result = await parser.next();
@@ -27,13 +27,13 @@ describe('TabName Token Parser', function() {
   });
 
   it('should parse a multi-part table name', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa4);
     buffer.writeUInt16LE(1 + 2 + ('dbo'.length * 2) + 2 + ('employees'.length * 2));
     buffer.writeUInt8(2);
-    buffer.writeUsVarchar('dbo');
-    buffer.writeUsVarchar('employees');
+    buffer.writeUsVarchar('dbo', 'ucs2');
+    buffer.writeUsVarchar('employees', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
     const result = await parser.next();
@@ -47,14 +47,14 @@ describe('TabName Token Parser', function() {
   });
 
   it('should parse multiple table names', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa4);
     buffer.writeUInt16LE((1 + 2 + ('employees'.length * 2)) + (1 + 2 + ('teams'.length * 2)));
     buffer.writeUInt8(1);
-    buffer.writeUsVarchar('employees');
+    buffer.writeUsVarchar('employees', 'ucs2');
     buffer.writeUInt8(1);
-    buffer.writeUsVarchar('teams');
+    buffer.writeUsVarchar('teams', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
     const result = await parser.next();
@@ -70,12 +70,12 @@ describe('TabName Token Parser', function() {
   it('should parse the multi-part table name format on TDS 7.1', async function() {
     // Servers speaking TDS 7.1 already use the multi-part format, which was
     // introduced in TDS 7.1 Revision 1.
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa4);
     buffer.writeUInt16LE(1 + 2 + ('employees'.length * 2));
     buffer.writeUInt8(1);
-    buffer.writeUsVarchar('employees');
+    buffer.writeUsVarchar('employees', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), { tdsVersion: '7_1' } as ParserOptions);
     const result = await parser.next();
@@ -89,12 +89,12 @@ describe('TabName Token Parser', function() {
   });
 
   it('should reject a token whose contents overrun its declared length', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa4);
     buffer.writeUInt16LE(1); // declared length only covers the part count
     buffer.writeUInt8(1);
-    buffer.writeUsVarchar('employees');
+    buffer.writeUsVarchar('employees', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
 
@@ -110,13 +110,13 @@ describe('TabName Token Parser', function() {
   });
 
   it('should parse a token that arrives in single byte chunks', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa4);
     buffer.writeUInt16LE(1 + 2 + ('dbo'.length * 2) + 2 + ('employees'.length * 2));
     buffer.writeUInt8(2);
-    buffer.writeUsVarchar('dbo');
-    buffer.writeUsVarchar('employees');
+    buffer.writeUsVarchar('dbo', 'ucs2');
+    buffer.writeUsVarchar('employees', 'ucs2');
 
     const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
 

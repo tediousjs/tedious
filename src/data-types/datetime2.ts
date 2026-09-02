@@ -61,7 +61,7 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     const value = parameter.value;
     let scale = parameter.scale;
 
-    const buffer = new WritableTrackingBuffer(16);
+    const buffer = new WritableTrackingBuffer();
     scale = scale!;
 
     let timestamp: number;

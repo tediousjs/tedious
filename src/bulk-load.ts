@@ -538,7 +538,7 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   getColMetaData() {
-    const tBuf = new WritableTrackingBuffer(100, null, true);
+    const tBuf = new WritableTrackingBuffer();
     // TokenType
     tBuf.writeUInt8(TOKEN_TYPE.COLMETADATA);
     // Count
@@ -595,7 +595,7 @@ class BulkLoad extends EventEmitter {
    */
   createDoneToken() {
     // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
-    const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
+    const tBuf = new WritableTrackingBuffer();
     tBuf.writeUInt8(TOKEN_TYPE.DONE);
     const status = DONE_STATUS.FINAL;
     tBuf.writeUInt16LE(status);

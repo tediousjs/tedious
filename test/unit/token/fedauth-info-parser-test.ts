@@ -9,7 +9,7 @@ const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 describe('Fedauth Info Parser', function() {
   it('should contain fed auth info', async function() {
     const debug = new Debug();
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xEE);
     buffer.writeUInt32LE(40);
     buffer.writeUInt32LE(2);
@@ -19,8 +19,8 @@ describe('Fedauth Info Parser', function() {
     buffer.writeUInt8(1);
     buffer.writeUInt32LE(12);
     buffer.writeUInt32LE(28);
-    buffer.writeString('spn');
-    buffer.writeString('stsurl');
+    buffer.writeString('spn', 'ucs2');
+    buffer.writeString('stsurl', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], debug, options);
     const result = await parser.next();

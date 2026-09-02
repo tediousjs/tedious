@@ -23,16 +23,11 @@ const TVP: DataType = {
     const schema = parameter.value?.schema ?? '';
     const typeName = parameter.value?.name ?? '';
 
-    const bufferLength = 1 +
-      1 + Buffer.byteLength(databaseName, 'ucs2') +
-      1 + Buffer.byteLength(schema, 'ucs2') +
-      1 + Buffer.byteLength(typeName, 'ucs2');
-
-    const buffer = new WritableTrackingBuffer(bufferLength, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(this.id);
-    buffer.writeBVarchar(databaseName);
-    buffer.writeBVarchar(schema);
-    buffer.writeBVarchar(typeName);
+    buffer.writeBVarchar(databaseName, 'ucs2');
+    buffer.writeBVarchar(schema, 'ucs2');
+    buffer.writeBVarchar(typeName, 'ucs2');
 
     return buffer.data;
   },

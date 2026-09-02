@@ -40,14 +40,14 @@ class RpcRequestPayload implements Iterable<Buffer> {
   }
 
   * generateData() {
-    const buffer = new WritableTrackingBuffer(500);
+    const buffer = new WritableTrackingBuffer();
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
       writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
     }
 
     if (typeof this.procedure === 'string') {
-      buffer.writeUsVarchar(this.procedure);
+      buffer.writeUsVarchar(this.procedure, 'ucs2');
     } else {
       buffer.writeUShort(0xFFFF);
       buffer.writeUShort(this.procedure);
@@ -68,12 +68,12 @@ class RpcRequestPayload implements Iterable<Buffer> {
   }
 
   * generateParameterData(parameter: Parameter) {
-    const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
+    const buffer = new WritableTrackingBuffer();
 
     if (parameter.name) {
-      buffer.writeBVarchar('@' + parameter.name);
+      buffer.writeBVarchar('@' + parameter.name, 'ucs2');
     } else {
-      buffer.writeBVarchar('');
+      buffer.writeBVarchar('', 'ucs2');
     }
 
     let statusFlags = 0;
