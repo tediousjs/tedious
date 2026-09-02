@@ -132,8 +132,11 @@ class WritableTrackingBuffer {
   }
 
   /**
-   * The chunks holding all appended and not yet consumed bytes. The returned
-   * array is not modified by later appends or `consume` calls.
+   * The chunks holding all appended and not yet consumed bytes.
+   *
+   * The returned array is the list's own: later appends can add chunks to
+   * it. `consume` does not modify it, so taking the chunks and consuming
+   * them right away yields a stable snapshot.
    */
   getBuffers(): Buffer[] {
     this._seal();
