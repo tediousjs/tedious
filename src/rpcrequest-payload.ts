@@ -19,6 +19,9 @@ const STATUS = {
   s2.2.6.5
  */
 class RpcRequestPayload implements Iterable<Buffer> {
+  // Installed as an own property by the constructor only when a parameter is
+  // streamed (not `declare`d like the fields below), so that `Readable.from`
+  // picks the synchronous iterator when nothing is streamed.
   [Symbol.asyncIterator]?: () => AsyncGenerator<Buffer, void>;
 
   declare procedure: string | number;

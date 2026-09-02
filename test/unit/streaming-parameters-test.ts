@@ -1,5 +1,6 @@
 import { assert } from 'chai';
 import { Readable } from 'stream';
+import iconv from 'iconv-lite';
 
 import RpcRequestPayload from '../../src/rpcrequest-payload';
 import { typeByName as TYPES, resolveParameter, type Parameter } from '../../src/data-type';
@@ -127,6 +128,17 @@ describe('streaming parameters', function() {
       // must produce the same UTF-8 as encoding the whole string at once.
       const streamed = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.VarChar, value: from(['a\uD83D', '\uDE00b']) }), utf8Collation, options)], txnDescriptor, options));
       assert.deepEqual(plpData(streamed), Buffer.from('a\u{1F600}b', 'utf-8'));
+    });
+
+    it('keeps a varchar surrogate pair split across chunks (CP932 collation)', async function() {
+      // A double-byte codepage cannot represent an astral character, but the
+      // stitched result must still match encoding the whole string at once
+      // (one replacement character, not two).
+      const cp932Collation = new Collation(0x0411, 0, 0, 0);
+      assert.strictEqual(cp932Collation.codepage, 'CP932');
+
+      const streamed = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.VarChar, value: from(['a\uD83D', '\uDE00b']) }), cp932Collation, options)], txnDescriptor, options));
+      assert.deepEqual(plpData(streamed), iconv.encode('a\u{1F600}b', 'CP932'));
     });
 
     it('matches the in-memory serialization of the same varbinary value', async function() {
