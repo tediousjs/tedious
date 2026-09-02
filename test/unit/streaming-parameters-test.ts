@@ -138,6 +138,35 @@ describe('streaming parameters', function() {
     });
   });
 
+  describe('crossing the CHUNK_SIZE flush boundary', function() {
+    it('reassembles a varbinary source larger than one chunk', async function() {
+      // 25 KB in 5 KB chunks: crosses the 8 KB flush/consume boundary repeatedly.
+      const chunks = Array.from({ length: 5 }, (_, i) => Buffer.alloc(5000, i + 1));
+      const bytes = await collect(new RpcRequestPayload('p', [resolveParameter(param({ value: from(chunks) }), undefined, options)], txnDescriptor, options));
+      assert.deepEqual(plpData(bytes), Buffer.concat(chunks));
+    });
+
+    it('reassembles an nvarchar source larger than one chunk', async function() {
+      const chunks = Array.from({ length: 5 }, (_, i) => String.fromCharCode(0x41 + i).repeat(3000));
+      const bytes = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.NVarChar, value: from(chunks) }), collation, options)], txnDescriptor, options));
+      assert.deepEqual(plpData(bytes), Buffer.from(chunks.join(''), 'ucs2'));
+    });
+
+    it('serializes a TVP of many rows the same from an array and an async source', async function() {
+      // ~2000 rows well past FLUSH_SIZE, so both writeRows and writeRowsFrom flush mid-stream.
+      const columns = [
+        { name: 'id', type: TYPES.Int },
+        { name: 'name', type: TYPES.NVarChar, length: 20 }
+      ];
+      const rows = Array.from({ length: 2000 }, (_, i) => [i, 'row ' + i]);
+      const fromArray = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.TVP, value: { name: 'T', columns, rows } }), collation, options)], txnDescriptor, options));
+      const fromAsync = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.TVP, value: { name: 'T', columns, rows: from(rows) } }), collation, options)], txnDescriptor, options));
+      assert.deepEqual(fromAsync, fromArray);
+      // Sanity: the request really is larger than one flush chunk.
+      assert.isAbove(fromArray.length, 8 * 1024);
+    });
+  });
+
   it('surfaces a failing source as InputError naming the parameter', async function() {
     async function * boom() {
       yield Buffer.from([1]);

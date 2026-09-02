@@ -26,6 +26,9 @@ async function * stitchSurrogates(source: AsyncIterable<unknown>): AsyncGenerato
     let value = pending + chunk;
     pending = '';
 
+    // Only a trailing *high* surrogate needs to be held back: a lone low
+    // surrogate is already invalid on its own, and encodes identically
+    // whether or not it is split from a preceding high surrogate.
     const lastCode = value.charCodeAt(value.length - 1);
     if (value.length > 0 && lastCode >= 0xD800 && lastCode <= 0xDBFF) {
       pending = value[value.length - 1];
