@@ -22,10 +22,10 @@ function createDbChangeBuffer() {
   buffer.writeUInt8(oldDb.length);
   buffer.writeString(oldDb, 'ucs2');
 
-  buffer.data.writeUInt16LE(buffer.data.length - (1 + 2), 1);
-  // console.log(buffer)
+  const data = buffer.data;
+  data.writeUInt16LE(data.length - (1 + 2), 1);
 
-  return buffer.data;
+  return data;
 }
 
 // Test handler that only handles database change events

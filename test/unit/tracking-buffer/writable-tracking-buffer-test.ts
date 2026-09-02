@@ -1,4 +1,4 @@
-import WritableTrackingBuffer, { CHUNK_SIZE } from '../../../src/tracking-buffer/writable-tracking-buffer';
+import WritableTrackingBuffer, { CHUNK_SIZE, type Encoding } from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { assert } from 'chai';
 
 function assertBuffer(actual: WritableTrackingBuffer, expected: number[]): void {
@@ -148,6 +148,20 @@ describe('Writable Tracking Buffer', () => {
     assert.deepEqual(buffer.slice(), Buffer.alloc(0));
   });
 
+  it('returns a view of a single chunk and a copy of several', () => {
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(1);
+
+    const view = buffer.data;
+    const [chunk] = buffer.getBuffers();
+    assert.strictEqual(view.buffer, chunk.buffer);
+    assert.strictEqual(view.byteOffset, chunk.byteOffset);
+
+    buffer.writeBuffer(Buffer.alloc(CHUNK_SIZE, 2));
+    assert.notStrictEqual(buffer.data, buffer.data);
+    assert.notStrictEqual(buffer.data.buffer, chunk.buffer);
+  });
+
   it('returns stable data across later writes', () => {
     const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(1);
@@ -177,6 +191,17 @@ describe('Writable Tracking Buffer', () => {
     assert.deepEqual(buffers[0], Buffer.from([1, 2, 3, 4, 5, 6]));
   });
 
+  it('copies buffers below the chunk size', () => {
+    const buffer = new WritableTrackingBuffer();
+    const almost = Buffer.alloc(CHUNK_SIZE - 1, 0x42);
+    buffer.writeBuffer(almost);
+
+    const [chunk] = buffer.getBuffers();
+    assert.notStrictEqual(chunk, almost);
+    assert.notStrictEqual(chunk.buffer, almost.buffer);
+    assert.deepEqual(chunk, almost);
+  });
+
   it('references large buffers instead of copying them', () => {
     const buffer = new WritableTrackingBuffer();
     const large = Buffer.alloc(CHUNK_SIZE, 0x42);
@@ -199,8 +224,11 @@ describe('Writable Tracking Buffer', () => {
       buffer.writeBuffer(piece);
     }
 
+    // 100 KB coalesced into chunks of at most 8 KB: at least 13 chunks, and
+    // not one per write.
     const buffers = buffer.getBuffers();
-    assert.isAbove(buffers.length, 1);
+    assert.isAtLeast(buffers.length, 13);
+    assert.isAtMost(buffers.length, 16);
     for (const chunk of buffers) {
       assert.isAtMost(chunk.length, CHUNK_SIZE);
     }
@@ -209,15 +237,23 @@ describe('Writable Tracking Buffer', () => {
 
   it('encodes strings', () => {
     const buffer = new WritableTrackingBuffer();
-    buffer.writeString('héllo 🎉', 'ucs2');
-    buffer.writeString('héllo 🎉', 'utf8');
-    buffer.writeString('x'.repeat(100), 'ucs2');
+    // Strings under 64 characters are encoded inline, longer ones natively;
+    // both must produce exactly what `Buffer.from` produces, including for
+    // surrogate pairs and lone surrogates.
+    const strings: [string, Encoding][] = [
+      ['héllo 🎉', 'ucs2'],
+      ['héllo 🎉', 'utf8'],
+      ['\ud83c', 'ucs2'],
+      ['x'.repeat(63), 'ucs2'],
+      ['x'.repeat(64), 'ucs2'],
+      ['x'.repeat(100), 'ucs2'],
+      ['abc', 'ascii']
+    ];
+    for (const [value, encoding] of strings) {
+      buffer.writeString(value, encoding);
+    }
 
-    const expected = Buffer.concat([
-      Buffer.from('héllo 🎉', 'ucs2'),
-      Buffer.from('héllo 🎉', 'utf8'),
-      Buffer.from('x'.repeat(100), 'ucs2')
-    ]);
+    const expected = Buffer.concat(strings.map(([value, encoding]) => Buffer.from(value, encoding)));
     assert.deepEqual(buffer.slice(), expected);
     assert.strictEqual(buffer.length, expected.length);
   });
@@ -254,16 +290,14 @@ describe('Writable Tracking Buffer', () => {
 
   it('keeps writes contiguous across chunk boundaries', () => {
     const buffer = new WritableTrackingBuffer();
-    // Fill up to just below the first chunk boundary, then write a value
-    // that does not fit into the remaining space.
-    buffer.writeBuffer(Buffer.alloc(1023, 0x00));
+    // The first chunk holds 64 bytes. Leave two of them free, then write a
+    // value that does not fit: it must land whole in the next chunk.
+    buffer.writeBuffer(Buffer.alloc(62, 0x00));
     buffer.writeUInt32LE(0x01020304);
 
     const data = buffer.slice();
-    assert.strictEqual(data.readUInt32LE(1023), 0x01020304);
-    for (const chunk of buffer.getBuffers()) {
-      assert.isAtMost(chunk.length, CHUNK_SIZE);
-    }
+    assert.strictEqual(data.readUInt32LE(62), 0x01020304);
+    assert.deepEqual(buffer.getBuffers().map((chunk) => chunk.length), [62, 4]);
   });
 
   it('consumes bytes from the front', () => {
