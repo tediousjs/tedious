@@ -1,7 +1,7 @@
 import WritableTrackingBuffer, { type Encoding } from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { assert } from 'chai';
 
 const { CHUNK_SIZE } = WritableTrackingBuffer;
-import { assert } from 'chai';
 
 function assertBuffer(actual: WritableTrackingBuffer, expected: number[]): void {
   const actualData = actual.data;
