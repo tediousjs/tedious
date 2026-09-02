@@ -20,6 +20,7 @@ import { type AccessToken, type TokenCredential, isTokenCredential } from '@azur
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
+import { isNativeError } from 'util/types';
 import { instanceLookup } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
@@ -172,6 +173,35 @@ const DEFAULT_CONNECT_RETRY_INTERVAL = 500;
  * @private
  */
 const DEFAULT_PACKET_SIZE = 4 * 1024;
+
+/**
+ * Duck-typed like Node core's `validateAbortSignal`, so cross-realm
+ * `AbortSignal`s and ponyfills are accepted.
+ *
+ * @private
+ */
+function validateAbortSignal(signal: AbortSignal | undefined) {
+  if (signal !== undefined && (signal === null || typeof signal !== 'object' || !('aborted' in signal))) {
+    throw new TypeError('The "options.signal" property must be an instance of AbortSignal');
+  }
+}
+
+/**
+ * The error a request aborted via its `AbortSignal` completes with: the
+ * signal's abort reason itself (e.g. an `AbortError` or a `TimeoutError`
+ * from `AbortSignal.timeout()`), or a `RequestError` wrapping the reason
+ * when the reason is not an `Error`.
+ *
+ * @private
+ */
+function errorForAbortedSignal(signal: AbortSignal): Error {
+  const reason = signal.reason;
+  // `isNativeError` also recognizes `Error`s from other realms, which fail
+  // the `instanceof` check; `instanceof` also recognizes objects that
+  // merely have `Error.prototype` in their prototype chain.
+  return reason instanceof Error || isNativeError(reason) ? reason : new RequestError('Aborted.', 'EABORT', { cause: reason });
+}
+
 /**
  * @private
  */
@@ -1044,6 +1074,23 @@ class Connection extends EventEmitter {
   declare requestTimer: undefined | NodeJS.Timeout;
 
   /**
+   * The `AbortSignal` the currently active request was executed with,
+   * if any.
+   *
+   * @private
+   */
+  declare requestAbortSignal: undefined | AbortSignal;
+  /**
+   * Handles the `abort` event of the currently active request's
+   * [[requestAbortSignal]]. Armed on the signal while the request is in
+   * flight, removed (via [[clearRequestAbortListener]]) when the request
+   * completes.
+   *
+   * @private
+   */
+  declare _onRequestAbort: () => void;
+
+  /**
    * Controller used to abort the connection establishment process
    * when the connection is closed before it was fully established.
    *
@@ -1812,6 +1859,33 @@ class Connection extends EventEmitter {
       this.createCancelTimer();
     };
 
+    this._onRequestAbort = () => {
+      const request = this.request!;
+
+      // If the request was already canceled - by `request.cancel()` or by
+      // the request timeout - that cancellation is the failure cause, and
+      // the abort arriving later must not change the reported outcome.
+      if (request.canceled) {
+        return;
+      }
+
+      // Pre-set the request's error to the abort reason, so the request
+      // completes with that reason instead of a generic `ECANCEL` error.
+      // An error that was recorded earlier (e.g. a server error or a
+      // request timeout) takes precedence over the abort reason.
+      request.error ??= errorForAbortedSignal(this.requestAbortSignal!);
+
+      // Stop the request timer: the abort is now the failure cause for
+      // this request, and the timer firing later (it only stops once
+      // response data arrives) would overwrite the abort reason with an
+      // `ETIMEOUT` error. (If the timer fired first, its cancellation
+      // already set `request.canceled`, and this handler returned early
+      // above - the `ETIMEOUT` error stands.)
+      this.clearRequestTimer();
+
+      request.cancel();
+    };
+
     this._onSocketClose = () => {
       this.socketClose();
     };
@@ -2181,6 +2255,7 @@ class Connection extends EventEmitter {
     if (!this.closed) {
       this.clearRequestTimer();
       this.clearCancelTimer();
+      this.clearRequestAbortListener();
       this.closeConnection();
 
       process.nextTick(() => {
@@ -2383,6 +2458,16 @@ class Connection extends EventEmitter {
     if (this.requestTimer) {
       clearTimeout(this.requestTimer);
       this.requestTimer = undefined;
+    }
+  }
+
+  /**
+   * @private
+   */
+  clearRequestAbortListener() {
+    if (this.requestAbortSignal) {
+      this.requestAbortSignal.removeEventListener('abort', this._onRequestAbort);
+      this.requestAbortSignal = undefined;
     }
   }
 
@@ -2699,9 +2784,23 @@ class Connection extends EventEmitter {
    * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Optional execution options. `options.signal` is an `AbortSignal` for this
+   *   execution of the request: aborting the signal cancels the request, which then completes
+   *   with the signal's abort reason (e.g. a `TimeoutError` from `AbortSignal.timeout()`)
+   *   instead of a generic `ECANCEL` error - unless the request had already failed with an
+   *   earlier error (e.g. a server error or a request timeout), in which case that error is
+   *   reported. If the signal is already aborted, the request fails immediately with the abort
+   *   reason, without anything being sent to the server. A non-`Error` abort reason is wrapped
+   *   in a `RequestError` with code `EABORT`. Note that a default abort reason is a
+   *   `DOMException`, which carries a legacy *numeric* `code` property - match abort outcomes
+   *   on `err.name` (`'AbortError'`, `'TimeoutError'`) or on the signal's state, not on a
+   *   tedious-style string `code`. The connection remains usable after an aborted request.
+   *   If the connection fails while the cancellation is in flight (e.g. the server does not
+   *   acknowledge it within [[ConnectionOptions.cancelTimeout]]), the request completes with
+   *   that connection error instead, like any other request on a failed connection.
    */
-  execSqlBatch(request: Request) {
-    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+  execSqlBatch(request: Request, options?: { signal?: AbortSignal }) {
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options), options);
   }
 
   /**
@@ -2718,8 +2817,13 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  execSql(request: Request) {
+  execSql(request: Request, options?: { signal?: AbortSignal }) {
+    // Validated up front, so that an invalid signal throws synchronously
+    // even when parameter validation would fail the request first.
+    validateAbortSignal(options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation);
     } catch (error: any) {
@@ -2759,7 +2863,7 @@ class Connection extends EventEmitter {
       parameters.push(...request.parameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), options);
   }
 
   /**
@@ -2818,11 +2922,19 @@ class Connection extends EventEmitter {
    *
    * @param bulkLoad A previously created [[BulkLoad]].
    * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, options?: { signal?: AbortSignal }): void
 
-  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>, options?: { signal?: AbortSignal }) {
+    // Validated up front, before the bulk load is marked as started or the
+    // row stream is set up - an invalid signal must not leave a partially
+    // started bulk load behind.
+    validateAbortSignal(options?.signal);
+
     bulkLoad.executionStarted = true;
+
+    let rowStream: Readable | undefined;
 
     if (rows) {
       if (bulkLoad.streamingMode) {
@@ -2833,21 +2945,27 @@ class Connection extends EventEmitter {
         throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
       }
 
-      const rowStream = Readable.from(rows);
+      // If the signal is already aborted, the bulk load will fail right
+      // away in `makeRequest` - don't start consuming the row iterable
+      // for a bulk load that will never be sent.
+      if (options?.signal?.aborted !== true) {
+        rowStream = Readable.from(rows);
+        const stream = rowStream;
 
-      // Destroy the packet transform if an error happens in the row stream,
-      // e.g. if an error is thrown from within a generator or stream.
-      rowStream.on('error', (err) => {
-        bulkLoad.rowToPacketTransform.destroy(err);
-      });
+        // Destroy the packet transform if an error happens in the row stream,
+        // e.g. if an error is thrown from within a generator or stream.
+        stream.on('error', (err) => {
+          bulkLoad.rowToPacketTransform.destroy(err);
+        });
 
-      // Destroy the row stream if an error happens in the packet transform,
-      // e.g. if the bulk load is cancelled.
-      bulkLoad.rowToPacketTransform.on('error', (err) => {
-        rowStream.destroy(err);
-      });
+        // Destroy the row stream if an error happens in the packet transform,
+        // e.g. if the bulk load is cancelled.
+        bulkLoad.rowToPacketTransform.on('error', (err) => {
+          stream.destroy(err);
+        });
 
-      rowStream.pipe(bulkLoad.rowToPacketTransform);
+        stream.pipe(bulkLoad.rowToPacketTransform);
+      }
     } else if (!bulkLoad.streamingMode) {
       // If the bulkload was not put into streaming mode by the user,
       // we end the rowToPacketTransform here for them.
@@ -2870,17 +2988,24 @@ class Connection extends EventEmitter {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
+
+        // The bulk load message will never be sent - tear down the row
+        // pipeline, so that an already-started row source stops producing
+        // rows and is finalized, instead of remaining paused indefinitely.
+        rowStream?.destroy();
+        bulkLoad.rowToPacketTransform.destroy();
+
         bulkLoad.error = error;
         bulkLoad.callback(error);
         return;
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload, options);
     });
 
     bulkLoad.once('cancel', onCancel);
 
-    this.execSqlBatch(request);
+    this.execSqlBatch(request, options);
   }
 
   /**
@@ -2891,8 +3016,13 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  prepare(request: Request) {
+  prepare(request: Request, options?: { signal?: AbortSignal }) {
+    // Validated up front, before the request is put into preparation mode -
+    // an invalid signal must not leave a half-prepared request behind.
+    validateAbortSignal(options?.signal);
+
     const parameters: Parameter[] = [];
 
     parameters.push({
@@ -2936,7 +3066,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), options);
   }
 
   /**
@@ -2945,8 +3075,13 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    *   Parameters only require a name and type.
    *   Parameter values are ignored.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  unprepare(request: Request) {
+  unprepare(request: Request, options?: { signal?: AbortSignal }) {
+    // No state is mutated before `makeRequest` here - validated up front
+    // anyway, for consistency with the other execution methods.
+    validateAbortSignal(options?.signal);
+
     const parameters: Parameter[] = [];
 
     parameters.push({
@@ -2960,7 +3095,7 @@ class Connection extends EventEmitter {
       scale: undefined
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), options);
   }
 
   /**
@@ -2971,8 +3106,13 @@ class Connection extends EventEmitter {
    *   parameters that were added to the [[Request]] before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: { signal?: AbortSignal }) {
+    // Validated up front, so that an invalid signal throws synchronously
+    // even when parameter validation would fail the request first.
+    validateAbortSignal(options?.signal);
+
     const executeParameters: Parameter[] = [];
 
     executeParameters.push({
@@ -3006,15 +3146,20 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), options);
   }
 
   /**
    * Call a stored procedure represented by [[Request]].
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  callProcedure(request: Request) {
+  callProcedure(request: Request, options?: { signal?: AbortSignal }) {
+    // Validated up front, so that an invalid signal throws synchronously
+    // even when parameter validation would fail the request first.
+    validateAbortSignal(options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation);
     } catch (error: any) {
@@ -3028,7 +3173,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation), options);
   }
 
   /**
@@ -3048,26 +3193,29 @@ class Connection extends EventEmitter {
    *   * `SNAPSHOT`
    *
    *   Optional, and defaults to the Connection's isolation level.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  beginTransaction(callback: BeginTransactionCallback, name = '', isolationLevel = this.config.options.isolationLevel) {
+  beginTransaction(callback: BeginTransactionCallback, name = '', isolationLevel = this.config.options.isolationLevel, options?: { signal?: AbortSignal }) {
     assertValidIsolationLevel(isolationLevel, 'isolationLevel');
 
     const transaction = new Transaction(name, isolationLevel);
 
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SET TRANSACTION ISOLATION LEVEL ' + (transaction.isolationLevelToTSQL()) + ';BEGIN TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
-        if (this.transactionDepth === 1) {
-          this.inTransaction = true;
+        if (!err) {
+          this.transactionDepth++;
+          if (this.transactionDepth === 1) {
+            this.inTransaction = true;
+          }
         }
         callback(err);
-      }));
+      }), options);
     }
 
     const request = new Request(undefined, (err) => {
       return callback(err, this.currentTransactionDescriptor());
     });
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.beginPayload(this.currentTransactionDescriptor()), options);
   }
 
   /**
@@ -3079,21 +3227,24 @@ class Connection extends EventEmitter {
    * @param callback
    * @param name A string representing a name to associate with the transaction.
    *   Optional, and defaults to an empty string. Required when `isolationLevel`is present.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  commitTransaction(callback: CommitTransactionCallback, name = '') {
+  commitTransaction(callback: CommitTransactionCallback, name = '', options?: { signal?: AbortSignal }) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('COMMIT TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+        if (!err) {
+          this.transactionDepth--;
+          if (this.transactionDepth === 0) {
+            this.inTransaction = false;
+          }
         }
 
         callback(err);
-      }));
+      }), options);
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.commitPayload(this.currentTransactionDescriptor()), options);
   }
 
   /**
@@ -3106,20 +3257,23 @@ class Connection extends EventEmitter {
    * @param name A string representing a name to associate with the transaction.
    *   Optional, and defaults to an empty string.
    *   Required when `isolationLevel` is present.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  rollbackTransaction(callback: RollbackTransactionCallback, name = '') {
+  rollbackTransaction(callback: RollbackTransactionCallback, name = '', options?: { signal?: AbortSignal }) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('ROLLBACK TRAN ' + transaction.name, (err) => {
-        this.transactionDepth--;
-        if (this.transactionDepth === 0) {
-          this.inTransaction = false;
+        if (!err) {
+          this.transactionDepth--;
+          if (this.transactionDepth === 0) {
+            this.inTransaction = false;
+          }
         }
         callback(err);
-      }));
+      }), options);
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.rollbackPayload(this.currentTransactionDescriptor()), options);
   }
 
   /**
@@ -3132,17 +3286,20 @@ class Connection extends EventEmitter {
    * @param name A string representing a name to associate with the transaction.\
    *   Optional, and defaults to an empty string.
    *   Required when `isolationLevel` is present.
+   * @param options Optional execution options. See [[execSqlBatch]] for a description of `options.signal`.
    */
-  saveTransaction(callback: SaveTransactionCallback, name: string) {
+  saveTransaction(callback: SaveTransactionCallback, name: string, options?: { signal?: AbortSignal }) {
     const transaction = new Transaction(name);
     if (this.config.options.tdsVersion < '7_2') {
       return this.execSqlBatch(new Request('SAVE TRAN ' + transaction.name, (err) => {
-        this.transactionDepth++;
+        if (!err) {
+          this.transactionDepth++;
+        }
         callback(err);
-      }));
+      }), options);
     }
     const request = new Request(undefined, callback);
-    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()));
+    return this.makeRequest(request, TYPE.TRANSACTION_MANAGER, transaction.savePayload(this.currentTransactionDescriptor()), options);
   }
 
   /**
@@ -3222,7 +3379,11 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, options?: { signal?: AbortSignal }) {
+    const { signal } = options ?? {};
+
+    validateAbortSignal(signal);
+
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
@@ -3232,10 +3393,34 @@ class Connection extends EventEmitter {
       this.debug.log(message);
       request.callback(new RequestError(message, 'EINVALIDSTATE'));
     } else if (request.canceled) {
+      // Checked before the signal: an earlier cancellation is the failure
+      // cause, and attaching an (already aborted) signal must not change
+      // the outcome of an already-canceled request.
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
+    } else if (signal !== undefined && signal.aborted) {
+      // The signal was already aborted - fail the request with the abort
+      // reason without sending anything to the server.
+      process.nextTick(() => {
+        request.callback(errorForAbortedSignal(signal));
+      });
     } else {
+      if (signal !== undefined) {
+        // An abort is performed as a cancellation (see `_onRequestAbort`).
+        // The listener is removed when the request completes, via
+        // `clearRequestAbortListener`.
+        //
+        // This is done before any further state is mutated (only the
+        // `request.error` reset above runs earlier): the duck-typed
+        // signal validation above matches Node core's
+        // `validateAbortSignal` and doesn't check for the listener
+        // methods, so if `addEventListener` throws here, the error
+        // surfaces to the caller with the connection left untouched.
+        signal.addEventListener('abort', this._onRequestAbort, { once: true });
+        this.requestAbortSignal = signal;
+      }
+
       if (packetType === TYPE.SQL_BATCH) {
         this.isSqlBatch = true;
       } else {
@@ -3311,6 +3496,16 @@ class Connection extends EventEmitter {
 
   /**
    * Cancel currently executed request.
+   *
+   * The canceled request completes with a [[RequestError]] with code
+   * `ECANCEL`.
+   *
+   * For new code, prefer passing an `AbortSignal` when executing the
+   * request (see [[execSqlBatch]]): a signal targets one specific
+   * execution rather than "whatever request happens to be in flight",
+   * composes with `AbortSignal.timeout()` and `AbortSignal.any()`, and
+   * completes the request with the signal's abort reason instead of a
+   * generic `ECANCEL` error.
    */
   cancel() {
     if (!this.request) {
@@ -3868,6 +4063,7 @@ Connection.prototype.STATE = {
           // a cancel timer is running - the response's arrival is what
           // completes the cancellation.
           this.clearCancelTimer();
+          this.clearRequestAbortListener();
 
           this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
@@ -3937,11 +4133,19 @@ Connection.prototype.STATE = {
           this.attentionSent = false;
           this.clearCancelTimer();
 
+          const abortSignal = this.requestAbortSignal;
+          this.clearRequestAbortListener();
+
           const sqlRequest = this.request!;
           this.request = undefined;
           this.transitionTo(this.STATE.LOGGED_IN);
 
           if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
+            sqlRequest.callback(sqlRequest.error);
+          } else if (sqlRequest.error && abortSignal !== undefined && abortSignal.aborted) {
+            // The cancellation was triggered by the request's `AbortSignal` -
+            // complete the request with the abort reason instead of a
+            // generic `ECANCEL` error.
             sqlRequest.callback(sqlRequest.error);
           } else {
             sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
