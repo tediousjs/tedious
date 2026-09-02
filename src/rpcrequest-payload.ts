@@ -58,6 +58,13 @@ class RpcRequestPayload implements Iterable<Buffer> {
   }
 
   * generateData() {
+    // A streamed parameter must be written through the async path; the
+    // constructor installs `[Symbol.asyncIterator]` so `Readable.from` uses
+    // it. Guard against a caller iterating a streamed payload synchronously.
+    if (this.streamed) {
+      throw new Error('A payload with a streamed parameter must be iterated asynchronously.');
+    }
+
     // The whole request is written into one buffer and its chunks are handed
     // out together: a large value written by reference stays by reference, so
     // this costs no extra copy, and the request reaches the packetizer as a
