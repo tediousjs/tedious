@@ -169,27 +169,15 @@ class WritableTrackingBuffer {
   }
 
   /**
-   * Copies the given byte range into a new buffer.
+   * Copies all appended and not yet consumed bytes into a new buffer.
    */
-  slice(start = 0, end = this.length): Buffer {
+  slice(): Buffer {
     this._seal();
 
-    const result = Buffer.allocUnsafe(Math.max(end - start, 0));
+    const result = Buffer.allocUnsafe(this.length);
     let position = 0;
-    let offset = 0;
-
     for (const buffer of this._bufs) {
-      if (offset >= end) {
-        break;
-      }
-
-      const from = Math.max(start - offset, 0);
-      const to = Math.min(end - offset, buffer.length);
-      if (to > from) {
-        position += buffer.copy(result, position, from, to);
-      }
-
-      offset += buffer.length;
+      position += buffer.copy(result, position);
     }
 
     return result;

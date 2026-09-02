@@ -296,15 +296,4 @@ describe('Writable Tracking Buffer', () => {
     assert.strictEqual(buffer.length, 2);
     assert.deepEqual(buffer.slice(), Buffer.from([0x42, 3]));
   });
-
-  it('slices ranges', () => {
-    const buffer = new WritableTrackingBuffer();
-    buffer.append(Buffer.from([1, 2, 3]));
-    buffer.append(Buffer.alloc(CHUNK_SIZE, 4));
-    buffer.append(Buffer.from([5, 6]));
-
-    assert.deepEqual(buffer.slice(1, 3), Buffer.from([2, 3]));
-    assert.deepEqual(buffer.slice(2, 5), Buffer.from([3, 4, 4]));
-    assert.deepEqual(buffer.slice(CHUNK_SIZE + 2), Buffer.from([4, 5, 6]));
-  });
 });
