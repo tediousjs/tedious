@@ -237,9 +237,9 @@ describe('Writable Tracking Buffer', () => {
 
   it('encodes strings', () => {
     const buffer = new WritableTrackingBuffer();
-    // Strings under 64 characters are encoded inline, longer ones natively;
-    // both must produce exactly what `Buffer.from` produces, including for
-    // surrogate pairs and lone surrogates.
+    // Strings are encoded in place; the result must be exactly what
+    // `Buffer.from` produces, including for surrogate pairs, lone
+    // surrogates, and strings that do not fit the open chunk.
     const strings: [string, Encoding][] = [
       ['héllo 🎉', 'ucs2'],
       ['héllo 🎉', 'utf8'],

@@ -11,10 +11,6 @@ export const CHUNK_SIZE = 8 * 1024;
 // built through this class are a few dozen bytes.
 const MIN_CHUNK_SIZE = 64;
 
-// Strings shorter than this are encoded in JavaScript. For short strings the
-// per-call overhead of the native encoder dominates the actual encoding.
-const INLINE_UCS2_LENGTH = 64;
-
 export type Encoding = 'utf8' | 'ucs2' | 'ascii';
 
 /**
@@ -259,24 +255,12 @@ class WritableTrackingBuffer {
   }
 
   writeString(value: string, encoding: Encoding) {
-    if (encoding === 'ucs2' && value.length < INLINE_UCS2_LENGTH) {
-      const length = value.length * 2;
-      this._ensure(length);
-
-      const open = this._open;
-      let pos = this._pos;
-      for (let i = 0; i < value.length; i++) {
-        const code = value.charCodeAt(i);
-        open[pos++] = code & 0xFF;
-        open[pos++] = code >>> 8;
-      }
-
-      this._pos = pos;
-      this.length += length;
-      return;
-    }
-
-    this.writeBuffer(Buffer.from(value, encoding));
+    // UCS-2 is two bytes per UTF-16 code unit.
+    const length = encoding === 'ucs2' ? value.length * 2 : Buffer.byteLength(value, encoding);
+    this._ensure(length);
+    this._open.write(value, this._pos, encoding);
+    this._pos += length;
+    this.length += length;
   }
 
   writeBVarchar(value: string, encoding: Encoding) {
