@@ -12,20 +12,20 @@ const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 function createDbChangeBuffer() {
   const oldDb = 'old';
   const newDb = 'new';
-  const buffer = new WritableTrackingBuffer(50, 'ucs2');
+  const buffer = new WritableTrackingBuffer();
 
   buffer.writeUInt8(TYPE.ENVCHANGE);
   buffer.writeUInt16LE(0); // Length written later
   buffer.writeUInt8(0x01); // Database
   buffer.writeUInt8(newDb.length);
-  buffer.writeString(newDb);
+  buffer.writeString(newDb, 'ucs2');
   buffer.writeUInt8(oldDb.length);
-  buffer.writeString(oldDb);
+  buffer.writeString(oldDb, 'ucs2');
 
-  buffer.data.writeUInt16LE(buffer.data.length - (1 + 2), 1);
-  // console.log(buffer)
+  const data = buffer.data;
+  data.writeUInt16LE(data.length - (1 + 2), 1);
 
-  return buffer.data;
+  return data;
 }
 
 // Test handler that only handles database change events

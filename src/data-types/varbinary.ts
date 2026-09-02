@@ -77,7 +77,7 @@ const VarBinary: { maximumLength: number } & DataType = {
       const buffer = Buffer.alloc(2);
       buffer.writeUInt16LE(length, 0);
       return buffer;
-    } else { // writePLPBody
+    } else {
       return UNKNOWN_PLP_LEN;
     }
   },
@@ -95,7 +95,7 @@ const VarBinary: { maximumLength: number } & DataType = {
       } else {
         yield Buffer.from(value.toString(), 'ucs2');
       }
-    } else { // writePLPBody
+    } else {
       if (!Buffer.isBuffer(value)) {
         value = value.toString();
       }

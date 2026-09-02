@@ -8,7 +8,7 @@ describe('ColInfo Token Parser', function() {
   const options = { tdsVersion: '7_4' } as ParserOptions;
 
   it('should parse a single column', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa5);
     buffer.writeUInt16LE(3);
@@ -30,7 +30,7 @@ describe('ColInfo Token Parser', function() {
   });
 
   it('should parse the column status flags', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa5);
     buffer.writeUInt16LE(3 * 3);
@@ -60,14 +60,14 @@ describe('ColInfo Token Parser', function() {
   });
 
   it('should parse the base column name for aliased columns', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa5);
     buffer.writeUInt16LE(3 + 1 + ('name'.length * 2) + 3);
     buffer.writeUInt8(1);
     buffer.writeUInt8(1);
     buffer.writeUInt8(0x20); // DIFFERENT_NAME
-    buffer.writeBVarchar('name');
+    buffer.writeBVarchar('name', 'ucs2');
     buffer.writeUInt8(2);
     buffer.writeUInt8(1);
     buffer.writeUInt8(0x00);
@@ -87,14 +87,14 @@ describe('ColInfo Token Parser', function() {
   });
 
   it('should reject a token whose contents overrun its declared length', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa5);
     buffer.writeUInt16LE(3); // declared length only covers the fixed fields
     buffer.writeUInt8(1);
     buffer.writeUInt8(1);
     buffer.writeUInt8(0x20); // DIFFERENT_NAME
-    buffer.writeBVarchar('name');
+    buffer.writeBVarchar('name', 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
 
@@ -110,14 +110,14 @@ describe('ColInfo Token Parser', function() {
   });
 
   it('should parse a token that arrives in single byte chunks', async function() {
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa5);
     buffer.writeUInt16LE(3 + 1 + ('name'.length * 2));
     buffer.writeUInt8(1);
     buffer.writeUInt8(1);
     buffer.writeUInt8(0x20); // DIFFERENT_NAME
-    buffer.writeBVarchar('name');
+    buffer.writeBVarchar('name', 'ucs2');
 
     const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
 
