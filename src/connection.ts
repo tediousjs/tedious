@@ -41,7 +41,7 @@ import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
-import { type Parameter, TYPES } from './data-type';
+import { type Parameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -2714,7 +2714,7 @@ class Connection extends EventEmitter {
    */
   execSql(request: Request) {
     try {
-      request.validateParameters(this.databaseCollation);
+      request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
       request.error = error;
 
@@ -2983,9 +2983,12 @@ class Connection extends EventEmitter {
       for (let i = 0, len = request.parameters.length; i < len; i++) {
         const parameter = request.parameters[i];
 
+        const resolved = resolveParameter({ ...parameter, value: parameters ? parameters[parameter.name] : null }, this.databaseCollation, this.config.options);
+
         executeParameters.push({
           ...parameter,
-          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
+          value: resolved.value,
+          resolved: resolved
         });
       }
     } catch (error: any) {
@@ -3009,7 +3012,7 @@ class Connection extends EventEmitter {
    */
   callProcedure(request: Request) {
     try {
-      request.validateParameters(this.databaseCollation);
+      request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
       request.error = error;
 

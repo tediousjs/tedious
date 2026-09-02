@@ -3,6 +3,7 @@ import IntN from './intn';
 
 const NULL_LENGTH = Buffer.from([0x00]);
 const DATA_LENGTH = Buffer.from([0x04]);
+const TYPE_INFO = Buffer.from([IntN.id, 0x04]);
 
 const Int: DataType = {
   id: 0x38,
@@ -33,6 +34,21 @@ const Int: DataType = {
     const buffer = Buffer.alloc(4);
     buffer.writeInt32LE(Number(parameter.value), 0);
     yield buffer;
+  },
+
+  serializeTypeInfo() {
+    return TYPE_INFO;
+  },
+
+  serializeValue(parameter) {
+    if (parameter.value == null) {
+      return [NULL_LENGTH];
+    }
+
+    const buffer = Buffer.alloc(5);
+    buffer.writeUInt8(0x04, 0);
+    buffer.writeInt32LE(Number(parameter.value), 1);
+    return [buffer];
   },
 
   validate: function(value): number | null {

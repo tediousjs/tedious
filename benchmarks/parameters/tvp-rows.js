@@ -45,8 +45,7 @@ async function main({ n, rows, source }) {
       ? (async function*() { yield* rowData; })()
       : rowData;
 
-    const value = TYPES.TVP.validate({ name: 'BenchType', columns, rows: rowSource }, undefined);
-    const parameter = { type: TYPES.TVP, name: 'tvp', value, output: false };
+    const parameter = { type: TYPES.TVP, name: 'tvp', value: { name: 'BenchType', columns, rows: rowSource }, output: false };
     const payload = new RpcRequestPayload('proc', [parameter], txnDescriptor, options, undefined);
 
     let bytes = 0;

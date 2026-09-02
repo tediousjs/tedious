@@ -118,6 +118,28 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
+  serializeValue(parameter) {
+    if (parameter.value == null) {
+      return [parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH];
+    }
+
+    const value = Buffer.isBuffer(parameter.value) ? parameter.value : Buffer.from(parameter.value.toString(), 'ucs2');
+
+    if (parameter.length! <= this.maximumLength) {
+      const length = Buffer.alloc(2);
+      length.writeUInt16LE(value.length, 0);
+      return [length, value];
+    }
+
+    if (value.length === 0) {
+      return [UNKNOWN_PLP_LEN, PLP_TERMINATOR];
+    }
+
+    const chunkLength = Buffer.alloc(4);
+    chunkLength.writeUInt32LE(value.length, 0);
+    return [UNKNOWN_PLP_LEN, chunkLength, value, PLP_TERMINATOR];
+  },
+
   validate: function(value): Buffer | null {
     if (value == null) {
       return null;

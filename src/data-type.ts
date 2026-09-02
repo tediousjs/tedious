@@ -48,6 +48,12 @@ export interface Parameter {
 
   value: unknown;
 
+  /**
+   * The parameter's resolved form (see `resolveParameter`), set once the
+   * parameter has been validated for a request.
+   */
+  resolved?: ParameterData | undefined;
+
   output: boolean;
   length?: number | undefined;
   precision?: number | undefined;
@@ -79,7 +85,7 @@ export interface DataType {
   declaration(parameter: Parameter): string;
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
-  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void> | AsyncGenerator<Buffer, void>;
+  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
   validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
@@ -87,6 +93,94 @@ export interface DataType {
   resolveLength?: (parameter: Parameter) => number;
   resolvePrecision?: (parameter: Parameter) => number;
   resolveScale?: (parameter: Parameter) => number;
+
+  // SPIKE: the reshaped serialization contract. Types can implement these
+  // natively; `resolveParameter`, `serializeTypeInfo` and `serializeValue`
+  // fall back to the legacy `validate` / `resolve*` / `generate*` methods
+  // for types that do not.
+
+  /**
+   * Validates the parameter's value and resolves its declaration facts
+   * (length, precision, scale, collation) into a single, self-coherent
+   * struct that all serialization is derived from.
+   */
+  resolve?(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ParameterData;
+
+  /**
+   * The TYPE_INFO for a resolved parameter.
+   */
+  serializeTypeInfo?(resolved: ParameterData, options: InternalConnectionOptions): Buffer;
+
+  /**
+   * The value of a resolved parameter (length prefix and data). Returns an
+   * array for regular types; only types whose value is unbounded (e.g. rows
+   * streamed into a table-valued parameter) return a lazy (async) iterable,
+   * at the cost of deferring value errors into the send path.
+   */
+  serializeValue?(resolved: ParameterData, options: InternalConnectionOptions): Iterable<Buffer> | AsyncIterable<Buffer>;
+}
+
+export function isAsyncIterable<T>(value: Iterable<T> | AsyncIterable<T>): value is AsyncIterable<T> {
+  return typeof (value as AsyncIterable<T>)[Symbol.asyncIterator] === 'function';
+}
+
+/**
+ * Validates a parameter's value and resolves its declaration facts into a
+ * `ParameterData` struct. This is the single place where a parameter's
+ * length, precision, scale and collation are resolved.
+ */
+export function resolveParameter(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ParameterData {
+  const type = parameter.type;
+
+  if (type.resolve) {
+    return type.resolve(parameter, collation, options);
+  }
+
+  const value = type.validate(parameter.value, collation, options);
+  const validated: Parameter = { ...parameter, value };
+  const resolved: ParameterData = { value };
+
+  if (parameter.length) {
+    resolved.length = parameter.length;
+  } else if (type.resolveLength) {
+    resolved.length = type.resolveLength(validated);
+  }
+
+  if (parameter.precision) {
+    resolved.precision = parameter.precision;
+  } else if (type.resolvePrecision) {
+    resolved.precision = type.resolvePrecision(validated);
+  }
+
+  if (parameter.scale) {
+    resolved.scale = parameter.scale;
+  } else if (type.resolveScale) {
+    resolved.scale = type.resolveScale(validated);
+  }
+
+  if (collation) {
+    resolved.collation = collation;
+  }
+
+  return resolved;
+}
+
+export function serializeTypeInfo(type: DataType, resolved: ParameterData, options: InternalConnectionOptions): Buffer {
+  if (type.serializeTypeInfo) {
+    return type.serializeTypeInfo(resolved, options);
+  }
+
+  return type.generateTypeInfo(resolved, options);
+}
+
+export function serializeValue(type: DataType, resolved: ParameterData, options: InternalConnectionOptions): Iterable<Buffer> | AsyncIterable<Buffer> {
+  if (type.serializeValue) {
+    return type.serializeValue(resolved, options);
+  }
+
+  // Legacy types generate their value lazily; collecting it here gives
+  // callers eager error semantics regardless of how the type is implemented.
+  return [type.generateParameterLength(resolved, options), ...type.generateParameterData(resolved, options)];
 }
 
 export const TYPE = {

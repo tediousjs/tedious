@@ -2,7 +2,7 @@ import { assert } from 'chai';
 
 import RpcRequestPayload from '../../src/rpcrequest-payload';
 import { InputError } from '../../src/errors';
-import { typeByName as TYPES, type Parameter } from '../../src/data-type';
+import { typeByName as TYPES, type Parameter, resolveParameter } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
@@ -22,8 +22,7 @@ function buildRows(count: number): unknown[][] {
 }
 
 async function serialize(rows: unknown): Promise<Buffer> {
-  const value = TYPES.TVP.validate({ name: 'TestType', columns, rows }, undefined);
-  const parameter: Parameter = { type: TYPES.TVP, name: 'tvp', value, output: false };
+  const parameter: Parameter = { type: TYPES.TVP, name: 'tvp', value: { name: 'TestType', columns, rows }, output: false };
   const payload = new RpcRequestPayload('proc', [parameter], txnDescriptor, options, undefined);
 
   const chunks = [];
@@ -65,7 +64,7 @@ describe('Streaming TVP', function() {
 
   it('validates rows given as an array before anything is serialized', function() {
     assert.throws(() => {
-      TYPES.TVP.validate({ name: 'TestType', columns, rows: [[1, 'ok'], ['not a number', 'bad']] }, undefined);
+      resolveParameter({ type: TYPES.TVP, name: 'tvp', value: { name: 'TestType', columns, rows: [[1, 'ok'], ['not a number', 'bad']] }, output: false }, undefined, options);
     }, InputError, /TVP column 'id' has invalid data at row index 1/);
   });
 
@@ -101,8 +100,7 @@ describe('Streaming TVP', function() {
       }
     })();
 
-    const value = TYPES.TVP.validate({ name: 'TestType', columns, rows: source }, undefined);
-    const parameter: Parameter = { type: TYPES.TVP, name: 'tvp', value, output: false };
+    const parameter: Parameter = { type: TYPES.TVP, name: 'tvp', value: { name: 'TestType', columns, rows: source }, output: false };
     const payload = new RpcRequestPayload('proc', [parameter], txnDescriptor, options, undefined);
 
     const iterator = payload[Symbol.asyncIterator]();

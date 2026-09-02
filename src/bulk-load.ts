@@ -5,7 +5,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter } from './data-type';
+import { type DataType, type Parameter, isAsyncIterable, resolveParameter, serializeTypeInfo, serializeValue } from './data-type';
 import { Collation } from './collation';
 
 /**
@@ -189,13 +189,6 @@ class RowTransform extends Transform {
         }
       }
 
-      const parameter = {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: value
-      };
-
       if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
         if (value == null) {
           this.push(textPointerNullBuffer);
@@ -205,14 +198,19 @@ class RowTransform extends Transform {
         this.push(textPointerAndTimestampBuffer);
       }
 
+      let chunks;
       try {
-        this.push(c.type.generateParameterLength(parameter, this.mainOptions));
-        // Bulk load columns are scalar types, whose data is generated synchronously.
-        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions) as Generator<Buffer, void>) {
-          this.push(chunk);
-        }
+        chunks = serializeValue(c.type, { ...c.resolved!, value }, this.mainOptions);
       } catch (error: any) {
         return callback(error);
+      }
+
+      if (isAsyncIterable(chunks)) {
+        return callback(new Error(`Column '${c.name}' has a type whose values cannot be serialized synchronously`));
+      }
+
+      for (const chunk of chunks) {
+        this.push(chunk);
       }
     }
 
@@ -430,19 +428,13 @@ class BulkLoad extends EventEmitter {
       collation: this.collation
     };
 
-    if ((type.id & 0x30) === 0x20) {
-      if (column.length == null && type.resolveLength) {
-        column.length = type.resolveLength(column);
-      }
-    }
-
-    if (type.resolvePrecision && column.precision == null) {
-      column.precision = type.resolvePrecision(column);
-    }
-
-    if (type.resolveScale && column.scale == null) {
-      column.scale = type.resolveScale(column);
-    }
+    // Resolve the column's declaration facts once, via the same path as any
+    // other parameter.
+    const resolved = resolveParameter(column, this.collation, this.options);
+    column.resolved = resolved;
+    column.length = resolved.length;
+    column.precision = resolved.precision;
+    column.scale = resolved.scale;
 
     this.columns.push(column);
 
@@ -564,7 +556,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      tBuf.writeBuffer(serializeTypeInfo(c.type, c.resolved!, this.options));
 
       // TableName
       if (c.type.hasTableName) {

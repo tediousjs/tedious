@@ -1,6 +1,6 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type Parameter, type ParameterData } from './data-type';
+import { type Parameter, isAsyncIterable, resolveParameter, serializeTypeInfo, serializeValue } from './data-type';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import { InputError } from './errors';
@@ -60,11 +60,34 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
-    yield buffer.data;
+
+    // Synchronously available data is coalesced into as few chunks as
+    // possible: every trip through the async iterator costs a promise
+    // resolution, which dominates the cost of small scalar parameters.
+    // Only values that are actually produced asynchronously (e.g. streamed
+    // table-valued parameters) are yielded as they arrive.
+    let pending: Buffer[] = [buffer.data];
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
-      yield * this.generateParameterData(this.parameters[i]);
+      const parameter = this.parameters[i];
+      const value = this.generateParameterData(parameter, pending);
+
+      if (value !== undefined) {
+        yield Buffer.concat(pending);
+        pending = [];
+
+        // Streamed values can only report errors while being sent.
+        try {
+          yield * value;
+        } catch (error) {
+          throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+        }
+      }
+    }
+
+    if (pending.length) {
+      yield pending.length === 1 ? pending[0] : Buffer.concat(pending);
     }
   }
 
@@ -72,7 +95,12 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  async * generateParameterData(parameter: Parameter) {
+  /**
+   * Serializes a single parameter. Synchronously available data is pushed
+   * onto `pending`; if the parameter's value is produced asynchronously, the
+   * async iterable is returned so that the caller can stream it.
+   */
+  generateParameterData(parameter: Parameter, pending: Buffer[]): AsyncIterable<Buffer> | undefined {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
 
     if (parameter.name) {
@@ -87,42 +115,38 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     }
     buffer.writeUInt8(statusFlags);
 
-    yield buffer.data;
-
-    const param: ParameterData = { value: parameter.value };
+    pending.push(buffer.data);
 
     const type = parameter.type;
 
-    if (parameter.length) {
-      param.length = parameter.length;
-    } else if (type.resolveLength) {
-      param.length = type.resolveLength(parameter);
-    }
+    // Parameters are resolved (validated, with their declaration facts
+    // determined) once, before the request is sent. Only the type's
+    // serialization is wrapped, so that other errors are not misattributed.
+    const resolved = parameter.resolved ?? resolveParameter(parameter, this.collation, this.options);
 
-    if (parameter.precision) {
-      param.precision = parameter.precision;
-    } else if (type.resolvePrecision) {
-      param.precision = type.resolvePrecision(parameter);
-    }
-
-    if (parameter.scale) {
-      param.scale = parameter.scale;
-    } else if (type.resolveScale) {
-      param.scale = type.resolveScale(parameter);
-    }
-
-    if (this.collation) {
-      param.collation = this.collation;
-    }
-
-    yield type.generateTypeInfo(param, this.options);
-    yield type.generateParameterLength(param, this.options);
+    let value;
     try {
-      // Works for both synchronous and asynchronous generators.
-      yield * type.generateParameterData(param, this.options);
+      pending.push(serializeTypeInfo(type, resolved, this.options));
+      value = serializeValue(type, resolved, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
     }
+
+    if (isAsyncIterable(value)) {
+      return value;
+    }
+
+    // Legacy `generateParameterData` implementations are generators that
+    // only run (and validate) when iterated, so draining them is wrapped too.
+    try {
+      for (const chunk of value) {
+        pending.push(chunk);
+      }
+    } catch (error) {
+      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+    }
+
+    return undefined;
   }
 }
 
