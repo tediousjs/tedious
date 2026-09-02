@@ -155,7 +155,7 @@ describe('Writable Tracking Buffer', () => {
 
     const first = buffer.data;
     buffer.writeUInt8(3);
-    buffer.append(Buffer.alloc(CHUNK_SIZE, 4));
+    buffer.writeBuffer(Buffer.alloc(CHUNK_SIZE, 4));
     buffer.writeUInt8(5);
 
     assert.deepEqual(first, Buffer.from([1, 2]));
@@ -164,11 +164,12 @@ describe('Writable Tracking Buffer', () => {
     assert.strictEqual(buffer.data[3 + CHUNK_SIZE], 5);
   });
 
-  it('coalesces small appended buffers into a single chunk', () => {
+  it('coalesces small buffers into a single chunk', () => {
     const buffer = new WritableTrackingBuffer();
-    buffer.append(Buffer.from([1, 2]));
-    buffer.append(Buffer.from([3]));
-    buffer.append([Buffer.from([4]), Buffer.from([5, 6])]);
+    buffer.writeBuffer(Buffer.from([1, 2]));
+    buffer.writeBuffer(Buffer.from([3]));
+    buffer.writeBuffer(Buffer.from([4]));
+    buffer.writeBuffer(Buffer.from([5, 6]));
 
     assert.strictEqual(buffer.length, 6);
     const buffers = buffer.getBuffers();
@@ -179,9 +180,9 @@ describe('Writable Tracking Buffer', () => {
   it('references large buffers instead of copying them', () => {
     const buffer = new WritableTrackingBuffer();
     const large = Buffer.alloc(CHUNK_SIZE, 0x42);
-    buffer.append(Buffer.from([1]));
-    buffer.append(large);
-    buffer.append(Buffer.from([2]));
+    buffer.writeBuffer(Buffer.from([1]));
+    buffer.writeBuffer(large);
+    buffer.writeBuffer(Buffer.from([2]));
 
     const buffers = buffer.getBuffers();
     assert.lengthOf(buffers, 3);
@@ -195,7 +196,7 @@ describe('Writable Tracking Buffer', () => {
     const buffer = new WritableTrackingBuffer();
     const piece = Buffer.alloc(1000, 0x01);
     for (let i = 0; i < 100; i++) {
-      buffer.append(piece);
+      buffer.writeBuffer(piece);
     }
 
     const buffers = buffer.getBuffers();
@@ -208,9 +209,9 @@ describe('Writable Tracking Buffer', () => {
 
   it('encodes strings', () => {
     const buffer = new WritableTrackingBuffer();
-    buffer.append('héllo 🎉', 'ucs2');
-    buffer.append('héllo 🎉', 'utf8');
-    buffer.append('x'.repeat(100), 'ucs2');
+    buffer.writeString('héllo 🎉', 'ucs2');
+    buffer.writeString('héllo 🎉', 'utf8');
+    buffer.writeString('x'.repeat(100), 'ucs2');
 
     const expected = Buffer.concat([
       Buffer.from('héllo 🎉', 'ucs2'),
@@ -255,7 +256,7 @@ describe('Writable Tracking Buffer', () => {
     const buffer = new WritableTrackingBuffer();
     // Fill up to just below the first chunk boundary, then write a value
     // that does not fit into the remaining space.
-    buffer.append(Buffer.alloc(1023, 0x00));
+    buffer.writeBuffer(Buffer.alloc(1023, 0x00));
     buffer.writeUInt32LE(0x01020304);
 
     const data = buffer.slice();
@@ -267,7 +268,7 @@ describe('Writable Tracking Buffer', () => {
 
   it('consumes bytes from the front', () => {
     const buffer = new WritableTrackingBuffer();
-    buffer.append(Buffer.from([1, 2, 3, 4, 5]));
+    buffer.writeBuffer(Buffer.from([1, 2, 3, 4, 5]));
 
     const before = buffer.getBuffers();
     buffer.consume(2);
@@ -281,16 +282,16 @@ describe('Writable Tracking Buffer', () => {
     assert.strictEqual(buffer.length, 0);
     assert.deepEqual(buffer.getBuffers(), []);
 
-    buffer.append(Buffer.from([6]));
+    buffer.writeBuffer(Buffer.from([6]));
     assert.deepEqual(buffer.slice(), Buffer.from([6]));
   });
 
   it('consumes across chunks', () => {
     const buffer = new WritableTrackingBuffer();
     const large = Buffer.alloc(CHUNK_SIZE, 0x42);
-    buffer.append(Buffer.from([1, 2]));
-    buffer.append(large);
-    buffer.append(Buffer.from([3]));
+    buffer.writeBuffer(Buffer.from([1, 2]));
+    buffer.writeBuffer(large);
+    buffer.writeBuffer(Buffer.from([3]));
 
     buffer.consume(2 + CHUNK_SIZE - 1);
     assert.strictEqual(buffer.length, 2);

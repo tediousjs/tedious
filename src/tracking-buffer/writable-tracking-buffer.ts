@@ -20,16 +20,16 @@ export type Encoding = 'utf8' | 'ucs2' | 'ascii';
 /**
  * A write-side buffer list.
  *
- * Bytes are appended through `append` and the `write*` methods, and taken
- * out again either as a single buffer (`data`, `slice`) or as a list of
- * chunks (`getBuffers`, `consume`). Small pieces are coalesced into chunks
- * of at most `CHUNK_SIZE` bytes. Buffers of at least `CHUNK_SIZE` bytes are
- * referenced rather than copied, so that large values cost no extra memory.
- * (The caller must therefore not modify such buffers until they have been
- * consumed.)
+ * Bytes are appended through the `write*` methods, and taken out again
+ * either as a single buffer (`data`, `slice`) or as a list of chunks
+ * (`getBuffers`, `consume`). Small pieces are coalesced into chunks of at
+ * most `CHUNK_SIZE` bytes. Buffers of at least `CHUNK_SIZE` bytes written
+ * through `writeBuffer` are referenced rather than copied, so that large
+ * values cost no extra memory. (The caller must therefore not modify such
+ * buffers until they have been consumed.)
  *
- * The list API mirrors that of `bl`'s `BufferList`, with `write*` methods in
- * place of its `read*` methods.
+ * The consumer side (`length`, `getBuffers`, `consume`, `slice`) mirrors
+ * that of `bl`'s `BufferList`.
  */
 class WritableTrackingBuffer {
   /**
@@ -78,56 +78,6 @@ class WritableTrackingBuffer {
         this._open = Buffer.allocUnsafe(size);
       }
     }
-  }
-
-  /**
-   * Appends a buffer, a string or a list of buffers.
-   */
-  append(value: Buffer | Buffer[] | string, encoding?: Encoding): this {
-    if (typeof value === 'string') {
-      return this._appendString(value, encoding ?? 'utf8');
-    }
-
-    if (Array.isArray(value)) {
-      for (let i = 0; i < value.length; i++) {
-        this.append(value[i]);
-      }
-      return this;
-    }
-
-    const length = value.length;
-    if (length >= CHUNK_SIZE) {
-      this._seal();
-      this._bufs.push(value);
-    } else {
-      this._ensure(length);
-      value.copy(this._open, this._pos);
-      this._pos += length;
-    }
-
-    this.length += length;
-    return this;
-  }
-
-  private _appendString(value: string, encoding: Encoding): this {
-    if (encoding === 'ucs2' && value.length < INLINE_UCS2_LENGTH) {
-      const length = value.length * 2;
-      this._ensure(length);
-
-      const open = this._open;
-      let pos = this._pos;
-      for (let i = 0; i < value.length; i++) {
-        const code = value.charCodeAt(i);
-        open[pos++] = code & 0xFF;
-        open[pos++] = code >>> 8;
-      }
-
-      this._pos = pos;
-      this.length += length;
-      return this;
-    }
-
-    return this.append(Buffer.from(value, encoding));
   }
 
   /**
@@ -309,26 +259,57 @@ class WritableTrackingBuffer {
   }
 
   writeString(value: string, encoding: Encoding) {
-    this.append(value, encoding);
+    if (encoding === 'ucs2' && value.length < INLINE_UCS2_LENGTH) {
+      const length = value.length * 2;
+      this._ensure(length);
+
+      const open = this._open;
+      let pos = this._pos;
+      for (let i = 0; i < value.length; i++) {
+        const code = value.charCodeAt(i);
+        open[pos++] = code & 0xFF;
+        open[pos++] = code >>> 8;
+      }
+
+      this._pos = pos;
+      this.length += length;
+      return;
+    }
+
+    this.writeBuffer(Buffer.from(value, encoding));
   }
 
   writeBVarchar(value: string, encoding: Encoding) {
     this.writeUInt8(value.length);
-    this.append(value, encoding);
+    this.writeString(value, encoding);
   }
 
   writeUsVarchar(value: string, encoding: Encoding) {
     this.writeUInt16LE(value.length);
-    this.append(value, encoding);
+    this.writeString(value, encoding);
   }
 
   writeUsVarbyte(value: Buffer) {
     this.writeUInt16LE(value.length);
-    this.append(value);
+    this.writeBuffer(value);
   }
 
+  /**
+   * Appends a buffer. Buffers of at least `CHUNK_SIZE` bytes are referenced
+   * rather than copied, and must not be modified until consumed.
+   */
   writeBuffer(value: Buffer) {
-    this.append(value);
+    const length = value.length;
+    if (length >= CHUNK_SIZE) {
+      this._seal();
+      this._bufs.push(value);
+    } else {
+      this._ensure(length);
+      value.copy(this._open, this._pos);
+      this._pos += length;
+    }
+
+    this.length += length;
   }
 }
 
