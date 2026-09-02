@@ -16,6 +16,65 @@ const STATUS = {
   DEFAULT_VALUE: 0x02
 };
 
+// Buffers at least this large are passed through as-is instead of being
+// copied into a coalesced chunk. Large values (e.g. a varbinary(max) holding
+// a file) therefore cost no extra memory, while the many small pieces that
+// make up scalar parameters are still sent as a single chunk.
+const COALESCE_LIMIT = 8 * 1024;
+
+/**
+ * Collects the pieces of a request. Small pieces are coalesced into a chunk
+ * of at most `COALESCE_LIMIT` bytes; larger pieces are passed through without
+ * being copied.
+ */
+class ChunkQueue {
+  declare ready: Buffer[];
+  declare pending: Buffer[];
+  declare pendingLength: number;
+
+  constructor() {
+    this.ready = [];
+    this.pending = [];
+    this.pendingLength = 0;
+  }
+
+  push(buffer: Buffer) {
+    if (buffer.length >= COALESCE_LIMIT) {
+      this.flush();
+      this.ready.push(buffer);
+      return;
+    }
+
+    this.pending.push(buffer);
+    this.pendingLength += buffer.length;
+
+    if (this.pendingLength >= COALESCE_LIMIT) {
+      this.flush();
+    }
+  }
+
+  flush() {
+    const pending = this.pending;
+    if (pending.length === 1) {
+      this.ready.push(pending[0]);
+    } else if (pending.length > 1) {
+      this.ready.push(Buffer.concat(pending, this.pendingLength));
+    }
+    this.pending = [];
+    this.pendingLength = 0;
+  }
+
+  /**
+   * Returns the chunks that are ready to be sent, without flushing the
+   * pieces that are still being coalesced.
+   */
+  take(): Buffer[] {
+    const ready = this.ready;
+    this.ready = [];
+    return ready;
+  }
+}
+
 /*
   s2.2.6.5
 
@@ -64,19 +123,26 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     // Synchronously available data is coalesced into as few chunks as
     // possible: every trip through the async iterator costs a promise
     // resolution, which dominates the cost of small scalar parameters.
-    // Only values that are actually produced asynchronously (e.g. streamed
-    // table-valued parameters) are yielded as they arrive.
-    let pending: Buffer[] = [buffer.data];
+    // Large pieces are passed through without being copied, and values that
+    // are produced asynchronously (e.g. streamed table-valued parameters)
+    // are yielded as they arrive.
+    const queue = new ChunkQueue();
+    queue.push(buffer.data);
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
       const parameter = this.parameters[i];
-      const value = this.generateParameterData(parameter, pending);
+      const value = this.generateParameterData(parameter, queue);
 
       if (value !== undefined) {
-        yield Buffer.concat(pending);
-        pending = [];
+        queue.flush();
+      }
 
+      if (queue.ready.length) {
+        yield * queue.take();
+      }
+
+      if (value !== undefined) {
         // Streamed values can only report errors while being sent.
         try {
           yield * value;
@@ -86,9 +152,8 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       }
     }
 
-    if (pending.length) {
-      yield pending.length === 1 ? pending[0] : Buffer.concat(pending);
-    }
+    queue.flush();
+    yield * queue.take();
   }
 
   toString(indent = '') {
@@ -97,10 +162,10 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 
   /**
    * Serializes a single parameter. Synchronously available data is pushed
-   * onto `pending`; if the parameter's value is produced asynchronously, the
+   * onto `queue`; if the parameter's value is produced asynchronously, the
    * async iterable is returned so that the caller can stream it.
    */
-  generateParameterData(parameter: Parameter, pending: Buffer[]): AsyncIterable<Buffer> | undefined {
+  generateParameterData(parameter: Parameter, queue: ChunkQueue): AsyncIterable<Buffer> | undefined {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
 
     if (parameter.name) {
@@ -115,7 +180,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     }
     buffer.writeUInt8(statusFlags);
 
-    pending.push(buffer.data);
+    queue.push(buffer.data);
 
     const type = parameter.type;
 
@@ -126,7 +191,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 
     let value;
     try {
-      pending.push(serializeTypeInfo(type, resolved, this.options));
+      queue.push(serializeTypeInfo(type, resolved, this.options));
       value = serializeValue(type, resolved, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
@@ -140,7 +205,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     // only run (and validate) when iterated, so draining them is wrapped too.
     try {
       for (const chunk of value) {
-        pending.push(chunk);
+        queue.push(chunk);
       }
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });

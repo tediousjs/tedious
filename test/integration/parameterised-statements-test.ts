@@ -417,6 +417,39 @@ describe('Parameterised Statements Test', function() {
     execSql(done, TYPES.NChar, null);
   });
 
+  it('should round-trip a large varbinary(max) value', function(done) {
+    const config = getConfig();
+    const value = Buffer.alloc(1024 * 1024 + 123);
+    for (let i = 0; i < value.length; i++) {
+      value[i] = i & 0xff;
+    }
+
+    const connection = new Connection(config);
+
+    const request = new Request('select DATALENGTH(@param) as len, @param as value', function(err) {
+      assert.ifError(err);
+      connection.close();
+    });
+    request.addParameter('param', TYPES.VarBinary, value, { length: Infinity });
+
+    let rows = 0;
+    request.on('row', function(columns) {
+      rows++;
+      assert.strictEqual(Number(columns[0].value), value.length);
+      assert.isTrue(value.equals(columns[1].value));
+    });
+
+    connection.connect(function(err) {
+      assert.ifError(err);
+      connection.execSql(request);
+    });
+
+    connection.on('end', function() {
+      assert.strictEqual(rows, 1);
+      done();
+    });
+  });
+
   describe('`ntext`', function() {
     it('should handle `null` values', function(done) {
       execSql(done, TYPES.NText, null);
