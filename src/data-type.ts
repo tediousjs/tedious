@@ -142,19 +142,21 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
   const validated: Parameter = { ...parameter, value };
   const data: ParameterData = { value };
 
-  if (parameter.length) {
+  // An explicitly specified declaration fact wins, including an explicit
+  // zero; otherwise the type resolves it from the value.
+  if (parameter.length != null) {
     data.length = parameter.length;
   } else if (type.resolveLength) {
     data.length = type.resolveLength(validated);
   }
 
-  if (parameter.precision) {
+  if (parameter.precision != null) {
     data.precision = parameter.precision;
   } else if (type.resolvePrecision) {
     data.precision = type.resolvePrecision(validated);
   }
 
-  if (parameter.scale) {
+  if (parameter.scale != null) {
     data.scale = parameter.scale;
   } else if (type.resolveScale) {
     data.scale = type.resolveScale(validated);

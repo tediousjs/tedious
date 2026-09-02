@@ -431,10 +431,8 @@ class BulkLoad extends EventEmitter {
       collation: this.collation
     };
 
-    if ((type.id & 0x30) === 0x20) {
-      if (column.length == null && type.resolveLength) {
-        column.length = type.resolveLength(column);
-      }
+    if (column.length == null && type.resolveLength) {
+      column.length = type.resolveLength(column);
     }
 
     if (type.resolvePrecision && column.precision == null) {

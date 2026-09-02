@@ -40,6 +40,14 @@ describe('Parameter serialization contract', function() {
       assert.deepEqual(resolved.data, { value: 'hello', length: 50 });
     });
 
+    it('keeps an explicitly specified zero', function() {
+      const resolved = resolveParameter({ type: TYPES.DateTime2, name: 'p', value: new Date(0), scale: 0, output: false }, undefined, options);
+      assert.strictEqual(resolved.data.scale, 0);
+
+      const unresolved = resolveParameter({ type: TYPES.DateTime2, name: 'p', value: new Date(0), output: false }, undefined, options);
+      assert.strictEqual(unresolved.data.scale, 7);
+    });
+
     it('resolves lengths for types with ids outside the legacy variable-length id bit pattern', function() {
       const type: DataType = {
         ...TYPES.VarBinary,
