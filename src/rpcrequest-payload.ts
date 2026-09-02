@@ -37,7 +37,12 @@ class RpcRequestPayload implements Iterable<Buffer> {
   }
 
   * generateData() {
+    // The whole request is written into one buffer and its chunks are handed
+    // out together: a large value written by reference stays by reference, so
+    // this costs no extra copy, and the request reaches the packetizer as a
+    // few large chunks rather than a small buffer per parameter.
     const buffer = new WritableTrackingBuffer();
+
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
       writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
@@ -52,21 +57,20 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
-    yield buffer.data;
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
-      yield * this.generateParameterData(this.parameters[i]);
+      this.writeParameterData(buffer, this.parameters[i]);
     }
+
+    yield * buffer.getBuffers();
   }
 
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  * generateParameterData(parameter: ResolvedParameter) {
-    const buffer = new WritableTrackingBuffer();
-
+  writeParameterData(buffer: WritableTrackingBuffer, parameter: ResolvedParameter) {
     if (parameter.name) {
       buffer.writeBVarchar('@' + parameter.name, 'ucs2');
     } else {
@@ -85,10 +89,6 @@ class RpcRequestPayload implements Iterable<Buffer> {
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
     }
-
-    // Large values are referenced by the buffer rather than copied; handing
-    // out its chunks keeps them that way.
-    yield * buffer.getBuffers();
   }
 }
 
