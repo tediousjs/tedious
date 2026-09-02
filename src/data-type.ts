@@ -79,7 +79,7 @@ export interface DataType {
   declaration(parameter: Parameter): string;
   generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
   generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
-  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
+  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void> | AsyncGenerator<Buffer, void>;
   validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;

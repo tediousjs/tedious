@@ -18,8 +18,13 @@ const STATUS = {
 
 /*
   s2.2.6.5
+
+  SPIKE: the payload is an *async* iterable, so that parameter data can be
+  pulled lazily from asynchronous sources (e.g. table-valued parameters whose
+  rows come from a stream). Backpressure propagates from the socket through
+  `Readable.from` back to the row source.
  */
-class RpcRequestPayload implements Iterable<Buffer> {
+class RpcRequestPayload implements AsyncIterable<Buffer> {
   declare procedure: string | number;
   declare parameters: Parameter[];
 
@@ -35,11 +40,11 @@ class RpcRequestPayload implements Iterable<Buffer> {
     this.collation = collation;
   }
 
-  [Symbol.iterator]() {
+  [Symbol.asyncIterator]() {
     return this.generateData();
   }
 
-  * generateData() {
+  async * generateData() {
     const buffer = new WritableTrackingBuffer(500);
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
@@ -67,7 +72,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  * generateParameterData(parameter: Parameter) {
+  async * generateParameterData(parameter: Parameter) {
     const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
 
     if (parameter.name) {
@@ -88,12 +93,10 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const type = parameter.type;
 
-    if ((type.id & 0x30) === 0x20) {
-      if (parameter.length) {
-        param.length = parameter.length;
-      } else if (type.resolveLength) {
-        param.length = type.resolveLength(parameter);
-      }
+    if (parameter.length) {
+      param.length = parameter.length;
+    } else if (type.resolveLength) {
+      param.length = type.resolveLength(parameter);
     }
 
     if (parameter.precision) {
@@ -115,6 +118,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
     yield type.generateTypeInfo(param, this.options);
     yield type.generateParameterLength(param, this.options);
     try {
+      // Works for both synchronous and asynchronous generators.
       yield * type.generateParameterData(param, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });

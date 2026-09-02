@@ -23,7 +23,7 @@ describe('BigInt', function() {
       const expected = Buffer.from('15cd5b0700000000', 'hex');
 
       const parameterValue = { value, length: 4 };
-      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
 
       assert.deepEqual(buffer, expected);
     });
@@ -33,7 +33,7 @@ describe('BigInt', function() {
       const expected = Buffer.from('15cd5b0700000000', 'hex');
 
       const parameterValue = { value, length: 4 };
-      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
 
       assert.deepEqual(buffer, expected);
     });
@@ -44,7 +44,7 @@ describe('BigInt', function() {
 
       const parameterValue = { value, length: 4 };
 
-      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.BigInt.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
 
       assert.deepEqual(buffer, expected);
     });
@@ -75,7 +75,7 @@ describe('Binary', function() {
       const expected = Buffer.from('12340000', 'hex');
       const parameterValue = { value, length: 4 };
 
-      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -84,7 +84,7 @@ describe('Binary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length: 4 };
 
-      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Binary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -117,7 +117,7 @@ describe('Bit', function() {
       const expected = Buffer.from([0x01]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -126,7 +126,7 @@ describe('Bit', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -135,7 +135,7 @@ describe('Bit', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Bit.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -163,7 +163,7 @@ describe('Char', function() {
       const value = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, value);
     });
 
@@ -172,7 +172,7 @@ describe('Char', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.Char.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -203,7 +203,7 @@ describe('Date', function() {
         [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('173a0b', 'hex')],
         [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('183a0b', 'hex')]
       ]) {
-        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: value }, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...TYPES.Date.generateParameterData({ value: value }, optionsWithUTCFalse) as Generator<Buffer, void>]);
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -252,7 +252,7 @@ describe('DateTime', function() {
       ]) {
         const parameter = { value: testSet[0] };
         const expectedNoOfDays = testSet[1];
-        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData(parameter, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...TYPES.DateTime.generateParameterData(parameter, optionsWithUTCFalse) as Generator<Buffer, void>]);
         assert.strictEqual(buffer.readInt32LE(0), expectedNoOfDays);
       }
     });
@@ -312,7 +312,7 @@ describe('DateTime2', function() {
         [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('7f5101173a0b', 'hex')],
         [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('000000183a0b', 'hex')]
       ]) {
-        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: value, scale: 0 }, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...TYPES.DateTime2.generateParameterData({ value: value, scale: 0 }, optionsWithUTCFalse) as Generator<Buffer, void>]);
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -370,7 +370,7 @@ describe('DateTimeOffset', function() {
       const expected = Buffer.from('20fd002d380b', 'hex');
       const parameterValue = { value, scale: 0 };
 
-      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue)]);
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue) as Generator<Buffer, void>]);
       assert.deepEqual(buffer.slice(0, 6), expected);
     });
 
@@ -379,7 +379,7 @@ describe('DateTimeOffset', function() {
       const expected = Buffer.from([]);
 
       const parameterValue = { value, scale: 0 };
-      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue)]);
+      const buffer = Buffer.concat([...TYPES.DateTimeOffset.generateParameterData(parameterValue, optionsWithUTCTrue) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -442,7 +442,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -454,7 +454,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -466,7 +466,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -478,7 +478,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -494,7 +494,7 @@ describe('Decimal', function() {
 
       let buffer!: Buffer;
       assert.doesNotThrow(() => {
-        buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+        buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       });
       assert.deepEqual(buffer, expected);
     });
@@ -503,7 +503,7 @@ describe('Decimal', function() {
       const parameterValue = { value: -3.4028234663852886e+38, precision: 7, scale: 4 };
 
       assert.throws(() => {
-        Buffer.concat([...TYPES.Decimal.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+        Buffer.concat([...TYPES.Decimal.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       }, RangeError, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
     });
   });
@@ -580,7 +580,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -591,7 +591,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -650,7 +650,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const parameterValue = { value, length: 100 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, value);
     });
 
@@ -661,7 +661,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const parameterValue = { value, length: -1 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -693,7 +693,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -704,7 +704,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -754,7 +754,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -765,7 +765,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -815,7 +815,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, value);
     });
 
@@ -826,7 +826,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -876,7 +876,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -888,7 +888,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -900,7 +900,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -912,7 +912,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -928,7 +928,7 @@ describe('Numeric', function() {
 
       let buffer!: Buffer;
       assert.doesNotThrow(() => {
-        buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+        buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       });
       assert.deepEqual(buffer, expected);
     });
@@ -937,7 +937,7 @@ describe('Numeric', function() {
       const parameterValue = { value: -3.4028234663852886e+38, precision: 7, scale: 4 };
 
       assert.throws(() => {
-        Buffer.concat([...TYPES.Numeric.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+        Buffer.concat([...TYPES.Numeric.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       }, RangeError, 'Value -3.4028234663852886e+38 is out of range for NUMERIC(7, 4).');
     });
   });
@@ -989,7 +989,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1001,7 +1001,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1013,7 +1013,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1025,7 +1025,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1064,7 +1064,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1075,7 +1075,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1107,7 +1107,7 @@ describe('SmallDateTime', function() {
         [new Date(2015, 5, 19, 23, 59, 59), 42172],
         [new Date(2015, 5, 20, 0, 0, 0), 42173]
       ]) {
-        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value }, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...TYPES.SmallDateTime.generateParameterData({ value }, optionsWithUTCFalse) as Generator<Buffer, void>]);
 
         assert.strictEqual(buffer.readUInt16LE(0), expectedNoOfDays);
       }
@@ -1156,7 +1156,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1167,7 +1167,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1217,7 +1217,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1228,7 +1228,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1278,7 +1278,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const parameterValue = { value, length: 15 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1289,7 +1289,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const parameterValue = { value, length: -1 };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1355,7 +1355,7 @@ describe('Time', function() {
 
       for (const { value, scale, expectedBuffer } of testCases) {
         const parameter = { value, scale };
-        const buffer = Buffer.concat([...type.generateParameterData(parameter, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...type.generateParameterData(parameter, optionsWithUTCFalse) as Generator<Buffer, void>]);
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -1388,7 +1388,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1399,7 +1399,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...type.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1480,7 +1480,15 @@ describe('TVP', function() {
   });
 
   describe('.generateParameterData', function() {
-    it('correctly converts TVP table values', function() {
+    async function collect(parameterValue: { value: unknown }) {
+      const chunks = [];
+      for await (const chunk of TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)) {
+        chunks.push(chunk);
+      }
+      return Buffer.concat(chunks);
+    }
+
+    it('correctly converts TVP table values', async function() {
       const value = {
         columns: [{ name: 'user_id', type: TYPES.Int }],
         rows: [[ 15 ]]
@@ -1488,17 +1496,17 @@ describe('TVP', function() {
       const expected = Buffer.from('0000000000002604000001040f00000000', 'hex');
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = await collect(parameterValue);
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `null` values', function() {
+    it('correctly converts `null` values', async function() {
       const value = null;
 
       const expected = Buffer.from([0x00, 0x00]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.TVP.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = await collect(parameterValue);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1528,7 +1536,7 @@ describe('UniqueIdentifier', function() {
       const expected = Buffer.from('34ae62e0e56df3478ba329d25f77e71a', 'hex');
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1538,7 +1546,7 @@ describe('UniqueIdentifier', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.UniqueIdentifier.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1586,7 +1594,7 @@ describe('VarBinary', function() {
       ];
       for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
-        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
         assert.deepEqual(buffer, expected);
       }
     });
@@ -1597,7 +1605,7 @@ describe('VarBinary', function() {
       ];
       for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
-        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+        const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
         assert.deepEqual(buffer, expected);
       }
     });
@@ -1608,7 +1616,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('3100', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1618,7 +1626,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('02000000310000000000', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1628,7 +1636,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1638,7 +1646,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarBinary.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1678,7 +1686,7 @@ describe('VarChar', function() {
       const expected = Buffer.from('68656c6c6f20776f726c64', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1688,7 +1696,7 @@ describe('VarChar', function() {
       const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1698,7 +1706,7 @@ describe('VarChar', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
 
@@ -1708,7 +1716,7 @@ describe('VarChar', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse)]);
+      const buffer = Buffer.concat([...TYPES.VarChar.generateParameterData(parameterValue, optionsWithUTCFalse) as Generator<Buffer, void>]);
       assert.deepEqual(buffer, expected);
     });
   });

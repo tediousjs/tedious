@@ -7,7 +7,7 @@ import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
-import { InputError } from '../../src/errors';
+import { InputError, RequestError } from '../../src/errors';
 
 function getConfig() {
   const config = {
@@ -178,8 +178,11 @@ describe('calling a procedure that takes and returns a TVP', function() {
 
   it('correctly handles validation errors', function(done) {
     const request = new Request('__tediousTvpTest', (err) => {
-      assert.instanceOf(err, InputError);
-      assert.strictEqual(err?.message, 'Input parameter \'tvp\' could not be validated');
+      // Rows given as an array are validated before the request is sent,
+      // like any other parameter value.
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual((err as RequestError).code, 'EPARAM');
+      assert.match(err!.message, /^Validation failed for parameter 'tvp'\./);
 
       assert.instanceOf(err?.cause, InputError);
       assert.strictEqual((err?.cause as InputError).message, 'TVP column \'b\' has invalid data at row index 0');

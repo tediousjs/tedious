@@ -207,7 +207,8 @@ class RowTransform extends Transform {
 
       try {
         this.push(c.type.generateParameterLength(parameter, this.mainOptions));
-        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
+        // Bulk load columns are scalar types, whose data is generated synchronously.
+        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions) as Generator<Buffer, void>) {
           this.push(chunk);
         }
       } catch (error: any) {
