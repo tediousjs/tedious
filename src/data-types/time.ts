@@ -53,7 +53,7 @@ const Time: DataType = {
       return;
     }
 
-    const buffer = new WritableTrackingBuffer(16);
+    const buffer = new WritableTrackingBuffer();
     const time = parameter.value;
 
     let timestamp;

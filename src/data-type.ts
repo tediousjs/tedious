@@ -1,5 +1,5 @@
 import Null from './data-types/null';
-import WritableBufferList from './writable-buffer-list';
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import TinyInt from './data-types/tinyint';
 import Bit from './data-types/bit';
 import SmallInt from './data-types/smallint';
@@ -110,7 +110,7 @@ export interface DataType {
   /**
    * Writes the TYPE_INFO for a resolved parameter.
    */
-  writeTypeInfo?(sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void;
+  writeTypeInfo?(sink: WritableTrackingBuffer, resolved: ParameterData, options: InternalConnectionOptions): void;
 
   /**
    * Writes the value of a resolved parameter (length prefix and data).
@@ -120,7 +120,7 @@ export interface DataType {
    * takes chunks out of the sink between steps. Errors from such values can
    * only be reported while they are being sent.
    */
-  writeValue?(sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
+  writeValue?(sink: WritableTrackingBuffer, resolved: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
 }
 
 export function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
@@ -168,7 +168,7 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
   return resolved;
 }
 
-export function writeTypeInfo(type: DataType, sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void {
+export function writeTypeInfo(type: DataType, sink: WritableTrackingBuffer, resolved: ParameterData, options: InternalConnectionOptions): void {
   if (type.writeTypeInfo) {
     type.writeTypeInfo(sink, resolved, options);
   } else {
@@ -176,7 +176,7 @@ export function writeTypeInfo(type: DataType, sink: WritableBufferList, resolved
   }
 }
 
-export function writeValue(type: DataType, sink: WritableBufferList, resolved: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void> {
+export function writeValue(type: DataType, sink: WritableTrackingBuffer, resolved: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void> {
   if (type.writeValue) {
     return type.writeValue(sink, resolved, options);
   }
@@ -188,15 +188,6 @@ export function writeValue(type: DataType, sink: WritableBufferList, resolved: P
   for (const chunk of type.generateParameterData(resolved, options)) {
     sink.append(chunk);
   }
-}
-
-/**
- * The TYPE_INFO for a resolved parameter as a buffer.
- */
-export function typeInfoBuffer(type: DataType, resolved: ParameterData, options: InternalConnectionOptions): Buffer {
-  const sink = new WritableBufferList();
-  writeTypeInfo(type, sink, resolved, options);
-  return sink.slice();
 }
 
 export const TYPE = {

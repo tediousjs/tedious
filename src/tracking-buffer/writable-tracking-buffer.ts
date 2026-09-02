@@ -1,80 +1,201 @@
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-const ZERO_LENGTH_BUFFER = Buffer.alloc(0);
+
+/**
+ * The size of the chunks a `WritableTrackingBuffer` produces, and the size
+ * from which appended buffers are referenced rather than copied.
+ */
+export const CHUNK_SIZE = 8 * 1024;
+
+const MIN_CHUNK_SIZE = 1024;
+
+// Strings shorter than this are encoded in JavaScript. For short strings the
+// per-call overhead of the native encoder dominates the actual encoding.
+const INLINE_UCS2_LENGTH = 64;
 
 export type Encoding = 'utf8' | 'ucs2' | 'ascii';
 
 /**
-  A Buffer-like class that tracks position.
-
-  As values are written, the position advances by the size of the written data.
-  When writing, automatically allocates new buffers if there's not enough space.
+ * A write-side buffer list.
+ *
+ * Bytes are appended through `append` and the `write*` methods, and taken
+ * out again either as a single buffer (`data`, `slice`) or as a list of
+ * chunks (`getBuffers`, `consume`). Small pieces are coalesced into chunks
+ * of at most `CHUNK_SIZE` bytes. Buffers of at least `CHUNK_SIZE` bytes are
+ * referenced rather than copied, so that large values cost no extra memory.
+ * (The caller must therefore not modify such buffers until they have been
+ * consumed.)
+ *
+ * The list API mirrors that of `bl`'s `BufferList`, with `write*` methods in
+ * place of its `read*` methods.
  */
 class WritableTrackingBuffer {
-  declare initialSize: number;
-  declare encoding: Encoding;
-  declare doubleSizeGrowth: boolean;
+  /**
+   * The number of bytes appended and not yet consumed.
+   */
+  declare length: number;
 
-  declare buffer: Buffer;
-  declare compositeBuffer: Buffer;
+  declare private _bufs: Buffer[];
+  declare private _open: Buffer;
+  declare private _pos: number;
 
-  declare position: number;
-
-  constructor(initialSize: number, encoding?: Encoding | null, doubleSizeGrowth?: boolean) {
-    this.initialSize = initialSize;
-    this.encoding = encoding || 'ucs2';
-    this.doubleSizeGrowth = doubleSizeGrowth || false;
-    this.buffer = Buffer.alloc(this.initialSize, 0);
-    this.compositeBuffer = ZERO_LENGTH_BUFFER;
-    this.position = 0;
+  constructor() {
+    this.length = 0;
+    this._bufs = [];
+    this._open = Buffer.allocUnsafe(MIN_CHUNK_SIZE);
+    this._pos = 0;
   }
 
-  get data() {
-    this.newBuffer(0);
-    return this.compositeBuffer;
+  /**
+   * All appended and not yet consumed bytes as a single buffer.
+   */
+  get data(): Buffer {
+    return this.slice();
   }
 
-  copyFrom(buffer: Buffer) {
-    const length = buffer.length;
-    this.makeRoomFor(length);
-    buffer.copy(this.buffer, this.position);
-    this.position += length;
+  private _seal() {
+    if (this._pos > 0) {
+      this._bufs.push(this._open.subarray(0, this._pos));
+      this._open = Buffer.allocUnsafe(Math.min(this._open.length * 2, CHUNK_SIZE));
+      this._pos = 0;
+    }
   }
 
-  makeRoomFor(requiredLength: number) {
-    if (this.buffer.length - this.position < requiredLength) {
-      if (this.doubleSizeGrowth) {
-        let size = Math.max(128, this.buffer.length * 2);
-        while (size < requiredLength) {
-          size *= 2;
-        }
-        this.newBuffer(size);
-      } else {
-        this.newBuffer(requiredLength);
+  private _ensure(size: number) {
+    if (this._open.length - this._pos < size) {
+      this._seal();
+
+      if (this._open.length < size) {
+        this._open = Buffer.allocUnsafe(size);
       }
     }
   }
 
-  newBuffer(size: number) {
-    const buffer = this.buffer.slice(0, this.position);
-    this.compositeBuffer = Buffer.concat([this.compositeBuffer, buffer]);
-    this.buffer = (size === 0) ? ZERO_LENGTH_BUFFER : Buffer.alloc(size, 0);
-    this.position = 0;
+  /**
+   * Appends a buffer, a string or a list of buffers.
+   */
+  append(value: Buffer | Buffer[] | string, encoding?: Encoding): this {
+    if (typeof value === 'string') {
+      return this._appendString(value, encoding ?? 'utf8');
+    }
+
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        this.append(value[i]);
+      }
+      return this;
+    }
+
+    const length = value.length;
+    if (length >= CHUNK_SIZE) {
+      this._seal();
+      this._bufs.push(value);
+    } else {
+      this._ensure(length);
+      value.copy(this._open, this._pos);
+      this._pos += length;
+    }
+
+    this.length += length;
+    return this;
+  }
+
+  private _appendString(value: string, encoding: Encoding): this {
+    if (encoding === 'ucs2' && value.length < INLINE_UCS2_LENGTH) {
+      const length = value.length * 2;
+      this._ensure(length);
+
+      const open = this._open;
+      let pos = this._pos;
+      for (let i = 0; i < value.length; i++) {
+        const code = value.charCodeAt(i);
+        open[pos++] = code & 0xFF;
+        open[pos++] = code >>> 8;
+      }
+
+      this._pos = pos;
+      this.length += length;
+      return this;
+    }
+
+    return this.append(Buffer.from(value, encoding));
+  }
+
+  /**
+   * The chunks holding all appended and not yet consumed bytes. The returned
+   * array is not modified by later appends or `consume` calls.
+   */
+  getBuffers(): Buffer[] {
+    this._seal();
+    return this._bufs;
+  }
+
+  /**
+   * Discards the given number of bytes from the front of the list.
+   */
+  consume(bytes: number): this {
+    this._seal();
+
+    const bufs = this._bufs;
+    let i = 0;
+    while (i < bufs.length && bytes >= bufs[i].length) {
+      bytes -= bufs[i].length;
+      this.length -= bufs[i].length;
+      i++;
+    }
+
+    // A fresh array, so that a previously returned `getBuffers()` result
+    // stays intact.
+    this._bufs = bufs.slice(i);
+
+    if (bytes > 0 && this._bufs.length) {
+      this._bufs[0] = this._bufs[0].subarray(bytes);
+      this.length -= bytes;
+    }
+
+    return this;
+  }
+
+  /**
+   * Copies the given byte range into a new buffer.
+   */
+  slice(start = 0, end = this.length): Buffer {
+    this._seal();
+
+    const result = Buffer.allocUnsafe(Math.max(end - start, 0));
+    let position = 0;
+    let offset = 0;
+
+    for (const buffer of this._bufs) {
+      if (offset >= end) {
+        break;
+      }
+
+      const from = Math.max(start - offset, 0);
+      const to = Math.min(end - offset, buffer.length);
+      if (to > from) {
+        position += buffer.copy(result, position, from, to);
+      }
+
+      offset += buffer.length;
+    }
+
+    return result;
   }
 
   writeUInt8(value: number) {
-    const length = 1;
-    this.makeRoomFor(length);
-    this.buffer.writeUInt8(value, this.position);
-    this.position += length;
+    this._ensure(1);
+    this._open.writeUInt8(value, this._pos);
+    this._pos += 1;
+    this.length += 1;
   }
 
   writeUInt16LE(value: number) {
-    const length = 2;
-    this.makeRoomFor(length);
-    this.buffer.writeUInt16LE(value, this.position);
-    this.position += length;
+    this._ensure(2);
+    this._open.writeUInt16LE(value, this._pos);
+    this._pos += 2;
+    this.length += 2;
   }
 
   writeUShort(value: number) {
@@ -82,33 +203,33 @@ class WritableTrackingBuffer {
   }
 
   writeUInt16BE(value: number) {
-    const length = 2;
-    this.makeRoomFor(length);
-    this.buffer.writeUInt16BE(value, this.position);
-    this.position += length;
+    this._ensure(2);
+    this._open.writeUInt16BE(value, this._pos);
+    this._pos += 2;
+    this.length += 2;
   }
 
   writeUInt24LE(value: number) {
-    const length = 3;
-    this.makeRoomFor(length);
-    this.buffer[this.position + 2] = (value >>> 16) & 0xff;
-    this.buffer[this.position + 1] = (value >>> 8) & 0xff;
-    this.buffer[this.position] = value & 0xff;
-    this.position += length;
+    this._ensure(3);
+    this._open[this._pos + 2] = (value >>> 16) & 0xff;
+    this._open[this._pos + 1] = (value >>> 8) & 0xff;
+    this._open[this._pos] = value & 0xff;
+    this._pos += 3;
+    this.length += 3;
   }
 
   writeUInt32LE(value: number) {
-    const length = 4;
-    this.makeRoomFor(length);
-    this.buffer.writeUInt32LE(value, this.position);
-    this.position += length;
+    this._ensure(4);
+    this._open.writeUInt32LE(value, this._pos);
+    this._pos += 4;
+    this.length += 4;
   }
 
   writeBigInt64LE(value: bigint) {
-    const length = 8;
-    this.makeRoomFor(length);
-    this.buffer.writeBigInt64LE(value, this.position);
-    this.position += length;
+    this._ensure(8);
+    this._open.writeBigInt64LE(value, this._pos);
+    this._pos += 8;
+    this.length += 8;
   }
 
   writeInt64LE(value: number) {
@@ -120,17 +241,17 @@ class WritableTrackingBuffer {
   }
 
   writeBigUInt64LE(value: bigint) {
-    const length = 8;
-    this.makeRoomFor(length);
-    this.buffer.writeBigUInt64LE(value, this.position);
-    this.position += length;
+    this._ensure(8);
+    this._open.writeBigUInt64LE(value, this._pos);
+    this._pos += 8;
+    this.length += 8;
   }
 
   writeUInt32BE(value: number) {
-    const length = 4;
-    this.makeRoomFor(length);
-    this.buffer.writeUInt32BE(value, this.position);
-    this.position += length;
+    this._ensure(4);
+    this._open.writeUInt32BE(value, this._pos);
+    this._pos += 4;
+    this.length += 4;
   }
 
   writeUInt40LE(value: number) {
@@ -140,131 +261,91 @@ class WritableTrackingBuffer {
   }
 
   writeInt8(value: number) {
-    const length = 1;
-    this.makeRoomFor(length);
-    this.buffer.writeInt8(value, this.position);
-    this.position += length;
+    this._ensure(1);
+    this._open.writeInt8(value, this._pos);
+    this._pos += 1;
+    this.length += 1;
   }
 
   writeInt16LE(value: number) {
-    const length = 2;
-    this.makeRoomFor(length);
-    this.buffer.writeInt16LE(value, this.position);
-    this.position += length;
+    this._ensure(2);
+    this._open.writeInt16LE(value, this._pos);
+    this._pos += 2;
+    this.length += 2;
   }
 
   writeInt16BE(value: number) {
-    const length = 2;
-    this.makeRoomFor(length);
-    this.buffer.writeInt16BE(value, this.position);
-    this.position += length;
+    this._ensure(2);
+    this._open.writeInt16BE(value, this._pos);
+    this._pos += 2;
+    this.length += 2;
   }
 
   writeInt32LE(value: number) {
-    const length = 4;
-    this.makeRoomFor(length);
-    this.buffer.writeInt32LE(value, this.position);
-    this.position += length;
+    this._ensure(4);
+    this._open.writeInt32LE(value, this._pos);
+    this._pos += 4;
+    this.length += 4;
   }
 
   writeInt32BE(value: number) {
-    const length = 4;
-    this.makeRoomFor(length);
-    this.buffer.writeInt32BE(value, this.position);
-    this.position += length;
+    this._ensure(4);
+    this._open.writeInt32BE(value, this._pos);
+    this._pos += 4;
+    this.length += 4;
   }
 
   writeFloatLE(value: number) {
-    const length = 4;
-    this.makeRoomFor(length);
-    this.buffer.writeFloatLE(value, this.position);
-    this.position += length;
+    this._ensure(4);
+    this._open.writeFloatLE(value, this._pos);
+    this._pos += 4;
+    this.length += 4;
   }
 
   writeDoubleLE(value: number) {
-    const length = 8;
-    this.makeRoomFor(length);
-    this.buffer.writeDoubleLE(value, this.position);
-    this.position += length;
+    this._ensure(8);
+    this._open.writeDoubleLE(value, this._pos);
+    this._pos += 8;
+    this.length += 8;
   }
 
-  writeString(value: string, encoding?: Encoding | null) {
-    if (encoding == null) {
-      encoding = this.encoding;
-    }
-
-    const length = Buffer.byteLength(value, encoding);
-    this.makeRoomFor(length);
-
-    // $FlowFixMe https://github.com/facebook/flow/pull/5398
-    this.buffer.write(value, this.position, encoding);
-    this.position += length;
+  writeString(value: string, encoding: Encoding) {
+    this.append(value, encoding);
   }
 
-  writeBVarchar(value: string, encoding?: Encoding | null) {
+  writeBVarchar(value: string, encoding: Encoding) {
     this.writeUInt8(value.length);
-    this.writeString(value, encoding);
+    this.append(value, encoding);
   }
 
-  writeUsVarchar(value: string, encoding?: Encoding | null) {
+  writeUsVarchar(value: string, encoding: Encoding) {
     this.writeUInt16LE(value.length);
-    this.writeString(value, encoding);
+    this.append(value, encoding);
   }
 
-  // TODO: Figure out what types are passed in other than `Buffer`
-  writeUsVarbyte(value: any, encoding?: Encoding | null) {
-    if (encoding == null) {
-      encoding = this.encoding;
-    }
-
-    let length;
-    if (value instanceof Buffer) {
-      length = value.length;
+  writeUsVarbyte(value: Buffer | string, encoding: Encoding) {
+    if (Buffer.isBuffer(value)) {
+      this.writeUInt16LE(value.length);
+      this.append(value);
     } else {
-      value = value.toString();
-      length = Buffer.byteLength(value, encoding);
-    }
-    this.writeUInt16LE(length);
-
-    if (value instanceof Buffer) {
-      this.writeBuffer(value);
-    } else {
-      this.makeRoomFor(length);
-      // $FlowFixMe https://github.com/facebook/flow/pull/5398
-      this.buffer.write(value, this.position, encoding);
-      this.position += length;
+      this.writeUInt16LE(Buffer.byteLength(value, encoding));
+      this.append(value, encoding);
     }
   }
 
-  writePLPBody(value: any, encoding?: Encoding | null) {
-    if (encoding == null) {
-      encoding = this.encoding;
-    }
-
-    let length;
-    if (value instanceof Buffer) {
-      length = value.length;
-    } else {
-      value = value.toString();
-      length = Buffer.byteLength(value, encoding);
-    }
+  writePLPBody(value: Buffer | string, encoding: Encoding) {
+    const length = Buffer.isBuffer(value) ? value.length : Buffer.byteLength(value, encoding);
 
     // Length of all chunks.
     // this.writeUInt64LE(length);
     // unknown seems to work better here - might revisit later.
-    this.writeBuffer(UNKNOWN_PLP_LEN);
+    this.append(UNKNOWN_PLP_LEN);
 
     // In the UNKNOWN_PLP_LEN case, the data is represented as a series of zero or more chunks.
     if (length > 0) {
       // One chunk.
       this.writeUInt32LE(length);
-      if (value instanceof Buffer) {
-        this.writeBuffer(value);
-      } else {
-        this.makeRoomFor(length);
-        this.buffer.write(value, this.position, encoding);
-        this.position += length;
-      }
+      this.append(value, encoding);
     }
 
     // PLP_TERMINATOR (no more chunks).
@@ -272,10 +353,7 @@ class WritableTrackingBuffer {
   }
 
   writeBuffer(value: Buffer) {
-    const length = value.length;
-    this.makeRoomFor(length);
-    value.copy(this.buffer, this.position);
-    this.position += length;
+    this.append(value);
   }
 
   writeMoney(value: number) {
@@ -286,3 +364,4 @@ class WritableTrackingBuffer {
 
 export default WritableTrackingBuffer;
 module.exports = WritableTrackingBuffer;
+module.exports.CHUNK_SIZE = CHUNK_SIZE;

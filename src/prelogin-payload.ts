@@ -3,7 +3,6 @@ import { sprintf } from 'sprintf-js';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { randomBytes } from 'crypto';
 
-const optionBufferSize = 20;
 const traceIdSize = 36;
 
 const TOKEN = {
@@ -125,7 +124,7 @@ class PreloginPayload {
   }
 
   createVersionOption() {
-    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(this.options.version.major);
     buffer.writeUInt8(this.options.version.minor);
     buffer.writeUInt16BE(this.options.version.build);
@@ -137,7 +136,7 @@ class PreloginPayload {
   }
 
   createEncryptionOption() {
-    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    const buffer = new WritableTrackingBuffer();
     if (this.options.encrypt) {
       buffer.writeUInt8(ENCRYPT.ON);
     } else {
@@ -150,7 +149,7 @@ class PreloginPayload {
   }
 
   createInstanceOption() {
-    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0x00);
     return {
       token: TOKEN.INSTOPT,
@@ -159,7 +158,7 @@ class PreloginPayload {
   }
 
   createThreadIdOption() {
-    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt32BE(0x00);
     return {
       token: TOKEN.THREADID,
@@ -168,7 +167,7 @@ class PreloginPayload {
   }
 
   createMarsOption() {
-    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(MARS.OFF);
     return {
       token: TOKEN.MARS,
@@ -177,7 +176,7 @@ class PreloginPayload {
   }
 
   createTraceIdOption() {
-    const buffer = new WritableTrackingBuffer(traceIdSize);
+    const buffer = new WritableTrackingBuffer();
     // Generate a random series of bytes to use as the TraceID.
     // Used for debugging purposes.
     buffer.writeBuffer(randomBytes(traceIdSize));
@@ -188,7 +187,7 @@ class PreloginPayload {
   }
 
   createFedAuthOption() {
-    const buffer = new WritableTrackingBuffer(optionBufferSize);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0x01);
     return {
       token: TOKEN.FEDAUTHREQUIRED,

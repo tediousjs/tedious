@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 
 import { typeByName as TYPES, type DataType, type Parameter, type ParameterData, resolveParameter, writeTypeInfo, writeValue } from '../../src/data-type';
-import WritableBufferList from '../../src/writable-buffer-list';
+import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
@@ -15,10 +15,10 @@ function legacyBytes(type: DataType, resolved: ParameterData) {
 }
 
 function contractBytes(type: DataType, resolved: ParameterData) {
-  const typeInfo = new WritableBufferList();
+  const typeInfo = new WritableTrackingBuffer();
   writeTypeInfo(type, typeInfo, resolved, options);
 
-  const value = new WritableBufferList();
+  const value = new WritableTrackingBuffer();
   const steps = writeValue(type, value, resolved, options);
   assert.isUndefined(steps, 'scalar types serialize synchronously');
 

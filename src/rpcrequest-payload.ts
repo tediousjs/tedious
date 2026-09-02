@@ -1,7 +1,6 @@
-import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import WritableTrackingBuffer, { CHUNK_SIZE } from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
 import { type Parameter, resolveParameter, writeTypeInfo, writeValue } from './data-type';
-import WritableBufferList, { CHUNK_SIZE } from './writable-buffer-list';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import { InputError } from './errors';
@@ -46,22 +45,6 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
   }
 
   async * generateData() {
-    const buffer = new WritableTrackingBuffer(500);
-    if (this.options.tdsVersion >= '7_2') {
-      const outstandingRequestCount = 1;
-      writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
-    }
-
-    if (typeof this.procedure === 'string') {
-      buffer.writeUsVarchar(this.procedure);
-    } else {
-      buffer.writeUShort(0xFFFF);
-      buffer.writeUShort(this.procedure);
-    }
-
-    const optionFlags = 0;
-    buffer.writeUInt16LE(optionFlags);
-
     // All data is written into a single sink, which coalesces small pieces
     // into chunks (every trip through the async iterator costs a promise
     // resolution, which would dominate the cost of small scalar parameters)
@@ -69,8 +52,22 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     // out of the sink whenever a chunk's worth of data has been written, and
     // between the steps of values that are produced asynchronously (e.g.
     // streamed table-valued parameters).
-    const sink = new WritableBufferList();
-    sink.append(buffer.data);
+    const sink = new WritableTrackingBuffer();
+
+    if (this.options.tdsVersion >= '7_2') {
+      const outstandingRequestCount = 1;
+      writeToTrackingBuffer(sink, this.txnDescriptor, outstandingRequestCount);
+    }
+
+    if (typeof this.procedure === 'string') {
+      sink.writeUsVarchar(this.procedure, 'ucs2');
+    } else {
+      sink.writeUShort(0xFFFF);
+      sink.writeUShort(this.procedure);
+    }
+
+    const optionFlags = 0;
+    sink.writeUInt16LE(optionFlags);
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
@@ -107,7 +104,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
    * Writes a single parameter into `sink`. If the parameter's value is
    * produced asynchronously, the async iterable driving it is returned.
    */
-  writeParameter(sink: WritableBufferList, parameter: Parameter): AsyncIterable<void> | undefined {
+  writeParameter(sink: WritableTrackingBuffer, parameter: Parameter): AsyncIterable<void> | undefined {
     const name = parameter.name ? '@' + parameter.name : '';
     sink.writeUInt8(name.length);
     sink.append(name, 'ucs2');
@@ -137,7 +134,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 /**
  * Takes all chunks out of the sink.
  */
-function take(sink: WritableBufferList): Buffer[] {
+function take(sink: WritableTrackingBuffer): Buffer[] {
   const buffers = sink.getBuffers();
   sink.consume(sink.length);
   return buffers;

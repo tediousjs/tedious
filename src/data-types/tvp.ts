@@ -1,9 +1,8 @@
 import { type DataType, type Parameter, type ParameterData, isAsyncIterable, resolveParameter, writeTypeInfo, writeValue } from '../data-type';
-import WritableBufferList, { CHUNK_SIZE } from '../writable-buffer-list';
+import WritableTrackingBuffer, { CHUNK_SIZE } from '../tracking-buffer/writable-tracking-buffer';
 import { type InternalConnectionOptions } from '../connection';
 import { Collation } from '../collation';
 import { InputError } from '../errors';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
 const TVP_END_TOKEN = Buffer.from([0x00]);
@@ -63,7 +62,7 @@ function validateRow(columns: ResolvedTvpValue['columns'], row: TvpRow, rowIndex
   return validated;
 }
 
-async function * writeRows(sink: WritableBufferList, columns: ResolvedTvpValue['columns'], rows: ResolvedTvpValue['rows'], validated: boolean, collation: Collation | undefined, options: InternalConnectionOptions): AsyncIterable<void> {
+async function * writeRows(sink: WritableTrackingBuffer, columns: ResolvedTvpValue['columns'], rows: ResolvedTvpValue['rows'], validated: boolean, collation: Collation | undefined, options: InternalConnectionOptions): AsyncIterable<void> {
   let rowIndex = 0;
   for await (const sourceRow of rows) {
     const row = validated ? sourceRow : validateRow(columns, sourceRow, rowIndex, collation, options);
@@ -134,8 +133,15 @@ const TVP: DataType = {
     return { value: resolved, collation };
   },
 
-  writeTypeInfo(sink, parameter, options) {
-    sink.append(this.generateTypeInfo(parameter, options));
+  writeTypeInfo(sink, parameter) {
+    const databaseName = '';
+    const schema = parameter.value?.schema ?? '';
+    const typeName = parameter.value?.name ?? '';
+
+    sink.writeUInt8(this.id);
+    sink.writeBVarchar(databaseName, 'ucs2');
+    sink.writeBVarchar(schema, 'ucs2');
+    sink.writeBVarchar(typeName, 'ucs2');
   },
 
   writeValue(sink, parameter, options) {
@@ -171,22 +177,9 @@ const TVP: DataType = {
     return writeRows(sink, columns, rows, validated, parameter.collation, options);
   },
 
-  generateTypeInfo(parameter) {
-    const databaseName = '';
-    const schema = parameter.value?.schema ?? '';
-    const typeName = parameter.value?.name ?? '';
-
-    const bufferLength = 1 +
-      1 + Buffer.byteLength(databaseName, 'ucs2') +
-      1 + Buffer.byteLength(schema, 'ucs2') +
-      1 + Buffer.byteLength(typeName, 'ucs2');
-
-    const buffer = new WritableTrackingBuffer(bufferLength, 'ucs2');
-    buffer.writeUInt8(this.id);
-    buffer.writeBVarchar(databaseName);
-    buffer.writeBVarchar(schema);
-    buffer.writeBVarchar(typeName);
-
+  generateTypeInfo(parameter, options) {
+    const buffer = new WritableTrackingBuffer();
+    this.writeTypeInfo!(buffer, parameter, options);
     return buffer.data;
   },
 

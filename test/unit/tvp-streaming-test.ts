@@ -4,7 +4,7 @@ import RpcRequestPayload from '../../src/rpcrequest-payload';
 import { InputError } from '../../src/errors';
 import { typeByName as TYPES, type Parameter, resolveParameter } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
-import { CHUNK_SIZE } from '../../src/writable-buffer-list';
+import { CHUNK_SIZE } from '../../src/tracking-buffer/writable-tracking-buffer';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
 const txnDescriptor = Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]);

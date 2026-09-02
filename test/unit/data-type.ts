@@ -1,5 +1,5 @@
 import { typeByName as TYPES, resolveParameter, writeValue } from '../../src/data-type';
-import WritableBufferList from '../../src/writable-buffer-list';
+import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { type InternalConnectionOptions } from '../../src/connection';
 
 import { assert } from 'chai';
@@ -1483,7 +1483,7 @@ describe('TVP', function() {
   describe('.generateParameterData', function() {
     async function collect(value: unknown) {
       const resolved = resolveParameter({ type: TYPES.TVP, name: 'tvp', value, output: false }, undefined, optionsWithUTCFalse);
-      const sink = new WritableBufferList();
+      const sink = new WritableTrackingBuffer();
       const steps = writeValue(TYPES.TVP, sink, resolved, optionsWithUTCFalse);
       if (steps) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars

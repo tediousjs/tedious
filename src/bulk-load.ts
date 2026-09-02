@@ -5,8 +5,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter, isAsyncIterable, resolveParameter, typeInfoBuffer, writeValue } from './data-type';
-import WritableBufferList from './writable-buffer-list';
+import { type DataType, type Parameter, isAsyncIterable, resolveParameter, writeTypeInfo, writeValue } from './data-type';
 import { Collation } from './collation';
 
 /**
@@ -176,7 +175,7 @@ class RowTransform extends Transform {
       this.columnMetadataWritten = true;
     }
 
-    const sink = new WritableBufferList();
+    const sink = new WritableTrackingBuffer();
     sink.append(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
@@ -533,7 +532,7 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   getColMetaData() {
-    const tBuf = new WritableTrackingBuffer(100, null, true);
+    const tBuf = new WritableTrackingBuffer();
     // TokenType
     tBuf.writeUInt8(TOKEN_TYPE.COLMETADATA);
     // Count
@@ -558,7 +557,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(typeInfoBuffer(c.type, c.resolved!, this.options));
+      writeTypeInfo(c.type, tBuf, c.resolved!, this.options);
 
       // TableName
       if (c.type.hasTableName) {
@@ -590,7 +589,7 @@ class BulkLoad extends EventEmitter {
    */
   createDoneToken() {
     // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
-    const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
+    const tBuf = new WritableTrackingBuffer();
     tBuf.writeUInt8(TOKEN_TYPE.DONE);
     const status = DONE_STATUS.FINAL;
     tBuf.writeUInt16LE(status);

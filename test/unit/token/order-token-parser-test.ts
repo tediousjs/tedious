@@ -13,7 +13,7 @@ describe('Order Token Parser', function() {
     const length = numberOfColumns * 2;
     const column = 3;
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa9);
     buffer.writeUInt16LE(length);
@@ -37,7 +37,7 @@ describe('Order Token Parser', function() {
     const column1 = 3;
     const column2 = 4;
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xa9);
     buffer.writeUInt16LE(length);
