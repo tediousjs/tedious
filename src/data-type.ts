@@ -138,7 +138,11 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
     return { name: parameter.name, output: parameter.output, type, data: type.resolve(parameter, collation, options) };
   }
 
-  const value = type.validate(parameter.value, collation, options);
+  // `validate` is deliberately not given the connection options: no caller
+  // ever passed them, so the `useUTC`-dependent range checks in the date and
+  // time types have never been active. Enabling them is a behaviour change
+  // to make on its own.
+  const value = type.validate(parameter.value, collation);
   const validated: Parameter = { ...parameter, value };
   const data: ParameterData = { value };
 

@@ -60,6 +60,20 @@ describe('Parameter serialization contract', function() {
       assert.strictEqual(resolved.data.length, 42);
     });
 
+    it('validates with the collation only, as callers did before', function() {
+      const received: unknown[][] = [];
+      const type: DataType = {
+        ...TYPES.Int,
+        validate(...args: unknown[]) {
+          received.push(args);
+          return 1;
+        }
+      };
+      const collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xd0, 0x00, 0x34]));
+      resolveParameter({ type, name: 'p', value: 1, output: false }, collation, options);
+      assert.deepEqual(received, [[1, collation]]);
+    });
+
     it('reports validation errors', function() {
       assert.throws(() => {
         resolveParameter({ type: TYPES.Int, name: 'p', value: 'not a number', output: false }, undefined, options);

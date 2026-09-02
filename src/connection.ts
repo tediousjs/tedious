@@ -2700,7 +2700,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  resolveParameter(parameter: Parameter): ResolvedParameter {
+  resolveRequestParameter(parameter: Parameter): ResolvedParameter {
     return resolveParameter(parameter, this.databaseCollation, this.config.options);
   }
 
@@ -2735,7 +2735,7 @@ class Connection extends EventEmitter {
 
     const parameters: ResolvedParameter[] = [];
 
-    parameters.push(this.resolveParameter({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'statement',
       value: request.sqlTextOrProcedure,
@@ -2746,7 +2746,7 @@ class Connection extends EventEmitter {
     }));
 
     if (request.parameters.length) {
-      parameters.push(this.resolveParameter({
+      parameters.push(this.resolveRequestParameter({
         type: TYPES.NVarChar,
         name: 'params',
         value: request.makeParamsParameter(request.parameters),
@@ -2895,7 +2895,7 @@ class Connection extends EventEmitter {
   prepare(request: Request) {
     const parameters: ResolvedParameter[] = [];
 
-    parameters.push(this.resolveParameter({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: 'handle',
       value: undefined,
@@ -2905,7 +2905,7 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
-    parameters.push(this.resolveParameter({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'params',
       value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
@@ -2915,7 +2915,7 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
-    parameters.push(this.resolveParameter({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'stmt',
       value: request.sqlTextOrProcedure,
@@ -2949,7 +2949,7 @@ class Connection extends EventEmitter {
   unprepare(request: Request) {
     const parameters: ResolvedParameter[] = [];
 
-    parameters.push(this.resolveParameter({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: 'handle',
       // TODO: Abort if `request.handle` is not set
@@ -2975,7 +2975,7 @@ class Connection extends EventEmitter {
   execute(request: Request, parameters?: { [key: string]: unknown }) {
     const executeParameters: ResolvedParameter[] = [];
 
-    executeParameters.push(this.resolveParameter({
+    executeParameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: '',
       // TODO: Abort if `request.handle` is not set
@@ -2990,7 +2990,7 @@ class Connection extends EventEmitter {
       for (let i = 0, len = request.parameters.length; i < len; i++) {
         const parameter = request.parameters[i];
 
-        executeParameters.push(this.resolveParameter({
+        executeParameters.push(this.resolveRequestParameter({
           ...parameter,
           value: parameters ? parameters[parameter.name] : null
         }));
