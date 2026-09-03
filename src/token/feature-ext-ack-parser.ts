@@ -10,19 +10,21 @@ const FEATURE_ID = {
   GLOBALTRANSACTIONS: 0x05,
   AZURESQLSUPPORT: 0x08,
   UTF8_SUPPORT: 0x0A,
+  JSON_SUPPORT: 0x0D,
   TERMINATOR: 0xFF
 };
 
 function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
+  let jsonSupport: Buffer | undefined;
 
   while (true) {
     let featureId;
     ({ value: featureId, offset } = readUInt8(buf, offset));
 
     if (featureId === FEATURE_ID.TERMINATOR) {
-      return new Result(new FeatureExtAckToken(fedAuth, utf8Support), offset);
+      return new Result(new FeatureExtAckToken(fedAuth, utf8Support, jsonSupport), offset);
     }
 
     let featureAckDataLen;
@@ -41,6 +43,12 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
         break;
       case FEATURE_ID.UTF8_SUPPORT:
         utf8Support = !!featureData[0];
+        break;
+      case FEATURE_ID.JSON_SUPPORT:
+        // The single data byte is the JSON version chosen by the server.
+        // Whether that version is one this client supports is decided by the
+        // Login7TokenHandler.
+        jsonSupport = featureData;
         break;
     }
   }
