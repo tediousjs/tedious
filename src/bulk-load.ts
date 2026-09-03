@@ -152,6 +152,21 @@ class RowTransform extends Transform {
    * @private
    */
   declare columns: BulkLoad['columns'];
+  /**
+   * Rows are serialized into this buffer and handed downstream in
+   * packet-sized chunks, not one chunk per row.
+   *
+   * @private
+   */
+  declare buffer: WritableTrackingBuffer;
+  /**
+   * Whether a flush of `buffer` is already scheduled for when the row
+   * source goes idle. A chunk-sized flush in the meantime does not cancel
+   * it; the scheduled flush then finds an empty buffer and does nothing.
+   *
+   * @private
+   */
+  declare flushScheduled: boolean;
 
   /**
    * @private
@@ -164,18 +179,22 @@ class RowTransform extends Transform {
     this.columns = bulkLoad.columns;
 
     this.columnMetadataWritten = false;
+    this.buffer = new WritableTrackingBuffer();
+    this.flushScheduled = false;
   }
 
   /**
    * @private
    */
   _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
+    const buffer = this.buffer;
+
     if (!this.columnMetadataWritten) {
-      this.push(this.bulkLoad.getColMetaData());
+      buffer.writeBuffer(this.bulkLoad.getColMetaData());
       this.columnMetadataWritten = true;
     }
 
-    this.push(rowTokenBuffer);
+    buffer.writeBuffer(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
@@ -198,21 +217,41 @@ class RowTransform extends Transform {
 
       if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
         if (value == null) {
-          this.push(textPointerNullBuffer);
+          buffer.writeBuffer(textPointerNullBuffer);
           continue;
         }
 
-        this.push(textPointerAndTimestampBuffer);
+        buffer.writeBuffer(textPointerAndTimestampBuffer);
       }
 
       try {
-        this.push(c.type.generateParameterLength(parameter, this.mainOptions));
+        buffer.writeBuffer(c.type.generateParameterLength(parameter, this.mainOptions));
         for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
-          this.push(chunk);
+          buffer.writeBuffer(chunk);
         }
       } catch (error: any) {
         return callback(error);
       }
+    }
+
+    if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+      this.flushBuffer();
+    } else if (!this.flushScheduled) {
+      // Rows that arrive back to back are coalesced up to a chunk. Rows are
+      // fed through `nextTick` and microtasks, so an immediate only runs
+      // once the row source has gone idle (waiting on something), at which
+      // point holding back what has accumulated would gain nothing.
+      this.flushScheduled = true;
+      setImmediate(() => {
+        this.flushScheduled = false;
+
+        // A row that failed part-way leaves its bytes in the buffer; the
+        // error destroys this stream synchronously, before this runs, so
+        // the check on `destroyed` keeps them from going downstream.
+        if (!this.destroyed && this.buffer.length > 0) {
+          this.flushBuffer();
+        }
+      });
     }
 
     process.nextTick(callback);
@@ -222,9 +261,25 @@ class RowTransform extends Transform {
    * @private
    */
   _flush(callback: () => void) {
-    this.push(this.bulkLoad.createDoneToken());
+    this.buffer.writeBuffer(this.bulkLoad.createDoneToken());
+    this.flushBuffer();
 
     process.nextTick(callback);
+  }
+
+  /**
+   * Hands everything serialized so far downstream.
+   *
+   * @private
+   */
+  flushBuffer() {
+    const buffer = this.buffer;
+
+    for (const chunk of buffer.getBuffers()) {
+      this.push(chunk);
+    }
+
+    buffer.consume(buffer.length);
   }
 }
 
