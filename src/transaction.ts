@@ -56,7 +56,7 @@ export class Transaction {
   }
 
   beginPayload(txnDescriptor: Buffer) {
-    const buffer = new WritableTrackingBuffer(100, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_BEGIN_XACT);
     buffer.writeUInt8(this.isolationLevel);
@@ -74,7 +74,7 @@ export class Transaction {
   }
 
   commitPayload(txnDescriptor: Buffer) {
-    const buffer = new WritableTrackingBuffer(100, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_COMMIT_XACT);
     buffer.writeUInt8(this.name.length * 2);
@@ -93,7 +93,7 @@ export class Transaction {
   }
 
   rollbackPayload(txnDescriptor: Buffer) {
-    const buffer = new WritableTrackingBuffer(100, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_ROLLBACK_XACT);
     buffer.writeUInt8(this.name.length * 2);
@@ -112,7 +112,7 @@ export class Transaction {
   }
 
   savePayload(txnDescriptor: Buffer) {
-    const buffer = new WritableTrackingBuffer(100, 'ascii');
+    const buffer = new WritableTrackingBuffer();
     writeToTrackingBuffer(buffer, txnDescriptor, this.outstandingRequestCount);
     buffer.writeUShort(OPERATION_TYPE.TM_SAVE_XACT);
     buffer.writeUInt8(this.name.length * 2);

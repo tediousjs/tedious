@@ -6,6 +6,7 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const NO_COLLATION = Buffer.alloc(5);
 
 const NVarChar: { maximumLength: number } & DataType = {
   id: 0xE7,
@@ -130,6 +131,53 @@ const NVarChar: { maximumLength: number } & DataType = {
       }
 
       yield PLP_TERMINATOR;
+    }
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(parameter.length! * 2);
+    } else {
+      buffer.writeUInt16LE(MAX);
+    }
+
+    if (parameter.collation) {
+      buffer.writeBuffer(parameter.collation.toBuffer().subarray(0, 5));
+    } else {
+      buffer.writeBuffer(NO_COLLATION);
+    }
+  },
+
+  writeValue(buffer, parameter) {
+    if (parameter.value == null) {
+      buffer.writeBuffer(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
+      return;
+    }
+
+    const value = parameter.value instanceof Buffer ? parameter.value : parameter.value.toString();
+    const length = typeof value === 'string' ? value.length * 2 : value.length;
+
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(length);
+    } else {
+      buffer.writeBuffer(UNKNOWN_PLP_LEN);
+      if (length === 0) {
+        buffer.writeBuffer(PLP_TERMINATOR);
+        return;
+      }
+      buffer.writeUInt32LE(length);
+    }
+
+    if (typeof value === 'string') {
+      buffer.writeString(value, 'ucs2');
+    } else {
+      buffer.writeBuffer(value);
+    }
+
+    if (parameter.length! > this.maximumLength) {
+      buffer.writeBuffer(PLP_TERMINATOR);
     }
   },
 

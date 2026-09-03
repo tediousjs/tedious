@@ -1,8 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type Parameter, type ParameterData } from './data-type';
+import { type ResolvedParameter, writeTypeInfo, writeValue } from './data-type';
 import { type InternalConnectionOptions } from './connection';
-import { Collation } from './collation';
 import { InputError } from './errors';
 
 // const OPTION = {
@@ -21,18 +20,16 @@ const STATUS = {
  */
 class RpcRequestPayload implements Iterable<Buffer> {
   declare procedure: string | number;
-  declare parameters: Parameter[];
+  declare parameters: ResolvedParameter[];
 
   declare options: InternalConnectionOptions;
   declare txnDescriptor: Buffer;
-  declare collation: Collation | undefined;
 
-  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions, collation: Collation | undefined) {
+  constructor(procedure: string | number, parameters: ResolvedParameter[], txnDescriptor: Buffer, options: InternalConnectionOptions) {
     this.procedure = procedure;
     this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
-    this.collation = collation;
   }
 
   [Symbol.iterator]() {
@@ -40,14 +37,14 @@ class RpcRequestPayload implements Iterable<Buffer> {
   }
 
   * generateData() {
-    const buffer = new WritableTrackingBuffer(500);
+    const buffer = new WritableTrackingBuffer();
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
       writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
     }
 
     if (typeof this.procedure === 'string') {
-      buffer.writeUsVarchar(this.procedure);
+      buffer.writeUsVarchar(this.procedure, 'ucs2');
     } else {
       buffer.writeUShort(0xFFFF);
       buffer.writeUShort(this.procedure);
@@ -67,13 +64,13 @@ class RpcRequestPayload implements Iterable<Buffer> {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  * generateParameterData(parameter: Parameter) {
-    const buffer = new WritableTrackingBuffer(1 + 2 + Buffer.byteLength(parameter.name, 'ucs-2') + 1);
+  * generateParameterData(parameter: ResolvedParameter) {
+    const buffer = new WritableTrackingBuffer();
 
     if (parameter.name) {
-      buffer.writeBVarchar('@' + parameter.name);
+      buffer.writeBVarchar('@' + parameter.name, 'ucs2');
     } else {
-      buffer.writeBVarchar('');
+      buffer.writeBVarchar('', 'ucs2');
     }
 
     let statusFlags = 0;
@@ -82,72 +79,16 @@ class RpcRequestPayload implements Iterable<Buffer> {
     }
     buffer.writeUInt8(statusFlags);
 
-    yield buffer.data;
-
-    const param: ParameterData = { value: parameter.value };
-
-    const type = parameter.type;
-
-    if ((type.id & 0x30) === 0x20) {
-      if (parameter.length) {
-        param.length = parameter.length;
-      } else if (type.resolveLength) {
-        param.length = type.resolveLength(parameter);
-      }
-    }
-
-    if (parameter.precision) {
-      param.precision = parameter.precision;
-    } else if (type.resolvePrecision) {
-      param.precision = type.resolvePrecision(parameter);
-    }
-
-    if (parameter.scale) {
-      param.scale = parameter.scale;
-    } else if (type.resolveScale) {
-      param.scale = type.resolveScale(parameter);
-    }
-
-    if (this.collation) {
-      param.collation = this.collation;
-    }
-
-    // Only the type's serialization calls are wrapped, so that errors from
-    // elsewhere (e.g. the consumer of this generator) are not misattributed
-    // to the parameter.
-    let typeInfoBuffer;
-    let parameterLengthBuffer;
     try {
-      typeInfoBuffer = type.generateTypeInfo(param, this.options);
-      parameterLengthBuffer = type.generateParameterLength(param, this.options);
+      writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
+      writeValue(parameter.type, buffer, parameter.data, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
     }
 
-    yield typeInfoBuffer;
-    yield parameterLengthBuffer;
-
-    let parameterData;
-    try {
-      parameterData = type.generateParameterData(param, this.options)[Symbol.iterator]();
-    } catch (error) {
-      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-    }
-
-    while (true) {
-      let result;
-      try {
-        result = parameterData.next();
-      } catch (error) {
-        throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-      }
-
-      if (result.done) {
-        break;
-      }
-
-      yield result.value;
-    }
+    // Large values are referenced by the buffer rather than copied; handing
+    // out its chunks keeps them that way.
+    yield * buffer.getBuffers();
   }
 }
 

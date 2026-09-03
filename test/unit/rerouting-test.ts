@@ -9,17 +9,17 @@ import Message from '../../src/message';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 
 function buildRoutingEnvChangeToken(hostname: string, port: number): Buffer {
-  const valueBuffer = new WritableTrackingBuffer(0);
+  const valueBuffer = new WritableTrackingBuffer();
   valueBuffer.writeUInt8(0); // Protocol
   valueBuffer.writeUInt16LE(port); // Port
   valueBuffer.writeUsVarchar(hostname, 'ucs2');
 
-  const envValueDataBuffer = new WritableTrackingBuffer(0);
+  const envValueDataBuffer = new WritableTrackingBuffer();
   envValueDataBuffer.writeUInt8(20); // Type
   envValueDataBuffer.writeUsVarbyte(valueBuffer.data);
   envValueDataBuffer.writeUsVarbyte(Buffer.alloc(0));
 
-  const envChangeBuffer = new WritableTrackingBuffer(0);
+  const envChangeBuffer = new WritableTrackingBuffer();
   envChangeBuffer.writeUInt8(0xE3); // TokenType
   envChangeBuffer.writeUsVarbyte(envValueDataBuffer.data); // Length + EnvValueData
 

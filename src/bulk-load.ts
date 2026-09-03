@@ -5,7 +5,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter } from './data-type';
+import { type DataType, type Parameter, writeTypeInfo, writeValue } from './data-type';
 import { InputError } from './errors';
 import { Collation } from './collation';
 
@@ -183,7 +183,8 @@ class RowTransform extends Transform {
       this.columnMetadataWritten = true;
     }
 
-    this.push(rowTokenBuffer);
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeBuffer(rowTokenBuffer);
 
     for (let i = 0; i < this.columns.length; i++) {
       const c = this.columns[i];
@@ -206,29 +207,22 @@ class RowTransform extends Transform {
 
       if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
         if (value == null) {
-          this.push(textPointerNullBuffer);
+          buffer.writeBuffer(textPointerNullBuffer);
           continue;
         }
 
-        this.push(textPointerAndTimestampBuffer);
+        buffer.writeBuffer(textPointerAndTimestampBuffer);
       }
 
-      // Only the type's serialization calls are wrapped, so that errors
-      // from stream internals (e.g. `this.push`) are not misattributed to
-      // the column.
-      let parameterLengthBuffer;
-      let parameterDataBuffers;
       try {
-        parameterLengthBuffer = c.type.generateParameterLength(parameter, this.mainOptions);
-        parameterDataBuffers = [...c.type.generateParameterData(parameter, this.mainOptions)];
+        writeValue(c.type, buffer, parameter, this.mainOptions);
       } catch (error: any) {
         return callback(new InputError(`Column '${c.name}' could not be serialized`, { cause: error }));
       }
+    }
 
-      this.push(parameterLengthBuffer);
-      for (const chunk of parameterDataBuffers) {
-        this.push(chunk);
-      }
+    for (const chunk of buffer.getBuffers()) {
+      this.push(chunk);
     }
 
     process.nextTick(callback);
@@ -445,10 +439,8 @@ class BulkLoad extends EventEmitter {
       collation: this.collation
     };
 
-    if ((type.id & 0x30) === 0x20) {
-      if (column.length == null && type.resolveLength) {
-        column.length = type.resolveLength(column);
-      }
+    if (column.length == null && type.resolveLength) {
+      column.length = type.resolveLength(column);
     }
 
     if (type.resolvePrecision && column.precision == null) {
@@ -554,7 +546,7 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   getColMetaData() {
-    const tBuf = new WritableTrackingBuffer(100, null, true);
+    const tBuf = new WritableTrackingBuffer();
     // TokenType
     tBuf.writeUInt8(TOKEN_TYPE.COLMETADATA);
     // Count
@@ -580,7 +572,7 @@ class BulkLoad extends EventEmitter {
 
       // TYPE_INFO
       try {
-        tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+        writeTypeInfo(c.type, tBuf, c, this.options);
       } catch (error) {
         throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
       }
@@ -615,7 +607,7 @@ class BulkLoad extends EventEmitter {
    */
   createDoneToken() {
     // It might be nice to make DoneToken a class if anything needs to create them, but for now, just do it here
-    const tBuf = new WritableTrackingBuffer(this.options.tdsVersion < '7_2' ? 9 : 13);
+    const tBuf = new WritableTrackingBuffer();
     tBuf.writeUInt8(TOKEN_TYPE.DONE);
     const status = DONE_STATUS.FINAL;
     tBuf.writeUInt16LE(status);

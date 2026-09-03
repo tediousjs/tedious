@@ -30,6 +30,10 @@ export class Parser extends EventEmitter {
     this.parser.on('end', () => {
       this.emit('end');
     });
+
+    this.parser.on('error', (error: Error) => {
+      this.emit('error', error);
+    });
   }
 
   declare on: (

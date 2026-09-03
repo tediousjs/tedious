@@ -77,7 +77,7 @@ const VarBinary: { maximumLength: number } & DataType = {
       const buffer = Buffer.alloc(2);
       buffer.writeUInt16LE(length, 0);
       return buffer;
-    } else { // writePLPBody
+    } else {
       return UNKNOWN_PLP_LEN;
     }
   },
@@ -95,7 +95,7 @@ const VarBinary: { maximumLength: number } & DataType = {
       } else {
         yield Buffer.from(value.toString(), 'ucs2');
       }
-    } else { // writePLPBody
+    } else {
       if (!Buffer.isBuffer(value)) {
         value = value.toString();
       }
@@ -115,6 +115,47 @@ const VarBinary: { maximumLength: number } & DataType = {
       }
 
       yield PLP_TERMINATOR;
+    }
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(parameter.length!);
+    } else {
+      buffer.writeUInt16LE(MAX);
+    }
+  },
+
+  writeValue(buffer, parameter) {
+    if (parameter.value == null) {
+      buffer.writeBuffer(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
+      return;
+    }
+
+    const value = Buffer.isBuffer(parameter.value) ? parameter.value : parameter.value.toString();
+    const length = typeof value === 'string' ? value.length * 2 : value.length;
+
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(length);
+    } else {
+      buffer.writeBuffer(UNKNOWN_PLP_LEN);
+      if (length === 0) {
+        buffer.writeBuffer(PLP_TERMINATOR);
+        return;
+      }
+      buffer.writeUInt32LE(length);
+    }
+
+    if (typeof value === 'string') {
+      buffer.writeString(value, 'ucs2');
+    } else {
+      buffer.writeBuffer(value);
+    }
+
+    if (parameter.length! > this.maximumLength) {
+      buffer.writeBuffer(PLP_TERMINATOR);
     }
   },
 

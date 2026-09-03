@@ -151,7 +151,10 @@ describe('BulkLoad', function() {
 
     bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
 
-    const request = new Request('CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))', (err) => {
+    // The constraint is left unnamed: constraint names on temporary tables
+    // are unique per database, so a named one collides between sessions
+    // running this test at the same time (e.g. the Azure CI jobs).
+    const request = new Request('CREATE TABLE #tmpTestTable3 ([id] int, CHECK (id BETWEEN 0 and 50))', (err) => {
       if (err) {
         return done(err);
       }
