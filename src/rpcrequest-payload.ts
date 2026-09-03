@@ -45,11 +45,19 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     this.streamed = false;
     for (let i = 0, len = parameters.length; i < len; i++) {
-      if (parameters[i].data.streamed) {
-        this.streamed = true;
-        this[Symbol.asyncIterator] = this.generateDataAsync;
-        break;
+      const { name, type, data } = parameters[i];
+      if (!data.streamed) {
+        continue;
       }
+
+      // A streamed value is delegated to the type's `writeValueStream`, so a
+      // type that resolves a value as streamed must implement it.
+      if (typeof type.writeValueStream !== 'function') {
+        throw new TypeError(`Type '${type.name}' resolved parameter '${name}' as streamed but does not implement writeValueStream`);
+      }
+
+      this.streamed = true;
+      this[Symbol.asyncIterator] = this.generateDataAsync;
     }
   }
 

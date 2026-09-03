@@ -171,12 +171,19 @@ const VarChar: { maximumLength: number } & DataType = {
   resolve(parameter, collation) {
     if (isAsyncIterable(parameter.value)) {
       // Read from its source while the request is written, and sent as
-      // `varchar(max)` since its length is not known up front.
-      const data: ParameterData = { value: parameter.value, length: MAX, streamed: true };
-      if (collation) {
-        data.collation = collation;
+      // `varchar(max)` since its length is not known up front. The chunks
+      // are encoded as they arrive, so the collation is checked here, as
+      // `validate` does for an in-memory value, rather than once the
+      // request is already being written.
+      if (!collation) {
+        throw new Error('No collation was set by the server for the current connection.');
       }
-      return data;
+
+      if (!collation.codepage) {
+        throw new Error('The collation set by the server has no associated encoding.');
+      }
+
+      return { value: parameter.value, length: MAX, streamed: true, collation };
     }
 
     const value = this.validate(parameter.value, collation);

@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import iconv from 'iconv-lite';
 
 import RpcRequestPayload from '../../src/rpcrequest-payload';
-import { typeByName as TYPES, resolveParameter, type Parameter } from '../../src/data-type';
+import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 import { Collation, Flags } from '../../src/collation';
 import { InputError } from '../../src/errors';
@@ -257,5 +257,22 @@ describe('streaming parameters', function() {
     const fromArray = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.TVP, value: table }), collation, options)], txnDescriptor, options));
     const fromAsync = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.TVP, value: streamedTable }), collation, options)], txnDescriptor, options));
     assert.deepEqual(fromAsync, fromArray);
+  });
+
+  describe('invariants', function() {
+    it('rejects a streamed varchar without a collation when the parameter is resolved', function() {
+      assert.throws(() => {
+        resolveParameter(param({ type: TYPES.VarChar, value: from(['a']) }), undefined, options);
+      }, /No collation was set by the server/);
+    });
+
+    it('rejects a streamed value whose type does not implement writeValueStream', function() {
+      const type: DataType = { ...TYPES.VarBinary };
+      delete (type as Partial<DataType>).writeValueStream;
+
+      assert.throws(() => {
+        new RpcRequestPayload('p', [{ name: 'p', output: false, type, data: { value: from([]), streamed: true } }], txnDescriptor, options);
+      }, /Type 'VarBinary' resolved parameter 'p' as streamed but does not implement writeValueStream/);
+    });
   });
 });
