@@ -51,6 +51,13 @@ describe('streaming parameters', function() {
     connection.close();
   });
 
+  beforeEach(function() {
+    // `max` types, and with them PLP, exist from TDS 7.2 on.
+    if (config.options.tdsVersion! < '7_2') {
+      this.skip();
+    }
+  });
+
   function selectParameter(type: typeof TYPES[keyof typeof TYPES], value: unknown, callback: (err: Error | null | undefined, result?: unknown) => void) {
     let result: unknown;
 
