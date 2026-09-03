@@ -268,7 +268,8 @@ class RowTransform extends Transform {
   }
 
   /**
-   * Hands everything serialized so far downstream.
+   * Hands everything serialized so far downstream. Does nothing when the
+   * buffer is empty.
    *
    * @private
    */
