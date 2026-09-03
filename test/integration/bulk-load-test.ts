@@ -4,7 +4,7 @@ import { assert } from 'chai';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
-import { RequestError } from '../../src/errors';
+import { InputError, RequestError } from '../../src/errors';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
@@ -1561,7 +1561,7 @@ describe('BulkLoad', function() {
     const bulkLoad = connection.newBulkLoad(
       '#tmpTestTable',
       (err, rowCount) => {
-        assert.instanceOf(err, TypeError);
+        assert.instanceOf(err, InputError);
         assert.match((err as Error).message, /Column 'value' could not be serialized/);
         assert.instanceOf((err as Error).cause, RangeError);
         assert.strictEqual(((err as Error).cause as Error).message, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
