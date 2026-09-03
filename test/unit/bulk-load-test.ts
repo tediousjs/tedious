@@ -73,6 +73,19 @@ describe('BulkLoad', function() {
       assert.match(error.message, /Column 'foo' could not be serialized/);
       assert.strictEqual(error.cause, cause);
     });
+
+    it('wraps errors thrown while generating row value chunks', async function() {
+      const cause = new RangeError('out of range');
+      const error = await writeRow(buildType({
+        * generateParameterData() {
+          throw cause;
+        }
+      }));
+
+      assert.instanceOf(error, InputError);
+      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.cause, cause);
+    });
   });
 
   it('starts out as not being canceled', function() {
