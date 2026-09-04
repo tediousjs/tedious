@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Readable } from 'stream';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import { type InternalConnectionOptions } from '../../src/connection';
@@ -56,6 +57,40 @@ describe('BulkLoad', function() {
       // Creating the payload and its iterator touches nothing.
       payload[Symbol.asyncIterator]();
       assert.isFalse(pulled);
+    });
+
+    it('accepts a synchronous iterable with an undefined async iterator property', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const rows = { [Symbol.asyncIterator]: undefined, *[Symbol.iterator]() { yield [1]; yield [2]; } };
+      const data = Buffer.concat(await collect(new BulkLoadPayload(request, rows)));
+
+      assert.strictEqual(data[0], 0x81);
+      assert.strictEqual(data[data.length - 13], 0xFD);
+      assert.lengthOf(data.filter((byte) => byte === 0xD1), 2);
+    });
+
+    it('keeps an error a stream source emits before the rows are read', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const source = new Readable({ objectMode: true, read() {} });
+      const payload = new BulkLoadPayload(request, source);
+
+      // The stream fails while nothing reads from it yet. Without a
+      // listener this would be an unhandled `'error'` event.
+      const expected = new Error('source failed');
+      source.destroy(expected);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      let error;
+      try {
+        await collect(payload);
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
     });
 
     it('hands a chunk downstream right away once a row fills it', async function() {

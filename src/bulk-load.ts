@@ -133,7 +133,7 @@ const textPointerAndTimestampBuffer = Buffer.from([
 ]);
 const textPointerNullBuffer = Buffer.from([0x00]);
 
-type Row = unknown[] | { [colName: string]: unknown };
+export type Row = unknown[] | { [colName: string]: unknown };
 
 const IDLE = Symbol('idle');
 
@@ -520,9 +520,11 @@ class BulkLoad extends EventEmitter {
     const options = this.options;
     const columns = this.columns;
 
-    const iterator = Symbol.asyncIterator in rows ?
-      rows[Symbol.asyncIterator]() :
-      rows[Symbol.iterator]();
+    // An object can carry an `undefined` `Symbol.asyncIterator` property
+    // and still be a perfectly good synchronous iterable.
+    const iterator = typeof (rows as Partial<AsyncIterable<Row>>)[Symbol.asyncIterator] === 'function' ?
+      (rows as AsyncIterable<Row>)[Symbol.asyncIterator]() :
+      (rows as Iterable<Row>)[Symbol.iterator]();
 
     // Resolves once the event loop got a turn, i.e. once the row source
     // stopped producing rows back to back (rows arrive through promises and
