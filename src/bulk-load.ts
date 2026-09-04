@@ -581,23 +581,24 @@ class BulkLoad extends EventEmitter {
             value: value
           };
 
-          if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
-            if (value == null) {
-              buffer.writeBuffer(textPointerNullBuffer);
-              continue;
+          const isTextType = c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText';
+
+          if (isTextType && value == null) {
+            buffer.writeBuffer(textPointerNullBuffer);
+          } else {
+            if (isTextType) {
+              buffer.writeBuffer(textPointerAndTimestampBuffer);
             }
 
-            buffer.writeBuffer(textPointerAndTimestampBuffer);
+            buffer.writeBuffer(c.type.generateParameterLength(parameter, options));
+            for (const chunk of c.type.generateParameterData(parameter, options)) {
+              buffer.writeBuffer(chunk);
+            }
           }
 
-          buffer.writeBuffer(c.type.generateParameterLength(parameter, options));
-          for (const chunk of c.type.generateParameterData(parameter, options)) {
-            buffer.writeBuffer(chunk);
-          }
-
-          // Checked after every cell, not only after every row, so that a
-          // wide row of large cells goes downstream as it is serialized
-          // rather than accumulating whole.
+          // Checked after every cell (a null text pointer included), not
+          // only after every row, so that a wide row of large cells goes
+          // downstream as it is serialized rather than accumulating whole.
           if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
             for (const chunk of buffer.getBuffers()) {
               yield chunk;

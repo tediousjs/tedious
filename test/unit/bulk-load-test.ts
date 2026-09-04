@@ -137,6 +137,30 @@ describe('BulkLoad', function() {
       assert.strictEqual(data.indexOf(value), data.length - value.length - 4);
     });
 
+    it('hands rows of null text cells downstream in chunks', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('t', TYPES.Text, { nullable: true });
+
+      // A null text cell is a single null text pointer byte; the chunk
+      // boundary must still be checked for it, or a source of such rows
+      // would be buffered whole.
+      const rowCount = 10000;
+      const rows: unknown[][] = [];
+      for (let i = 0; i < rowCount; i++) {
+        rows.push([null]);
+      }
+
+      const chunks = await collect(new BulkLoadPayload(request, rows));
+      const data = Buffer.concat(chunks);
+
+      assert.isAbove(chunks.length, 1);
+      for (const chunk of chunks) {
+        assert.isAtMost(chunk.length, WritableTrackingBuffer.CHUNK_SIZE);
+      }
+      assert.strictEqual(data[0], 0x81);
+      assert.strictEqual(data[data.length - 13], 0xFD);
+    });
+
     it('hands a chunk downstream in the middle of a wide row', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
 
@@ -520,11 +544,18 @@ describe('BulkLoad', function() {
       }
 
       let turns = 0;
-      const tick = () => { turns++; setImmediate(tick); };
+      let stopped = false;
+      const tick = () => {
+        turns++;
+        if (!stopped) {
+          setImmediate(tick);
+        }
+      };
       const timer = setImmediate(tick);
       try {
         await collect(new BulkLoadPayload(request, rows));
       } finally {
+        stopped = true;
         clearImmediate(timer);
       }
 
