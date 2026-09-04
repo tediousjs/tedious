@@ -446,6 +446,74 @@ describe('BulkLoad', function() {
       assert.lengthOf(chunks, 0);
     });
 
+    it('ends the bulk load when an event-emitting source fails while a row read is pending', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The source hands over one row, then emits `'error'` while its next
+      // read stays pending forever.
+      const expected = new Error('source broke mid-read');
+      class Source extends EventEmitter implements AsyncIterable<unknown[]> {
+        [Symbol.asyncIterator]() {
+          let reads = 0;
+          return {
+            next: (): Promise<IteratorResult<unknown[]>> => {
+              if (reads++ === 0) {
+                return Promise.resolve({ value: [1], done: false });
+              }
+
+              setImmediate(() => { this.emit('error', expected); });
+              return new Promise(() => {});
+            },
+            return: async (): Promise<IteratorResult<unknown[]>> => ({ value: undefined, done: true })
+          };
+        }
+      }
+      const source = new Source();
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
+    it('only destroys an emitter source when closed unread, and never throws doing so', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let destroyCalls = 0;
+      const plain = {
+        destroy() {
+          destroyCalls++;
+          throw new Error('not a stream');
+        },
+        *[Symbol.iterator]() {
+          yield [1];
+        }
+      };
+      new BulkLoadPayload(request, plain).close();
+      assert.strictEqual(destroyCalls, 0);
+
+      class Emitter extends EventEmitter {
+        destroy() {
+          destroyCalls++;
+          throw new Error('destroy failed');
+        }
+
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+        }
+      }
+      const emitter = new Emitter();
+      new BulkLoadPayload(request, emitter).close();
+      assert.strictEqual(destroyCalls, 1);
+      assert.strictEqual(emitter.listenerCount('error'), 0);
+    });
+
     it('takes its error listener off an event-emitting source once the rows are read', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });

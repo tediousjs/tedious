@@ -22,6 +22,12 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
    */
   declare sourceError: Error | undefined;
   declare onSourceError: (err: Error) => void;
+  /**
+   * Rejects with that error, so a row read pending at the time can be
+   * abandoned. Only a guarded source has one.
+   */
+  declare abort: Promise<never> | undefined;
+  declare failSource: ((err: Error) => void) | undefined;
 
   constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
@@ -49,12 +55,18 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     this.sourceError = undefined;
     this.onSourceError = (err) => {
       this.sourceError ??= err;
+      this.failSource?.(err);
     };
     if (rows instanceof EventEmitter) {
       this.guarded = rows;
+      this.abort = new Promise<never>((_, reject) => { this.failSource = reject; });
+      // Nobody may be racing against it when it rejects.
+      this.abort.catch(ignoreError);
       rows.on('error', this.onSourceError);
     } else {
       this.guarded = undefined;
+      this.abort = undefined;
+      this.failSource = undefined;
     }
 
     this.iterator = this.serialize();
@@ -68,7 +80,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     this.started = true;
 
     try {
-      for await (const chunk of this.bulkLoad.serializeRows(this.source)) {
+      for await (const chunk of this.bulkLoad.serializeRows(this.source, this.abort)) {
         // An error the source emitted without failing its iterator ends
         // the bulk load before another chunk goes out.
         if (this.sourceError !== undefined) {
@@ -121,10 +133,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     }
 
     // A stream's iterator only takes effect once it has been pulled, so
-    // the stream itself is destroyed to release what it holds open.
+    // the stream itself is destroyed to release what it holds open. Only
+    // an emitter is taken for a stream, and its `destroy` is as best
+    // effort as the `return` above.
     const stream = this.rows as { destroy?: () => void };
-    if (typeof stream.destroy === 'function') {
-      stream.destroy();
+    if (this.rows instanceof EventEmitter && typeof stream.destroy === 'function') {
+      try {
+        stream.destroy();
+      } catch {
+        // Nothing left to report it to.
+      }
     }
   }
 

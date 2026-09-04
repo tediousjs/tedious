@@ -507,11 +507,14 @@ class BulkLoad extends EventEmitter {
    *
    * A row that fails validation or serialization ends the iteration with
    * that error; nothing written for it (or for rows still coalescing with
-   * it) is yielded. The row source is closed either way.
+   * it) is yielded. The row source is closed either way. `abort`, when
+   * given, is raced against every pending row read, so that a source
+   * that signals failure out of band (an `'error'` event) while a read
+   * is pending ends the iteration too instead of hanging it.
    *
    * @private
    */
-  async *serializeRows(iterator: Iterator<Row> | AsyncIterator<Row>): AsyncGenerator<Buffer, void, undefined> {
+  async *serializeRows(iterator: Iterator<Row> | AsyncIterator<Row>, abort?: Promise<never>): AsyncGenerator<Buffer, void, undefined> {
     const buffer = new WritableTrackingBuffer();
     const options = this.options;
     const columns = this.columns;
@@ -540,7 +543,7 @@ class BulkLoad extends EventEmitter {
         if (isPromiseLike(result)) {
           idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
 
-          const winner = await Promise.race([result, idle]);
+          const winner = await Promise.race(abort === undefined ? [result, idle] : [result, idle, abort]);
           if (winner === IDLE) {
             idle = undefined;
 
@@ -551,7 +554,7 @@ class BulkLoad extends EventEmitter {
               buffer.consume(buffer.length);
             }
 
-            result = await result;
+            result = await (abort === undefined ? result : Promise.race([result, abort]));
           } else {
             result = winner;
           }
