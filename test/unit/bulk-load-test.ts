@@ -5,7 +5,7 @@ import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import { type InternalConnectionOptions } from '../../src/connection';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
-import { typeByName as TYPES } from '../../src/data-type';
+import { typeByName as TYPES, type DataType } from '../../src/data-type';
 
 // Test options - using type assertion since tests only exercise code paths
 // that use a subset of the full InternalConnectionOptions
@@ -302,6 +302,61 @@ describe('BulkLoad', function() {
 
       const data = Buffer.concat(await collect(new BulkLoadPayload(request, source)));
       assert.strictEqual(data[0], 0x81);
+    });
+
+    it('closes the row source when a column fails to write its TYPE_INFO', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      const expected = new Error('no TYPE_INFO for you');
+      const type: DataType = { ...TYPES.Int, generateTypeInfo() { throw expected; } };
+      request.addColumn('id', type, { nullable: false });
+
+      // A generator that was never pulled skips its `finally` on `return()`,
+      // so the call is recorded on a hand-written iterator instead.
+      let closed = false;
+      const source: AsyncIterable<unknown[]> = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async (): Promise<IteratorResult<unknown[]>> => ({ value: [1], done: false }),
+            return: async (): Promise<IteratorResult<unknown[]>> => {
+              closed = true;
+              return { value: undefined, done: true };
+            }
+          };
+        }
+      };
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.isTrue(closed);
+    });
+
+    it('surfaces an error an event-emitting source emits without failing its iterator', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const expected = new Error('source broke');
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+          this.emit('error', expected);
+          yield [2];
+        }
+      }
+      const source = new Source();
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.strictEqual(source.listenerCount('error'), 0);
     });
 
     it('takes its error listener off an event-emitting source once the rows are read', async function() {

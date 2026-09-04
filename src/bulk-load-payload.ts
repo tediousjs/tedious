@@ -17,6 +17,11 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
    * The row source, while the payload's own `'error'` listener is on it.
    */
   declare guarded: EventEmitter | undefined;
+  /**
+   * The first error the guarded source emitted.
+   */
+  declare sourceError: Error | undefined;
+  declare onSourceError: (err: Error) => void;
 
   constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
@@ -34,14 +39,20 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // error handling only once it is iterated, which does not happen
     // before the `INSERT BULK` statement has been accepted. An `'error'`
     // it emits in the meantime would be unhandled and crash the process.
-    // With a listener in place the stream keeps the error, and iterating
-    // it later rejects with it, so it still reaches the bulk load's
-    // callback. The listener comes off again once the rows have been
-    // read, or the payload is closed unread. Only a real emitter is
-    // guarded, not anything with a method that happens to be called `on`.
+    // With a listener in place a `Readable` keeps the error and iterating
+    // it later rejects with it; an emitter that does not replay it through
+    // its iterator gets it surfaced by `serialize` instead, so either way
+    // it reaches the bulk load's callback. The listener comes off again
+    // once the rows have been read, or the payload is closed unread. Only
+    // a real emitter is guarded, not anything with a method that happens
+    // to be called `on`.
+    this.sourceError = undefined;
+    this.onSourceError = (err) => {
+      this.sourceError ??= err;
+    };
     if (rows instanceof EventEmitter) {
       this.guarded = rows;
-      rows.on('error', ignoreError);
+      rows.on('error', this.onSourceError);
     } else {
       this.guarded = undefined;
     }
@@ -57,7 +68,19 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     this.started = true;
 
     try {
-      yield* this.bulkLoad.serializeRows(this.source);
+      for await (const chunk of this.bulkLoad.serializeRows(this.source)) {
+        // An error the source emitted without failing its iterator ends
+        // the bulk load before another chunk goes out.
+        if (this.sourceError !== undefined) {
+          throw this.sourceError;
+        }
+
+        yield chunk;
+      }
+
+      if (this.sourceError !== undefined) {
+        throw this.sourceError;
+      }
     } finally {
       this.unguard();
     }
@@ -65,7 +88,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
 
   unguard() {
     if (this.guarded) {
-      this.guarded.removeListener('error', ignoreError);
+      this.guarded.removeListener('error', this.onSourceError);
       this.guarded = undefined;
     }
   }

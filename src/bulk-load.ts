@@ -527,11 +527,13 @@ class BulkLoad extends EventEmitter {
     // buffered is a no-op.
     let idle: Promise<typeof IDLE> | undefined;
 
-    buffer.writeBuffer(this.getColMetaData());
-
     let done = false;
     let failed = false;
     try {
+      // Inside the `try` so that a column type that fails to write its
+      // TYPE_INFO still closes the source.
+      buffer.writeBuffer(this.getColMetaData());
+
       while (true) {
         let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
 
