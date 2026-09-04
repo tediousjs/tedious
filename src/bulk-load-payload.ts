@@ -1,15 +1,7 @@
+import { EventEmitter } from 'events';
 import BulkLoad, { type Row } from './bulk-load';
 
-interface EventSource {
-  on(event: 'error', listener: (err: Error) => void): unknown;
-  removeListener(event: 'error', listener: (err: Error) => void): unknown;
-}
-
 function ignoreError() {}
-
-function isEventSource(value: unknown): value is EventSource {
-  return typeof (value as Partial<EventSource>).on === 'function' && typeof (value as Partial<EventSource>).removeListener === 'function';
-}
 
 export class BulkLoadPayload implements AsyncIterable<Buffer> {
   declare bulkLoad: BulkLoad;
@@ -24,7 +16,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
   /**
    * The row source, while the payload's own `'error'` listener is on it.
    */
-  declare guarded: EventSource | undefined;
+  declare guarded: EventEmitter | undefined;
 
   constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
@@ -45,8 +37,9 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // With a listener in place the stream keeps the error, and iterating
     // it later rejects with it, so it still reaches the bulk load's
     // callback. The listener comes off again once the rows have been
-    // read, or the payload is closed unread.
-    if (isEventSource(rows)) {
+    // read, or the payload is closed unread. Only a real emitter is
+    // guarded, not anything with a method that happens to be called `on`.
+    if (rows instanceof EventEmitter) {
       this.guarded = rows;
       rows.on('error', ignoreError);
     } else {

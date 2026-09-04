@@ -17,7 +17,7 @@ import {
 } from '@azure/identity';
 import { type AccessToken, type TokenCredential, isTokenCredential } from '@azure/core-auth';
 
-import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
+import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback, type Row as BulkLoadRow } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
 import { instanceLookup } from './instance-lookup';
@@ -2819,9 +2819,9 @@ class Connection extends EventEmitter {
    * @param bulkLoad A previously created [[BulkLoad]].
    * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
    */
-  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
 
-  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>) {
     bulkLoad.executionStarted = true;
 
     if (rows) {

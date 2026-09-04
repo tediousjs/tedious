@@ -274,6 +274,26 @@ describe('BulkLoad', function() {
       assert.strictEqual(error, expected);
     });
 
+    it('does not treat an unrelated `on` method as an event emitter', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const source = {
+        on() {
+          throw new Error('not an event emitter');
+        },
+        removeListener() {
+          throw new Error('not an event emitter');
+        },
+        *[Symbol.iterator]() {
+          yield [1];
+        }
+      };
+
+      const data = Buffer.concat(await collect(new BulkLoadPayload(request, source)));
+      assert.strictEqual(data[0], 0x81);
+    });
+
     it('takes its error listener off an event-emitting source once the rows are read', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
