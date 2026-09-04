@@ -332,6 +332,50 @@ describe('BulkLoad', function() {
       payload.close();
     });
 
+    it('does not throw when a synchronous source fails to close unread', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let closed = false;
+      const payload = new BulkLoadPayload(request, (function*() {
+        try {
+          yield [1];
+        } finally {
+          closed = true;
+          // eslint-disable-next-line no-unsafe-finally
+          throw new Error('close failed');
+        }
+      })());
+
+      // The generator has not started, so `return()` completes it without
+      // running its body; nothing to release, nothing thrown.
+      assert.doesNotThrow(() => payload.close());
+      assert.isFalse(closed);
+    });
+
+    it('does not throw when a started synchronous source fails to close', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let closed = false;
+      const source = (function*() {
+        try {
+          yield [1];
+          yield [2];
+        } finally {
+          closed = true;
+          // eslint-disable-next-line no-unsafe-finally
+          throw new Error('close failed');
+        }
+      })();
+      // Pull the first row ourselves so the generator sits inside its `try`.
+      source.next();
+
+      const payload = new BulkLoadPayload(request, source);
+      assert.doesNotThrow(() => payload.close());
+      assert.isTrue(closed);
+    });
+
     it('hands what it has downstream once the row source goes idle', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });

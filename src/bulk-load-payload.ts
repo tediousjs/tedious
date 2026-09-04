@@ -50,7 +50,8 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
   }
 
   /**
-   * Runs until the generator has been pulled.
+   * Marks the payload as started the moment it is first pulled, before
+   * any row is read, then hands over to `serializeRows`.
    */
   async *serialize() {
     this.started = true;
@@ -83,10 +84,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
 
     this.unguard();
 
+    // Closing is best effort: a source that fails while being released
+    // has nothing to report it to, the bulk load already failed.
     if (typeof this.source.return === 'function') {
-      const closing = this.source.return();
-      if (closing && typeof (closing as PromiseLike<unknown>).then === 'function') {
-        (closing as PromiseLike<unknown>).then(undefined, ignoreError);
+      try {
+        const closing = this.source.return();
+        if (closing && typeof (closing as PromiseLike<unknown>).then === 'function') {
+          (closing as PromiseLike<unknown>).then(undefined, ignoreError);
+        }
+      } catch {
+        // A synchronous source's `finally` threw.
       }
     }
 

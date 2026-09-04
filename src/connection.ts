@@ -2825,10 +2825,6 @@ class Connection extends EventEmitter {
     bulkLoad.executionStarted = true;
 
     if (rows) {
-      if (bulkLoad.streamingMode) {
-        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that was put in streaming mode.");
-      }
-
       if (bulkLoad.firstRowWritten) {
         throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
       }

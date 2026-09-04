@@ -555,6 +555,31 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('releases the row source if `cancel` is called immediately after executing the bulk load', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', (err) => {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
+      assert.isTrue(source.destroyed);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL)', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, source);
+      bulkLoad.cancel();
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('should not do anything if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {

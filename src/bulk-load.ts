@@ -184,10 +184,6 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  declare streamingMode: boolean;
-  /**
-   * @private
-   */
   declare table: string;
   /**
    * @private
@@ -290,7 +286,6 @@ class BulkLoad extends EventEmitter {
     this.columns = [];
     this.columnsByName = {};
     this.firstRowWritten = false;
-    this.streamingMode = false;
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
