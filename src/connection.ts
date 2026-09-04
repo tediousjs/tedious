@@ -2851,9 +2851,10 @@ class Connection extends EventEmitter {
         return;
       }
 
-      if (bulkLoad.canceled) {
-        // `makeRequest` completes a canceled bulk load without reading
-        // its payload.
+      if (bulkLoad.canceled || this.state !== this.STATE.LOGGED_IN) {
+        // `makeRequest` completes a canceled bulk load, or one on a
+        // connection that is no longer logged in, without reading its
+        // payload.
         payload.close();
       }
 

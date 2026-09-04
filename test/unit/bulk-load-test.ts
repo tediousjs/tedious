@@ -417,6 +417,35 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('error'), 0);
     });
 
+    it('surfaces an error an event-emitting source emits after its last row', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The error arrives while the source is being asked for the row
+      // after its last one, so the bulk load ends with it before DONE
+      // goes out.
+      const expected = new Error('source broke late');
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+          this.emit('error', expected);
+        }
+      }
+      const source = new Source();
+
+      const chunks: Buffer[] = [];
+      let error;
+      try {
+        for await (const chunk of new BulkLoadPayload(request, source)) {
+          chunks.push(chunk);
+        }
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.lengthOf(chunks, 0);
+    });
+
     it('takes its error listener off an event-emitting source once the rows are read', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
