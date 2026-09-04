@@ -511,7 +511,61 @@ describe('BulkLoad', function() {
       const emitter = new Emitter();
       new BulkLoadPayload(request, emitter).close();
       assert.strictEqual(destroyCalls, 1);
+
+      // The guard stays on until the destroyed source says it is closed.
+      assert.strictEqual(emitter.listenerCount('error'), 1);
+      emitter.emit('close');
       assert.strictEqual(emitter.listenerCount('error'), 0);
+    });
+
+    it('ends the bulk load when an async generator source fails while a row read is pending', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // An async generator queues `return()` behind its pending `next()`,
+      // so the source's cleanup can never finish here; the bulk load must
+      // not wait for it.
+      const expected = new Error('source broke mid-read');
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+          setImmediate(() => { this.emit('error', expected); });
+          await new Promise(() => {});
+        }
+      }
+      const source = new Source();
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
+    it('keeps guarding a stream source closed unread until it has been destroyed', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // `_destroy` reports its failure asynchronously; without a listener
+      // at that point the `'error'` would be unhandled.
+      const source = new Readable({
+        objectMode: true,
+        read() {},
+        destroy(_error, callback) {
+          setImmediate(() => { callback(new Error('destroy failed')); });
+        }
+      });
+
+      const payload = new BulkLoadPayload(request, source);
+      payload.close();
+      assert.isTrue(source.destroyed);
+      assert.strictEqual(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => source.once('close', resolve));
+      assert.strictEqual(source.listenerCount('error'), 0);
     });
 
     it('takes its error listener off an event-emitting source once the rows are read', async function() {
@@ -546,6 +600,8 @@ describe('BulkLoad', function() {
 
       payload.close();
       assert.isTrue(source.destroyed);
+
+      await new Promise((resolve) => source.once('close', resolve));
       assert.strictEqual(source.listenerCount('error'), 0);
 
       // Closing is a one-time thing; a close after the rows were read is a no-op.

@@ -137,6 +137,8 @@ export type Row = unknown[] | { [colName: string]: unknown };
 
 const IDLE = Symbol('idle');
 
+function ignoreError() {}
+
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
   return value != null && typeof (value as PromiseLike<T>).then === 'function';
 }
@@ -541,9 +543,14 @@ class BulkLoad extends EventEmitter {
         let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
 
         if (isPromiseLike(result)) {
+          // Settled into one promise up front: a thenable that is not a
+          // native promise may start its work again on every `then`, and
+          // this read can take part in two races.
+          const read = Promise.resolve(result);
+
           idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
 
-          const winner = await Promise.race(abort === undefined ? [result, idle] : [result, idle, abort]);
+          const winner = await Promise.race(abort === undefined ? [read, idle] : [read, idle, abort]);
           if (winner === IDLE) {
             idle = undefined;
 
@@ -554,7 +561,7 @@ class BulkLoad extends EventEmitter {
               buffer.consume(buffer.length);
             }
 
-            result = await (abort === undefined ? result : Promise.race([result, abort]));
+            result = await (abort === undefined ? read : Promise.race([read, abort]));
           } else {
             result = winner;
           }
@@ -618,16 +625,23 @@ class BulkLoad extends EventEmitter {
       // because the bulk load was canceled) closes the source as a
       // `for await` would.
       if (!done && typeof iterator.return === 'function') {
-        try {
-          await iterator.return();
-        } catch (err) {
-          // A source that fails while closing must not hide the row error
-          // that stopped the iteration. Without one (the consumer stopped
-          // pulling), its failure is what the consumer gets.
-          if (!failed) {
-            // eslint-disable-next-line no-unsafe-finally
-            throw err;
+        if (failed) {
+          // Best effort, and not waited for: the failure must reach the
+          // bulk load now, not after the source's cleanup, which may never
+          // finish (an async generator queues `return()` behind a `next()`
+          // that is still pending, which is exactly what an abort leaves
+          // behind). A close failure must not hide the row error either.
+          try {
+            const closing = iterator.return();
+            if (isPromiseLike(closing)) {
+              closing.then(undefined, ignoreError);
+            }
+          } catch {
+            // A synchronous source's `finally` threw.
           }
+        } else {
+          // The consumer stopped pulling; a close failure is what it gets.
+          await iterator.return();
         }
       }
     }

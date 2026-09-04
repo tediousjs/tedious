@@ -117,8 +117,6 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     }
     this.started = true;
 
-    this.unguard();
-
     // Closing is best effort: a source that fails while being released
     // has nothing to report it to, the bulk load already failed.
     if (typeof this.source.return === 'function') {
@@ -135,14 +133,19 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // A stream's iterator only takes effect once it has been pulled, so
     // the stream itself is destroyed to release what it holds open. Only
     // an emitter is taken for a stream, and its `destroy` is as best
-    // effort as the `return` above.
+    // effort as the `return` above. The error guard stays on until the
+    // stream has finished destroying itself, since its `_destroy` may
+    // report an error later, asynchronously; it comes off on `'close'`.
     const stream = this.rows as { destroy?: () => void };
     if (this.rows instanceof EventEmitter && typeof stream.destroy === 'function') {
+      this.rows.once('close', () => { this.unguard(); });
       try {
         stream.destroy();
       } catch {
         // Nothing left to report it to.
       }
+    } else {
+      this.unguard();
     }
   }
 
