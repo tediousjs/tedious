@@ -228,11 +228,11 @@ describe('BulkLoad', function() {
       request.addColumn('id', TYPES.Int, { nullable: false });
 
       const rows = [[1], ['not a number']];
-      const source = {
+      const source: AsyncIterable<unknown[]> = {
         [Symbol.asyncIterator]() {
           let i = 0;
           return {
-            next: async () => i < rows.length ? { value: rows[i++], done: false } : { value: undefined, done: true },
+            next: async (): Promise<IteratorResult<unknown[]>> => (i < rows.length ? { value: rows[i++], done: false } : { value: undefined, done: true }),
             return: async () => { throw new Error('close failed'); }
           };
         }
@@ -252,11 +252,11 @@ describe('BulkLoad', function() {
       request.addColumn('id', TYPES.Int, { nullable: false });
 
       const expected = new Error('close failed');
-      const source = {
+      const source: AsyncIterable<unknown[]> = {
         [Symbol.asyncIterator]() {
           let i = 0;
           return {
-            next: async () => ({ value: [i++], done: false }),
+            next: async (): Promise<IteratorResult<unknown[]>> => ({ value: [i++], done: false }),
             return: async () => { throw expected; }
           };
         }
