@@ -503,9 +503,13 @@ class BulkLoad extends EventEmitter {
    * (`WritableTrackingBuffer.CHUNK_SIZE`), or as soon as an asynchronous
    * row source goes idle. The second rule matters for a source that
    * yields a row and then waits on something: its rows must not be held
-   * back until a chunk has accumulated. Rows from a synchronous source, or
-   * from an asynchronous source that keeps producing, are coalesced up to
-   * a full chunk.
+   * back until a chunk has accumulated. That is a guarantee, not an
+   * optimization: a source may be waiting on the server's reaction to the
+   * rows it has already produced (the cancellation tests do), and would
+   * deadlock with them stuck in the buffer. Rows from a synchronous
+   * source, or from an asynchronous source that keeps producing, are
+   * coalesced up to a full chunk. The unit tests under "row
+   * serialization" pin both rules and the abort race below.
    *
    * A row that fails validation or serialization ends the iteration with
    * that error; nothing written for it (or for rows still coalescing with
