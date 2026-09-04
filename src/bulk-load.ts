@@ -520,8 +520,11 @@ class BulkLoad extends EventEmitter {
     // stopped producing rows back to back (rows arrive through promises and
     // microtasks, so an immediate only runs when the source is waiting on
     // something). Armed whenever an asynchronous source is awaited and no
-    // immediate is pending; when it fires with nothing buffered, the flush
-    // is a no-op.
+    // immediate is pending. One that fired while no row was being awaited
+    // (the consumer was slow to pull, or the source handed over a row
+    // without a promise) wins the next race outright; that costs one
+    // smaller chunk, never a wrong byte, and a flush with nothing
+    // buffered is a no-op.
     let idle: Promise<typeof IDLE> | undefined;
 
     buffer.writeBuffer(this.getColMetaData());

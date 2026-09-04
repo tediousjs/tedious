@@ -555,6 +555,59 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('supports a bulk load with no rows', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 0);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, []);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('releases the row source if `cancel` was called before executing the bulk load', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
+      assert.isUndefined(rowCount);
+
+      assert.isTrue(source.destroyed);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      // The `INSERT BULK` statement itself goes through; the bulk load is
+      // then completed as canceled without its rows being read.
+      bulkLoad.cancel();
+      connection.execBulkLoad(bulkLoad, source);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('releases the row source if `cancel` is called immediately after executing the bulk load', function(done) {
     const source = Readable.from([[1]], { objectMode: true });
 

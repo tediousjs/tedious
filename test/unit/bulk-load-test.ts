@@ -45,6 +45,16 @@ describe('BulkLoad', function() {
       }
     });
 
+    it('sends COLMETADATA and DONE for a bulk load with no rows', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const data = Buffer.concat(await collect(new BulkLoadPayload(request, [])));
+
+      // The server rejects a bulk load message that carries only DONE.
+      assert.deepEqual(data, Buffer.concat([request.getColMetaData(), request.createDoneToken()]));
+    });
+
     it('does not read rows before the bytes are consumed', function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
