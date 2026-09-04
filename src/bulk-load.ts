@@ -594,13 +594,16 @@ class BulkLoad extends EventEmitter {
           for (const chunk of c.type.generateParameterData(parameter, options)) {
             buffer.writeBuffer(chunk);
           }
-        }
 
-        if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
-          for (const chunk of buffer.getBuffers()) {
-            yield chunk;
+          // Checked after every cell, not only after every row, so that a
+          // wide row of large cells goes downstream as it is serialized
+          // rather than accumulating whole.
+          if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+            for (const chunk of buffer.getBuffers()) {
+              yield chunk;
+            }
+            buffer.consume(buffer.length);
           }
-          buffer.consume(buffer.length);
         }
       }
     } catch (err) {

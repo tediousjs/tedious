@@ -137,6 +137,40 @@ describe('BulkLoad', function() {
       assert.strictEqual(data.indexOf(value), data.length - value.length - 4);
     });
 
+    it('hands a chunk downstream in the middle of a wide row', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+
+      // Three cells of 6,000 bytes: the second one takes the buffer past
+      // CHUNK_SIZE, so the first chunk goes out before the third cell is
+      // serialized.
+      const serialized: string[] = [];
+      const tracking = (name: string): DataType => ({
+        ...TYPES.VarBinary,
+        *generateParameterData(parameter, options) {
+          serialized.push(name);
+          yield* TYPES.VarBinary.generateParameterData(parameter, options);
+        }
+      });
+      request.addColumn('a', tracking('a'), { length: 6000, nullable: false });
+      request.addColumn('b', tracking('b'), { length: 6000, nullable: false });
+      request.addColumn('c', tracking('c'), { length: 6000, nullable: false });
+
+      const row = [Buffer.alloc(6000, 1), Buffer.alloc(6000, 2), Buffer.alloc(6000, 3)];
+      const iterator = new BulkLoadPayload(request, [row])[Symbol.asyncIterator]();
+
+      const first = await iterator.next();
+      assert.isFalse(first.done);
+      assert.deepEqual(serialized, ['a', 'b']);
+
+      const chunks = [first.value!];
+      for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
+        chunks.push(chunk);
+      }
+      assert.deepEqual(serialized, ['a', 'b', 'c']);
+      const data = Buffer.concat(chunks);
+      assert.strictEqual(data[data.length - 13], 0xFD);
+    });
+
     it('produces the same bytes as serializing each row on its own', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
@@ -445,10 +479,14 @@ describe('BulkLoad', function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
+      // The source hands over one row and then waits on something only the
+      // test releases, so the order of events does not depend on timers.
+      let resume!: () => void;
+      const gate = new Promise<void>((resolve) => { resume = resolve; });
       let resumed = false;
       const payload = new BulkLoadPayload(request, (async function*() {
         yield [1];
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await gate;
         resumed = true;
         yield [2];
       })());
@@ -462,6 +500,7 @@ describe('BulkLoad', function() {
       assert.isFalse(resumed);
       assert.strictEqual(first.value![0], 0x81);
 
+      resume();
       const chunks = [first.value!];
       for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
         chunks.push(chunk);
