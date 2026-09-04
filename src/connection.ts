@@ -2849,9 +2849,16 @@ class Connection extends EventEmitter {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
+        payload.close();
         bulkLoad.error = error;
         bulkLoad.callback(error);
         return;
+      }
+
+      if (bulkLoad.canceled) {
+        // `makeRequest` completes a canceled bulk load without reading
+        // its payload.
+        payload.close();
       }
 
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);

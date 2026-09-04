@@ -497,8 +497,9 @@ class BulkLoad extends EventEmitter {
   }
 
   /**
-   * Serializes `rows` into the TDS byte stream of this bulk load:
-   * COLMETADATA, a ROW token per row, and a DONE token at the end.
+   * Serializes the rows produced by `iterator` into the TDS byte stream of
+   * this bulk load: COLMETADATA, a ROW token per row, and a DONE token at
+   * the end.
    *
    * Rows are written into one buffer that lives for the whole bulk load.
    * Its contents are yielded once it holds a chunk's worth
@@ -515,16 +516,10 @@ class BulkLoad extends EventEmitter {
    *
    * @private
    */
-  async *serializeRows(rows: Iterable<Row> | AsyncIterable<Row>): AsyncGenerator<Buffer, void, undefined> {
+  async *serializeRows(iterator: Iterator<Row> | AsyncIterator<Row>): AsyncGenerator<Buffer, void, undefined> {
     const buffer = new WritableTrackingBuffer();
     const options = this.options;
     const columns = this.columns;
-
-    // An object can carry an `undefined` `Symbol.asyncIterator` property
-    // and still be a perfectly good synchronous iterable.
-    const iterator = typeof (rows as Partial<AsyncIterable<Row>>)[Symbol.asyncIterator] === 'function' ?
-      (rows as AsyncIterable<Row>)[Symbol.asyncIterator]() :
-      (rows as Iterable<Row>)[Symbol.iterator]();
 
     // Resolves once the event loop got a turn, i.e. once the row source
     // stopped producing rows back to back (rows arrive through promises and
@@ -535,6 +530,7 @@ class BulkLoad extends EventEmitter {
     buffer.writeBuffer(this.getColMetaData());
 
     let done = false;
+    let failed = false;
     try {
       while (true) {
         let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
@@ -605,12 +601,25 @@ class BulkLoad extends EventEmitter {
           buffer.consume(buffer.length);
         }
       }
+    } catch (err) {
+      failed = true;
+      throw err;
     } finally {
       // Leaving early (a failed row, or the consumer stopped pulling, e.g.
       // because the bulk load was canceled) closes the source as a
       // `for await` would.
       if (!done && typeof iterator.return === 'function') {
-        await iterator.return();
+        try {
+          await iterator.return();
+        } catch (err) {
+          // A source that fails while closing must not hide the row error
+          // that stopped the iteration. Without one (the consumer stopped
+          // pulling), its failure is what the consumer gets.
+          if (!failed) {
+            // eslint-disable-next-line no-unsafe-finally
+            throw err;
+          }
+        }
       }
     }
 

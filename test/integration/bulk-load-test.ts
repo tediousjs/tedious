@@ -595,6 +595,21 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('releases the row source when the `INSERT BULK` statement is rejected', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#does_not_exist', (err) => {
+      assert.instanceOf(err, Error);
+      assert.isTrue(source.destroyed);
+
+      done();
+    });
+
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+    connection.execBulkLoad(bulkLoad, source);
+  });
+
   it('supports streaming bulk load rows from a Stream', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {

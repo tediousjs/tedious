@@ -1,5 +1,6 @@
 import { assert } from 'chai';
 import { Readable } from 'stream';
+import { EventEmitter } from 'events';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import { type InternalConnectionOptions } from '../../src/connection';
@@ -220,6 +221,95 @@ describe('BulkLoad', function() {
       await iterator.return();
 
       assert.isTrue(closed);
+    });
+
+    it('keeps the row error when the source fails to close', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const rows = [[1], ['not a number']];
+      const source = {
+        [Symbol.asyncIterator]() {
+          let i = 0;
+          return {
+            next: async () => i < rows.length ? { value: rows[i++], done: false } : { value: undefined, done: true },
+            return: async () => { throw new Error('close failed'); }
+          };
+        }
+      };
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, TypeError);
+    });
+
+    it('reports a source that fails to close when the consumer stops early', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const expected = new Error('close failed');
+      const source = {
+        [Symbol.asyncIterator]() {
+          let i = 0;
+          return {
+            next: async () => ({ value: [i++], done: false }),
+            return: async () => { throw expected; }
+          };
+        }
+      };
+
+      const iterator = new BulkLoadPayload(request, source)[Symbol.asyncIterator]();
+      await iterator.next();
+
+      let error;
+      try {
+        await iterator.return();
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+    });
+
+    it('takes its error listener off an event-emitting source once the rows are read', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+          yield [2];
+        }
+      }
+      const source = new Source();
+
+      const payload = new BulkLoadPayload(request, source);
+      assert.strictEqual(source.listenerCount('error'), 1);
+
+      await collect(payload);
+      assert.strictEqual(source.listenerCount('error'), 0);
+
+      // The source can be handed to another bulk load without listeners piling up.
+      await collect(new BulkLoadPayload(request, source));
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
+    it('releases a stream source that is closed unread', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const source = new Readable({ objectMode: true, read() {} });
+      const payload = new BulkLoadPayload(request, source);
+
+      payload.close();
+      assert.isTrue(source.destroyed);
+      assert.strictEqual(source.listenerCount('error'), 0);
+
+      // Closing is a one-time thing; a close after the rows were read is a no-op.
+      payload.close();
     });
 
     it('hands what it has downstream once the row source goes idle', async function() {
