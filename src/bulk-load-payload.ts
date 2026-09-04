@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import BulkLoad, { type Row } from './bulk-load';
+import { RequestError } from './errors';
 
 function ignoreError() {}
 
@@ -29,6 +30,12 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
    */
   declare aborted: Promise<never>;
   declare rejectAborted: (err: Error) => void;
+  /**
+   * On the bulk load until the payload is done with its rows, so that a
+   * completed bulk load an application holds on to does not hold on to
+   * the payload, and with it the rows, through this listener.
+   */
+  declare onCancel: () => void;
 
   constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
@@ -69,6 +76,17 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       this.guarded = undefined;
     }
 
+    // A cancellation while the rows are being sent stops the payload
+    // stream, but a row read pending inside the payload must be abandoned
+    // as well, or a source that never delivers the row would keep the bulk
+    // load's resources open. The consumer has stopped pulling by then, so
+    // the reason reaches nobody, but the source is closed as on any other
+    // failure.
+    this.onCancel = () => {
+      this.rejectAborted(new RequestError('Canceled.', 'ECANCEL'));
+    };
+    bulkLoad.once('cancel', this.onCancel);
+
     this.iterator = this.serialize();
   }
 
@@ -94,8 +112,17 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         throw this.sourceError;
       }
     } finally {
+      this.release();
       this.unguard();
     }
+  }
+
+  /**
+   * Takes the payload's listener off the bulk load. The bulk load may be
+   * canceled later, but the payload no longer has a row read to abandon.
+   */
+  release() {
+    this.bulkLoad.removeListener('cancel', this.onCancel);
   }
 
   unguard() {
@@ -103,18 +130,6 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       this.guarded.removeListener('error', this.onSourceError);
       this.guarded = undefined;
     }
-  }
-
-  /**
-   * Stops reading rows: a read pending in the payload's generator is
-   * abandoned with `reason`, and the source is closed as on any other
-   * failure. For a bulk load that is canceled while its rows are being
-   * sent; the consumer has stopped pulling by then, so `reason` reaches
-   * nobody, but a source that would otherwise keep a read pending
-   * indefinitely is released.
-   */
-  abort(reason: Error) {
-    this.rejectAborted(reason);
   }
 
   /**
@@ -128,6 +143,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       return;
     }
     this.started = true;
+    this.release();
 
     // Closing is best effort: a source that fails while being released
     // has nothing to report it to, the bulk load already failed.

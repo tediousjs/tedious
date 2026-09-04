@@ -2856,14 +2856,6 @@ class Connection extends EventEmitter {
         // connection that is no longer logged in, without reading its
         // payload.
         payload.close();
-      } else {
-        // A cancellation while the rows are being sent stops the payload
-        // stream, but a row read pending inside the payload must be
-        // abandoned as well, or a source that never delivers the row would
-        // keep the bulk load's resources open.
-        bulkLoad.once('cancel', () => {
-          payload.abort(new RequestError('Canceled.', 'ECANCEL'));
-        });
       }
 
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);

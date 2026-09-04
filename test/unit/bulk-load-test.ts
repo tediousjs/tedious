@@ -3,6 +3,7 @@ import { Readable } from 'stream';
 import { EventEmitter } from 'events';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
+import { RequestError } from '../../src/errors';
 import { type InternalConnectionOptions } from '../../src/connection';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { typeByName as TYPES, type DataType } from '../../src/data-type';
@@ -537,7 +538,7 @@ describe('BulkLoad', function() {
       assert.strictEqual(emitter.listenerCount('close'), 0);
     });
 
-    it('abandons a pending row read when the bulk load is aborted', async function() {
+    it('abandons a pending row read when the bulk load is canceled', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
@@ -556,18 +557,44 @@ describe('BulkLoad', function() {
       const first = await iterator.next();
       assert.isFalse(first.done);
 
-      const reason = new Error('canceled');
       const pending = iterator.next();
-      payload.abort(reason);
+      request.cancel();
 
-      let error;
+      let error: any;
       try {
         await pending;
       } catch (err) {
         error = err;
       }
-      assert.strictEqual(error, reason);
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual(error.code, 'ECANCEL');
       assert.strictEqual(source.listenerCount('error'), 0);
+      assert.strictEqual(request.listenerCount('cancel'), 0);
+    });
+
+    it('takes its cancel listener off the bulk load once the rows are read', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const payload = new BulkLoadPayload(request, [[1], [2]]);
+      assert.strictEqual(request.listenerCount('cancel'), 1);
+
+      await collect(payload);
+      assert.strictEqual(request.listenerCount('cancel'), 0);
+
+      // A cancellation of the completed bulk load reaches nothing of the payload.
+      request.cancel();
+    });
+
+    it('takes its cancel listener off the bulk load when it is closed unread', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const payload = new BulkLoadPayload(request, [[1], [2]]);
+      assert.strictEqual(request.listenerCount('cancel'), 1);
+
+      payload.close();
+      assert.strictEqual(request.listenerCount('cancel'), 0);
     });
 
     it('ends the bulk load when an async generator source fails while a row read is pending', async function() {
