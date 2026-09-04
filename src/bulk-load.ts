@@ -2,7 +2,6 @@ import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import Connection, { type InternalConnectionOptions } from './connection';
 
-import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
@@ -134,154 +133,12 @@ const textPointerAndTimestampBuffer = Buffer.from([
 ]);
 const textPointerNullBuffer = Buffer.from([0x00]);
 
-// A transform that converts rows to packets.
-class RowTransform extends Transform {
-  /**
-   * @private
-   */
-  declare columnMetadataWritten: boolean;
-  /**
-   * @private
-   */
-  declare bulkLoad: BulkLoad;
-  /**
-   * @private
-   */
-  declare mainOptions: BulkLoad['options'];
-  /**
-   * @private
-   */
-  declare columns: BulkLoad['columns'];
-  /**
-   * Rows are serialized into this buffer and handed downstream in
-   * packet-sized chunks, not one chunk per row.
-   *
-   * @private
-   */
-  declare buffer: WritableTrackingBuffer;
-  /**
-   * Whether a flush of `buffer` is already scheduled for when the row
-   * source goes idle. A chunk-sized flush in the meantime does not cancel
-   * it; the scheduled flush then finds an empty buffer and does nothing.
-   *
-   * @private
-   */
-  declare flushScheduled: boolean;
+type Row = unknown[] | { [colName: string]: unknown };
 
-  /**
-   * @private
-   */
-  constructor(bulkLoad: BulkLoad) {
-    super({ writableObjectMode: true });
+const IDLE = Symbol('idle');
 
-    this.bulkLoad = bulkLoad;
-    this.mainOptions = bulkLoad.options;
-    this.columns = bulkLoad.columns;
-
-    this.columnMetadataWritten = false;
-    this.buffer = new WritableTrackingBuffer();
-    this.flushScheduled = false;
-  }
-
-  /**
-   * @private
-   */
-  _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
-    const buffer = this.buffer;
-
-    if (!this.columnMetadataWritten) {
-      buffer.writeBuffer(this.bulkLoad.getColMetaData());
-      this.columnMetadataWritten = true;
-    }
-
-    buffer.writeBuffer(rowTokenBuffer);
-
-    for (let i = 0; i < this.columns.length; i++) {
-      const c = this.columns[i];
-      let value = Array.isArray(row) ? row[i] : row[c.objName];
-
-      if (!this.bulkLoad.firstRowWritten) {
-        try {
-          value = c.type.validate(value, c.collation);
-        } catch (error: any) {
-          return callback(error);
-        }
-      }
-
-      const parameter = {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: value
-      };
-
-      if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
-        if (value == null) {
-          buffer.writeBuffer(textPointerNullBuffer);
-          continue;
-        }
-
-        buffer.writeBuffer(textPointerAndTimestampBuffer);
-      }
-
-      try {
-        buffer.writeBuffer(c.type.generateParameterLength(parameter, this.mainOptions));
-        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
-          buffer.writeBuffer(chunk);
-        }
-      } catch (error: any) {
-        return callback(error);
-      }
-    }
-
-    if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
-      this.flushBuffer();
-    } else if (!this.flushScheduled) {
-      // Rows that arrive back to back are coalesced up to a chunk. Rows are
-      // fed through `nextTick` and microtasks, so an immediate only runs
-      // once the row source has gone idle (waiting on something), at which
-      // point holding back what has accumulated would gain nothing.
-      this.flushScheduled = true;
-      setImmediate(() => {
-        this.flushScheduled = false;
-
-        // A row that failed part-way leaves its bytes in the buffer; the
-        // error destroys this stream synchronously, before this runs, so
-        // the check on `destroyed` keeps them from going downstream.
-        if (!this.destroyed && this.buffer.length > 0) {
-          this.flushBuffer();
-        }
-      });
-    }
-
-    process.nextTick(callback);
-  }
-
-  /**
-   * @private
-   */
-  _flush(callback: () => void) {
-    this.buffer.writeBuffer(this.bulkLoad.createDoneToken());
-    this.flushBuffer();
-
-    process.nextTick(callback);
-  }
-
-  /**
-   * Hands everything serialized so far downstream. Does nothing when the
-   * buffer is empty.
-   *
-   * @private
-   */
-  flushBuffer() {
-    const buffer = this.buffer;
-
-    for (const chunk of buffer.getBuffers()) {
-      this.push(chunk);
-    }
-
-    buffer.consume(buffer.length);
-  }
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return value != null && typeof (value as PromiseLike<T>).then === 'function';
 }
 
 /**
@@ -362,11 +219,6 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  declare rowToPacketTransform: RowTransform;
-
-  /**
-   * @private
-   */
   declare bulkOptions: InternalOptions;
 
   /**
@@ -439,8 +291,6 @@ class BulkLoad extends EventEmitter {
     this.columnsByName = {};
     this.firstRowWritten = false;
     this.streamingMode = false;
-
-    this.rowToPacketTransform = new RowTransform(this);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
@@ -644,6 +494,129 @@ class BulkLoad extends EventEmitter {
    */
   setTimeout(timeout?: number) {
     this.timeout = timeout;
+  }
+
+  /**
+   * Serializes `rows` into the TDS byte stream of this bulk load:
+   * COLMETADATA, a ROW token per row, and a DONE token at the end.
+   *
+   * Rows are written into one buffer that lives for the whole bulk load.
+   * Its contents are yielded once it holds a chunk's worth
+   * (`WritableTrackingBuffer.CHUNK_SIZE`), or as soon as an asynchronous
+   * row source goes idle. The second rule matters for a source that
+   * yields a row and then waits on something: its rows must not be held
+   * back until a chunk has accumulated. Rows from a synchronous source, or
+   * from an asynchronous source that keeps producing, are coalesced up to
+   * a full chunk.
+   *
+   * A row that fails validation or serialization ends the iteration with
+   * that error; nothing written for it (or for rows still coalescing with
+   * it) is yielded. The row source is closed either way.
+   *
+   * @private
+   */
+  async *serializeRows(rows: Iterable<Row> | AsyncIterable<Row>): AsyncGenerator<Buffer, void, undefined> {
+    const buffer = new WritableTrackingBuffer();
+    const options = this.options;
+    const columns = this.columns;
+
+    const iterator = Symbol.asyncIterator in rows ?
+      rows[Symbol.asyncIterator]() :
+      rows[Symbol.iterator]();
+
+    // Resolves once the event loop got a turn, i.e. once the row source
+    // stopped producing rows back to back (rows arrive through promises and
+    // microtasks, so an immediate only runs when the source is waiting on
+    // something). Armed while there are unflushed bytes and an async source.
+    let idle: Promise<typeof IDLE> | undefined;
+
+    buffer.writeBuffer(this.getColMetaData());
+
+    let done = false;
+    try {
+      while (true) {
+        let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
+
+        if (isPromiseLike(result)) {
+          idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
+
+          const winner = await Promise.race([result, idle]);
+          if (winner === IDLE) {
+            idle = undefined;
+
+            if (buffer.length > 0) {
+              for (const chunk of buffer.getBuffers()) {
+                yield chunk;
+              }
+              buffer.consume(buffer.length);
+            }
+
+            result = await result;
+          } else {
+            result = winner;
+          }
+        }
+
+        if (result.done) {
+          done = true;
+          break;
+        }
+
+        const row = result.value;
+
+        buffer.writeBuffer(rowTokenBuffer);
+
+        for (let i = 0; i < columns.length; i++) {
+          const c = columns[i];
+          let value = Array.isArray(row) ? row[i] : row[c.objName];
+
+          if (!this.firstRowWritten) {
+            value = c.type.validate(value, c.collation);
+          }
+
+          const parameter = {
+            length: c.length,
+            scale: c.scale,
+            precision: c.precision,
+            value: value
+          };
+
+          if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
+            if (value == null) {
+              buffer.writeBuffer(textPointerNullBuffer);
+              continue;
+            }
+
+            buffer.writeBuffer(textPointerAndTimestampBuffer);
+          }
+
+          buffer.writeBuffer(c.type.generateParameterLength(parameter, options));
+          for (const chunk of c.type.generateParameterData(parameter, options)) {
+            buffer.writeBuffer(chunk);
+          }
+        }
+
+        if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+          for (const chunk of buffer.getBuffers()) {
+            yield chunk;
+          }
+          buffer.consume(buffer.length);
+        }
+      }
+    } finally {
+      // Leaving early (a failed row, or the consumer stopped pulling, e.g.
+      // because the bulk load was canceled) closes the source as a
+      // `for await` would.
+      if (!done && typeof iterator.return === 'function') {
+        await iterator.return();
+      }
+    }
+
+    buffer.writeBuffer(this.createDoneToken());
+    for (const chunk of buffer.getBuffers()) {
+      yield chunk;
+    }
+    buffer.consume(buffer.length);
   }
 
   /**

@@ -2832,36 +2832,15 @@ class Connection extends EventEmitter {
       if (bulkLoad.firstRowWritten) {
         throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
       }
-
-      const rowStream = Readable.from(rows);
-
-      // Destroy the packet transform if an error happens in the row stream,
-      // e.g. if an error is thrown from within a generator or stream.
-      rowStream.on('error', (err) => {
-        bulkLoad.rowToPacketTransform.destroy(err);
-      });
-
-      // Destroy the row stream if an error happens in the packet transform,
-      // e.g. if the bulk load is cancelled.
-      bulkLoad.rowToPacketTransform.on('error', (err) => {
-        rowStream.destroy(err);
-      });
-
-      rowStream.pipe(bulkLoad.rowToPacketTransform);
-    } else if (!bulkLoad.streamingMode) {
-      // If the bulkload was not put into streaming mode by the user,
-      // we end the rowToPacketTransform here for them.
-      //
-      // If it was put into streaming mode, it's the user's responsibility
-      // to end the stream.
-      bulkLoad.rowToPacketTransform.end();
     }
+
+    // The rows are only read once the server has accepted the
+    // `INSERT BULK` statement and the request message is being sent.
+    const payload = new BulkLoadPayload(bulkLoad, rows ?? []);
 
     const onCancel = () => {
       request.cancel();
     };
-
-    const payload = new BulkLoadPayload(bulkLoad);
 
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       bulkLoad.removeListener('cancel', onCancel);

@@ -1,19 +1,18 @@
 import BulkLoad from './bulk-load';
 
+type Row = unknown[] | { [colName: string]: unknown };
+
 export class BulkLoadPayload implements AsyncIterable<Buffer> {
   declare bulkLoad: BulkLoad;
-  declare iterator: AsyncIterableIterator<Buffer>;
+  declare rows: Iterable<Row> | AsyncIterable<Row>;
 
-  constructor(bulkLoad: BulkLoad) {
+  constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
-
-    // We need to grab the iterator here so that `error` event handlers are set up
-    // as early as possible (and are not potentially lost).
-    this.iterator = this.bulkLoad.rowToPacketTransform[Symbol.asyncIterator]();
+    this.rows = rows;
   }
 
   [Symbol.asyncIterator]() {
-    return this.iterator;
+    return this.bulkLoad.serializeRows(this.rows);
   }
 
   toString(indent = '') {

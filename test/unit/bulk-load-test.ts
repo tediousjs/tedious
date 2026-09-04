@@ -1,5 +1,6 @@
 import { assert } from 'chai';
 import BulkLoad from '../../src/bulk-load';
+import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import { type InternalConnectionOptions } from '../../src/connection';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { typeByName as TYPES } from '../../src/data-type';
@@ -10,63 +11,87 @@ const connectionOptions = { tdsVersion: '7_2' } as InternalConnectionOptions;
 
 describe('BulkLoad', function() {
   describe('row serialization', function() {
-    it('hands rows downstream in packet-sized chunks rather than one chunk per row', function(done) {
+    async function collect(payload: AsyncIterable<Buffer>) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of payload) {
+        chunks.push(chunk);
+      }
+      return chunks;
+    }
+
+    it('hands rows downstream in packet-sized chunks rather than one chunk per row', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
       request.addColumn('name', TYPES.NVarChar, { length: 50, nullable: true });
 
       const rowCount = 2000;
-      const chunks: Buffer[] = [];
-      const transform = request.rowToPacketTransform;
-
-      transform.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-
-      transform.on('end', () => {
-        const data = Buffer.concat(chunks);
-
-        // COLMETADATA first, DONE (13 bytes on TDS 7.2+) last, and the
-        // rows in between coalesced into chunks of at most CHUNK_SIZE bytes.
-        assert.strictEqual(data[0], 0x81);
-        assert.strictEqual(data[data.length - 13], 0xFD);
-        assert.isBelow(chunks.length, rowCount / 20);
-        for (const chunk of chunks) {
-          assert.isAtMost(chunk.length, WritableTrackingBuffer.CHUNK_SIZE);
-        }
-
-        done();
-      });
-
+      const rows: unknown[][] = [];
       for (let i = 0; i < rowCount; i++) {
-        transform.write([i, 'row ' + i]);
+        rows.push([i, 'row ' + i]);
       }
-      transform.end();
+
+      const chunks = await collect(new BulkLoadPayload(request, rows));
+      const data = Buffer.concat(chunks);
+
+      // COLMETADATA first, DONE (13 bytes on TDS 7.2+) last, and the
+      // rows in between coalesced into chunks of at most CHUNK_SIZE bytes.
+      assert.strictEqual(data[0], 0x81);
+      assert.strictEqual(data[data.length - 13], 0xFD);
+      assert.isBelow(chunks.length, rowCount / 20);
+      for (const chunk of chunks) {
+        assert.isAtMost(chunk.length, WritableTrackingBuffer.CHUNK_SIZE);
+      }
     });
 
-    it('hands a chunk downstream right away once a row fills it', function() {
+    it('does not read rows before the bytes are consumed', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let pulled = false;
+      const payload = new BulkLoadPayload(request, (function*() {
+        pulled = true;
+        yield [1];
+      })());
+
+      // Creating the payload and its iterator touches nothing.
+      payload[Symbol.asyncIterator]();
+      assert.isFalse(pulled);
+    });
+
+    it('hands a chunk downstream right away once a row fills it', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('blob', TYPES.VarBinary, { length: WritableTrackingBuffer.CHUNK_SIZE + 1000, nullable: false });
 
-      const chunks: Buffer[] = [];
-      const transform = request.rowToPacketTransform;
-      transform.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-
-      // A single row larger than a chunk is flushed synchronously, without
-      // waiting for further rows or for the source to go idle.
       const value = Buffer.alloc(WritableTrackingBuffer.CHUNK_SIZE + 1000, 0xAB);
-      transform.write([value]);
+      let secondRowPulled = false;
+      const payload = new BulkLoadPayload(request, (async function*() {
+        yield [value];
+        secondRowPulled = true;
+        yield [Buffer.alloc(1)];
+      })());
 
-      assert.isAtLeast(chunks.length, 1);
-      const data = Buffer.concat(chunks);
+      // A single row larger than a chunk is handed downstream before the
+      // next row is read, without waiting for the source to go idle.
+      // Pull chunks until the whole row (the value is followed by the 4-byte
+      // PLP terminator) has arrived, then stop.
+      const chunks: Buffer[] = [];
+      let data = Buffer.alloc(0);
+      for await (const chunk of payload) {
+        chunks.push(chunk);
+        data = Buffer.concat(chunks);
+        const index = data.indexOf(value);
+        if (index !== -1 && data.length >= index + value.length + 4) {
+          break;
+        }
+      }
+
+      assert.isFalse(secondRowPulled);
       assert.strictEqual(data[0], 0x81);
       // The value is the last thing in the row, ahead of the 4-byte PLP terminator.
       assert.strictEqual(data.indexOf(value), data.length - value.length - 4);
     });
 
-    it('produces the same bytes as serializing each row on its own', function(done) {
+    it('produces the same bytes as serializing each row on its own', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
       request.addColumn('name', TYPES.NVarChar, { length: 50, nullable: true });
@@ -95,71 +120,124 @@ describe('BulkLoad', function() {
       }
       expected.push(request.createDoneToken());
 
-      const chunks: Buffer[] = [];
-      const transform = request.rowToPacketTransform;
-      transform.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-      transform.on('end', () => {
-        assert.deepEqual(Buffer.concat(chunks), Buffer.concat(expected));
-        done();
-      });
+      const fromArray = await collect(new BulkLoadPayload(request, rows));
+      assert.deepEqual(Buffer.concat(fromArray), Buffer.concat(expected));
 
-      for (const row of rows) {
-        transform.write(row);
-      }
-      transform.end();
+      const fromAsyncSource = await collect(new BulkLoadPayload(request, (async function*() {
+        for (const row of rows) {
+          await new Promise((resolve) => setImmediate(resolve));
+          yield row;
+        }
+      })()));
+      assert.deepEqual(Buffer.concat(fromAsyncSource), Buffer.concat(expected));
     });
 
-    it('hands nothing downstream after a row fails, even with a flush pending', async function() {
+    it('hands nothing downstream after a row fails, and closes the row source', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
+      let closed = false;
+      const payload = new BulkLoadPayload(request, (async function*() {
+        try {
+          // A valid row, then one that fails validation before the first
+          // one was handed downstream.
+          yield [1];
+          yield ['not a number'];
+          yield [2];
+        } finally {
+          closed = true;
+        }
+      })());
+
       const chunks: Buffer[] = [];
-      const transform = request.rowToPacketTransform;
-      transform.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-      const failed = new Promise<Error>((resolve) => transform.on('error', resolve));
+      let error;
+      try {
+        for await (const chunk of payload) {
+          chunks.push(chunk);
+        }
+      } catch (err) {
+        error = err;
+      }
 
-      // A valid row schedules an idle flush; the next row fails validation
-      // before that flush gets a turn.
-      transform.write([1]);
-      transform.write(['not a number']);
-
-      const error = await failed;
       assert.instanceOf(error, TypeError);
-      assert.isTrue(transform.destroyed);
-
-      await new Promise((resolve) => setImmediate(resolve));
       assert.lengthOf(chunks, 0);
+      assert.isTrue(closed);
+    });
+
+    it('closes the row source when the consumer stops early', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let closed = false;
+      const payload = new BulkLoadPayload(request, (async function*() {
+        try {
+          let i = 0;
+          while (true) {
+            yield [i++];
+          }
+        } finally {
+          closed = true;
+        }
+      })());
+
+      const iterator = payload[Symbol.asyncIterator]();
+      await iterator.next();
+      await iterator.return();
+
+      assert.isTrue(closed);
     });
 
     it('hands what it has downstream once the row source goes idle', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
-      const chunks: Buffer[] = [];
-      const transform = request.rowToPacketTransform;
-      transform.on('data', (chunk: Buffer) => {
+      let resumed = false;
+      const payload = new BulkLoadPayload(request, (async function*() {
+        yield [1];
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        resumed = true;
+        yield [2];
+      })());
+
+      const iterator = payload[Symbol.asyncIterator]();
+
+      // The first row is far smaller than a chunk; it still goes downstream
+      // as soon as the source is waiting, before it produces the next row.
+      const first = await iterator.next();
+      assert.isFalse(first.done);
+      assert.isFalse(resumed);
+      assert.strictEqual(first.value![0], 0x81);
+
+      const chunks = [first.value!];
+      for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
         chunks.push(chunk);
-      });
+      }
+      assert.isTrue(resumed);
+      const data = Buffer.concat(chunks);
+      assert.strictEqual(data[data.length - 13], 0xFD);
+    });
 
-      transform.write([1]);
-      assert.lengthOf(chunks, 0);
+    it('serializes rows from a synchronous source without touching the event loop', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
 
-      // The row is far smaller than a chunk; it still goes downstream as
-      // soon as no further rows arrive.
-      await new Promise((resolve) => setImmediate(resolve));
-      assert.lengthOf(chunks, 1);
-      assert.strictEqual(chunks[0][0], 0x81);
+      const rows: unknown[][] = [];
+      for (let i = 0; i < 5000; i++) {
+        rows.push([i]);
+      }
 
-      const ended = new Promise((resolve) => transform.on('end', resolve));
-      transform.end();
-      await ended;
+      let turns = 0;
+      const tick = () => { turns++; setImmediate(tick); };
+      const timer = setImmediate(tick);
+      try {
+        await collect(new BulkLoadPayload(request, rows));
+      } finally {
+        clearImmediate(timer);
+      }
 
-      assert.lengthOf(chunks, 2);
-      assert.strictEqual(chunks[1][0], 0xFD);
+      // The consumer's `for await` yields to the microtask queue, never to
+      // the event loop, and neither does reading from the array.
+      assert.strictEqual(turns, 0);
     });
   });
 
