@@ -23,11 +23,12 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
   declare sourceError: Error | undefined;
   declare onSourceError: (err: Error) => void;
   /**
-   * Rejects with that error, so a row read pending at the time can be
-   * abandoned. Only a guarded source has one.
+   * Rejects once the bulk load must stop reading rows: the source
+   * reported an error out of band, or the bulk load was canceled. A row
+   * read pending at the time is abandoned.
    */
-  declare abort: Promise<never> | undefined;
-  declare failSource: ((err: Error) => void) | undefined;
+  declare aborted: Promise<never>;
+  declare rejectAborted: (err: Error) => void;
 
   constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
@@ -52,21 +53,20 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // once the rows have been read, or the payload is closed unread. Only
     // a real emitter is guarded, not anything with a method that happens
     // to be called `on`.
+    this.aborted = new Promise<never>((_, reject) => { this.rejectAborted = reject; });
+    // Nobody may be racing against it when it rejects.
+    this.aborted.catch(ignoreError);
+
     this.sourceError = undefined;
     this.onSourceError = (err) => {
       this.sourceError ??= err;
-      this.failSource?.(err);
+      this.rejectAborted(err);
     };
     if (rows instanceof EventEmitter) {
       this.guarded = rows;
-      this.abort = new Promise<never>((_, reject) => { this.failSource = reject; });
-      // Nobody may be racing against it when it rejects.
-      this.abort.catch(ignoreError);
       rows.on('error', this.onSourceError);
     } else {
       this.guarded = undefined;
-      this.abort = undefined;
-      this.failSource = undefined;
     }
 
     this.iterator = this.serialize();
@@ -80,7 +80,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     this.started = true;
 
     try {
-      for await (const chunk of this.bulkLoad.serializeRows(this.source, this.abort)) {
+      for await (const chunk of this.bulkLoad.serializeRows(this.source, this.aborted)) {
         // An error the source emitted without failing its iterator ends
         // the bulk load before another chunk goes out.
         if (this.sourceError !== undefined) {
@@ -103,6 +103,18 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       this.guarded.removeListener('error', this.onSourceError);
       this.guarded = undefined;
     }
+  }
+
+  /**
+   * Stops reading rows: a read pending in the payload's generator is
+   * abandoned with `reason`, and the source is closed as on any other
+   * failure. For a bulk load that is canceled while its rows are being
+   * sent; the consumer has stopped pulling by then, so `reason` reaches
+   * nobody, but a source that would otherwise keep a read pending
+   * indefinitely is released.
+   */
+  abort(reason: Error) {
+    this.rejectAborted(reason);
   }
 
   /**
@@ -135,14 +147,25 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // an emitter is taken for a stream, and its `destroy` is as best
     // effort as the `return` above. The error guard stays on until the
     // stream has finished destroying itself, since its `_destroy` may
-    // report an error later, asynchronously; it comes off on `'close'`.
+    // report an error later, asynchronously: it comes off on `'close'`,
+    // on that `'error'`, or right away when `destroy` itself throws. (A
+    // stream that emits neither, `emitClose: false` and a clean
+    // destruction, keeps a listener; it is dead by then.)
     const stream = this.rows as { destroy?: () => void };
     if (this.rows instanceof EventEmitter && typeof stream.destroy === 'function') {
-      this.rows.once('close', () => { this.unguard(); });
+      const emitter = this.rows;
+      const destroyed = () => {
+        emitter.removeListener('close', destroyed);
+        emitter.removeListener('error', destroyed);
+        this.unguard();
+      };
+      emitter.on('close', destroyed);
+      emitter.on('error', destroyed);
+
       try {
         stream.destroy();
       } catch {
-        // Nothing left to report it to.
+        destroyed();
       }
     } else {
       this.unguard();

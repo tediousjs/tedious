@@ -512,10 +512,62 @@ describe('BulkLoad', function() {
       new BulkLoadPayload(request, emitter).close();
       assert.strictEqual(destroyCalls, 1);
 
-      // The guard stays on until the destroyed source says it is closed.
-      assert.strictEqual(emitter.listenerCount('error'), 1);
+      // `destroy` threw, so nothing more can come from the source and the
+      // guard comes off right away.
+      assert.strictEqual(emitter.listenerCount('error'), 0);
+    });
+
+    it('takes its guard off a stream source closed unread once it says it is closed', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      class Emitter extends EventEmitter {
+        destroy() {}
+
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+        }
+      }
+      const emitter = new Emitter();
+      new BulkLoadPayload(request, emitter).close();
+
+      assert.strictEqual(emitter.listenerCount('error'), 2);
       emitter.emit('close');
       assert.strictEqual(emitter.listenerCount('error'), 0);
+      assert.strictEqual(emitter.listenerCount('close'), 0);
+    });
+
+    it('abandons a pending row read when the bulk load is aborted', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The source hands over one row and then never delivers another.
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+          await new Promise(() => {});
+        }
+      }
+      const source = new Source();
+      const payload = new BulkLoadPayload(request, source);
+      const iterator = payload[Symbol.asyncIterator]();
+
+      // The first row comes out once the source is idle.
+      const first = await iterator.next();
+      assert.isFalse(first.done);
+
+      const reason = new Error('canceled');
+      const pending = iterator.next();
+      payload.abort(reason);
+
+      let error;
+      try {
+        await pending;
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, reason);
+      assert.strictEqual(source.listenerCount('error'), 0);
     });
 
     it('ends the bulk load when an async generator source fails while a row read is pending', async function() {
@@ -562,7 +614,8 @@ describe('BulkLoad', function() {
       const payload = new BulkLoadPayload(request, source);
       payload.close();
       assert.isTrue(source.destroyed);
-      assert.strictEqual(source.listenerCount('error'), 1);
+      // The guard stays on (alongside the listener waiting for destruction to finish).
+      assert.isAtLeast(source.listenerCount('error'), 1);
 
       await new Promise((resolve) => source.once('close', resolve));
       assert.strictEqual(source.listenerCount('error'), 0);
