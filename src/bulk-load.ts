@@ -551,44 +551,59 @@ class BulkLoad extends EventEmitter {
 
       while (true) {
         let result: IteratorResult<Row> | PromiseLike<IteratorResult<Row>> = iterator.next();
+        let row: unknown;
 
-        if (isPromiseLike(result)) {
-          // Settled into one promise up front: a thenable that is not a
-          // native promise may start its work again on every `then`, and
-          // this read can take part in two races.
-          const read = Promise.resolve(result);
+        // A read that is pending is waited for; so is a promised row,
+        // the same way, since `Readable.from` settled a promised element
+        // before handing it on and a JavaScript caller may hand over
+        // promises for rows.
+        while (true) {
+          if (isPromiseLike(result)) {
+            // Settled into one promise up front: a thenable that is not a
+            // native promise may start its work again on every `then`,
+            // and this read can take part in two races.
+            const read = Promise.resolve(result);
 
-          idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
+            idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
 
-          const winner = await Promise.race([read, idle, abort]);
-          if (winner === IDLE) {
-            idle = undefined;
+            const winner = await Promise.race([read, idle, abort]);
+            if (winner === IDLE) {
+              idle = undefined;
 
-            if (buffer.length > 0) {
-              for (const chunk of buffer.getBuffers()) {
-                yield chunk;
+              if (buffer.length > 0) {
+                for (const chunk of buffer.getBuffers()) {
+                  yield chunk;
+                }
+                buffer.consume(buffer.length);
               }
-              buffer.consume(buffer.length);
-            }
 
-            result = await Promise.race([read, abort]);
-          } else {
-            result = winner;
+              result = await Promise.race([read, abort]);
+            } else {
+              result = winner;
+            }
           }
+
+          if (result.done) {
+            done = true;
+            break;
+          }
+
+          row = result.value;
+          if (!isPromiseLike(row)) {
+            break;
+          }
+          result = Promise.resolve(row).then((value) => ({ done: false, value: value as Row }));
         }
 
-        if (result.done) {
-          done = true;
+        if (done) {
           break;
         }
-
-        const row = result.value;
 
         buffer.writeBuffer(rowTokenBuffer);
 
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
-          let value = Array.isArray(row) ? row[i] : row[c.objName];
+          let value = Array.isArray(row) ? row[i] : (row as { [colName: string]: unknown })[c.objName];
 
           if (!this.firstRowWritten) {
             value = c.type.validate(value, c.collation);

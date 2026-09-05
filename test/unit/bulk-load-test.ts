@@ -281,6 +281,56 @@ describe('BulkLoad', function() {
       assert.deepEqual(fromObjects, fromArrays);
     });
 
+    it('settles promised rows, as piping the rows through Readable.from did', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+      request.addColumn('name', TYPES.NVarChar, { nullable: true, length: 10 });
+
+      const plain = Buffer.concat(await collect(new BulkLoadPayload(request, [[1, 'one'], { id: 2, name: null }, [3, 'three']])));
+      // Promised rows are outside the declared type; JavaScript callers hand them over.
+      const rows = [Promise.resolve([1, 'one']), { id: 2, name: null }, Promise.resolve([3, 'three'])] as unknown as Iterable<unknown[]>;
+      const promised = Buffer.concat(await collect(new BulkLoadPayload(request, rows)));
+      assert.deepEqual(promised, plain);
+    });
+
+    it('hands what it has downstream while a promised row is pending', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const rows = [[1], new Promise<unknown[]>(() => {})] as unknown as Iterable<unknown[]>;
+      const iterator = new BulkLoadPayload(request, rows)[Symbol.asyncIterator]();
+      const first = await iterator.next();
+      assert.isFalse(first.done);
+      // COLMETADATA, then the row: ROW, and the int with its length.
+      assert.deepEqual(first.value.subarray(-6), Buffer.from([0xD1, 0x04, 0x01, 0x00, 0x00, 0x00]));
+    });
+
+    it('fails the bulk load with the rejection of a promised row, and closes the source', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const expected = new Error('row lookup failed');
+      let closed = false;
+      const rows = (function*() {
+        try {
+          yield [1];
+          yield Promise.reject(expected);
+        } finally {
+          closed = true;
+        }
+      })() as unknown as Iterable<unknown[]>;
+      const payload = new BulkLoadPayload(request, rows);
+
+      let error;
+      try {
+        await collect(payload);
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.isTrue(closed);
+    });
+
     it('writes a text pointer and timestamp before a text value, and a null pointer for none', async function() {
       const collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xD0, 0x00, 0x34]));
       const request = new BulkLoad('tablename', collation, connectionOptions, { }, () => {});
