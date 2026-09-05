@@ -264,8 +264,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // synchronously; a stream that failed earlier emits nothing more),
     // which is the only signal from a stream created with
     // `emitClose: false`.
-    type Destroy = (this: unknown, err: Error | null, callback: (err?: Error | null) => void) => void;
-    const stream = this.rows as { destroy?: () => void, _destroy?: Destroy, closed?: boolean, errored?: Error | null };
+    const stream = this.rows as { destroy?: (err?: Error, callback?: (err?: Error | null) => void) => void, destroyed?: boolean, closed?: boolean, errored?: Error | null };
     if (this.rows instanceof Stream && typeof stream.destroy === 'function') {
       const destroyed = () => {
         emitter.removeListener('close', destroyed);
@@ -279,33 +278,26 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       emitter.on('close', destroyed);
       emitter.on('error', destroyed);
 
-      // `destroy` runs the stream's `_destroy`, and once that has called
-      // back emits `'error'` and `'close'` on the next tick, or nothing
-      // at all for a stream created with `emitClose: false` whose
-      // `_destroy` succeeds. That callback is the one signal every stream
-      // gives, so it is watched for the length of this `destroy` call
-      // (which is when Node takes `_destroy` up), and the listeners come
-      // off a turn after it, once anything the stream emits about the
-      // destruction has been emitted.
-      const original = stream._destroy;
-      if (typeof original === 'function') {
-        stream._destroy = function(err, callback) {
-          original.call(this, err, (error) => {
-            callback(error);
-            setImmediate(destroyed);
-          });
-        };
-      }
-
+      // `destroy` runs the stream's `_destroy` (once the stream is
+      // constructed, if it is not yet), and once that has called back
+      // emits `'error'` and `'close'` on the next tick, or nothing at all
+      // for a stream created with `emitClose: false` whose `_destroy`
+      // succeeds. That callback is the one signal every stream gives.
+      // Node's `destroy` takes a callback of its own that it runs right
+      // after it, so that is what is passed, and the listeners come off a
+      // turn later, once anything the stream emits about the destruction
+      // has been emitted. A stream destroyed before would run the callback
+      // at once, while its destruction may still be going on, so it gets
+      // none and is waited for through its events, as below.
       try {
-        stream.destroy();
+        if (stream.destroyed === true) {
+          stream.destroy();
+        } else {
+          stream.destroy(undefined, () => { setImmediate(destroyed); });
+        }
       } catch {
         destroyed();
         return;
-      } finally {
-        if (typeof original === 'function') {
-          stream._destroy = original;
-        }
       }
 
       // A stream destroyed before this does not run `_destroy` again.

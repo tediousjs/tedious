@@ -971,6 +971,57 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('close'), 0);
     });
 
+    it('takes everything of its own off a stream closed unread before it was even constructed', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // Destruction waits for construction to finish, and with
+      // `emitClose: false` nothing is emitted about it afterwards.
+      let constructed = false;
+      const source = new Readable({
+        objectMode: true,
+        emitClose: false,
+        read() {},
+        construct(callback) {
+          setImmediate(() => {
+            constructed = true;
+            callback();
+          });
+        }
+      });
+      const payload = new BulkLoadPayload(request, source);
+
+      payload.close();
+      assert.isTrue(source.destroyed);
+      assert.isFalse(constructed);
+      assert.notInclude(source.listeners('error'), payload.onSourceError);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(constructed);
+      assert.isTrue(source.closed);
+      assert.strictEqual(source.listenerCount('error'), 0);
+      assert.strictEqual(source.listenerCount('close'), 0);
+    });
+
+    it('closes a stream source whose destruction hook cannot be replaced unread without throwing', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // Its `_destroy` cannot be replaced, so it must be destroyed as it is.
+      const source = new Readable({ objectMode: true, read() {} });
+      Object.defineProperty(source, '_destroy', { value: source._destroy, writable: false, configurable: false });
+      const payload = new BulkLoadPayload(request, source);
+
+      payload.close();
+      assert.isTrue(source.destroyed);
+
+      await new Promise((resolve) => source.once('close', resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
     it('takes everything of its own off a stream closed unread that never emits close', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
