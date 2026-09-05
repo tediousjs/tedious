@@ -697,6 +697,30 @@ describe('BulkLoad', function() {
     connection.execBulkLoad(bulkLoad, source);
   });
 
+  it('reports an error a synchronous source throws on its first read through the callback', function(done) {
+    const expected = new TypeError('bad input');
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err) => {
+      assert.strictEqual(err, expected);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, (function*() {
+        throw expected;
+      })());
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('supports streaming bulk load rows from a Stream', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
       if (err) {

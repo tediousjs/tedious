@@ -60,8 +60,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // iterator's listeners: an error it emits while the statement is in
     // flight is kept and reported on the next read, instead of being an
     // unhandled `'error'` event. The read is awaited when the rows are
-    // serialized; its rejection is not unhandled until then.
-    const first = this.iterator.next();
+    // serialized; its rejection is not unhandled until then, and neither
+    // is a synchronous source's throw, which reaches the bulk load's
+    // callback the same way.
+    let first: IteratorResult<Row> | Promise<IteratorResult<Row>>;
+    try {
+      first = this.iterator.next();
+    } catch (err) {
+      first = Promise.reject(err);
+    }
+
     if (isPromiseLike(first)) {
       const read = Promise.resolve(first);
       read.then(undefined, ignoreError);
@@ -100,6 +108,10 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     const columns = bulkLoad.columns;
     const iterator = this.iterator;
 
+    // Per column, not per cell: a text type's value is written behind a
+    // text pointer and timestamp, or as a null pointer.
+    const isTextType = columns.map((c) => c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText');
+
     const buffer = new WritableTrackingBuffer();
     buffer.writeBuffer(bulkLoad.getColMetaData());
 
@@ -127,9 +139,10 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
 
         buffer.writeBuffer(rowTokenBuffer);
 
+        const isArray = Array.isArray(row);
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
-          const value = c.type.validate(Array.isArray(row) ? row[i] : row[c.objName], c.collation);
+          const value = c.type.validate(isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName], c.collation);
 
           const parameter = {
             length: c.length,
@@ -138,12 +151,10 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
             value: value
           };
 
-          const isTextType = c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText';
-
-          if (isTextType && value == null) {
+          if (isTextType[i] && value == null) {
             buffer.writeBuffer(textPointerNullBuffer);
           } else {
-            if (isTextType) {
+            if (isTextType[i]) {
               buffer.writeBuffer(textPointerAndTimestampBuffer);
             }
 

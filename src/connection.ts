@@ -42,7 +42,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, TYPES } from './data-type';
-import { BulkLoadPayload } from './bulk-load-payload';
+import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
 
@@ -2850,9 +2850,9 @@ class Connection extends EventEmitter {
    * @param bulkLoad A previously created [[BulkLoad]].
    * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
    */
-  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
 
-  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>) {
     bulkLoad.executionStarted = true;
 
     // Owns the row source from here on: the first row is requested now,

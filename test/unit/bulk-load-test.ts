@@ -263,6 +263,28 @@ describe('BulkLoad', function() {
       assert.lengthOf(data.filter((byte) => byte === 0xD1), 3);
     });
 
+    it('reports a synchronous source that throws on its first read through the iteration, not when created', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const expected = new TypeError('bad input');
+      const rows = (function*() {
+        throw expected;
+      })();
+
+      // On `master`, `Readable.from` read the source on a later tick, so
+      // a throw never left `execBulkLoad` itself.
+      const payload = new BulkLoadPayload(request, rows);
+
+      let error;
+      try {
+        await collect(payload);
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+    });
+
     it('closes a stream source when closed unread', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
