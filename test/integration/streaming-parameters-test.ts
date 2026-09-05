@@ -175,17 +175,25 @@ describe('streaming parameters', function() {
       }
     });
 
+    // Named per test: the Azure CI jobs share one database and run this
+    // suite at the same time, so a fixed name is dropped by one job while
+    // another is calling it.
+    let procedureName: string;
+    let typeName: string;
+
     beforeEach(function(done) {
+      const suffix = Math.floor(Math.random() * 1000000);
+      procedureName = `__tediousStreamedTvpTest${suffix}`;
+      typeName = `__tediousStreamedTvpType${suffix}`;
+
       connection.execSqlBatch(new Request(`
-        DROP PROCEDURE IF EXISTS [__tediousStreamedTvpTest];
-        DROP TYPE IF EXISTS [__tediousStreamedTvpType];
-        CREATE TYPE [__tediousStreamedTvpType] AS TABLE (a int, b nvarchar(50));
+        CREATE TYPE [${typeName}] AS TABLE (a int, b nvarchar(50));
       `, done));
     });
 
     beforeEach(function(done) {
       connection.execSqlBatch(new Request(`
-        CREATE PROCEDURE [__tediousStreamedTvpTest] @tvp __tediousStreamedTvpType readonly AS BEGIN
+        CREATE PROCEDURE [${procedureName}] @tvp ${typeName} readonly AS BEGIN
           select a, b from @tvp order by a
         END
       `, done));
@@ -193,8 +201,8 @@ describe('streaming parameters', function() {
 
     afterEach(function(done) {
       connection.execSqlBatch(new Request(`
-        DROP PROCEDURE IF EXISTS [__tediousStreamedTvpTest];
-        DROP TYPE IF EXISTS [__tediousStreamedTvpType];
+        DROP PROCEDURE IF EXISTS [${procedureName}];
+        DROP TYPE IF EXISTS [${typeName}];
       `, done));
     });
 
@@ -210,7 +218,7 @@ describe('streaming parameters', function() {
 
       const received: Array<[number, string]> = [];
 
-      const request = new Request('__tediousStreamedTvpTest', (err) => {
+      const request = new Request(procedureName, (err) => {
         if (err) {
           return done(err);
         }
@@ -243,7 +251,7 @@ describe('streaming parameters', function() {
         yield ['not a number', 'bad'];
       }
 
-      const request = new Request('__tediousStreamedTvpTest', (err) => {
+      const request = new Request(procedureName, (err) => {
         assert.instanceOf(err, InputError);
         assert.strictEqual(err!.message, 'Input parameter \'tvp\' could not be validated');
         assert.instanceOf((err as InputError).cause, InputError);
