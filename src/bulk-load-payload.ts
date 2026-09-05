@@ -257,9 +257,10 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // destruction has finished, since its `_destroy` may report an error
     // later, asynchronously: on `'close'`, on that `'error'`, right away
     // when `destroy` itself throws, or right away when the destruction
-    // has already finished cleanly (Node's default `_destroy` completes
-    // synchronously), which is the only signal from a stream created
-    // with `emitClose: false`.
+    // has already finished (Node's default `_destroy` completes
+    // synchronously; a stream that failed earlier emits nothing more),
+    // which is the only signal from a stream created with
+    // `emitClose: false`.
     const stream = this.rows as { destroy?: () => void, closed?: boolean, errored?: Error | null };
     if (typeof stream.destroy === 'function') {
       const destroyed = () => {
@@ -281,8 +282,15 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         return;
       }
 
-      if (stream.closed === true && stream.errored == null) {
-        destroyed();
+      if (stream.closed === true) {
+        if (stream.errored == null) {
+          destroyed();
+        } else {
+          // Destroyed with an error before this, on this very tick or
+          // long ago: its `'error'` is either about to be emitted or was
+          // emitted already, so the guard is kept for one more turn.
+          setImmediate(destroyed);
+        }
       }
     }
   }

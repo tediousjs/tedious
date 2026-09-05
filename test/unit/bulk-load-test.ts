@@ -882,6 +882,45 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('error'), 0);
     });
 
+    it('takes everything of its own off a stream closed unread that had already failed', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The stream failed while the `INSERT BULK` statement was in
+      // flight, which the payload's guard handled; it has emitted both
+      // `'error'` and `'close'` by the time the statement is rejected and
+      // the payload is closed, and destroying it again emits nothing.
+      const source = new Readable({ objectMode: true, read() {} });
+      const payload = new BulkLoadPayload(request, source);
+      source.destroy(new Error('source failed early'));
+      await new Promise((resolve) => source.once('close', resolve));
+
+      payload.close();
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.strictEqual(source.listenerCount('error'), 0);
+      assert.strictEqual(source.listenerCount('close'), 0);
+    });
+
+    it('keeps guarding a stream closed unread whose failure is still to be emitted', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // Destroyed with an error on the same tick: the stream is closed
+      // already, but its `'error'` only comes on the next one.
+      const source = new Readable({ objectMode: true, read() {} });
+      const payload = new BulkLoadPayload(request, source);
+      source.destroy(new Error('source failed just now'));
+
+      payload.close();
+      assert.isAtLeast(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.strictEqual(source.listenerCount('error'), 0);
+      assert.strictEqual(source.listenerCount('close'), 0);
+    });
+
     it('takes everything of its own off a stream closed unread that never emits close', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
