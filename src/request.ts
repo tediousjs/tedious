@@ -441,6 +441,18 @@ class Request extends EventEmitter {
    *   The value that the parameter is to be given. The Javascript type of the
    *   argument should match that documented for data types.
    *
+   *   A `varchar(max)`, `nvarchar(max)` or `varbinary(max)` value, or the rows
+   *   of a table-valued parameter, can also be given as an async iterable
+   *   (e.g. a `Readable`) of chunks, or of rows. The source is read while the
+   *   request is being sent, so it does not have to fit in memory, and a
+   *   request that carries one can be executed only once.
+   *
+   *   Each chunk of a string source is encoded on its own, as `Writable.write`
+   *   would encode it, so a chunk must not end halfway through a UTF-16
+   *   surrogate pair. Text that Node.js decoded from UTF-8 (a `Readable` with
+   *   `encoding: 'utf8'`, `readline`, `TextDecoder`) never does; a string
+   *   sliced by index can.
+   *
    * @param options
    *   Additional type options. Optional.
    */

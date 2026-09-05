@@ -10,42 +10,6 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-// Re-chunks a string source so that a UTF-16 surrogate pair is never split
-// across chunks. An async source may yield the halves of a surrogate pair in
-// separate chunks; encoding each half on its own (e.g. as UTF-8) would corrupt
-// the character, so a trailing lone high surrogate is carried into the next
-// chunk. The result is byte-identical to encoding the whole string at once.
-async function * stitchSurrogates(source: AsyncIterable<unknown>): AsyncGenerator<string, void> {
-  let pending = '';
-
-  for await (const chunk of source) {
-    if (typeof chunk !== 'string') {
-      throw new TypeError('Invalid string.');
-    }
-
-    let value = pending + chunk;
-    pending = '';
-
-    // Only a trailing *high* surrogate needs to be held back: a lone low
-    // surrogate is already invalid on its own, and encodes identically
-    // whether or not it is split from a preceding high surrogate.
-    const lastCode = value.charCodeAt(value.length - 1);
-    if (value.length > 0 && lastCode >= 0xD800 && lastCode <= 0xDBFF) {
-      pending = value[value.length - 1];
-      value = value.slice(0, -1);
-    }
-
-    if (value.length > 0) {
-      yield value;
-    }
-  }
-
-  // A dangling high surrogate is encoded as it would be in the whole string.
-  if (pending) {
-    yield pending;
-  }
-}
-
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
   type: 'BIGVARCHR',
@@ -205,7 +169,15 @@ const VarChar: { maximumLength: number } & DataType = {
     }
     const codepage = collation.codepage;
 
-    return writePlpStream(stitchSurrogates(parameter.value as AsyncIterable<unknown>), (chunk) => iconv.encode(chunk as string, codepage));
+    // Each chunk is encoded on its own, as `Writable.prototype.write` would
+    // encode it: a source must not split a UTF-16 surrogate pair across two
+    // chunks (see `Request.addParameter`).
+    return writePlpStream(parameter.value as AsyncIterable<unknown>, (chunk) => {
+      if (typeof chunk !== 'string') {
+        throw new TypeError('Invalid string.');
+      }
+      return iconv.encode(chunk, codepage);
+    });
   }
 };
 

@@ -1,11 +1,10 @@
 import { assert } from 'chai';
 import { Readable } from 'stream';
-import iconv from 'iconv-lite';
 
 import RpcRequestPayload from '../../src/rpcrequest-payload';
 import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
-import { Collation, Flags } from '../../src/collation';
+import { Collation } from '../../src/collation';
 import { InputError } from '../../src/errors';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
@@ -118,27 +117,6 @@ describe('streaming parameters', function() {
       const resolved = resolveParameter(param({ type: TYPES.NVarChar, value: from(['ab', 'c']) }), collation, options);
       const bytes = await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
       assert.deepEqual(plpData(bytes), Buffer.from('abc', 'ucs2'));
-    });
-
-    it('keeps a varchar surrogate pair split across chunks (UTF-8 collation)', async function() {
-      const utf8Collation = new Collation(0x0409, Flags.UTF8, 0, 0);
-      assert.strictEqual(utf8Collation.codepage, 'utf-8');
-
-      // A source that yields the two halves of one emoji in separate chunks
-      // must produce the same UTF-8 as encoding the whole string at once.
-      const streamed = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.VarChar, value: from(['a\uD83D', '\uDE00b']) }), utf8Collation, options)], txnDescriptor, options));
-      assert.deepEqual(plpData(streamed), Buffer.from('a\u{1F600}b', 'utf-8'));
-    });
-
-    it('keeps a varchar surrogate pair split across chunks (CP932 collation)', async function() {
-      // A double-byte codepage cannot represent an astral character, but the
-      // stitched result must still match encoding the whole string at once
-      // (one replacement character, not two).
-      const cp932Collation = new Collation(0x0411, 0, 0, 0);
-      assert.strictEqual(cp932Collation.codepage, 'CP932');
-
-      const streamed = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.VarChar, value: from(['a\uD83D', '\uDE00b']) }), cp932Collation, options)], txnDescriptor, options));
-      assert.deepEqual(plpData(streamed), iconv.encode('a\u{1F600}b', 'CP932'));
     });
 
     it('matches the in-memory serialization of the same varbinary value', async function() {
