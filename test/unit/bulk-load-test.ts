@@ -369,9 +369,9 @@ describe('BulkLoad', function() {
       const serialized: string[] = [];
       const tracking = (name: string): DataType => ({
         ...TYPES.VarBinary,
-        *generateParameterData(parameter, options) {
+        writeValue(buffer, parameter, options) {
           serialized.push(name);
-          yield* TYPES.VarBinary.generateParameterData(parameter, options);
+          TYPES.VarBinary.writeValue!(buffer, parameter, options);
         }
       });
       request.addColumn('a', tracking('a'), { length: 6000, nullable: false });
@@ -512,6 +512,29 @@ describe('BulkLoad', function() {
   it('starts out as not being canceled', function() {
     const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
     assert.strictEqual(request.canceled, false);
+  });
+
+  describe('#addColumn', function() {
+    it('resolves the length for types with ids outside the legacy variable-length id bit pattern', function() {
+      // Like the type ids introduced in TDS 7.2 and later (e.g. VECTORTYPE
+      // 0xF5), which do not match `(id & 0x30) === 0x20`.
+      const type: DataType = {
+        ...TYPES.VarBinary,
+        id: 0xF5,
+        resolveLength() {
+          return 42;
+        }
+      };
+
+      const bulkLoad = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      bulkLoad.addColumn('modern', type, { nullable: true });
+      bulkLoad.addColumn('explicit', type, { nullable: true, length: 7 });
+      bulkLoad.addColumn('legacy', TYPES.VarBinary, { nullable: true });
+
+      assert.strictEqual(bulkLoad.columns[0].length, 42);
+      assert.strictEqual(bulkLoad.columns[1].length, 7);
+      assert.strictEqual(bulkLoad.columns[2].length, TYPES.VarBinary.maximumLength);
+    });
   });
 
   describe('#execBulkLoad', function() {

@@ -1,8 +1,7 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type Parameter, type ParameterData } from './data-type';
+import { type ResolvedParameter, writeTypeInfo, writeValue } from './data-type';
 import { type InternalConnectionOptions } from './connection';
-import { Collation } from './collation';
 import { InputError } from './errors';
 
 // const OPTION = {
@@ -21,18 +20,16 @@ const STATUS = {
  */
 class RpcRequestPayload implements Iterable<Buffer> {
   declare procedure: string | number;
-  declare parameters: Parameter[];
+  declare parameters: ResolvedParameter[];
 
   declare options: InternalConnectionOptions;
   declare txnDescriptor: Buffer;
-  declare collation: Collation | undefined;
 
-  constructor(procedure: string | number, parameters: Parameter[], txnDescriptor: Buffer, options: InternalConnectionOptions, collation: Collation | undefined) {
+  constructor(procedure: string | number, parameters: ResolvedParameter[], txnDescriptor: Buffer, options: InternalConnectionOptions) {
     this.procedure = procedure;
     this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
-    this.collation = collation;
   }
 
   [Symbol.iterator]() {
@@ -67,7 +64,7 @@ class RpcRequestPayload implements Iterable<Buffer> {
     return indent + ('RPC Request - ' + this.procedure);
   }
 
-  * generateParameterData(parameter: Parameter) {
+  * generateParameterData(parameter: ResolvedParameter) {
     const buffer = new WritableTrackingBuffer();
 
     if (parameter.name) {
@@ -82,46 +79,16 @@ class RpcRequestPayload implements Iterable<Buffer> {
     }
     buffer.writeUInt8(statusFlags);
 
-    yield buffer.data;
-
-    const param: ParameterData = { value: parameter.value };
-
-    const type = parameter.type;
-
-    // Note: this is deliberately not keyed off the legacy variable-length
-    // type id bit pattern ((type.id & 0x30) === 0x20), as that pattern does
-    // not hold for type ids introduced in TDS 7.2 and later (e.g. XMLTYPE
-    // 0xF1 or VECTORTYPE 0xF5). A type has a length whenever it can resolve
-    // one, mirroring how precision and scale are resolved below.
-    if (parameter.length) {
-      param.length = parameter.length;
-    } else if (type.resolveLength) {
-      param.length = type.resolveLength(parameter);
-    }
-
-    if (parameter.precision) {
-      param.precision = parameter.precision;
-    } else if (type.resolvePrecision) {
-      param.precision = type.resolvePrecision(parameter);
-    }
-
-    if (parameter.scale) {
-      param.scale = parameter.scale;
-    } else if (type.resolveScale) {
-      param.scale = type.resolveScale(parameter);
-    }
-
-    if (this.collation) {
-      param.collation = this.collation;
-    }
-
-    yield type.generateTypeInfo(param, this.options);
-    yield type.generateParameterLength(param, this.options);
     try {
-      yield * type.generateParameterData(param, this.options);
+      writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
+      writeValue(parameter.type, buffer, parameter.data, this.options);
     } catch (error) {
       throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
     }
+
+    // Large values are referenced by the buffer rather than copied; handing
+    // out its chunks keeps them that way.
+    yield * buffer.getBuffers();
   }
 }
 

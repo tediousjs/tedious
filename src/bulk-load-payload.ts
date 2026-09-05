@@ -1,6 +1,7 @@
 import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';
+import { writeValue } from './data-type';
 
 export type Row = unknown[] | { [colName: string]: unknown };
 
@@ -158,10 +159,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
               buffer.writeBuffer(textPointerAndTimestampBuffer);
             }
 
-            buffer.writeBuffer(c.type.generateParameterLength(parameter, options));
-            for (const chunk of c.type.generateParameterData(parameter, options)) {
-              buffer.writeBuffer(chunk);
-            }
+            writeValue(c.type, buffer, parameter, options);
           }
 
           // Checked after every cell, not only after every row, so that a

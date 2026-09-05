@@ -41,7 +41,7 @@ import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
-import { type Parameter, TYPES } from './data-type';
+import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -2705,6 +2705,13 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * @private
+   */
+  resolveRequestParameter(parameter: Parameter): ResolvedParameter {
+    return resolveParameter(parameter, this.databaseCollation, this.config.options);
+  }
+
+  /**
    *  Execute the SQL represented by [[Request]].
    *
    * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
@@ -2721,7 +2728,7 @@ class Connection extends EventEmitter {
    */
   execSql(request: Request) {
     try {
-      request.validateParameters(this.databaseCollation);
+      request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
       request.error = error;
 
@@ -2733,9 +2740,9 @@ class Connection extends EventEmitter {
       return;
     }
 
-    const parameters: Parameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'statement',
       value: request.sqlTextOrProcedure,
@@ -2743,10 +2750,10 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
     if (request.parameters.length) {
-      parameters.push({
+      parameters.push(this.resolveRequestParameter({
         type: TYPES.NVarChar,
         name: 'params',
         value: request.makeParamsParameter(request.parameters),
@@ -2754,12 +2761,12 @@ class Connection extends EventEmitter {
         length: undefined,
         precision: undefined,
         scale: undefined
-      });
+      }));
 
-      parameters.push(...request.parameters);
+      parameters.push(...request.resolvedParameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2902,9 +2909,9 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type. Parameter values are ignored.
    */
   prepare(request: Request) {
-    const parameters: Parameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: 'handle',
       value: undefined,
@@ -2912,9 +2919,9 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'params',
       value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
@@ -2922,9 +2929,9 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'stmt',
       value: request.sqlTextOrProcedure,
@@ -2932,7 +2939,7 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
     request.preparing = true;
 
@@ -2945,7 +2952,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2956,9 +2963,9 @@ class Connection extends EventEmitter {
    *   Parameter values are ignored.
    */
   unprepare(request: Request) {
-    const parameters: Parameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: 'handle',
       // TODO: Abort if `request.handle` is not set
@@ -2967,9 +2974,9 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2982,9 +2989,9 @@ class Connection extends EventEmitter {
    *   request is executed.
    */
   execute(request: Request, parameters?: { [key: string]: unknown }) {
-    const executeParameters: Parameter[] = [];
+    const executeParameters: ResolvedParameter[] = [];
 
-    executeParameters.push({
+    executeParameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: '',
       // TODO: Abort if `request.handle` is not set
@@ -2993,16 +3000,16 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
     try {
       for (let i = 0, len = request.parameters.length; i < len; i++) {
         const parameter = request.parameters[i];
 
-        executeParameters.push({
+        executeParameters.push(this.resolveRequestParameter({
           ...parameter,
-          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
-        });
+          value: parameters ? parameters[parameter.name] : null
+        }));
       }
     } catch (error: any) {
       request.error = error;
@@ -3015,7 +3022,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -3025,7 +3032,7 @@ class Connection extends EventEmitter {
    */
   callProcedure(request: Request) {
     try {
-      request.validateParameters(this.databaseCollation);
+      request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
       request.error = error;
 
@@ -3037,7 +3044,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**

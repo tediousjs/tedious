@@ -4,7 +4,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter } from './data-type';
+import { type DataType, type Parameter, writeTypeInfo } from './data-type';
 import { Collation } from './collation';
 
 /**
@@ -441,7 +441,7 @@ class BulkLoad extends EventEmitter {
       tBuf.writeUInt16LE(flags);
 
       // TYPE_INFO
-      tBuf.writeBuffer(c.type.generateTypeInfo(c, this.options));
+      writeTypeInfo(c.type, tBuf, c, this.options);
 
       // TableName
       if (c.type.hasTableName) {
