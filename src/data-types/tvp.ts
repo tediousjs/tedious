@@ -5,6 +5,8 @@ import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { isAsyncIterable } from './plp-stream';
 
+const TVP_TYPE_ID = 0xF3;
+
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
 const TVP_END_TOKEN = Buffer.from([0x00]);
 
@@ -33,6 +35,23 @@ interface TvpValue {
   rows: TvpRow[] | AsyncIterable<TvpRow>;
 }
 
+function validateTable(value: unknown): TvpValue | null {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value !== 'object' || !Array.isArray((value as TvpValue).columns)) {
+    throw new TypeError('Invalid table.');
+  }
+
+  const rows = (value as TvpValue).rows;
+  if (!Array.isArray(rows) && !isAsyncIterable(rows)) {
+    throw new TypeError('Invalid table.');
+  }
+
+  return value as TvpValue;
+}
+
 function validateRow(columns: TvpColumn[], row: TvpRow, rowIndex: number, collation: Collation | undefined): TvpRow {
   if (!Array.isArray(row)) {
     throw new InputError(`TVP row at index ${rowIndex} is not an array`);
@@ -58,11 +77,19 @@ function validateRow(columns: TvpColumn[], row: TvpRow, rowIndex: number, collat
   return validated;
 }
 
-function writeColumnMetadata(buffer: WritableTrackingBuffer, value: TvpValue, options: InternalConnectionOptions) {
-  const { columns } = value;
+function writeTvpTypeInfo(buffer: WritableTrackingBuffer, value: TvpValue | null) {
+  buffer.writeUInt8(TVP_TYPE_ID);
+  // DbName
+  buffer.writeBVarchar('', 'ucs2');
+  // OwningSchema
+  buffer.writeBVarchar(value?.schema ?? '', 'ucs2');
+  // TypeName
+  buffer.writeBVarchar(value?.name ?? '', 'ucs2');
+}
 
-  buffer.writeUInt16LE(columns.length);
-
+// The column metadata after the column count: one entry per column, then
+// the end token.
+function writeColumns(buffer: WritableTrackingBuffer, columns: TvpColumn[], options: InternalConnectionOptions) {
   for (let i = 0, len = columns.length; i < len; i++) {
     const column = columns[i];
 
@@ -77,6 +104,11 @@ function writeColumnMetadata(buffer: WritableTrackingBuffer, value: TvpValue, op
   }
 
   buffer.writeBuffer(TVP_END_TOKEN);
+}
+
+function writeColumnMetadata(buffer: WritableTrackingBuffer, value: TvpValue, options: InternalConnectionOptions) {
+  buffer.writeUInt16LE(value.columns.length);
+  writeColumns(buffer, value.columns, options);
 }
 
 function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], row: TvpRow, options: InternalConnectionOptions) {
@@ -123,7 +155,7 @@ async function * writeRowsFrom(buffer: WritableTrackingBuffer, value: TvpValue, 
 }
 
 const TVP: DataType = {
-  id: 0xF3,
+  id: TVP_TYPE_ID,
   type: 'TVPTYPE',
   name: 'TVP',
 
@@ -133,149 +165,67 @@ const TVP: DataType = {
     return schema + value.name + ' readonly';
   },
 
+  // The legacy serialization methods below are still required by the
+  // `DataType` interface. They write the same bytes as `writeTypeInfo` and
+  // `writeValueStream` through the same helpers, for rows given as an array.
+
   generateTypeInfo(parameter) {
-    const databaseName = '';
-    const schema = parameter.value?.schema ?? '';
-    const typeName = parameter.value?.name ?? '';
-
     const buffer = new WritableTrackingBuffer();
-    buffer.writeUInt8(this.id);
-    buffer.writeBVarchar(databaseName, 'ucs2');
-    buffer.writeBVarchar(schema, 'ucs2');
-    buffer.writeBVarchar(typeName, 'ucs2');
-
+    writeTvpTypeInfo(buffer, parameter.value as TvpValue | null);
     return buffer.data;
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
+  generateParameterLength(parameter) {
+    const value = parameter.value as TvpValue | null;
+    if (value == null) {
       return NULL_LENGTH;
     }
 
-    const { columns } = parameter.value;
     const buffer = Buffer.alloc(2);
-    buffer.writeUInt16LE(columns.length, 0);
+    buffer.writeUInt16LE(value.columns.length, 0);
     return buffer;
   },
 
   *generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+    const value = parameter.value as TvpValue | null;
+    if (value == null) {
       yield TVP_END_TOKEN;
       yield TVP_END_TOKEN;
       return;
     }
 
-    const { columns, rows } = parameter.value;
-
-    for (let i = 0, len = columns.length; i < len; i++) {
-      const column = columns[i];
-
-      const buff = Buffer.alloc(6);
-      // UserType
-      buff.writeUInt32LE(0x00000000, 0);
-
-      // Flags
-      buff.writeUInt16LE(0x0000, 4);
-      yield buff;
-
-      // TYPE_INFO
-      yield column.type.generateTypeInfo(column);
-
-      // ColName
-      yield Buffer.from([0x00]);
+    if (!Array.isArray(value.rows)) {
+      throw new TypeError('A TVP whose rows are an async iterable can only be written through writeValueStream.');
     }
 
-    yield TVP_END_TOKEN;
-
-    for (let i = 0, length = rows.length; i < length; i++) {
-      yield TVP_ROW_TOKEN;
-
-      const row = rows[i];
-      for (let k = 0, len2 = row.length; k < len2; k++) {
-        const column = columns[k];
-        const value = row[k];
-
-        let paramValue;
-        try {
-          paramValue = column.type.validate(value, parameter.collation);
-        } catch (error) {
-          throw new InputError(`TVP column '${column.name}' has invalid data at row index ${i}`, { cause: error });
-        }
-
-        const param = {
-          value: paramValue,
-          length: column.length,
-          scale: column.scale,
-          precision: column.precision
-        };
-
-        // TvpColumnData
-        yield column.type.generateParameterLength(param, options);
-        yield * column.type.generateParameterData(param, options);
-      }
+    const buffer = new WritableTrackingBuffer();
+    writeColumns(buffer, value.columns, options);
+    for (let i = 0, len = value.rows.length; i < len; i++) {
+      writeRow(buffer, value.columns, validateRow(value.columns, value.rows[i], i, parameter.collation), options);
     }
+    buffer.writeBuffer(TVP_END_TOKEN);
 
-    yield TVP_END_TOKEN;
+    yield * buffer.getBuffers();
   },
 
-  validate: function(value): Buffer | null {
-    if (value == null) {
-      return null;
-    }
-
-    if (typeof value !== 'object') {
-      throw new TypeError('Invalid table.');
-    }
-
-    if (!Array.isArray(value.columns)) {
-      throw new TypeError('Invalid table.');
-    }
-
-    if (!Array.isArray(value.rows)) {
-      throw new TypeError('Invalid table.');
-    }
-
-    return value;
+  validate(value) {
+    return validateTable(value);
   },
 
   resolve(parameter, collation) {
-    const value = parameter.value as TvpValue | null | undefined;
-
     // A TVP always serializes through `writeValueStream` (it has no
     // synchronous `writeValue`), whether its rows are an array or an async
     // iterable, so it is always `streamed`.
-    const data: ParameterData<TvpValue | null> = { value: null, streamed: true };
+    const data: ParameterData<TvpValue | null> = { value: validateTable(parameter.value), streamed: true };
     if (collation) {
       data.collation = collation;
     }
-
-    if (value == null) {
-      return data;
-    }
-
-    if (typeof value !== 'object' || !Array.isArray(value.columns)) {
-      throw new TypeError('Invalid table.');
-    }
-
-    if (!Array.isArray(value.rows) && !isAsyncIterable(value.rows)) {
-      throw new TypeError('Invalid table.');
-    }
-
-    data.value = value;
 
     return data;
   },
 
   writeTypeInfo(buffer, parameter) {
-    const value = parameter.value as TvpValue | null;
-
-    buffer.writeUInt8(this.id);
-    // DbName
-    buffer.writeBVarchar('', 'ucs2');
-    // OwningSchema
-    buffer.writeBVarchar(value?.schema ?? '', 'ucs2');
-    // TypeName
-    buffer.writeBVarchar(value?.name ?? '', 'ucs2');
+    writeTvpTypeInfo(buffer, parameter.value as TvpValue | null);
   },
 
   async * writeValueStream(buffer, parameter, options) {
