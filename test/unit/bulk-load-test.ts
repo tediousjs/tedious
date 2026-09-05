@@ -116,6 +116,27 @@ describe('BulkLoad', function() {
       assert.instanceOf(error, InputError);
       assert.isTrue(closed);
     });
+
+    it('closes the row source when a row value cannot be serialized', async function() {
+      let closed = false;
+      const rows = (function*() {
+        try {
+          yield [null];
+          yield [null];
+        } finally {
+          closed = true;
+        }
+      })();
+
+      const error = await writeRow(buildType({
+        generateParameterLength() {
+          throw new RangeError('out of range');
+        }
+      }), rows);
+
+      assert.instanceOf(error, InputError);
+      assert.isTrue(closed);
+    });
   });
 
   describe('row serialization', function() {
