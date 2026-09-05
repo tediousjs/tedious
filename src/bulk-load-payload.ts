@@ -264,7 +264,8 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // synchronously; a stream that failed earlier emits nothing more),
     // which is the only signal from a stream created with
     // `emitClose: false`.
-    const stream = this.rows as { destroy?: () => void, closed?: boolean, errored?: Error | null };
+    type Destroy = (this: unknown, err: Error | null, callback: (err?: Error | null) => void) => void;
+    const stream = this.rows as { destroy?: () => void, _destroy?: Destroy, closed?: boolean, errored?: Error | null };
     if (this.rows instanceof Stream && typeof stream.destroy === 'function') {
       const destroyed = () => {
         emitter.removeListener('close', destroyed);
@@ -278,20 +279,44 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       emitter.on('close', destroyed);
       emitter.on('error', destroyed);
 
+      // `destroy` runs the stream's `_destroy`, and once that has called
+      // back emits `'error'` and `'close'` on the next tick, or nothing
+      // at all for a stream created with `emitClose: false` whose
+      // `_destroy` succeeds. That callback is the one signal every stream
+      // gives, so it is watched for the length of this `destroy` call
+      // (which is when Node takes `_destroy` up), and the listeners come
+      // off a turn after it, once anything the stream emits about the
+      // destruction has been emitted.
+      const original = stream._destroy;
+      if (typeof original === 'function') {
+        stream._destroy = function(err, callback) {
+          original.call(this, err, (error) => {
+            callback(error);
+            setImmediate(destroyed);
+          });
+        };
+      }
+
       try {
         stream.destroy();
       } catch {
         destroyed();
         return;
+      } finally {
+        if (typeof original === 'function') {
+          stream._destroy = original;
+        }
       }
 
+      // A stream destroyed before this does not run `_destroy` again.
+      // Closed already, it emits nothing more, except the `'error'` of a
+      // destruction with an error on this very tick, which is about to
+      // be emitted, so the guard is kept for one more turn then. (Still
+      // closing, it is waited for through its events, as above.)
       if (stream.closed === true) {
         if (stream.errored == null) {
           destroyed();
         } else {
-          // Destroyed with an error before this, on this very tick or
-          // long ago: its `'error'` is either about to be emitted or was
-          // emitted already, so the guard is kept for one more turn.
           setImmediate(destroyed);
         }
       }
