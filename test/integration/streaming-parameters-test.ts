@@ -114,6 +114,34 @@ describe('streaming parameters', function() {
     });
   });
 
+  it('streams a varbinary(max) value through a prepared statement', function(done) {
+    // `execute` resolves its parameters from the values given to it, so a
+    // streamed value reaches the prepared statement the same way it
+    // reaches `execSql`.
+    const value = randomBytes(100_000);
+    let result: unknown;
+
+    const request = new Request('select @param', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.instanceOf(result, Buffer);
+      assert.strictEqual(Buffer.compare(result as Buffer, value), 0);
+      done();
+    });
+    request.addParameter('param', TYPES.VarBinary, undefined, { length: Infinity });
+    request.on('row', (columns) => {
+      result = columns[0].value;
+    });
+
+    request.on('prepared', () => {
+      connection.execute(request, { param: chunked(value, [1, 0, 4_097, 20_000, 3]) });
+    });
+
+    connection.prepare(request);
+  });
+
   it('fails the request when the source throws, and leaves the connection usable', function(done) {
     const cause = new Error('source failed');
 

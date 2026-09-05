@@ -259,6 +259,19 @@ describe('streaming parameters', function() {
     assert.deepEqual(fromAsync, fromArray);
   });
 
+  it('serializes a TVP from an empty async iterable exactly as from an empty array', async function() {
+    const columns = [
+      { name: 'id', type: TYPES.Int },
+      { name: 'name', type: TYPES.NVarChar, length: 20 }
+    ];
+    const table = { name: 'T', columns, rows: [] };
+    const streamedTable = { name: 'T', columns, rows: from([]) };
+
+    const fromArray = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.TVP, value: table }), collation, options)], txnDescriptor, options));
+    const fromAsync = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.TVP, value: streamedTable }), collation, options)], txnDescriptor, options));
+    assert.deepEqual(fromAsync, fromArray);
+  });
+
   describe('invariants', function() {
     it('rejects a streamed varchar without a collation when the parameter is resolved', function() {
       assert.throws(() => {
