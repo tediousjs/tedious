@@ -2861,6 +2861,10 @@ class Connection extends EventEmitter {
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
     });
 
+    // Cancels the `INSERT BULK` statement while it is in flight. The
+    // payload has its own listener, from its creation until its rows have
+    // been read, to abandon a row read that is pending when the bulk load
+    // is canceled while the rows are being sent.
     bulkLoad.once('cancel', onCancel);
 
     this.execSqlBatch(request);

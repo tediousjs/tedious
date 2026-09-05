@@ -204,8 +204,11 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       }
     }
 
-    // A stream's iterator only takes effect once it has been pulled, so
-    // the stream itself is destroyed to release what it holds open. Only
+    // A stream's iterator only takes effect once it has been pulled (a
+    // `Readable` sets its iterator up, and destroys the stream when that
+    // iterator is returned, in the first `next()`), so the stream itself
+    // is destroyed to release what it holds open. The unit test that
+    // closes a `Readable` unread pins this against a change in Node. Only
     // an emitter is taken for a stream, and its `destroy` is as best
     // effort as the `return` above. The error guard stays on until the
     // stream has finished destroying itself, since its `_destroy` may

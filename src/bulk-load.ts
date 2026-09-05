@@ -523,16 +523,15 @@ class BulkLoad extends EventEmitter {
    *
    * A row that fails validation or serialization ends the iteration with
    * that error; nothing written for it (or for rows still coalescing with
-   * it) is yielded. The row source is closed either way. `abort`, when
-   * given, is raced against every pending row read, so that a source
-   * that signals failure out of band (an `'error'` event) while a read
-   * is pending ends the iteration too instead of hanging it, and a
-   * consumer that stops early does not wait for the source to close once
-   * the bulk load is aborted.
+   * it) is yielded. The row source is closed either way. `abort` is raced
+   * against every pending row read, so that a source that signals failure
+   * out of band (an `'error'` event) while a read is pending ends the
+   * iteration too instead of hanging it, and a consumer that stops early
+   * does not wait for the source to close once the bulk load is aborted.
    *
    * @private
    */
-  async *serializeRows(iterator: RowSource, abort?: Promise<never>): AsyncGenerator<Buffer, void, undefined> {
+  async *serializeRows(iterator: RowSource, abort: Promise<never>): AsyncGenerator<Buffer, void, undefined> {
     const buffer = new WritableTrackingBuffer();
     const options = this.options;
     const columns = this.columns;
@@ -566,7 +565,7 @@ class BulkLoad extends EventEmitter {
 
           idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
 
-          const winner = await Promise.race(abort === undefined ? [read, idle] : [read, idle, abort]);
+          const winner = await Promise.race([read, idle, abort]);
           if (winner === IDLE) {
             idle = undefined;
 
@@ -577,7 +576,7 @@ class BulkLoad extends EventEmitter {
               buffer.consume(buffer.length);
             }
 
-            result = await (abort === undefined ? read : Promise.race([read, abort]));
+            result = await Promise.race([read, abort]);
           } else {
             result = winner;
           }
@@ -662,7 +661,7 @@ class BulkLoad extends EventEmitter {
           // and its source may be stuck in a read (an async generator
           // queues `return()` behind it), so the wait could never end.
           const closing = iterator.return();
-          if (abort === undefined || !isPromiseLike(closing)) {
+          if (!isPromiseLike(closing)) {
             await closing;
           } else {
             const settled = Promise.resolve(closing);
