@@ -451,7 +451,9 @@ class Request extends EventEmitter {
    *   would encode it, so a chunk must not end halfway through a UTF-16
    *   surrogate pair. Text that Node.js decoded from UTF-8 (a `Readable` with
    *   `encoding: 'utf8'`, `readline`, `TextDecoder`) never does; a string
-   *   sliced by index can.
+   *   sliced by index can. A `Buffer` chunk of 8 KB or more is sent by
+   *   reference, as `socket.write` would send it, so a source must not reuse
+   *   or modify a buffer it has yielded until the request has completed.
    *
    * @param options
    *   Additional type options. Optional.
