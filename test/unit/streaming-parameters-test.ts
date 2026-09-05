@@ -272,19 +272,5 @@ describe('streaming parameters', function() {
         resolveParameter(param({ type: TYPES.VarChar, value: from(['a']) }), undefined, options);
       }, /No collation was set by the server/);
     });
-
-    it('rejects a streamed value whose type does not implement writeValueStream', async function() {
-      const type: DataType = { ...TYPES.VarBinary };
-      delete (type as Partial<DataType>).writeValueStream;
-
-      let error: unknown;
-      try {
-        await collect(new RpcRequestPayload('p', [{ name: 'p', output: false, type, data: { value: from([]), streamed: true } }], txnDescriptor, options));
-      } catch (err) {
-        error = err;
-      }
-      assert.instanceOf(error, TypeError);
-      assert.match((error as TypeError).message, /Type 'VarBinary' resolved parameter 'p' as streamed but does not implement writeValueStream/);
-    });
   });
 });

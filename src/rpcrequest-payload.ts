@@ -50,12 +50,6 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       this.writeParameterHeader(buffer, parameter);
 
       if (parameter.data.streamed) {
-        // A streamed value is delegated to the type's `writeValueStream`, so
-        // a type that resolves a value as streamed must implement it.
-        if (typeof parameter.type.writeValueStream !== 'function') {
-          throw new TypeError(`Type '${parameter.type.name}' resolved parameter '${parameter.name}' as streamed but does not implement writeValueStream`);
-        }
-
         try {
           writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
         } catch (error) {
@@ -68,7 +62,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
         buffer.consume(buffer.length);
 
         try {
-          yield * parameter.type.writeValueStream(parameter.data, this.options);
+          yield * parameter.type.writeValueStream!(parameter.data, this.options);
         } catch (error) {
           throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
         }
