@@ -1067,6 +1067,52 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('close'), 0);
     });
 
+    it('keeps guarding the iterator of a stream closed unread whose destruction reports twice', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The destruction is reported both through `destroy`'s callback
+      // and through `'close'`, while the iterator is still closing and
+      // about to report a failure; that guard must stay on.
+      let returned = false;
+      class Source extends Stream {
+        destroy(_error?: Error, callback?: (error?: Error | null) => void) {
+          callback?.();
+          process.nextTick(() => { this.emit('close'); });
+        }
+
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => Promise.resolve({ done: false, value: [1] }),
+            return: () => {
+              return new Promise<IteratorResult<unknown[]>>((resolve) => {
+                setImmediate(() => {
+                  setImmediate(() => {
+                    this.emit('error', new Error('cleanup failed'));
+                    returned = true;
+                    resolve({ done: true, value: undefined });
+                  });
+                });
+              });
+            }
+          };
+        }
+      }
+      const source = new Source();
+
+      new BulkLoadPayload(request, source).close();
+      await new Promise((resolve) => setImmediate(resolve));
+      // Destroyed, and reported twice: the iterator's guard is still on.
+      assert.isFalse(returned);
+      assert.strictEqual(source.listenerCount('close'), 0);
+      assert.strictEqual(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(returned);
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
     it('takes everything of its own off a stream closed unread that finishes destroying itself silently', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });

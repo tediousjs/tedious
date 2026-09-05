@@ -261,7 +261,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // `emitClose: false`.
     const stream = this.rows as { destroy?: (err?: Error, callback?: (err?: Error | null) => void) => void, destroyed?: boolean, closed?: boolean, errored?: Error | null };
     if (this.rows instanceof Stream && typeof stream.destroy === 'function') {
+      // Once only: it may be reached both through `destroy`'s callback
+      // and through `'close'`, and a second pass would take off the
+      // `ignoreError` that guards the iterator's own close, if that is
+      // still running.
+      let done = false;
       const destroyed = () => {
+        if (done) {
+          return;
+        }
+        done = true;
         emitter.removeListener('close', destroyed);
         emitter.removeListener('error', destroyed);
         emitter.removeListener('error', ignoreError);
