@@ -70,6 +70,13 @@ export interface ParameterData<T = any> {
   collation?: Collation | undefined;
 
   value: T;
+
+  /**
+   * Whether `value` is a source that is read while the parameter is being
+   * written (see `DataType.writeValueStream`) rather than a value that is
+   * fully in memory.
+   */
+  streamed?: boolean | undefined;
 }
 
 export interface DataType {
@@ -113,6 +120,19 @@ export interface DataType {
    * Writes the value of a resolved parameter (length prefix and data).
    */
   writeValue?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
+
+  /**
+   * Writes the value of a resolved parameter whose data is not fully in
+   * memory (`parameter.streamed`): yields the length prefix and data as
+   * buffers, in chunks of the type's choosing, reading the value's source
+   * as it goes. A synchronous source (e.g. an array of rows) may be written
+   * by a synchronous iterable, an asynchronous one by an async iterable.
+   *
+   * A large buffer (`CHUNK_SIZE` or more) is referenced rather than copied,
+   * so a source must not reuse or mutate a buffer it has yielded until the
+   * request has been sent.
+   */
+  writeValueStream?(parameter: ParameterData, options: InternalConnectionOptions): Iterable<Buffer> | AsyncIterable<Buffer>;
 }
 
 /**

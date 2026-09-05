@@ -1,6 +1,7 @@
 import iconv from 'iconv-lite';
 
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import { isAsyncIterable, writePlpStream } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -8,6 +9,42 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+// Re-chunks a string source so that a UTF-16 surrogate pair is never split
+// across chunks. An async source may yield the halves of a surrogate pair in
+// separate chunks; encoding each half on its own (e.g. as UTF-8) would corrupt
+// the character, so a trailing lone high surrogate is carried into the next
+// chunk. The result is byte-identical to encoding the whole string at once.
+async function * stitchSurrogates(source: AsyncIterable<unknown>): AsyncGenerator<string, void> {
+  let pending = '';
+
+  for await (const chunk of source) {
+    if (typeof chunk !== 'string') {
+      throw new TypeError('Invalid string.');
+    }
+
+    let value = pending + chunk;
+    pending = '';
+
+    // Only a trailing *high* surrogate needs to be held back: a lone low
+    // surrogate is already invalid on its own, and encodes identically
+    // whether or not it is split from a preceding high surrogate.
+    const lastCode = value.charCodeAt(value.length - 1);
+    if (value.length > 0 && lastCode >= 0xD800 && lastCode <= 0xDBFF) {
+      pending = value[value.length - 1];
+      value = value.slice(0, -1);
+    }
+
+    if (value.length > 0) {
+      yield value;
+    }
+  }
+
+  // A dangling high surrogate is encoded as it would be in the whole string.
+  if (pending) {
+    yield pending;
+  }
+}
 
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
@@ -17,6 +54,10 @@ const VarChar: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as Buffer | null;
+
+    if (isAsyncIterable(value)) {
+      return 'varchar(max)';
+    }
 
     let length;
     if (parameter.length) {
@@ -125,6 +166,46 @@ const VarChar: { maximumLength: number } & DataType = {
     }
 
     return iconv.encode(value, collation.codepage);
+  },
+
+  resolve(parameter, collation) {
+    if (isAsyncIterable(parameter.value)) {
+      // Read from its source while the request is written, and sent as
+      // `varchar(max)` since its length is not known up front. The chunks
+      // are encoded as they arrive, so the collation is checked here, as
+      // `validate` does for an in-memory value, rather than once the
+      // request is already being written.
+      if (!collation) {
+        throw new Error('No collation was set by the server for the current connection.');
+      }
+
+      if (!collation.codepage) {
+        throw new Error('The collation set by the server has no associated encoding.');
+      }
+
+      return { value: parameter.value, length: MAX, streamed: true, collation };
+    }
+
+    const value = this.validate(parameter.value, collation);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    if (collation) {
+      data.collation = collation;
+    }
+    return data;
+  },
+
+  writeValueStream(parameter) {
+    const collation = parameter.collation;
+    if (!collation) {
+      throw new Error('No collation was set by the server for the current connection.');
+    }
+    if (!collation.codepage) {
+      throw new Error('The collation set by the server has no associated encoding.');
+    }
+    const codepage = collation.codepage;
+
+    return writePlpStream(stitchSurrogates(parameter.value as AsyncIterable<unknown>), (chunk) => iconv.encode(chunk as string, codepage));
   }
 };
 

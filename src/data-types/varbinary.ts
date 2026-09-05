@@ -1,4 +1,5 @@
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import { isAsyncIterable, writePlpStream } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -15,6 +16,10 @@ const VarBinary: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    if (isAsyncIterable(value)) {
+      return 'varbinary(max)';
+    }
+
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -167,6 +172,29 @@ const VarBinary: { maximumLength: number } & DataType = {
       throw new TypeError('Invalid buffer.');
     }
     return value;
+  },
+
+  resolve(parameter) {
+    if (isAsyncIterable(parameter.value)) {
+      // The value is read from its source while the request is written. Its
+      // length is not known up front, so it is sent as `varbinary(max)`;
+      // an explicitly specified `length` is deliberately overridden.
+      return { value: parameter.value, length: MAX, streamed: true };
+    }
+
+    const value = this.validate(parameter.value, undefined);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    return data;
+  },
+
+  writeValueStream(parameter) {
+    return writePlpStream(parameter.value as AsyncIterable<unknown>, (chunk) => {
+      if (!Buffer.isBuffer(chunk)) {
+        throw new TypeError('Invalid buffer.');
+      }
+      return chunk;
+    });
   }
 };
 

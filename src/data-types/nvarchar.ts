@@ -1,4 +1,5 @@
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import { isAsyncIterable, writePlpStream } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -16,6 +17,10 @@ const NVarChar: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
+    if (isAsyncIterable(value)) {
+      return 'nvarchar(max)';
+    }
 
     let length;
     if (parameter.length) {
@@ -191,6 +196,35 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
 
     return value;
+  },
+
+  resolve(parameter, collation) {
+    if (isAsyncIterable(parameter.value)) {
+      // Read from its source while the request is written, and sent as
+      // `nvarchar(max)` since its length is not known up front.
+      const data: ParameterData = { value: parameter.value, length: MAX, streamed: true };
+      if (collation) {
+        data.collation = collation;
+      }
+      return data;
+    }
+
+    const value = this.validate(parameter.value, collation);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    if (collation) {
+      data.collation = collation;
+    }
+    return data;
+  },
+
+  writeValueStream(parameter) {
+    return writePlpStream(parameter.value as AsyncIterable<unknown>, (chunk) => {
+      if (typeof chunk !== 'string') {
+        throw new TypeError('Invalid string.');
+      }
+      return Buffer.from(chunk, 'ucs2');
+    });
   }
 };
 
