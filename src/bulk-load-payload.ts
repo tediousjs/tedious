@@ -160,6 +160,10 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         yield chunk;
       }
 
+      // An error the source emits after its last row, even once the
+      // final chunk (DONE) is with the consumer, still fails the bulk
+      // load: a source that fails at all fails it, and the message it
+      // ends can still be marked ignored by the server.
       if (this.sourceError !== undefined) {
         throw this.sourceError;
       }
@@ -256,6 +260,9 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         emitter.removeListener('error', destroyed);
         emitter.removeListener('error', ignoreError);
       };
+      // Its own `ignoreError` next to the one `guardWhileClosing` may
+      // have added: each is taken off once, by its own signal, and the
+      // emitter stays guarded until both are gone.
       emitter.on('error', ignoreError);
       emitter.on('close', destroyed);
       emitter.on('error', destroyed);

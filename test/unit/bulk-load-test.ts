@@ -448,6 +448,38 @@ describe('BulkLoad', function() {
       assert.lengthOf(chunks, 0);
     });
 
+    it('surfaces an error an event-emitting source emits once its last chunk is with the consumer', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+        }
+      }
+      const source = new Source();
+      const iterator = new BulkLoadPayload(request, source)[Symbol.asyncIterator]();
+
+      // The one row and DONE come out together.
+      const last = await iterator.next();
+      assert.isFalse(last.done);
+      assert.strictEqual(last.value[last.value.length - 13], 0xFD);
+
+      // The error arrives after that; the bulk load still ends with it
+      // (the message it ends can still be marked ignored).
+      const expected = new Error('source broke after the end');
+      source.emit('error', expected);
+
+      let error;
+      try {
+        await iterator.next();
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
     it('ends the bulk load when an event-emitting source fails while a row read is pending', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
@@ -797,6 +829,56 @@ describe('BulkLoad', function() {
 
       // The source can be handed to another bulk load without listeners piling up.
       await collect(new BulkLoadPayload(request, source));
+      assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
+    it('keeps guarding a source closed unread until both its iterator and its destruction have finished', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // Both the iterator's `return()` and `destroy` finish later, on
+      // different ticks; the guard must outlast the slower one.
+      let returned = false;
+      let closed = false;
+      class Source extends EventEmitter {
+        destroy() {
+          setImmediate(() => {
+            closed = true;
+            this.emit('close');
+          });
+        }
+
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => Promise.resolve({ done: false, value: [1] }),
+            return: () => {
+              return new Promise<IteratorResult<unknown[]>>((resolve) => {
+                setImmediate(() => {
+                  setImmediate(() => {
+                    returned = true;
+                    this.emit('error', new Error('cleanup failed'));
+                    resolve({ done: true, value: undefined });
+                  });
+                });
+              });
+            }
+          };
+        }
+      }
+      const source = new Source();
+
+      new BulkLoadPayload(request, source).close();
+      assert.isAtLeast(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(closed);
+      assert.isFalse(returned);
+      // Destroyed, but the iterator is still closing: still guarded.
+      assert.isAtLeast(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(returned);
       assert.strictEqual(source.listenerCount('error'), 0);
     });
 
