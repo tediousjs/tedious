@@ -4,7 +4,8 @@ import { EventEmitter } from 'events';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import { RequestError } from '../../src/errors';
-import { type InternalConnectionOptions } from '../../src/connection';
+import Connection, { type InternalConnectionOptions } from '../../src/connection';
+import { type Request } from '../../src/tedious';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { typeByName as TYPES, type DataType } from '../../src/data-type';
 
@@ -929,6 +930,35 @@ describe('BulkLoad', function() {
   it('starts out as not being canceled', function() {
     const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
     assert.strictEqual(request.canceled, false);
+  });
+
+  describe('#execBulkLoad', function() {
+    it('releases the row source when the connection is not logged in by the time the rows would be sent', function(done) {
+      // Never connected, so it is not logged in when the `INSERT BULK`
+      // statement's callback runs; `makeRequest` rejects the bulk load
+      // without reading its rows, and the source must not be left open.
+      const connection = new Connection({ server: 'localhost', options: {} });
+      connection.execSqlBatch = (request: Request) => {
+        process.nextTick(() => { request.callback(undefined); });
+      };
+
+      const source = new Readable({ objectMode: true, read() {} });
+      const bulkLoad = connection.newBulkLoad('tablename', (err: any) => {
+        try {
+          assert.instanceOf(err, RequestError);
+          assert.strictEqual(err.code, 'EINVALIDSTATE');
+          assert.isTrue(source.destroyed);
+          assert.strictEqual(bulkLoad.listenerCount('cancel'), 0);
+          done();
+        } catch (assertion) {
+          done(assertion);
+        }
+      });
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+      connection.execBulkLoad(bulkLoad, source);
+      assert.isFalse(source.destroyed);
+    });
   });
 
   describe('#cancel', function() {

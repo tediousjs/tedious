@@ -2,6 +2,8 @@ import { EventEmitter } from 'events';
 import BulkLoad, { type Row, type RowSource } from './bulk-load';
 import { RequestError } from './errors';
 
+// Kept local: `bulk-load.ts` ends with a `module.exports` assignment for
+// its default export, which leaves it no named runtime exports.
 function ignoreError() {}
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
