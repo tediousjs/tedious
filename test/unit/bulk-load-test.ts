@@ -189,36 +189,6 @@ describe('BulkLoad', function() {
       assert.isTrue(closed);
     });
 
-    it('hands what it has downstream once the row source goes idle', async function() {
-      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
-      request.addColumn('id', TYPES.Int, { nullable: false });
-
-      let resumed = false;
-      const payload = new BulkLoadPayload(request, (async function*() {
-        yield [1];
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        resumed = true;
-        yield [2];
-      })());
-
-      const iterator = payload[Symbol.asyncIterator]();
-
-      // The first row is far smaller than a chunk; it still goes downstream
-      // as soon as the source is waiting, before it produces the next row.
-      const first = await iterator.next();
-      assert.isFalse(first.done);
-      assert.isFalse(resumed);
-      assert.strictEqual(first.value![0], 0x81);
-
-      const chunks = [first.value!];
-      for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
-        chunks.push(chunk);
-      }
-      assert.isTrue(resumed);
-      const data = Buffer.concat(chunks);
-      assert.strictEqual(data[data.length - 13], 0xFD);
-    });
-
     it('serializes rows from a synchronous source without touching the event loop', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
@@ -381,18 +351,6 @@ describe('BulkLoad', function() {
       const rows = [Promise.resolve([1, 'one']), { id: 2, name: null }, Promise.resolve([3, 'three'])] as unknown as Iterable<unknown[]>;
       const promised = Buffer.concat(await collect(new BulkLoadPayload(request, rows)));
       assert.deepEqual(promised, plain);
-    });
-
-    it('hands what it has downstream while a promised row is pending', async function() {
-      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
-      request.addColumn('id', TYPES.Int, { nullable: false });
-
-      const rows = [[1], new Promise<unknown[]>(() => {})] as unknown as Iterable<unknown[]>;
-      const iterator = new BulkLoadPayload(request, rows)[Symbol.asyncIterator]();
-      const first = await iterator.next();
-      assert.isFalse(first.done);
-      // COLMETADATA, then the row: ROW, and the int with its length.
-      assert.deepEqual(first.value.subarray(-6), Buffer.from([0xD1, 0x04, 0x01, 0x00, 0x00, 0x00]));
     });
 
     it('fails the bulk load with the rejection of a promised row, and closes the source', async function() {

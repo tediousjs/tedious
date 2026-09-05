@@ -135,8 +135,6 @@ const textPointerNullBuffer = Buffer.from([0x00]);
 
 type Row = unknown[] | { [colName: string]: unknown };
 
-const IDLE = Symbol('idle');
-
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
   return value != null && typeof (value as PromiseLike<T>).then === 'function';
 }
@@ -492,12 +490,10 @@ class BulkLoad extends EventEmitter {
    *
    * Rows are written into one buffer that lives for the whole bulk load.
    * Its contents are yielded once it holds a chunk's worth
-   * (`WritableTrackingBuffer.CHUNK_SIZE`), or as soon as an asynchronous
-   * row source goes idle. The second rule matters for a source that
-   * yields a row and then waits on something: its rows must not be held
-   * back until a chunk has accumulated. Rows from a synchronous source, or
-   * from an asynchronous source that keeps producing, are coalesced up to
-   * a full chunk.
+   * (`WritableTrackingBuffer.CHUNK_SIZE`), checked after every cell, and
+   * at the end. Rows from a synchronous source are serialized without an
+   * event-loop turn in between; rows from an asynchronous source are
+   * awaited one at a time.
    *
    * A row that fails validation or serialization ends the iteration with
    * that error; nothing written for it (or for rows still coalescing with
@@ -514,44 +510,15 @@ class BulkLoad extends EventEmitter {
       (rows as AsyncIterable<Row>)[Symbol.asyncIterator]() :
       (rows as Iterable<Row>)[Symbol.iterator]();
 
-    // Resolves once the event loop got a turn, i.e. once the row source
-    // stopped producing rows back to back (rows arrive through promises and
-    // microtasks, so an immediate only runs when the source is waiting on
-    // something). Armed while there are unflushed bytes and an async source.
-    let idle: Promise<typeof IDLE> | undefined;
-
     buffer.writeBuffer(this.getColMetaData());
 
     let done = false;
     let closed = false;
     try {
       while (true) {
-        let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
-
-        // A row given as a promise is settled like a pending read, as
-        // `Readable.from` settled it before handing it on.
-        if (!isPromiseLike(result) && !result.done && isPromiseLike(result.value)) {
-          result = Promise.resolve(result.value).then((value) => ({ done: false as const, value }));
-        }
-
+        let result = iterator.next();
         if (isPromiseLike(result)) {
-          idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
-
-          const winner = await Promise.race([result, idle]);
-          if (winner === IDLE) {
-            idle = undefined;
-
-            if (buffer.length > 0) {
-              for (const chunk of buffer.getBuffers()) {
-                yield chunk;
-              }
-              buffer.consume(buffer.length);
-            }
-
-            result = await result;
-          } else {
-            result = winner;
-          }
+          result = await result;
         }
 
         if (result.done) {
@@ -559,7 +526,12 @@ class BulkLoad extends EventEmitter {
           break;
         }
 
-        const row = result.value;
+        // A row given as a promise is settled first, as `Readable.from`
+        // settled it before handing it on.
+        let row = result.value;
+        if (isPromiseLike(row)) {
+          row = await row;
+        }
 
         buffer.writeBuffer(rowTokenBuffer);
 
