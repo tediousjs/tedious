@@ -18,105 +18,74 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload implements Iterable<Buffer> {
-  // Installed as an own property by the constructor only when a parameter is
-  // streamed (not `declare`d like the fields below), so that `Readable.from`
-  // picks the synchronous iterator when nothing is streamed.
-  [Symbol.asyncIterator]?: () => AsyncGenerator<Buffer, void>;
-
+class RpcRequestPayload implements AsyncIterable<Buffer> {
   declare procedure: string | number;
   declare parameters: ResolvedParameter[];
 
   declare options: InternalConnectionOptions;
   declare txnDescriptor: Buffer;
 
-  // Whether any parameter's value is streamed from a source read while the
-  // request is written. When none is, the request is written synchronously
-  // into one buffer (`[Symbol.iterator]`); when one is, the payload is an
-  // async iterable instead (`[Symbol.asyncIterator]`, installed below), so
-  // the non-streaming case keeps a fully synchronous fast path.
-  declare streamed: boolean;
-
   constructor(procedure: string | number, parameters: ResolvedParameter[], txnDescriptor: Buffer, options: InternalConnectionOptions) {
     this.procedure = procedure;
     this.parameters = parameters;
     this.options = options;
     this.txnDescriptor = txnDescriptor;
-
-    this.streamed = false;
-    for (let i = 0, len = parameters.length; i < len; i++) {
-      const { name, type, data } = parameters[i];
-      if (!data.streamed) {
-        continue;
-      }
-
-      // A streamed value is delegated to the type's `writeValueStream`, so a
-      // type that resolves a value as streamed must implement it.
-      if (typeof type.writeValueStream !== 'function') {
-        throw new TypeError(`Type '${type.name}' resolved parameter '${name}' as streamed but does not implement writeValueStream`);
-      }
-
-      this.streamed = true;
-      this[Symbol.asyncIterator] = this.generateDataAsync;
-    }
   }
 
-  [Symbol.iterator]() {
-    return this.generateData();
-  }
-
-  * generateData() {
-    // A streamed parameter must be written through the async path; the
-    // constructor installs `[Symbol.asyncIterator]` so `Readable.from` uses
-    // it. Guard against a caller iterating a streamed payload synchronously.
-    if (this.streamed) {
-      throw new Error('A payload with a streamed parameter must be iterated asynchronously.');
-    }
-
-    // The whole request is written into one buffer and its chunks are handed
-    // out together: a large value written by reference stays by reference, so
-    // this costs no extra copy, and the request reaches the packetizer as a
-    // few large chunks rather than a small buffer per parameter.
-    const buffer = new WritableTrackingBuffer();
-    this.writeHeader(buffer);
-
-    const parametersLength = this.parameters.length;
-    for (let i = 0; i < parametersLength; i++) {
-      this.writeParameterData(buffer, this.parameters[i]);
-    }
-
-    yield * buffer.getBuffers();
-  }
-
-  async * generateDataAsync() {
+  /**
+   * The request is written into one buffer whose contents are yielded once
+   * it holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`), checked
+   * after every parameter, and at the end. A large value written by
+   * reference stays by reference, so this costs no extra copy. A parameter
+   * whose value is streamed (`data.streamed`) has its bytes yielded by the
+   * type's `writeValueStream`, read from the value's source as it goes.
+   */
+  async *[Symbol.asyncIterator]() {
     const buffer = new WritableTrackingBuffer();
     this.writeHeader(buffer);
 
     const parametersLength = this.parameters.length;
     for (let i = 0; i < parametersLength; i++) {
       const parameter = this.parameters[i];
+      this.writeParameterHeader(buffer, parameter);
 
-      if (!parameter.data.streamed) {
-        this.writeParameterData(buffer, parameter);
+      if (parameter.data.streamed) {
+        // A streamed value is delegated to the type's `writeValueStream`, so
+        // a type that resolves a value as streamed must implement it.
+        if (typeof parameter.type.writeValueStream !== 'function') {
+          throw new TypeError(`Type '${parameter.type.name}' resolved parameter '${parameter.name}' as streamed but does not implement writeValueStream`);
+        }
+
+        try {
+          writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
+        } catch (error) {
+          throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+        }
+
+        // Flush everything written so far, then let the type stream the
+        // value's bytes (length prefix and data) from its source.
+        yield * buffer.getBuffers();
+        buffer.consume(buffer.length);
+
+        try {
+          yield * parameter.type.writeValueStream(parameter.data, this.options);
+        } catch (error) {
+          throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+        }
+
         continue;
       }
 
-      // Flush everything written so far, then let the type stream the value's
-      // bytes (length prefix and data) from its source.
-      this.writeParameterHeader(buffer, parameter);
       try {
         writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
+        writeValue(parameter.type, buffer, parameter.data, this.options);
       } catch (error) {
         throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
       }
 
-      yield * buffer.getBuffers();
-      buffer.consume(buffer.length);
-
-      try {
-        yield * parameter.type.writeValueStream!(parameter.data, this.options);
-      } catch (error) {
-        throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+      if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+        yield * buffer.getBuffers();
+        buffer.consume(buffer.length);
       }
     }
 
@@ -156,17 +125,6 @@ class RpcRequestPayload implements Iterable<Buffer> {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
     buffer.writeUInt8(statusFlags);
-  }
-
-  writeParameterData(buffer: WritableTrackingBuffer, parameter: ResolvedParameter) {
-    this.writeParameterHeader(buffer, parameter);
-
-    try {
-      writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-      writeValue(parameter.type, buffer, parameter.data, this.options);
-    } catch (error) {
-      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-    }
   }
 }
 

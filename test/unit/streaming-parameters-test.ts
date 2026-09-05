@@ -2,6 +2,7 @@ import { assert } from 'chai';
 import { Readable } from 'stream';
 
 import RpcRequestPayload from '../../src/rpcrequest-payload';
+import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 import { Collation } from '../../src/collation';
@@ -24,7 +25,7 @@ async function * from(chunks: unknown[]) {
   }
 }
 
-async function collect(payload: Iterable<Buffer> | AsyncIterable<Buffer>) {
+async function collect(payload: AsyncIterable<Buffer>) {
   const chunks: Buffer[] = [];
   for await (const chunk of payload) {
     chunks.push(chunk);
@@ -88,19 +89,34 @@ describe('streaming parameters', function() {
     });
   });
 
-  describe('the payload iterates synchronously unless a value is streamed', function() {
-    it('is synchronous with only in-memory values', function() {
-      const resolved = resolveParameter(param({ type: TYPES.Int, value: 1 }), undefined, options);
-      const payload = new RpcRequestPayload('p', [resolved], txnDescriptor, options);
-      assert.strictEqual(payload.streamed, false);
-      assert.strictEqual((payload as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator], undefined);
-    });
+  describe('the payload yields the request in chunks', function() {
+    it('hands out what it has once a chunk is full, before writing the next parameter', async function() {
+      // A first parameter that fills a chunk on its own, and a second whose
+      // serialization records whether the first was already handed out.
+      let secondWritten = false;
+      const recording: DataType = {
+        ...TYPES.Int,
+        writeValue(buffer, parameter, options) {
+          secondWritten = true;
+          TYPES.Int.writeValue!(buffer, parameter, options);
+        }
+      };
 
-    it('is asynchronous when a value is streamed', function() {
-      const resolved = resolveParameter(param({ value: Readable.from([]) }), undefined, options);
-      const payload = new RpcRequestPayload('p', [resolved], txnDescriptor, options);
-      assert.strictEqual(payload.streamed, true);
-      assert.strictEqual(typeof (payload as AsyncIterable<Buffer>)[Symbol.asyncIterator], 'function');
+      const first = resolveParameter(param({ name: 'big', value: Buffer.alloc(WritableTrackingBuffer.CHUNK_SIZE, 1), length: Infinity }), undefined, options);
+      const second = resolveParameter(param({ name: 'small', type: recording, value: 1 }), undefined, options);
+      const payload = new RpcRequestPayload('p', [first, second], txnDescriptor, options);
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of payload) {
+        if (chunks.length === 0) {
+          assert.isFalse(secondWritten);
+        }
+        chunks.push(chunk);
+      }
+
+      assert.isTrue(secondWritten);
+      assert.isAbove(chunks.length, 1);
+      assert.deepEqual(Buffer.concat(chunks), await collect(new RpcRequestPayload('p', [first, second], txnDescriptor, options)));
     });
   });
 
@@ -257,13 +273,18 @@ describe('streaming parameters', function() {
       }, /No collation was set by the server/);
     });
 
-    it('rejects a streamed value whose type does not implement writeValueStream', function() {
+    it('rejects a streamed value whose type does not implement writeValueStream', async function() {
       const type: DataType = { ...TYPES.VarBinary };
       delete (type as Partial<DataType>).writeValueStream;
 
-      assert.throws(() => {
-        new RpcRequestPayload('p', [{ name: 'p', output: false, type, data: { value: from([]), streamed: true } }], txnDescriptor, options);
-      }, /Type 'VarBinary' resolved parameter 'p' as streamed but does not implement writeValueStream/);
+      let error: unknown;
+      try {
+        await collect(new RpcRequestPayload('p', [{ name: 'p', output: false, type, data: { value: from([]), streamed: true } }], txnDescriptor, options));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, TypeError);
+      assert.match((error as TypeError).message, /Type 'VarBinary' resolved parameter 'p' as streamed but does not implement writeValueStream/);
     });
   });
 });
