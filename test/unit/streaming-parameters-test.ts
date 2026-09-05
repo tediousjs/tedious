@@ -152,11 +152,14 @@ describe('streaming parameters', function() {
       assert.deepEqual(plpData(bytes), Buffer.concat(chunks));
     });
 
-    it('reassembles a varbinary source of one chunk larger than CHUNK_SIZE', async function() {
-      // A single >= 8 KB chunk exercises the zero-copy (by-reference) writeBuffer branch.
+    it('hands a varbinary chunk of CHUNK_SIZE or more on by reference', async function() {
       const chunk = Buffer.alloc(20000, 0xAB);
-      const bytes = await collect(new RpcRequestPayload('p', [resolveParameter(param({ value: from([chunk]) }), undefined, options)], txnDescriptor, options));
-      assert.deepEqual(plpData(bytes), chunk);
+      const yielded: Buffer[] = [];
+      for await (const piece of new RpcRequestPayload('p', [resolveParameter(param({ value: from([chunk]) }), undefined, options)], txnDescriptor, options)) {
+        yielded.push(piece);
+      }
+      assert.include(yielded, chunk);
+      assert.deepEqual(plpData(Buffer.concat(yielded)), chunk);
     });
 
     it('reassembles an nvarchar source larger than one chunk', async function() {
