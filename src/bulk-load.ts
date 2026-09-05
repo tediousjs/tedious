@@ -531,6 +531,7 @@ class BulkLoad extends EventEmitter {
     buffer.writeBuffer(this.getColMetaData());
 
     let done = false;
+    let closed = false;
     try {
       while (true) {
         let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
@@ -610,11 +611,23 @@ class BulkLoad extends EventEmitter {
           }
         }
       }
+    } catch (err) {
+      // A failed row closes the source as a `for await` would. A close
+      // that fails must not replace the row error the bulk load is
+      // failing with.
+      closed = true;
+      if (typeof iterator.return === 'function') {
+        try {
+          await iterator.return();
+        } catch {
+          // The row error is what surfaces.
+        }
+      }
+      throw err;
     } finally {
-      // Leaving early (a failed row, or the consumer stopped pulling, e.g.
-      // because the bulk load was canceled) closes the source as a
-      // `for await` would.
-      if (!done && typeof iterator.return === 'function') {
+      // The consumer stopped pulling (e.g. because the bulk load was
+      // canceled): close the source as a `for await` would.
+      if (!done && !closed && typeof iterator.return === 'function') {
         await iterator.return();
       }
     }

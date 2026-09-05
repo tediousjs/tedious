@@ -2802,7 +2802,7 @@ class Connection extends EventEmitter {
    * // otherwise the bulk load will fail.
    * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
    * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
-   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   * bulkLoad.addColumn('day_of_birth', TYPES.Date, { nullable: false });
    *
    * // Execute a bulk load with a predefined list of rows.
    * //
@@ -2814,6 +2814,62 @@ class Connection extends EventEmitter {
    *   { 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') },
    *   { 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') }
    * ]);
+   * ```
+   *
+   * ### Reading and closing the row source
+   *
+   * The rows are read only once the server has accepted the bulk load.
+   * Nothing is read from `rows` before that, and a bulk load that fails
+   * up to that point (the server rejects the `INSERT BULK` statement,
+   * [[BulkLoad.cancel]] was called, the connection was lost) completes
+   * without having touched the source.
+   *
+   * From the first row on, the source is closed the way a `for await`
+   * loop closes it: when a row fails or the bulk load is canceled, the
+   * iterator's `return()` is called, which for a Node.js stream destroys
+   * the stream. An iterator that was never started has no `return()` to
+   * run, so a source that was never read stays open and remains the
+   * caller's to close.
+   *
+   * An async generator that opens what it reads from only once it is
+   * started needs no extra care: if it is never started, nothing was
+   * opened, and if it is closed early, its `finally` runs.
+   *
+   * ```js
+   * async function* employees() {
+   *   const file = await fs.promises.open('employees.csv');
+   *   try {
+   *     for await (const line of file.readLines()) {
+   *       const [first_name, last_name, day_of_birth] = line.split(',');
+   *       yield { first_name, last_name, day_of_birth: new Date(day_of_birth) };
+   *     }
+   *   } finally {
+   *     await file.close();
+   *   }
+   * }
+   *
+   * connection.execBulkLoad(bulkLoad, employees());
+   * ```
+   *
+   * A stream that is created up front holds its resources from the start,
+   * so close it from the bulk load's callback in case it was never read.
+   * Destroying a stream that has already ended or was already destroyed
+   * is harmless.
+   *
+   * ```js
+   * const rows = otherDatabase.query('SELECT first_name, last_name, day_of_birth FROM employees').stream();
+   *
+   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
+   *   // The bulk load may have failed before any row was read from the
+   *   // stream, in which case the stream is still open.
+   *   rows.destroy();
+   *
+   *   // ...
+   * });
+   *
+   * // ... add the columns ...
+   *
+   * connection.execBulkLoad(bulkLoad, rows);
    * ```
    *
    * @param bulkLoad A previously created [[BulkLoad]].

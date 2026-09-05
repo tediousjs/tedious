@@ -421,6 +421,57 @@ describe('BulkLoad', function() {
       assert.isTrue(closed);
     });
 
+    it('keeps the row error when the source fails to close', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const rows = [[1], ['not a number']];
+      const source: AsyncIterable<unknown[]> = {
+        [Symbol.asyncIterator]() {
+          let i = 0;
+          return {
+            next: async (): Promise<IteratorResult<unknown[]>> => (i < rows.length ? { value: rows[i++], done: false } : { value: undefined, done: true }),
+            return: async () => { throw new Error('close failed'); }
+          };
+        }
+      };
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, TypeError);
+    });
+
+    it('reports a source that fails to close when the consumer stops early', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const expected = new Error('close failed');
+      const source: AsyncIterable<unknown[]> = {
+        [Symbol.asyncIterator]() {
+          let i = 0;
+          return {
+            next: async (): Promise<IteratorResult<unknown[]>> => ({ value: [i++], done: false }),
+            return: async () => { throw expected; }
+          };
+        }
+      };
+
+      const iterator = new BulkLoadPayload(request, source)[Symbol.asyncIterator]();
+      await iterator.next();
+
+      let error;
+      try {
+        await iterator.return();
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+    });
+
     it('writes a text pointer and timestamp before a text value, and a null pointer for none', async function() {
       const collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xD0, 0x00, 0x34]));
       const request = new BulkLoad('tablename', collation, connectionOptions, { }, () => {});
