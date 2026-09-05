@@ -2,12 +2,7 @@ import { EventEmitter } from 'events';
 import { Stream } from 'stream';
 import BulkLoad, { type Row, type RowSource } from './bulk-load';
 import { RequestError } from './errors';
-import { isPromiseLike } from './promise-like';
-
-// `bulk-load.ts` has one too, and cannot share it: it ends with a
-// `module.exports` assignment for its default export, which leaves it no
-// named runtime exports.
-function ignoreError() {}
+import { ignoreError, isPromiseLike } from './promise-like';
 
 /**
  * Swallows what `emitter` emits as `'error'` until `closing` settles: the

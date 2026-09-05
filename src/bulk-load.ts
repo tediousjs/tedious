@@ -6,7 +6,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
 import { Collation } from './collation';
-import { isPromiseLike } from './promise-like';
+import { ignoreError, isPromiseLike } from './promise-like';
 
 /**
  * @private
@@ -147,8 +147,6 @@ export interface RowSource {
   next(): IteratorResult<Row> | PromiseLike<IteratorResult<Row>>;
   return?(): unknown;
 }
-
-function ignoreError() {}
 
 /**
  * A BulkLoad instance is used to perform a bulk insert.
@@ -658,9 +656,7 @@ class BulkLoad extends EventEmitter {
           // and its source may be stuck in a read (an async generator
           // queues `return()` behind it), so the wait could never end.
           const closing = iterator.return();
-          if (!isPromiseLike(closing)) {
-            await closing;
-          } else {
+          if (isPromiseLike(closing)) {
             const settled = Promise.resolve(closing);
             const winner = await Promise.race([settled, abort.then(undefined, () => ABORTED)]);
             if (winner === ABORTED) {
