@@ -1,19 +1,36 @@
+import { EventEmitter } from 'events';
 import BulkLoad from './bulk-load';
+
+type Row = unknown[] | { [colName: string]: unknown };
+
+function ignoreError() {}
 
 export class BulkLoadPayload implements AsyncIterable<Buffer> {
   declare bulkLoad: BulkLoad;
-  declare iterator: AsyncIterableIterator<Buffer>;
+  declare rows: Iterable<Row> | AsyncIterable<Row>;
 
-  constructor(bulkLoad: BulkLoad) {
+  constructor(bulkLoad: BulkLoad, rows: Iterable<Row> | AsyncIterable<Row>) {
     this.bulkLoad = bulkLoad;
+    this.rows = rows;
 
-    // We need to grab the iterator here so that `error` event handlers are set up
-    // as early as possible (and are not potentially lost).
-    this.iterator = this.bulkLoad.rowToPacketTransform[Symbol.asyncIterator]();
+    // A stream source that fails while the `INSERT BULK` statement is in
+    // flight, before anything reads from it, would emit an unhandled
+    // `'error'` event; with a listener it keeps the error for its iterator
+    // instead. The listener comes off once the rows are read and the
+    // iterator has its own.
+    if (rows instanceof EventEmitter) {
+      rows.on('error', ignoreError);
+    }
   }
 
-  [Symbol.asyncIterator]() {
-    return this.iterator;
+  async *[Symbol.asyncIterator]() {
+    const rows = this.rows;
+
+    if (rows instanceof EventEmitter) {
+      rows.removeListener('error', ignoreError);
+    }
+
+    yield* this.bulkLoad.serializeRows(rows);
   }
 
   toString(indent = '') {

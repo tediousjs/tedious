@@ -555,6 +555,30 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('supports a bulk load with no rows', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 0);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, []);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('should not do anything if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {

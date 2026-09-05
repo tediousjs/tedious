@@ -2,7 +2,6 @@ import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import Connection, { type InternalConnectionOptions } from './connection';
 
-import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
@@ -134,98 +133,12 @@ const textPointerAndTimestampBuffer = Buffer.from([
 ]);
 const textPointerNullBuffer = Buffer.from([0x00]);
 
-// A transform that converts rows to packets.
-class RowTransform extends Transform {
-  /**
-   * @private
-   */
-  declare columnMetadataWritten: boolean;
-  /**
-   * @private
-   */
-  declare bulkLoad: BulkLoad;
-  /**
-   * @private
-   */
-  declare mainOptions: BulkLoad['options'];
-  /**
-   * @private
-   */
-  declare columns: BulkLoad['columns'];
+type Row = unknown[] | { [colName: string]: unknown };
 
-  /**
-   * @private
-   */
-  constructor(bulkLoad: BulkLoad) {
-    super({ writableObjectMode: true });
+const IDLE = Symbol('idle');
 
-    this.bulkLoad = bulkLoad;
-    this.mainOptions = bulkLoad.options;
-    this.columns = bulkLoad.columns;
-
-    this.columnMetadataWritten = false;
-  }
-
-  /**
-   * @private
-   */
-  _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
-    if (!this.columnMetadataWritten) {
-      this.push(this.bulkLoad.getColMetaData());
-      this.columnMetadataWritten = true;
-    }
-
-    this.push(rowTokenBuffer);
-
-    for (let i = 0; i < this.columns.length; i++) {
-      const c = this.columns[i];
-      let value = Array.isArray(row) ? row[i] : row[c.objName];
-
-      if (!this.bulkLoad.firstRowWritten) {
-        try {
-          value = c.type.validate(value, c.collation);
-        } catch (error: any) {
-          return callback(error);
-        }
-      }
-
-      const parameter = {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: value
-      };
-
-      if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
-        if (value == null) {
-          this.push(textPointerNullBuffer);
-          continue;
-        }
-
-        this.push(textPointerAndTimestampBuffer);
-      }
-
-      try {
-        this.push(c.type.generateParameterLength(parameter, this.mainOptions));
-        for (const chunk of c.type.generateParameterData(parameter, this.mainOptions)) {
-          this.push(chunk);
-        }
-      } catch (error: any) {
-        return callback(error);
-      }
-    }
-
-    process.nextTick(callback);
-  }
-
-  /**
-   * @private
-   */
-  _flush(callback: () => void) {
-    this.push(this.bulkLoad.createDoneToken());
-
-    process.nextTick(callback);
-  }
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return value != null && typeof (value as PromiseLike<T>).then === 'function';
 }
 
 /**
@@ -271,7 +184,6 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  declare streamingMode: boolean;
   /**
    * @private
    */
@@ -303,11 +215,6 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   declare firstRowWritten: boolean;
-  /**
-   * @private
-   */
-  declare rowToPacketTransform: RowTransform;
-
   /**
    * @private
    */
@@ -382,9 +289,6 @@ class BulkLoad extends EventEmitter {
     this.columns = [];
     this.columnsByName = {};
     this.firstRowWritten = false;
-    this.streamingMode = false;
-
-    this.rowToPacketTransform = new RowTransform(this);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
@@ -588,6 +492,138 @@ class BulkLoad extends EventEmitter {
    */
   setTimeout(timeout?: number) {
     this.timeout = timeout;
+  }
+
+  /**
+   * Serializes `rows` into the TDS byte stream of this bulk load:
+   * COLMETADATA, a ROW token per row, and a DONE token at the end.
+   *
+   * Rows are written into one buffer that lives for the whole bulk load.
+   * Its contents are yielded once it holds a chunk's worth
+   * (`WritableTrackingBuffer.CHUNK_SIZE`), or as soon as an asynchronous
+   * row source goes idle. The second rule matters for a source that
+   * yields a row and then waits on something: its rows must not be held
+   * back until a chunk has accumulated. Rows from a synchronous source, or
+   * from an asynchronous source that keeps producing, are coalesced up to
+   * a full chunk.
+   *
+   * A row that fails validation or serialization ends the iteration with
+   * that error; nothing written for it (or for rows still coalescing with
+   * it) is yielded. The row source is closed either way.
+   *
+   * @private
+   */
+  async *serializeRows(rows: Iterable<Row> | AsyncIterable<Row>): AsyncGenerator<Buffer, void, undefined> {
+    const buffer = new WritableTrackingBuffer();
+    const options = this.options;
+    const columns = this.columns;
+
+    const iterator = typeof (rows as Partial<AsyncIterable<Row>>)[Symbol.asyncIterator] === 'function' ?
+      (rows as AsyncIterable<Row>)[Symbol.asyncIterator]() :
+      (rows as Iterable<Row>)[Symbol.iterator]();
+
+    // Resolves once the event loop got a turn, i.e. once the row source
+    // stopped producing rows back to back (rows arrive through promises and
+    // microtasks, so an immediate only runs when the source is waiting on
+    // something). Armed while there are unflushed bytes and an async source.
+    let idle: Promise<typeof IDLE> | undefined;
+
+    buffer.writeBuffer(this.getColMetaData());
+
+    let done = false;
+    try {
+      while (true) {
+        let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
+
+        // A row given as a promise is settled like a pending read, as
+        // `Readable.from` settled it before handing it on.
+        if (!isPromiseLike(result) && !result.done && isPromiseLike(result.value)) {
+          result = Promise.resolve(result.value).then((value) => ({ done: false as const, value }));
+        }
+
+        if (isPromiseLike(result)) {
+          idle ??= new Promise((resolve) => { setImmediate(resolve, IDLE); });
+
+          const winner = await Promise.race([result, idle]);
+          if (winner === IDLE) {
+            idle = undefined;
+
+            if (buffer.length > 0) {
+              for (const chunk of buffer.getBuffers()) {
+                yield chunk;
+              }
+              buffer.consume(buffer.length);
+            }
+
+            result = await result;
+          } else {
+            result = winner;
+          }
+        }
+
+        if (result.done) {
+          done = true;
+          break;
+        }
+
+        const row = result.value;
+
+        buffer.writeBuffer(rowTokenBuffer);
+
+        for (let i = 0; i < columns.length; i++) {
+          const c = columns[i];
+          let value = Array.isArray(row) ? row[i] : row[c.objName];
+
+          if (!this.firstRowWritten) {
+            value = c.type.validate(value, c.collation);
+          }
+
+          const parameter = {
+            length: c.length,
+            scale: c.scale,
+            precision: c.precision,
+            value: value
+          };
+
+          const isTextType = c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText';
+
+          if (isTextType && value == null) {
+            buffer.writeBuffer(textPointerNullBuffer);
+          } else {
+            if (isTextType) {
+              buffer.writeBuffer(textPointerAndTimestampBuffer);
+            }
+
+            buffer.writeBuffer(c.type.generateParameterLength(parameter, options));
+            for (const chunk of c.type.generateParameterData(parameter, options)) {
+              buffer.writeBuffer(chunk);
+            }
+          }
+
+          // Checked after every cell, not only after every row, so that a
+          // wide row of large cells goes downstream as it is serialized.
+          if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+            for (const chunk of buffer.getBuffers()) {
+              yield chunk;
+            }
+            buffer.consume(buffer.length);
+          }
+        }
+      }
+    } finally {
+      // Leaving early (a failed row, or the consumer stopped pulling, e.g.
+      // because the bulk load was canceled) closes the source as a
+      // `for await` would.
+      if (!done && typeof iterator.return === 'function') {
+        await iterator.return();
+      }
+    }
+
+    buffer.writeBuffer(this.createDoneToken());
+    for (const chunk of buffer.getBuffers()) {
+      yield chunk;
+    }
+    buffer.consume(buffer.length);
   }
 
   /**
