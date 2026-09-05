@@ -532,9 +532,12 @@ describe('BulkLoad', function() {
         }
       }
       const emitter = new Emitter();
-      new BulkLoadPayload(request, emitter).close();
+      const payload = new BulkLoadPayload(request, emitter);
+      payload.close();
 
-      assert.strictEqual(emitter.listenerCount('error'), 2);
+      // Guarded while it finishes closing, by nothing that holds on to the payload.
+      assert.isAtLeast(emitter.listenerCount('error'), 1);
+      assert.notInclude(emitter.listeners('error'), payload.onSourceError);
       emitter.emit('close');
       assert.strictEqual(emitter.listenerCount('close'), 0);
 
@@ -795,6 +798,24 @@ describe('BulkLoad', function() {
       // The source can be handed to another bulk load without listeners piling up.
       await collect(new BulkLoadPayload(request, source));
       assert.strictEqual(source.listenerCount('error'), 0);
+    });
+
+    it('takes everything of its own off a stream closed unread that never emits close', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // Node's default `_destroy` completes synchronously, and with
+      // `emitClose: false` that completion is the only signal there is.
+      const source = new Readable({ objectMode: true, emitClose: false, read() {} });
+      const payload = new BulkLoadPayload(request, source);
+
+      payload.close();
+      assert.isTrue(source.destroyed);
+      assert.notInclude(source.listeners('error'), payload.onSourceError);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.strictEqual(source.listenerCount('error'), 0);
+      assert.strictEqual(source.listenerCount('close'), 0);
     });
 
     it('releases a stream source that is closed unread', async function() {

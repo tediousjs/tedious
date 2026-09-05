@@ -10,6 +10,19 @@ function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
   return value != null && typeof (value as PromiseLike<T>).then === 'function';
 }
 
+/**
+ * Swallows what `emitter` emits as `'error'` until `closing` settles: the
+ * source is being let go of, and a failure it reports while doing so
+ * has nowhere to go but must not crash the process. The listener holds
+ * on to nothing but the emitter, so a source that never finishes closing
+ * does not keep the bulk load alive through it.
+ */
+function guardWhileClosing(emitter: EventEmitter, closing: Promise<unknown>) {
+  emitter.on('error', ignoreError);
+  const unguard = () => { emitter.removeListener('error', ignoreError); };
+  closing.then(unguard, unguard);
+}
+
 export class BulkLoadPayload implements AsyncIterable<Buffer> {
   declare bulkLoad: BulkLoad;
   declare rows: Iterable<Row> | AsyncIterable<Row>;
@@ -152,15 +165,13 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       }
     } finally {
       this.release();
+      this.unguard();
 
-      if (closing === undefined) {
-        this.unguard();
-      } else {
-        // A close that never finishes (an async generator stuck in a
-        // read) keeps the guard on the source; the source is broken by
-        // then, and an error it still emits must not crash the process.
-        const unguard = () => { this.unguard(); };
-        closing.then(unguard, unguard);
+      // A close still running (or one that never finishes: an async
+      // generator stuck in a read) keeps a guard on the source, one that
+      // does not hold on to the payload.
+      if (closing !== undefined && this.rows instanceof EventEmitter) {
+        guardWhileClosing(this.rows, closing);
       }
     }
   }
@@ -212,21 +223,17 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       return;
     }
 
-    // The error guard stays on an emitter until everything that releases
-    // it has finished: an asynchronous `return()` may emit `'error'` on
-    // a later tick while letting go of a cursor or a file, and so may a
-    // stream's `_destroy`. `pending` counts what is still to finish.
+    // From here on nothing holds on to the payload: its own guard comes
+    // off, and what stays on the emitter while it finishes closing is a
+    // listener that knows only the emitter. An application that keeps a
+    // destroyed stream around must not keep the rows through it.
     const emitter = this.rows;
-    let pending = 0;
-    const done = () => {
-      if (--pending === 0) {
-        this.unguard();
-      }
-    };
+    this.unguard();
 
+    // An asynchronous `return()` may emit `'error'` on a later tick while
+    // letting go of a cursor or a file.
     if (closing !== undefined) {
-      pending++;
-      closing.then(done, done);
+      guardWhileClosing(emitter, closing);
     }
 
     // A stream's iterator only takes effect once it has been pulled (a
@@ -235,19 +242,21 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // is destroyed to release what it holds open. The unit test that
     // closes a `Readable` unread pins this against a change in Node. Only
     // an emitter is taken for a stream, and its `destroy` is as best
-    // effort as the `return` above. Its destruction is finished on
-    // `'close'`, on the `'error'` a failing `_destroy` reports instead,
-    // or right away when `destroy` itself throws. (A stream that emits
-    // neither, `emitClose: false` and a clean destruction, keeps a
-    // listener; it is dead by then.)
-    const stream = this.rows as { destroy?: () => void };
+    // effort as the `return` above. A guard stays on until its
+    // destruction has finished, since its `_destroy` may report an error
+    // later, asynchronously: on `'close'`, on that `'error'`, right away
+    // when `destroy` itself throws, or right away when the destruction
+    // has already finished cleanly (Node's default `_destroy` completes
+    // synchronously), which is the only signal from a stream created
+    // with `emitClose: false`.
+    const stream = this.rows as { destroy?: () => void, closed?: boolean, errored?: Error | null };
     if (typeof stream.destroy === 'function') {
-      pending++;
       const destroyed = () => {
         emitter.removeListener('close', destroyed);
         emitter.removeListener('error', destroyed);
-        done();
+        emitter.removeListener('error', ignoreError);
       };
+      emitter.on('error', ignoreError);
       emitter.on('close', destroyed);
       emitter.on('error', destroyed);
 
@@ -255,11 +264,12 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         stream.destroy();
       } catch {
         destroyed();
+        return;
       }
-    }
 
-    if (pending === 0) {
-      this.unguard();
+      if (stream.closed === true && stream.errored == null) {
+        destroyed();
+      }
     }
   }
 
