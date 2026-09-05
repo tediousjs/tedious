@@ -2,10 +2,9 @@ import { EventEmitter } from 'events';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import Connection, { type InternalConnectionOptions } from './connection';
 
-import { Transform } from 'stream';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter, writeTypeInfo, writeValue } from './data-type';
+import { type DataType, type Parameter, writeTypeInfo } from './data-type';
 import { InputError } from './errors';
 import { Collation } from './collation';
 
@@ -122,122 +121,6 @@ interface ColumnOptions {
   nullable?: boolean;
 }
 
-const rowTokenBuffer = Buffer.from([ TOKEN_TYPE.ROW ]);
-const textPointerAndTimestampBuffer = Buffer.from([
-  // TextPointer length
-  0x10,
-
-  // TextPointer
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-
-  // Timestamp
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-]);
-const textPointerNullBuffer = Buffer.from([0x00]);
-
-// A transform that converts rows to packets.
-class RowTransform extends Transform {
-  /**
-   * @private
-   */
-  declare columnMetadataWritten: boolean;
-  /**
-   * @private
-   */
-  declare bulkLoad: BulkLoad;
-  /**
-   * @private
-   */
-  declare mainOptions: BulkLoad['options'];
-  /**
-   * @private
-   */
-  declare columns: BulkLoad['columns'];
-
-  /**
-   * @private
-   */
-  constructor(bulkLoad: BulkLoad) {
-    super({ writableObjectMode: true });
-
-    this.bulkLoad = bulkLoad;
-    this.mainOptions = bulkLoad.options;
-    this.columns = bulkLoad.columns;
-
-    this.columnMetadataWritten = false;
-  }
-
-  /**
-   * @private
-   */
-  _transform(row: Array<unknown> | { [colName: string]: unknown }, _encoding: string, callback: (error?: Error) => void) {
-    if (!this.columnMetadataWritten) {
-      let colMetaData;
-      try {
-        colMetaData = this.bulkLoad.getColMetaData();
-      } catch (error: any) {
-        return callback(error);
-      }
-
-      this.push(colMetaData);
-      this.columnMetadataWritten = true;
-    }
-
-    const buffer = new WritableTrackingBuffer();
-    buffer.writeBuffer(rowTokenBuffer);
-
-    for (let i = 0; i < this.columns.length; i++) {
-      const c = this.columns[i];
-      let value = Array.isArray(row) ? row[i] : row[c.objName];
-
-      if (!this.bulkLoad.firstRowWritten) {
-        try {
-          value = c.type.validate(value, c.collation);
-        } catch (error: any) {
-          return callback(error);
-        }
-      }
-
-      const parameter = {
-        length: c.length,
-        scale: c.scale,
-        precision: c.precision,
-        value: value
-      };
-
-      if (c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText') {
-        if (value == null) {
-          buffer.writeBuffer(textPointerNullBuffer);
-          continue;
-        }
-
-        buffer.writeBuffer(textPointerAndTimestampBuffer);
-      }
-
-      try {
-        writeValue(c.type, buffer, parameter, this.mainOptions);
-      } catch (error: any) {
-        return callback(new InputError(`Column '${c.name}' could not be serialized`, { cause: error }));
-      }
-    }
-
-    for (const chunk of buffer.getBuffers()) {
-      this.push(chunk);
-    }
-
-    process.nextTick(callback);
-  }
-
-  /**
-   * @private
-   */
-  _flush(callback: () => void) {
-    this.push(this.bulkLoad.createDoneToken());
-
-    process.nextTick(callback);
-  }
-}
-
 /**
  * A BulkLoad instance is used to perform a bulk insert.
  *
@@ -281,7 +164,6 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  declare streamingMode: boolean;
   /**
    * @private
    */
@@ -308,15 +190,6 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   declare columnsByName: { [name: string]: Column };
-
-  /**
-   * @private
-   */
-  declare firstRowWritten: boolean;
-  /**
-   * @private
-   */
-  declare rowToPacketTransform: RowTransform;
 
   /**
    * @private
@@ -391,10 +264,6 @@ class BulkLoad extends EventEmitter {
     this.callback = callback;
     this.columns = [];
     this.columnsByName = {};
-    this.firstRowWritten = false;
-    this.streamingMode = false;
-
-    this.rowToPacketTransform = new RowTransform(this);
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
@@ -419,9 +288,6 @@ class BulkLoad extends EventEmitter {
    * @param scale For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
   */
   addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
-    if (this.firstRowWritten) {
-      throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
-    }
     if (this.executionStarted) {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }

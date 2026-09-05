@@ -558,6 +558,90 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('supports a bulk load with no rows', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 0);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, []);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('closes the row source if `cancel` was called before executing the bulk load', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
+      assert.isUndefined(rowCount);
+
+      // The source is closed through its iterator's `return()`, which
+      // destroys the stream a turn later.
+      setImmediate(() => {
+        assert.isTrue(source.destroyed);
+        done();
+      });
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      // The `INSERT BULK` statement itself goes through; the bulk load is
+      // then completed as canceled without its rows being read.
+      bulkLoad.cancel();
+      connection.execBulkLoad(bulkLoad, source);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('closes the row source if `cancel` is called immediately after executing the bulk load', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', (err) => {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
+      // The source is closed through its iterator's `return()`, which
+      // destroys the stream a turn later.
+      setImmediate(() => {
+        assert.isTrue(source.destroyed);
+        done();
+      });
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL)', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, source);
+      bulkLoad.cancel();
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('should not do anything if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
@@ -593,6 +677,48 @@ describe('BulkLoad', function() {
 
     verifyBulkLoadRequest.on('row', function(columns) {
       assert.strictEqual(columns[0].value, 1234);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('closes the row source when the `INSERT BULK` statement is rejected', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#does_not_exist', (err) => {
+      assert.instanceOf(err, Error);
+      // The source is closed through its iterator's `return()`, which
+      // destroys the stream a turn later.
+      setImmediate(() => {
+        assert.isTrue(source.destroyed);
+        done();
+      });
+    });
+
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+    connection.execBulkLoad(bulkLoad, source);
+  });
+
+  it('reports an error a synchronous source throws on its first read through the callback', function(done) {
+    const expected = new TypeError('bad input');
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err) => {
+      assert.strictEqual(err, expected);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, (function*() {
+        throw expected;
+      })());
     });
 
     connection.execSqlBatch(request);
