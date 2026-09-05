@@ -214,10 +214,6 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  declare firstRowWritten: boolean;
-  /**
-   * @private
-   */
   declare bulkOptions: InternalOptions;
 
   /**
@@ -288,7 +284,6 @@ class BulkLoad extends EventEmitter {
     this.callback = callback;
     this.columns = [];
     this.columnsByName = {};
-    this.firstRowWritten = false;
 
     this.bulkOptions = { checkConstraints, fireTriggers, keepNulls, lockTable, order };
   }
@@ -313,9 +308,6 @@ class BulkLoad extends EventEmitter {
    * @param scale For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
   */
   addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
-    if (this.firstRowWritten) {
-      throw new Error('Columns cannot be added to bulk insert after the first row has been written.');
-    }
     if (this.executionStarted) {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }
@@ -573,11 +565,7 @@ class BulkLoad extends EventEmitter {
 
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
-          let value = Array.isArray(row) ? row[i] : row[c.objName];
-
-          if (!this.firstRowWritten) {
-            value = c.type.validate(value, c.collation);
-          }
+          const value = c.type.validate(Array.isArray(row) ? row[i] : row[c.objName], c.collation);
 
           const parameter = {
             length: c.length,

@@ -2880,12 +2880,6 @@ class Connection extends EventEmitter {
   execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     bulkLoad.executionStarted = true;
 
-    if (rows) {
-      if (bulkLoad.firstRowWritten) {
-        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
-      }
-    }
-
     // The rows are only read once the server has accepted the
     // `INSERT BULK` statement and the request message is being sent.
     const payload = new BulkLoadPayload(bulkLoad, rows ?? []);
