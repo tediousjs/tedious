@@ -971,6 +971,42 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('close'), 0);
     });
 
+    it('takes everything of its own off a stream closed unread while it was already destroying itself silently', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // Destroyed by its owner while the `INSERT BULK` statement was in
+      // flight, with a `_destroy` that succeeds later and `emitClose:
+      // false`: nothing is ever emitted about it, and Node does not run
+      // `_destroy` again for the payload.
+      let finish: (() => void) | undefined;
+      const source = new Readable({
+        objectMode: true,
+        emitClose: false,
+        read() {},
+        destroy(_error, callback) {
+          finish = () => { callback(); };
+        }
+      });
+      const payload = new BulkLoadPayload(request, source);
+      source.destroy();
+      assert.isFunction(finish);
+
+      payload.close();
+      assert.notInclude(source.listeners('error'), payload.onSourceError);
+      // Still destroying: still guarded.
+      assert.isAtLeast(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      assert.isAtLeast(source.listenerCount('error'), 1);
+
+      finish!();
+      assert.isTrue(source.closed);
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      assert.strictEqual(source.listenerCount('error'), 0);
+      assert.strictEqual(source.listenerCount('close'), 0);
+    });
+
     it('takes everything of its own off a stream closed unread before it was even constructed', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });

@@ -286,32 +286,36 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       // Node's `destroy` takes a callback of its own that it runs right
       // after it, so that is what is passed, and the listeners come off a
       // turn later, once anything the stream emits about the destruction
-      // has been emitted. A stream destroyed before would run the callback
-      // at once, while its destruction may still be going on, so it gets
-      // none and is waited for through its events, as below.
-      try {
-        if (stream.destroyed === true) {
-          stream.destroy();
-        } else {
+      // has been emitted.
+      if (stream.destroyed !== true) {
+        try {
           stream.destroy(undefined, () => { setImmediate(destroyed); });
+        } catch {
+          destroyed();
         }
-      } catch {
-        destroyed();
         return;
       }
 
-      // A stream destroyed before this does not run `_destroy` again.
-      // Closed already, it emits nothing more, except the `'error'` of a
-      // destruction with an error on this very tick, which is about to
-      // be emitted, so the guard is kept for one more turn then. (Still
-      // closing, it is waited for through its events, as above.)
-      if (stream.closed === true) {
-        if (stream.errored == null) {
-          destroyed();
-        } else {
+      // A stream destroyed before this is not destroyed again: Node
+      // would run the callback at once, while the destruction may still
+      // be going on, and does not run `_destroy` twice. What tells that
+      // it is done is its `closed` flag, set once `_destroy` has called
+      // back, which is looked at until it is set, on a timer that does
+      // not keep the process alive and backs off; the events, when the
+      // stream has them, come sooner. Once closed, the stream emits
+      // nothing more, except the `'error'` of a destruction with an error
+      // on this very tick, which is about to be emitted, so the listeners
+      // come off a turn later either way.
+      let delay = 20;
+      const watch = () => {
+        if (stream.closed === true) {
           setImmediate(destroyed);
+          return;
         }
-      }
+        setTimeout(watch, delay).unref();
+        delay = Math.min(delay * 2, 1000);
+      };
+      watch();
     }
   }
 
