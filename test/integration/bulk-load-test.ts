@@ -1687,7 +1687,7 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('should not throw in _transform function', function(done) {
+  it('wraps a value the column type cannot serialize in an InputError naming the column', function(done) {
     const bulkLoad = connection.newBulkLoad(
       '#tmpTestTable',
       (err, rowCount) => {
