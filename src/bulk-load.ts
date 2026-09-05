@@ -136,6 +136,16 @@ const textPointerNullBuffer = Buffer.from([0x00]);
 export type Row = unknown[] | { [colName: string]: unknown };
 
 const IDLE = Symbol('idle');
+const ABORTED = Symbol('aborted');
+
+/**
+ * What `serializeRows` needs of a row source: an iterator's `next`, and
+ * its `return` if it has one.
+ */
+export interface RowSource {
+  next(): IteratorResult<Row> | PromiseLike<IteratorResult<Row>>;
+  return?(): unknown;
+}
 
 function ignoreError() {}
 
@@ -516,11 +526,13 @@ class BulkLoad extends EventEmitter {
    * it) is yielded. The row source is closed either way. `abort`, when
    * given, is raced against every pending row read, so that a source
    * that signals failure out of band (an `'error'` event) while a read
-   * is pending ends the iteration too instead of hanging it.
+   * is pending ends the iteration too instead of hanging it, and a
+   * consumer that stops early does not wait for the source to close once
+   * the bulk load is aborted.
    *
    * @private
    */
-  async *serializeRows(iterator: Iterator<Row> | AsyncIterator<Row>, abort?: Promise<never>): AsyncGenerator<Buffer, void, undefined> {
+  async *serializeRows(iterator: RowSource, abort?: Promise<never>): AsyncGenerator<Buffer, void, undefined> {
     const buffer = new WritableTrackingBuffer();
     const options = this.options;
     const columns = this.columns;
@@ -544,7 +556,7 @@ class BulkLoad extends EventEmitter {
       buffer.writeBuffer(this.getColMetaData());
 
       while (true) {
-        let result: IteratorResult<Row> | Promise<IteratorResult<Row>> = iterator.next();
+        let result: IteratorResult<Row> | PromiseLike<IteratorResult<Row>> = iterator.next();
 
         if (isPromiseLike(result)) {
           // Settled into one promise up front: a thenable that is not a
@@ -645,7 +657,20 @@ class BulkLoad extends EventEmitter {
           }
         } else {
           // The consumer stopped pulling; a close failure is what it gets.
-          await iterator.return();
+          // Unless the bulk load is aborted, now or while the source is
+          // closing: it was canceled while a chunk sat with the consumer,
+          // and its source may be stuck in a read (an async generator
+          // queues `return()` behind it), so the wait could never end.
+          const closing = iterator.return();
+          if (abort === undefined || !isPromiseLike(closing)) {
+            await closing;
+          } else {
+            const settled = Promise.resolve(closing);
+            const winner = await Promise.race([settled, abort.then(undefined, () => ABORTED)]);
+            if (winner === ABORTED) {
+              settled.then(undefined, ignoreError);
+            }
+          }
         }
       }
     }

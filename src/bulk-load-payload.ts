@@ -1,8 +1,12 @@
 import { EventEmitter } from 'events';
-import BulkLoad, { type Row } from './bulk-load';
+import BulkLoad, { type Row, type RowSource } from './bulk-load';
 import { RequestError } from './errors';
 
 function ignoreError() {}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return value != null && typeof (value as PromiseLike<T>).then === 'function';
+}
 
 export class BulkLoadPayload implements AsyncIterable<Buffer> {
   declare bulkLoad: BulkLoad;
@@ -97,8 +101,41 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
   async *serialize() {
     this.started = true;
 
+    // `serializeRows` closes the source when it leaves early, without
+    // waiting for it on a failure. The source is watched so that the
+    // error guard can stay on it while an asynchronous close is still
+    // running: an `'error'` the close emits on a later tick would
+    // otherwise be unhandled. `closing` is the close in progress, if any.
+    const source = this.source;
+    let closing: Promise<unknown> | undefined;
+    const watched: RowSource = {
+      next: () => source.next(),
+      return: () => {
+        if (typeof source.return !== 'function') {
+          return undefined;
+        }
+
+        const result = source.return();
+        if (!isPromiseLike(result)) {
+          return result;
+        }
+
+        // Settled into one promise, handed on as such: it may be awaited
+        // and raced by `serializeRows`, and is watched here.
+        const settled = Promise.resolve(result);
+        closing = settled;
+        const done = () => {
+          if (closing === settled) {
+            closing = undefined;
+          }
+        };
+        settled.then(done, done);
+        return settled;
+      }
+    };
+
     try {
-      for await (const chunk of this.bulkLoad.serializeRows(this.source, this.aborted)) {
+      for await (const chunk of this.bulkLoad.serializeRows(watched, this.aborted)) {
         // An error the source emitted without failing its iterator ends
         // the bulk load before another chunk goes out.
         if (this.sourceError !== undefined) {
@@ -113,7 +150,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
       }
     } finally {
       this.release();
-      this.unguard();
+
+      if (closing === undefined) {
+        this.unguard();
+      } else {
+        // A close that never finishes (an async generator stuck in a
+        // read) keeps the guard on the source; the source is broken by
+        // then, and an error it still emits must not crash the process.
+        const unguard = () => { this.unguard(); };
+        closing.then(unguard, unguard);
+      }
     }
   }
 

@@ -568,8 +568,91 @@ describe('BulkLoad', function() {
       }
       assert.instanceOf(error, RequestError);
       assert.strictEqual(error.code, 'ECANCEL');
-      assert.strictEqual(source.listenerCount('error'), 0);
       assert.strictEqual(request.listenerCount('cancel'), 0);
+      // The source's `return()` is queued behind the read that never
+      // settles, so it never finishes closing, and stays guarded.
+      assert.strictEqual(source.listenerCount('error'), 1);
+    });
+
+    it('closes without waiting for a stuck source when the bulk load is canceled with a chunk downstream', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The source hands over one row and then never delivers another.
+      class Source extends EventEmitter {
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+          await new Promise(() => {});
+        }
+      }
+      const source = new Source();
+      const payload = new BulkLoadPayload(request, source);
+      const iterator = payload[Symbol.asyncIterator]();
+
+      // The first row comes out once the source is idle; the payload is
+      // now suspended handing it over, with the next read pending.
+      const first = await iterator.next();
+      assert.isFalse(first.done);
+
+      // Cancellation stops the consumer, which closes the payload as a
+      // destroyed stream would. The source's `return()` is queued behind
+      // its pending read and never settles; the close must not wait for it.
+      request.cancel();
+      const closed = await iterator.return(undefined);
+      assert.isTrue(closed.done);
+      assert.strictEqual(request.listenerCount('cancel'), 0);
+    });
+
+    it('keeps guarding an event-emitting source while it is still closing after a failure', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // The source fails out of band with a read pending, and its close
+      // reports a failure on a later tick, as a stream's `_destroy` may.
+      // Without a listener at that point the `'error'` would be unhandled.
+      const expected = new Error('source broke mid-read');
+      let closed = false;
+      class Source extends EventEmitter {
+        [Symbol.asyncIterator]() {
+          let count = 0;
+          return {
+            next: () => {
+              if (count++ === 0) {
+                return Promise.resolve({ done: false, value: [1] });
+              }
+              setImmediate(() => { this.emit('error', expected); });
+              return new Promise<IteratorResult<unknown[]>>(() => {});
+            },
+            return: () => {
+              return new Promise<IteratorResult<unknown[]>>((resolve) => {
+                setImmediate(() => {
+                  this.emit('error', new Error('cleanup failed'));
+                  closed = true;
+                  resolve({ done: true, value: undefined });
+                });
+              });
+            }
+          };
+        }
+      }
+      const source = new Source();
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, expected);
+
+      // The failure reached the bulk load before the close finished.
+      assert.isFalse(closed);
+      assert.strictEqual(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(closed);
+      assert.strictEqual(source.listenerCount('error'), 0);
     });
 
     it('takes its cancel listener off the bulk load once the rows are read', async function() {
@@ -621,7 +704,9 @@ describe('BulkLoad', function() {
         error = err;
       }
       assert.strictEqual(error, expected);
-      assert.strictEqual(source.listenerCount('error'), 0);
+      // The source's `return()` is queued behind the read that never
+      // settles, so it never finishes closing, and stays guarded.
+      assert.strictEqual(source.listenerCount('error'), 1);
     });
 
     it('keeps guarding a stream source closed unread until it has been destroyed', async function() {
