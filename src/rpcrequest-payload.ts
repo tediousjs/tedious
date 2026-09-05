@@ -88,12 +88,15 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const type = parameter.type;
 
-    if ((type.id & 0x30) === 0x20) {
-      if (parameter.length) {
-        param.length = parameter.length;
-      } else if (type.resolveLength) {
-        param.length = type.resolveLength(parameter);
-      }
+    // Note: this is deliberately not keyed off the legacy variable-length
+    // type id bit pattern ((type.id & 0x30) === 0x20), as that pattern does
+    // not hold for type ids introduced in TDS 7.2 and later (e.g. XMLTYPE
+    // 0xF1 or VECTORTYPE 0xF5). A type has a length whenever it can resolve
+    // one, mirroring how precision and scale are resolved below.
+    if (parameter.length) {
+      param.length = parameter.length;
+    } else if (type.resolveLength) {
+      param.length = type.resolveLength(parameter);
     }
 
     if (parameter.precision) {
