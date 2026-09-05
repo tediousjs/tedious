@@ -170,8 +170,12 @@ describe('BulkLoad', function() {
   });
 
   it('fires triggers if the `fireTriggers` option is set to `true`', async function() {
-    // Generate a random table name to avoid collisions when tests are run in parallel
+    // Generate a random table name to avoid collisions when tests are run in
+    // parallel against the same database (as the Azure CI jobs are). The
+    // trigger's name is derived from it for the same reason: trigger names
+    // are scoped to the schema, not to the table.
     const tableName = 'testTable' + Math.floor(Math.random() * 1000000);
+    const triggerName = tableName + 'Trigger';
 
     await new Promise<void>((resolve, reject) => {
       const dropTable = `DROP TABLE ${tableName}`;
@@ -207,7 +211,7 @@ describe('BulkLoad', function() {
 
     await new Promise<void>((resolve, reject) => {
       const createTrigger = `
-        CREATE TRIGGER bulkLoadTest on ${tableName}
+        CREATE TRIGGER ${triggerName} on ${tableName}
         AFTER INSERT
         AS
         INSERT INTO ${tableName} SELECT * FROM ${tableName};
