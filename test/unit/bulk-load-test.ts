@@ -7,6 +7,7 @@ import { RequestError } from '../../src/errors';
 import Connection, { type InternalConnectionOptions } from '../../src/connection';
 import { type Request } from '../../src/tedious';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
+import { Collation } from '../../src/collation';
 import { typeByName as TYPES, type DataType } from '../../src/data-type';
 
 // Test options - using type assertion since tests only exercise code paths
@@ -268,6 +269,133 @@ describe('BulkLoad', function() {
       assert.instanceOf(error, TypeError);
       assert.lengthOf(chunks, 0);
       assert.isTrue(closed);
+    });
+
+    it('serializes rows given as objects the same as rows given as arrays', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+      request.addColumn('name', TYPES.NVarChar, { nullable: true, length: 10 });
+
+      const fromArrays = Buffer.concat(await collect(new BulkLoadPayload(request, [[1, 'one'], [2, null]])));
+      const fromObjects = Buffer.concat(await collect(new BulkLoadPayload(request, [{ id: 1, name: 'one' }, { id: 2, name: null }])));
+      assert.deepEqual(fromObjects, fromArrays);
+    });
+
+    it('writes a text pointer and timestamp before a text value, and a null pointer for none', async function() {
+      const collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xD0, 0x00, 0x34]));
+      const request = new BulkLoad('tablename', collation, connectionOptions, { }, () => {});
+      request.addColumn('note', TYPES.Text, { nullable: true });
+
+      const data = Buffer.concat(await collect(new BulkLoadPayload(request, [['ab'], [null]])));
+      const rows = data.subarray(data.indexOf(0xD1), data.length - 13);
+
+      // ROW, 16-byte pointer prefixed by its length, 8-byte timestamp, 4-byte length, data.
+      const withValue = Buffer.concat([Buffer.from([0xD1, 0x10]), Buffer.alloc(16, 0), Buffer.alloc(8, 0), Buffer.from([2, 0, 0, 0]), Buffer.from('ab', 'ascii')]);
+      // ROW, null pointer.
+      const withoutValue = Buffer.from([0xD1, 0x00]);
+      assert.deepEqual(rows, Buffer.concat([withValue, withoutValue]));
+    });
+
+    it('writes the shorter DONE token of TDS versions before 7.2', async function() {
+      const request = new BulkLoad('tablename', undefined, { tdsVersion: '7_1' } as InternalConnectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const data = Buffer.concat(await collect(new BulkLoadPayload(request, [])));
+      assert.strictEqual(data[data.length - 9], 0xFD);
+      assert.strictEqual(data.readUInt32LE(data.length - 4), 0);
+    });
+
+    it('describes itself for the debug log', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      assert.strictEqual(new BulkLoadPayload(request, []).toString(), 'BulkLoad');
+      assert.strictEqual(new BulkLoadPayload(request, []).toString('  '), '  BulkLoad');
+    });
+
+    it('closes a synchronous source when the consumer stops early', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let closed = false;
+      const payload = new BulkLoadPayload(request, (function*() {
+        try {
+          let i = 0;
+          while (true) {
+            yield [i++];
+          }
+        } finally {
+          closed = true;
+        }
+      })());
+
+      const iterator = payload[Symbol.asyncIterator]();
+      await iterator.next();
+      await iterator.return();
+
+      assert.isTrue(closed);
+    });
+
+    it('closes a synchronous source when a row fails', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let closed = false;
+      const payload = new BulkLoadPayload(request, (function*() {
+        try {
+          yield [1];
+          yield ['not a number'];
+        } finally {
+          closed = true;
+        }
+      })());
+
+      let error;
+      try {
+        await collect(payload);
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, TypeError);
+      assert.isTrue(closed);
+    });
+
+    it('gets on without a return on the source when a row fails', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const rows = [[1], ['not a number']];
+      const source: Iterable<unknown[]> = {
+        [Symbol.iterator]() {
+          let i = 0;
+          return {
+            next: () => (i < rows.length ? { done: false, value: rows[i++] } : { done: true, value: undefined })
+          };
+        }
+      };
+
+      let error;
+      try {
+        await collect(new BulkLoadPayload(request, source));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, TypeError);
+    });
+
+    it('lets go of an event-emitting synchronous source closed unread at once', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      class Source extends EventEmitter {
+        *[Symbol.iterator]() {
+          yield [1];
+        }
+      }
+      const source = new Source();
+      const payload = new BulkLoadPayload(request, source);
+      assert.strictEqual(source.listenerCount('error'), 1);
+
+      payload.close();
+      assert.strictEqual(source.listenerCount('error'), 0);
     });
 
     it('closes the row source when the consumer stops early', async function() {
