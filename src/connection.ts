@@ -2816,24 +2816,20 @@ class Connection extends EventEmitter {
    * ]);
    * ```
    *
-   * ### Reading and closing the row source
+   * ### The row source
    *
-   * The rows are read only once the server has accepted the bulk load.
-   * Nothing is read from `rows` before that, and a bulk load that fails
-   * up to that point (the server rejects the `INSERT BULK` statement,
-   * [[BulkLoad.cancel]] was called, the connection was lost) completes
-   * without having touched the source.
+   * The connection owns `rows` from this call on, the way a `for await`
+   * loop owns what it iterates. The first row is requested right away,
+   * the rest once the server has accepted the bulk load, and the source
+   * is closed through its iterator's `return()` whenever the bulk load
+   * does not run to completion: a row failed, the bulk load was canceled,
+   * the server rejected the `INSERT BULK` statement, or the connection
+   * was lost. For a Node.js stream that destroys the stream. A read that
+   * is still pending in the source cannot be interrupted; the source is
+   * closed once it has settled.
    *
-   * From the first row on, the source is closed the way a `for await`
-   * loop closes it: when a row fails or the bulk load is canceled, the
-   * iterator's `return()` is called, which for a Node.js stream destroys
-   * the stream. An iterator that was never started has no `return()` to
-   * run, so a source that was never read stays open and remains the
-   * caller's to close.
-   *
-   * An async generator that opens what it reads from only once it is
-   * started needs no extra care: if it is never started, nothing was
-   * opened, and if it is closed early, its `finally` runs.
+   * An async generator that acquires what it reads from once it is
+   * started therefore releases it on every path, through its `finally`:
    *
    * ```js
    * async function* employees() {
@@ -2851,27 +2847,6 @@ class Connection extends EventEmitter {
    * connection.execBulkLoad(bulkLoad, employees());
    * ```
    *
-   * A stream that is created up front holds its resources from the start,
-   * so close it from the bulk load's callback in case it was never read.
-   * Destroying a stream that has already ended or was already destroyed
-   * is harmless.
-   *
-   * ```js
-   * const rows = otherDatabase.query('SELECT first_name, last_name, day_of_birth FROM employees').stream();
-   *
-   * const bulkLoad = connection.newBulkLoad('employees', (err, rowCount) => {
-   *   // The bulk load may have failed before any row was read from the
-   *   // stream, in which case the stream is still open.
-   *   rows.destroy();
-   *
-   *   // ...
-   * });
-   *
-   * // ... add the columns ...
-   *
-   * connection.execBulkLoad(bulkLoad, rows);
-   * ```
-   *
    * @param bulkLoad A previously created [[BulkLoad]].
    * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
    */
@@ -2880,8 +2855,9 @@ class Connection extends EventEmitter {
   execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
     bulkLoad.executionStarted = true;
 
-    // The rows are only read once the server has accepted the
-    // `INSERT BULK` statement and the request message is being sent.
+    // Owns the row source from here on: the first row is requested now,
+    // the rest are read once the server has accepted the `INSERT BULK`
+    // statement, and the source is closed if that never happens.
     const payload = new BulkLoadPayload(bulkLoad, rows ?? []);
 
     const onCancel = () => {
@@ -2895,9 +2871,17 @@ class Connection extends EventEmitter {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
+        payload.close();
         bulkLoad.error = error;
         bulkLoad.callback(error);
         return;
+      }
+
+      if (bulkLoad.canceled || this.state !== this.STATE.LOGGED_IN) {
+        // `makeRequest` completes a canceled bulk load, or one on a
+        // connection that is no longer logged in, without reading its
+        // payload.
+        payload.close();
       }
 
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);

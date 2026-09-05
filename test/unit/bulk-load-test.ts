@@ -2,7 +2,9 @@ import { assert } from 'chai';
 import { Readable } from 'stream';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
-import { type InternalConnectionOptions } from '../../src/connection';
+import { RequestError } from '../../src/errors';
+import Connection, { type InternalConnectionOptions } from '../../src/connection';
+import { type Request } from '../../src/tedious';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { Collation } from '../../src/collation';
 import { typeByName as TYPES, type DataType } from '../../src/data-type';
@@ -43,21 +45,6 @@ describe('BulkLoad', function() {
       for (const chunk of chunks) {
         assert.isAtMost(chunk.length, WritableTrackingBuffer.CHUNK_SIZE);
       }
-    });
-
-    it('does not read rows before the bytes are consumed', function() {
-      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
-      request.addColumn('id', TYPES.Int, { nullable: false });
-
-      let pulled = false;
-      const payload = new BulkLoadPayload(request, (function*() {
-        pulled = true;
-        yield [1];
-      })());
-
-      // Creating the payload and its iterator touches nothing.
-      payload[Symbol.asyncIterator]();
-      assert.isFalse(pulled);
     });
 
     it('hands a chunk downstream right away once a row fills it', async function() {
@@ -256,21 +243,75 @@ describe('BulkLoad', function() {
       assert.strictEqual(error, expected);
     });
 
-    it('takes its error listener off a stream source once the rows are read', async function() {
+    it('requests the first row when it is created, and no more', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
-      // The stream's own iterator leaves a listener of its own behind;
-      // the payload's must not add to it.
-      const plain = Readable.from([[1], [2]], { objectMode: true });
-      await collect(plain);
+      let requested = 0;
+      const rows = (function*() {
+        for (let i = 1; i <= 3; i++) {
+          requested++;
+          yield [i];
+        }
+      })();
+
+      const payload = new BulkLoadPayload(request, rows);
+      assert.strictEqual(requested, 1);
+
+      const data = Buffer.concat(await collect(payload));
+      assert.strictEqual(requested, 3);
+      assert.lengthOf(data.filter((byte) => byte === 0xD1), 3);
+    });
+
+    it('closes a stream source when closed unread', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
 
       const source = Readable.from([[1], [2]], { objectMode: true });
       const payload = new BulkLoadPayload(request, source);
-      assert.strictEqual(source.listenerCount('error'), 1);
+      assert.isFalse(source.destroyed);
 
-      await collect(payload);
-      assert.strictEqual(source.listenerCount('error'), plain.listenerCount('error'));
+      payload.close();
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(source.destroyed);
+    });
+
+    it('closes a generator source when closed unread', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      let closed = false;
+      const rows = (function*() {
+        try {
+          yield [1];
+          yield [2];
+        } finally {
+          closed = true;
+        }
+      })();
+
+      const payload = new BulkLoadPayload(request, rows);
+      assert.isFalse(closed);
+
+      payload.close();
+      assert.isTrue(closed);
+    });
+
+    it('never throws when closing a source that fails to close', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      const rows = (function*() {
+        try {
+          yield [1];
+        } finally {
+          // eslint-disable-next-line no-unsafe-finally
+          throw new Error('close failed');
+        }
+      })();
+
+      const payload = new BulkLoadPayload(request, rows);
+      assert.doesNotThrow(() => payload.close());
     });
 
     it('hands rows of null text cells downstream in chunks', async function() {
@@ -449,6 +490,43 @@ describe('BulkLoad', function() {
   it('starts out as not being canceled', function() {
     const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
     assert.strictEqual(request.canceled, false);
+  });
+
+  describe('#execBulkLoad', function() {
+    it('closes the row source when the connection is not logged in by the time the rows would be sent', function(done) {
+      // Never connected, so it is not logged in when the `INSERT BULK`
+      // statement's callback runs; `makeRequest` rejects the bulk load
+      // without reading its rows.
+      const connection = new Connection({ server: 'localhost', options: {} });
+      connection.execSqlBatch = (request: Request) => {
+        process.nextTick(() => { request.callback(undefined); });
+      };
+
+      const source = Readable.from([[1]], { objectMode: true });
+      const bulkLoad = connection.newBulkLoad('tablename', (err: any) => {
+        try {
+          assert.instanceOf(err, RequestError);
+          assert.strictEqual(err.code, 'EINVALIDSTATE');
+        } catch (assertion) {
+          return done(assertion);
+        }
+
+        // The stream's first read is still pending when the bulk load is
+        // rejected, this early; it is closed once that read has settled.
+        setImmediate(() => {
+          try {
+            assert.isTrue(source.destroyed);
+            done();
+          } catch (assertion) {
+            done(assertion);
+          }
+        });
+      });
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+      connection.execBulkLoad(bulkLoad, source);
+      assert.isFalse(source.destroyed);
+    });
   });
 
   describe('#cancel', function() {
