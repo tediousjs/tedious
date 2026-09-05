@@ -482,7 +482,7 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('error'), 0);
     });
 
-    it('only destroys an emitter source when closed unread, and never throws doing so', function() {
+    it('only destroys an emitter source when closed unread, and never throws doing so', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
@@ -513,12 +513,13 @@ describe('BulkLoad', function() {
       new BulkLoadPayload(request, emitter).close();
       assert.strictEqual(destroyCalls, 1);
 
-      // `destroy` threw, so nothing more can come from the source and the
-      // guard comes off right away.
+      // `destroy` threw, so nothing more can come from it; the guard
+      // comes off once the iterator's own `return()` has settled too.
+      await new Promise((resolve) => setImmediate(resolve));
       assert.strictEqual(emitter.listenerCount('error'), 0);
     });
 
-    it('takes its guard off a stream source closed unread once it says it is closed', function() {
+    it('takes its guard off a stream source closed unread once it says it is closed', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
@@ -534,8 +535,47 @@ describe('BulkLoad', function() {
 
       assert.strictEqual(emitter.listenerCount('error'), 2);
       emitter.emit('close');
-      assert.strictEqual(emitter.listenerCount('error'), 0);
       assert.strictEqual(emitter.listenerCount('close'), 0);
+
+      // The guard also waits for the iterator's `return()` to settle.
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.strictEqual(emitter.listenerCount('error'), 0);
+    });
+
+    it('keeps guarding an emitter source closed unread while its iterator is still closing', async function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('id', TYPES.Int, { nullable: false });
+
+      // No `destroy`; the iterator's `return()` lets go of what the source
+      // holds open, and reports a failure on a later tick. Without a
+      // listener at that point the `'error'` would be unhandled.
+      let closed = false;
+      class Source extends EventEmitter {
+        [Symbol.asyncIterator]() {
+          return {
+            next: () => Promise.resolve({ done: false, value: [1] }),
+            return: () => {
+              return new Promise<IteratorResult<unknown[]>>((resolve) => {
+                setImmediate(() => {
+                  this.emit('error', new Error('cleanup failed'));
+                  closed = true;
+                  resolve({ done: true, value: undefined });
+                });
+              });
+            }
+          };
+        }
+      }
+      const source = new Source();
+
+      new BulkLoadPayload(request, source).close();
+      assert.isFalse(closed);
+      assert.strictEqual(source.listenerCount('error'), 1);
+
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.isTrue(closed);
+      assert.strictEqual(source.listenerCount('error'), 0);
     });
 
     it('abandons a pending row read when the bulk load is canceled', async function() {
@@ -766,7 +806,10 @@ describe('BulkLoad', function() {
       payload.close();
       assert.isTrue(source.destroyed);
 
+      // The guard comes off once the stream has closed and its iterator's
+      // `return()` has settled.
       await new Promise((resolve) => source.once('close', resolve));
+      await new Promise((resolve) => setImmediate(resolve));
       assert.strictEqual(source.listenerCount('error'), 0);
 
       // Closing is a one-time thing; a close after the rows were read is a no-op.
