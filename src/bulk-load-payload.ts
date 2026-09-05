@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { Stream } from 'stream';
 import BulkLoad, { type Row, type RowSource } from './bulk-load';
 import { RequestError } from './errors';
 import { isPromiseLike } from './promise-like';
@@ -252,17 +253,19 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // iterator is returned, in the first `next()`), so the stream itself
     // is destroyed to release what it holds open. The unit test that
     // closes a `Readable` unread pins this against a change in Node. Only
-    // an emitter is taken for a stream, and its `destroy` is as best
-    // effort as the `return` above. A guard stays on until its
-    // destruction has finished, since its `_destroy` may report an error
-    // later, asynchronously: on `'close'`, on that `'error'`, right away
-    // when `destroy` itself throws, or right away when the destruction
-    // has already finished (Node's default `_destroy` completes
+    // a Node stream is destroyed: its destruction ends with a signal,
+    // where another emitter's `destroy` could finish silently and keep
+    // the guard on for good. Its `destroy` is as best effort as the
+    // `return` above. A guard stays on until the destruction has
+    // finished, since its `_destroy` may report an error later,
+    // asynchronously: on `'close'`, on that `'error'`, right away when
+    // `destroy` itself throws, or right away when the destruction has
+    // already finished (Node's default `_destroy` completes
     // synchronously; a stream that failed earlier emits nothing more),
     // which is the only signal from a stream created with
     // `emitClose: false`.
     const stream = this.rows as { destroy?: () => void, closed?: boolean, errored?: Error | null };
-    if (typeof stream.destroy === 'function') {
+    if (this.rows instanceof Stream && typeof stream.destroy === 'function') {
       const destroyed = () => {
         emitter.removeListener('close', destroyed);
         emitter.removeListener('error', destroyed);

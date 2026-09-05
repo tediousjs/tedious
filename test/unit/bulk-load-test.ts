@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import { Readable } from 'stream';
+import { Readable, Stream } from 'stream';
 import { EventEmitter } from 'events';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
@@ -515,7 +515,7 @@ describe('BulkLoad', function() {
       assert.strictEqual(source.listenerCount('error'), 0);
     });
 
-    it('only destroys an emitter source when closed unread, and never throws doing so', async function() {
+    it('only destroys a stream source when closed unread, and never throws doing so', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
@@ -532,7 +532,25 @@ describe('BulkLoad', function() {
       new BulkLoadPayload(request, plain).close();
       assert.strictEqual(destroyCalls, 0);
 
+      // An emitter that is not a stream is not destroyed either: its
+      // `destroy` could finish without any signal, and the guard would
+      // never come off.
       class Emitter extends EventEmitter {
+        destroy() {
+          destroyCalls++;
+        }
+
+        async *[Symbol.asyncIterator]() {
+          yield [1];
+        }
+      }
+      const emitter = new Emitter();
+      new BulkLoadPayload(request, emitter).close();
+      assert.strictEqual(destroyCalls, 0);
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.strictEqual(emitter.listenerCount('error'), 0);
+
+      class Failing extends Stream {
         destroy() {
           destroyCalls++;
           throw new Error('destroy failed');
@@ -542,21 +560,21 @@ describe('BulkLoad', function() {
           yield [1];
         }
       }
-      const emitter = new Emitter();
-      new BulkLoadPayload(request, emitter).close();
+      const failing = new Failing();
+      new BulkLoadPayload(request, failing).close();
       assert.strictEqual(destroyCalls, 1);
 
       // `destroy` threw, so nothing more can come from it; the guard
       // comes off once the iterator's own `return()` has settled too.
       await new Promise((resolve) => setImmediate(resolve));
-      assert.strictEqual(emitter.listenerCount('error'), 0);
+      assert.strictEqual(failing.listenerCount('error'), 0);
     });
 
     it('takes its guard off a stream source closed unread once it says it is closed', async function() {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
       request.addColumn('id', TYPES.Int, { nullable: false });
 
-      class Emitter extends EventEmitter {
+      class Emitter extends Stream {
         destroy() {}
 
         async *[Symbol.asyncIterator]() {
@@ -840,7 +858,7 @@ describe('BulkLoad', function() {
       // different ticks; the guard must outlast the slower one.
       let returned = false;
       let closed = false;
-      class Source extends EventEmitter {
+      class Source extends Stream {
         destroy() {
           setImmediate(() => {
             closed = true;
