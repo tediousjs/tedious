@@ -14,10 +14,6 @@ const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 // of the rows.
 const NULL_TABLE = Buffer.from([0xFF, 0xFF, 0x00, 0x00]);
 
-// Row data is accumulated up to this size before being handed out, so the
-// number of yields is proportional to the byte size, not the row count.
-const FLUSH_SIZE = WritableTrackingBuffer.CHUNK_SIZE;
-
 interface TvpColumn {
   name: string;
   type: DataType;
@@ -95,39 +91,35 @@ function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], row: Tvp
   }
 }
 
-function * writeRows(value: TvpValue, rows: TvpRow[], collation: Collation | undefined, options: InternalConnectionOptions): Generator<Buffer, void> {
-  const buffer = new WritableTrackingBuffer();
+// Rows given as an array are written in a synchronous loop, so the only
+// asynchrony is the yield for every chunk's worth of rows.
+async function * writeRows(buffer: WritableTrackingBuffer, value: TvpValue, rows: TvpRow[], collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<void, void> {
   writeColumnMetadata(buffer, value, options);
 
   for (let i = 0, len = rows.length; i < len; i++) {
     writeRow(buffer, value.columns, validateRow(value.columns, rows[i], i, collation), options);
 
-    if (buffer.length >= FLUSH_SIZE) {
-      yield * buffer.getBuffers();
-      buffer.consume(buffer.length);
+    if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+      yield;
     }
   }
 
   buffer.writeBuffer(TVP_END_TOKEN);
-  yield * buffer.getBuffers();
 }
 
-async function * writeRowsFrom(value: TvpValue, rows: AsyncIterable<TvpRow>, collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<Buffer, void> {
-  const buffer = new WritableTrackingBuffer();
+async function * writeRowsFrom(buffer: WritableTrackingBuffer, value: TvpValue, rows: AsyncIterable<TvpRow>, collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<void, void> {
   writeColumnMetadata(buffer, value, options);
 
   let rowIndex = 0;
   for await (const row of rows) {
     writeRow(buffer, value.columns, validateRow(value.columns, row, rowIndex++, collation), options);
 
-    if (buffer.length >= FLUSH_SIZE) {
-      yield * buffer.getBuffers();
-      buffer.consume(buffer.length);
+    if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+      yield;
     }
   }
 
   buffer.writeBuffer(TVP_END_TOKEN);
-  yield * buffer.getBuffers();
 }
 
 const TVP: DataType = {
@@ -286,18 +278,20 @@ const TVP: DataType = {
     buffer.writeBVarchar(value?.name ?? '', 'ucs2');
   },
 
-  writeValueStream(parameter, options) {
+  async * writeValueStream(buffer, parameter, options) {
     const value = parameter.value as TvpValue | null;
 
     if (value == null) {
-      return [NULL_TABLE];
+      buffer.writeBuffer(NULL_TABLE);
+      return;
     }
 
     if (Array.isArray(value.rows)) {
-      return writeRows(value, value.rows, parameter.collation, options);
+      yield * writeRows(buffer, value, value.rows, parameter.collation, options);
+      return;
     }
 
-    return writeRowsFrom(value, value.rows, parameter.collation, options);
+    yield * writeRowsFrom(buffer, value, value.rows, parameter.collation, options);
   }
 };
 

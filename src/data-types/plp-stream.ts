@@ -13,13 +13,12 @@ export function isAsyncIterable(value: unknown): value is AsyncIterable<unknown>
 }
 
 /**
- * Streams a PLP value: the unknown-length marker, then one length-prefixed
- * chunk per non-empty encoded piece read from `source`, then the terminator.
- * Pieces are coalesced up to `CHUNK_SIZE` before being handed out, so the
- * number of yields is proportional to the byte size, not the chunk count.
+ * Writes a streamed PLP value into `buffer`: the unknown-length marker, then
+ * one length-prefixed chunk per non-empty encoded piece read from `source`,
+ * then the terminator. Yields whenever the buffer holds a chunk's worth, as
+ * `DataType.writeValueStream` promises.
  */
-export async function * writePlpStream(source: AsyncIterable<unknown>, encode: (chunk: unknown) => Buffer): AsyncGenerator<Buffer, void> {
-  const buffer = new WritableTrackingBuffer();
+export async function * writePlpStream(buffer: WritableTrackingBuffer, source: AsyncIterable<unknown>, encode: (chunk: unknown) => Buffer): AsyncGenerator<void, void> {
   buffer.writeBuffer(UNKNOWN_PLP_LEN);
 
   for await (const chunk of source) {
@@ -34,11 +33,9 @@ export async function * writePlpStream(source: AsyncIterable<unknown>, encode: (
     buffer.writeBuffer(bytes);
 
     if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
-      yield * buffer.getBuffers();
-      buffer.consume(buffer.length);
+      yield;
     }
   }
 
   buffer.writeBuffer(PLP_TERMINATOR);
-  yield * buffer.getBuffers();
 }

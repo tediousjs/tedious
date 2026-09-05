@@ -123,16 +123,12 @@ export interface DataType {
 
   /**
    * Writes the value of a resolved parameter whose data is not fully in
-   * memory (`parameter.streamed`): yields the length prefix and data as
-   * buffers, in chunks of the type's choosing, reading the value's source
-   * as it goes. A synchronous source (e.g. an array of rows) may be written
-   * by a synchronous iterable, an asynchronous one by an async iterable.
-   *
-   * A large buffer (`CHUNK_SIZE` or more) is referenced rather than copied,
-   * so a source must not reuse or mutate a buffer it has yielded until the
-   * request has been sent.
+   * memory (`parameter.streamed`) into `buffer`, as `writeValue` would,
+   * reading the value's source as it goes. Yields whenever `buffer` holds a
+   * chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`) or more, so that the
+   * caller can hand those bytes on before the rest of the value is read.
    */
-  writeValueStream?(parameter: ParameterData, options: InternalConnectionOptions): Iterable<Buffer> | AsyncIterable<Buffer>;
+  writeValueStream?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): AsyncIterable<void>;
 }
 
 /**

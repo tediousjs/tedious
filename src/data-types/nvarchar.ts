@@ -218,8 +218,8 @@ const NVarChar: { maximumLength: number } & DataType = {
     return data;
   },
 
-  writeValueStream(parameter) {
-    return writePlpStream(parameter.value as AsyncIterable<unknown>, (chunk) => {
+  writeValueStream(buffer, parameter) {
+    return writePlpStream(buffer, parameter.value as AsyncIterable<unknown>, (chunk) => {
       if (typeof chunk !== 'string') {
         throw new TypeError('Invalid string.');
       }

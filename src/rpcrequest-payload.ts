@@ -37,8 +37,9 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
    * it holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`), checked
    * after every parameter, and at the end. A large value written by
    * reference stays by reference, so this costs no extra copy. A parameter
-   * whose value is streamed (`data.streamed`) has its bytes yielded by the
-   * type's `writeValueStream`, read from the value's source as it goes.
+   * whose value is streamed (`data.streamed`) is written into the same
+   * buffer by the type's `writeValueStream`, which reads the value's source
+   * as it goes and yields whenever the buffer is worth handing on.
    */
   async *[Symbol.asyncIterator]() {
     const buffer = new WritableTrackingBuffer();
@@ -49,30 +50,19 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       const parameter = this.parameters[i];
       this.writeParameterHeader(buffer, parameter);
 
-      if (parameter.data.streamed) {
-        try {
-          writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-        } catch (error) {
-          throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-        }
-
-        // Flush everything written so far, then let the type stream the
-        // value's bytes (length prefix and data) from its source.
-        yield * buffer.getBuffers();
-        buffer.consume(buffer.length);
-
-        try {
-          yield * parameter.type.writeValueStream!(parameter.data, this.options);
-        } catch (error) {
-          throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-        }
-
-        continue;
-      }
-
       try {
         writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-        writeValue(parameter.type, buffer, parameter.data, this.options);
+
+        if (parameter.data.streamed) {
+          // The type yields whenever the buffer is worth handing on.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          for await (const _ of parameter.type.writeValueStream!(buffer, parameter.data, this.options)) {
+            yield * buffer.getBuffers();
+            buffer.consume(buffer.length);
+          }
+        } else {
+          writeValue(parameter.type, buffer, parameter.data, this.options);
+        }
       } catch (error) {
         throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
       }

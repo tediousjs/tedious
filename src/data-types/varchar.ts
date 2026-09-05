@@ -159,7 +159,7 @@ const VarChar: { maximumLength: number } & DataType = {
     return data;
   },
 
-  writeValueStream(parameter) {
+  writeValueStream(buffer, parameter) {
     const collation = parameter.collation;
     if (!collation) {
       throw new Error('No collation was set by the server for the current connection.');
@@ -172,7 +172,7 @@ const VarChar: { maximumLength: number } & DataType = {
     // Each chunk is encoded on its own, as `Writable.prototype.write` would
     // encode it: a source must not split a UTF-16 surrogate pair across two
     // chunks (see `Request.addParameter`).
-    return writePlpStream(parameter.value as AsyncIterable<unknown>, (chunk) => {
+    return writePlpStream(buffer, parameter.value as AsyncIterable<unknown>, (chunk) => {
       if (typeof chunk !== 'string') {
         throw new TypeError('Invalid string.');
       }
