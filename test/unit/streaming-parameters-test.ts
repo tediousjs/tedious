@@ -239,6 +239,24 @@ describe('streaming parameters', function() {
     assert.include(((error as InputError).cause as InputError).message, 'has 1 value(s), but 2 column(s)');
   });
 
+  it('rejects a TVP row that is not an array', async function() {
+    const columns = [{ name: 'a', type: TYPES.Int }];
+    async function * rows() {
+      yield { a: 1 } as unknown as unknown[];
+    }
+    const resolved = resolveParameter(param({ type: TYPES.TVP, name: 'tvp', value: { name: 'T', columns, rows: rows() } }), collation, options);
+
+    let error: unknown;
+    try {
+      await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+    } catch (err) {
+      error = err;
+    }
+    assert.instanceOf(error, InputError);
+    assert.instanceOf((error as InputError).cause, InputError);
+    assert.strictEqual(((error as InputError).cause as InputError).message, 'TVP row at index 0 is not an array');
+  });
+
   it('serializes a TVP from an async iterable of rows exactly as from an array', async function() {
     const columns = [
       { name: 'id', type: TYPES.Int },

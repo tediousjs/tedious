@@ -73,8 +73,9 @@ export interface ParameterData<T = any> {
 
   /**
    * Whether `value` is a source that is read while the parameter is being
-   * written (see `DataType.writeValueStream`) rather than a value that is
-   * fully in memory.
+   * written rather than a value that is fully in memory. A type that
+   * resolves a value as streamed must implement `DataType.writeValueStream`,
+   * which is what writes it.
    */
   streamed?: boolean | undefined;
 }
