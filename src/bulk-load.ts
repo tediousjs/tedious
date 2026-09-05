@@ -6,6 +6,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
 import { Collation } from './collation';
+import { isPromiseLike } from './promise-like';
 
 /**
  * @private
@@ -148,10 +149,6 @@ export interface RowSource {
 }
 
 function ignoreError() {}
-
-function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-  return value != null && typeof (value as PromiseLike<T>).then === 'function';
-}
 
 /**
  * A BulkLoad instance is used to perform a bulk insert.

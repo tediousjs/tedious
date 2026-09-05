@@ -1,14 +1,12 @@
 import { EventEmitter } from 'events';
 import BulkLoad, { type Row, type RowSource } from './bulk-load';
 import { RequestError } from './errors';
+import { isPromiseLike } from './promise-like';
 
-// Kept local: `bulk-load.ts` ends with a `module.exports` assignment for
-// its default export, which leaves it no named runtime exports.
+// `bulk-load.ts` has one too, and cannot share it: it ends with a
+// `module.exports` assignment for its default export, which leaves it no
+// named runtime exports.
 function ignoreError() {}
-
-function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-  return value != null && typeof (value as PromiseLike<T>).then === 'function';
-}
 
 /**
  * Swallows what `emitter` emits as `'error'` until `closing` settles: the
@@ -197,9 +195,20 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
 
   /**
    * Releases the row source of a payload whose rows were never read: the
-   * `INSERT BULK` statement was rejected, or the bulk load was canceled
-   * before its request message was sent. A payload that is being read
-   * closes the source itself when it stops.
+   * `INSERT BULK` statement was rejected, the bulk load was canceled
+   * before its request message was sent, or the connection is no longer
+   * logged in. A payload that is being read closes the source itself
+   * when it stops.
+   *
+   * In order: the payload lets go of the bulk load (`release`) and of
+   * the source (`unguard`), so that nothing of it is retained from here
+   * on; the source's iterator is returned; a stream source is destroyed.
+   * Each of the two releases that may still be running gets a standalone
+   * `'error'` listener on the source for as long as it runs, the
+   * iterator's until its `return()` settles, the stream's until its
+   * destruction has finished, and the source is unguarded once both are
+   * gone. Everything is best effort: a source that fails while being
+   * released has nothing to report it to, the bulk load already failed.
    */
   close() {
     if (this.started) {
@@ -208,8 +217,6 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     this.started = true;
     this.release();
 
-    // Closing is best effort: a source that fails while being released
-    // has nothing to report it to, the bulk load already failed.
     let closing: Promise<unknown> | undefined;
     if (typeof this.source.return === 'function') {
       try {
