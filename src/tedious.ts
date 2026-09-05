@@ -3,7 +3,7 @@ import Connection, { type ConnectionAuthentication, type ConnectionConfiguration
 import Request from './request';
 import { name } from './library';
 
-import { ConnectionError, RequestError } from './errors';
+import { ConnectionError, InputError, RequestError } from './errors';
 
 import { TYPES } from './data-type';
 import { ISOLATION_LEVEL } from './transaction';
@@ -23,6 +23,7 @@ export {
   Request,
   library,
   ConnectionError,
+  InputError,
   RequestError,
   TYPES,
   ISOLATION_LEVEL,
