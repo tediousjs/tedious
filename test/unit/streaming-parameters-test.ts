@@ -336,6 +336,15 @@ describe('streaming parameters', function() {
   });
 
   describe('invariants', function() {
+    it('rejects a TVP whose rows are neither an array nor an async iterable', function() {
+      const columns = [{ name: 'a', type: TYPES.Int }];
+      for (const rows of [{}, null, 'rows', 42]) {
+        assert.throws(() => {
+          resolveParameter(param({ type: TYPES.TVP, value: { name: 'T', columns, rows } }), collation, options);
+        }, TypeError, 'Invalid table.');
+      }
+    });
+
     it('rejects a streamed varchar without a collation when the parameter is resolved', function() {
       assert.throws(() => {
         resolveParameter(param({ type: TYPES.VarChar, value: from(['a']) }), undefined, options);

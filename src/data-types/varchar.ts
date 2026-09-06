@@ -159,14 +159,16 @@ const VarChar: { maximumLength: number } & DataType = {
     return data;
   },
 
-  writeValueStream(buffer, parameter) {
+  // An async generator, like the other streamed types, so that nothing runs
+  // before the payload's first `next()`.
+  async * writeValueStream(buffer, parameter) {
     // `resolve` rejected a streamed value without a collation or codepage.
     const codepage = parameter.collation!.codepage!;
 
     // Each chunk is encoded on its own, as `Writable.prototype.write` would
     // encode it: a source must not split a UTF-16 surrogate pair across two
     // chunks (see `Request.addParameter`).
-    return writePlpStream(buffer, parameter.value as AsyncIterable<unknown>, (chunk) => {
+    yield * writePlpStream(buffer, parameter.value as AsyncIterable<unknown>, (chunk) => {
       if (typeof chunk !== 'string') {
         throw new TypeError('Invalid string.');
       }
