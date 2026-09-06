@@ -124,6 +124,12 @@ node benchmarks/compare/select-many-rows.js driver=msnodesqlv8 n=100
   compare the resident set size when looking at total memory usage. Peak
   values include whatever the process had allocated before the measurement
   started (e.g. test data), which is the same for both drivers.
+- Configurations with few iterations (`n=10`, `n=100`) of fast requests
+  complete in well under a second, which is inside V8's JIT warm-up window.
+  `tedious` executes far more JavaScript per request than a native driver and
+  is therefore penalised more by a cold JIT: on a 1 KB parameterised request
+  its throughput roughly doubles between the first and the 3000th request.
+  Use `n=1000` or higher when comparing small, fast requests.
 - The drivers are given comparable, but not identical, work: `tedious` is
   asked to collect all rows of a result set through its `row` event, while
   `msnodesqlv8` returns the rows of a result set from its `query` callback.
