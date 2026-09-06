@@ -47,6 +47,10 @@ class IncomingMessage extends Readable {
    * `false`.
    */
   declare onDrain: (() => void) | undefined;
+  /**
+   * Whether buffered data is currently being delivered to the sink.
+   */
+  declare flushing: boolean;
 
   constructor({ type }: { type: number }) {
     super();
@@ -58,10 +62,16 @@ class IncomingMessage extends Readable {
     this.ended = false;
     this.endDelivered = false;
     this.onDrain = undefined;
+    this.flushing = false;
   }
 
   _read() {
-    this.notifyDrain();
+    // While buffered data is being delivered to the sink, the stream's
+    // buffer draining must not let the writer add data, as it would be
+    // delivered ahead of what is still buffered.
+    if (!this.flushing) {
+      this.notifyDrain();
+    }
   }
 
   notifyDrain() {
@@ -78,7 +88,7 @@ class IncomingMessage extends Readable {
    */
   write(data: Buffer): boolean {
     const sink = this.sink;
-    if (sink !== undefined) {
+    if (sink !== undefined && !this.stalled) {
       if (sink.push(data)) {
         return true;
       }
@@ -87,7 +97,11 @@ class IncomingMessage extends Readable {
       return false;
     }
 
-    return this.push(data);
+    // No sink yet, or the sink asked for delivery to be suspended while
+    // data was still buffered: buffer the data, and hold the writer back
+    // while the sink is stalled.
+    const accepted = this.push(data);
+    return accepted && !this.stalled;
   }
 
   /**
@@ -117,6 +131,11 @@ class IncomingMessage extends Readable {
 
     this.sink = sink;
     this.flushToSink();
+
+    if (!this.stalled) {
+      // The writer may have been held back by the stream's buffer.
+      this.notifyDrain();
+    }
   }
 
   /**
@@ -125,17 +144,22 @@ class IncomingMessage extends Readable {
   flushToSink() {
     const sink = this.sink!;
 
-    let chunk;
-    while ((chunk = this.read()) !== null) {
-      if (!sink.push(chunk)) {
-        this.stalled = true;
-        return;
+    this.flushing = true;
+    try {
+      let chunk;
+      while ((chunk = this.read()) !== null) {
+        if (!sink.push(chunk)) {
+          this.stalled = true;
+          return;
+        }
       }
-    }
 
-    if (this.ended && !this.endDelivered) {
-      this.endDelivered = true;
-      sink.end();
+      if (this.ended && !this.endDelivered) {
+        this.endDelivered = true;
+        sink.end();
+      }
+    } finally {
+      this.flushing = false;
     }
   }
 
