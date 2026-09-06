@@ -53,18 +53,46 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       try {
         writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
 
-        if (parameter.data.streamed) {
-          // The type yields whenever the buffer is worth handing on.
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          for await (const _ of parameter.type.writeValueStream!(buffer, parameter.data, this.options)) {
-            yield * buffer.getBuffers();
-            buffer.consume(buffer.length);
-          }
-        } else {
+        if (!parameter.data.streamed) {
           writeValue(parameter.type, buffer, parameter.data, this.options);
         }
       } catch (error) {
         throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+      }
+
+      if (parameter.data.streamed) {
+        // The type yields whenever the buffer is worth handing on. Only the
+        // type's reads are wrapped as the parameter's error; the yields to
+        // the consumer stay outside that `try`, so an error the consumer
+        // throws into this generator is not relabeled as the parameter's.
+        const flushes = parameter.type.writeValueStream!(buffer, parameter.data, this.options)[Symbol.asyncIterator]();
+        let done = false;
+        try {
+          while (true) {
+            let result: IteratorResult<void>;
+            try {
+              result = await flushes.next();
+            } catch (error) {
+              // A generator that threw is finished; there is nothing to close.
+              done = true;
+              throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+            }
+
+            if (result.done) {
+              done = true;
+              break;
+            }
+
+            yield * buffer.getBuffers();
+            buffer.consume(buffer.length);
+          }
+        } finally {
+          // The consumer stopped pulling: close the type's generator, and
+          // with it the value's source, as `for await` would.
+          if (!done && typeof flushes.return === 'function') {
+            await flushes.return();
+          }
+        }
       }
 
       if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
