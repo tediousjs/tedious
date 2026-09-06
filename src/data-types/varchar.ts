@@ -191,6 +191,53 @@ const VarChar: { maximumLength: number } & DataType = {
     } else {
       writePlpValue(buffer, value);
     }
+  },
+
+  compileWriter(column) {
+    const collation = column.collation;
+    const codepage = collation?.codepage;
+
+    // A cell is encoded like `validate` would, once its value is known to
+    // be a string; the collation is only needed then.
+    function encode(value: unknown): Buffer {
+      if (typeof value !== 'string') {
+        throw new TypeError('Invalid string.');
+      }
+      if (!collation) {
+        throw new Error('No collation was set by the server for the current connection.');
+      }
+      if (!codepage) {
+        throw new Error('The collation set by the server has no associated encoding.');
+      }
+      return iconv.encode(value, codepage);
+    }
+
+    if (column.length! <= this.maximumLength) {
+      return (buffer, value) => {
+        if (value == null) {
+          buffer.writeBuffer(NULL_LENGTH);
+          return;
+        }
+
+        const bytes = encode(value);
+        buffer.writeUInt16LE(bytes.length);
+        buffer.writeBuffer(bytes);
+      };
+    }
+
+    // varchar(max): a string, or a source read while the row is written.
+    return (buffer, value) => {
+      if (value == null) {
+        buffer.writeBuffer(MAX_NULL_LENGTH);
+        return;
+      }
+
+      if (isAsyncIterable(value)) {
+        return writePlpStream(buffer, value, encode);
+      }
+
+      writePlpValue(buffer, encode(value));
+    };
   }
 };
 

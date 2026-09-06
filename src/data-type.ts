@@ -72,6 +72,19 @@ export interface ParameterData<T = any> {
   value: T;
 }
 
+/**
+ * The declaration facts of a column whose cells are written one after the
+ * other: a TVP column, or a bulk load column.
+ */
+export type ColumnData = Omit<ParameterData, 'value'>;
+
+/**
+ * Writes one cell of a column into `buffer`: validates the value and writes
+ * its length prefix and data. A value read from a source while the request
+ * is written returns the rest of the write, as `DataType.writeValue` does.
+ */
+export type CellWriter = (buffer: WritableTrackingBuffer, value: unknown) => void | AsyncIterable<void>;
+
 export interface DataType {
   id: number;
   type: string;
@@ -121,6 +134,15 @@ export interface DataType {
    * value is read. Nothing of that rest runs before its first `next()`.
    */
   writeValue?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
+
+  /**
+   * Builds the writer for the cells of a column, whose declaration facts
+   * are known before any of its values: the writer validates and writes one
+   * value, as `validate` followed by `writeValue` would, with the facts
+   * resolved once, here, rather than per cell. Types without one are
+   * adapted from those two methods by `compileWriter` below.
+   */
+  compileWriter?(column: ColumnData, options: InternalConnectionOptions): CellWriter;
 }
 
 /**
@@ -206,6 +228,27 @@ export function writeValue(type: DataType, buffer: WritableTrackingBuffer, param
   for (const chunk of type.generateParameterData(parameter, options)) {
     buffer.writeBuffer(chunk);
   }
+}
+
+/**
+ * Builds the writer for the cells of a column (see `DataType.compileWriter`).
+ * A type without one gets a writer that validates and writes each cell
+ * through its `validate` and `writeValue`, with one reused cell object.
+ */
+export function compileWriter(type: DataType, column: ColumnData, options: InternalConnectionOptions): CellWriter {
+  if (type.compileWriter) {
+    return type.compileWriter(column, options);
+  }
+
+  // Reused for every cell: a type writes a cell's bytes as soon as it is
+  // handed the cell and keeps no reference to it.
+  const cell: ParameterData = { length: column.length, precision: column.precision, scale: column.scale, collation: column.collation, value: undefined };
+  const collation = column.collation;
+
+  return (buffer, value) => {
+    cell.value = type.validate(value, collation);
+    return writeValue(type, buffer, cell, options);
+  };
 }
 
 /**

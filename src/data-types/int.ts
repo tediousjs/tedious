@@ -68,6 +68,30 @@ const Int: DataType = {
     }
 
     return value | 0;
+  },
+
+  compileWriter() {
+    return (buffer, value) => {
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
+
+      if (typeof value !== 'number') {
+        value = Number(value);
+      }
+
+      if (isNaN(value as number)) {
+        throw new TypeError('Invalid number.');
+      }
+
+      if ((value as number) < -2147483648 || (value as number) > 2147483647) {
+        throw new TypeError('Value must be between -2147483648 and 2147483647, inclusive.');
+      }
+
+      buffer.writeUInt8(0x04);
+      buffer.writeInt32LE((value as number) | 0);
+    };
   }
 };
 

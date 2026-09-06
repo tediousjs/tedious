@@ -1,7 +1,7 @@
 import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import { compileWriter, writeRest } from './data-type';
 import { TYPE as TOKEN_TYPE } from './token/token';
-import { writeValue } from './data-type';
 
 export type Row = unknown[] | { [colName: string]: unknown };
 
@@ -113,6 +113,11 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // text pointer and timestamp, or as a null pointer.
     const isTextType = columns.map((c) => c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText');
 
+    // One writer per column, compiled once for all rows: it validates and
+    // writes a cell, and returns the rest of the write for a cell whose
+    // value is read from a source while the row is written.
+    const writers = columns.map((c) => compileWriter(c.type, { length: c.length, scale: c.scale, precision: c.precision, collation: c.collation }, options));
+
     const buffer = new WritableTrackingBuffer();
     buffer.writeBuffer(bulkLoad.getColMetaData());
 
@@ -143,14 +148,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         const isArray = Array.isArray(row);
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
-          const value = c.type.validate(isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName], c.collation);
-
-          const parameter = {
-            length: c.length,
-            scale: c.scale,
-            precision: c.precision,
-            value: value
-          };
+          const value = isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName];
 
           if (isTextType[i] && value == null) {
             buffer.writeBuffer(textPointerNullBuffer);
@@ -159,7 +157,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
               buffer.writeBuffer(textPointerAndTimestampBuffer);
             }
 
-            writeValue(c.type, buffer, parameter, options);
+            const rest = writers[i](buffer, value);
+            if (rest !== undefined) {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              for await (const _ of writeRest(rest, (error) => error as Error)) {
+                for (const chunk of buffer.getBuffers()) {
+                  yield chunk;
+                }
+                buffer.consume(buffer.length);
+              }
+            }
           }
 
           // Checked after every cell, not only after every row, so that a

@@ -1,5 +1,5 @@
 import { type DataType, type ParameterData } from '../data-type';
-import { isAsyncIterable, writePlpStream } from './plp-stream';
+import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -199,6 +199,42 @@ const VarBinary: { maximumLength: number } & DataType = {
     const data: ParameterData = { value };
     data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
     return data;
+  },
+
+  compileWriter(column) {
+    if (column.length! <= this.maximumLength) {
+      return (buffer, value) => {
+        if (value == null) {
+          buffer.writeBuffer(NULL_LENGTH);
+          return;
+        }
+
+        if (!Buffer.isBuffer(value)) {
+          throw new TypeError('Invalid buffer.');
+        }
+
+        buffer.writeUInt16LE(value.length);
+        buffer.writeBuffer(value);
+      };
+    }
+
+    // varbinary(max): a buffer, or a source read while the row is written.
+    return (buffer, value) => {
+      if (value == null) {
+        buffer.writeBuffer(MAX_NULL_LENGTH);
+        return;
+      }
+
+      if (isAsyncIterable(value)) {
+        return writePlpStream(buffer, value, requireBuffer);
+      }
+
+      if (!Buffer.isBuffer(value)) {
+        throw new TypeError('Invalid buffer.');
+      }
+
+      writePlpValue(buffer, value);
+    };
   }
 };
 

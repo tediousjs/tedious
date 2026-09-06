@@ -1,5 +1,5 @@
 import { type DataType, type ParameterData } from '../data-type';
-import { isAsyncIterable, writePlpStream } from './plp-stream';
+import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -229,6 +229,42 @@ const NVarChar: { maximumLength: number } & DataType = {
       data.collation = collation;
     }
     return data;
+  },
+
+  compileWriter(column) {
+    if (column.length! <= this.maximumLength) {
+      return (buffer, value) => {
+        if (value == null) {
+          buffer.writeBuffer(NULL_LENGTH);
+          return;
+        }
+
+        if (typeof value !== 'string') {
+          throw new TypeError('Invalid string.');
+        }
+
+        buffer.writeUInt16LE(value.length * 2);
+        buffer.writeString(value, 'ucs2');
+      };
+    }
+
+    // nvarchar(max): a string, or a source read while the row is written.
+    return (buffer, value) => {
+      if (value == null) {
+        buffer.writeBuffer(MAX_NULL_LENGTH);
+        return;
+      }
+
+      if (isAsyncIterable(value)) {
+        return writePlpStream(buffer, value, encodeUcs2);
+      }
+
+      if (typeof value !== 'string') {
+        throw new TypeError('Invalid string.');
+      }
+
+      writePlpValue(buffer, Buffer.from(value, 'ucs2'));
+    };
   }
 };
 

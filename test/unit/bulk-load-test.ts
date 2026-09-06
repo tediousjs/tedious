@@ -369,9 +369,12 @@ describe('BulkLoad', function() {
       const serialized: string[] = [];
       const tracking = (name: string): DataType => ({
         ...TYPES.VarBinary,
-        writeValue(buffer, parameter, options) {
-          serialized.push(name);
-          TYPES.VarBinary.writeValue!(buffer, parameter, options);
+        compileWriter(column, options) {
+          const write = TYPES.VarBinary.compileWriter!(column, options);
+          return (buffer, value) => {
+            serialized.push(name);
+            return write(buffer, value);
+          };
         }
       });
       request.addColumn('a', tracking('a'), { length: 6000, nullable: false });

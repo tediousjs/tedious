@@ -1,4 +1,4 @@
-import { type DataType, type ParameterData, writeTypeInfo, writeValue } from '../data-type';
+import { type CellWriter, type DataType, type ParameterData, compileWriter, writeRest, writeTypeInfo } from '../data-type';
 import { type InternalConnectionOptions } from '../connection';
 import { type Collation } from '../collation';
 import { InputError } from '../errors';
@@ -52,10 +52,20 @@ function validateTable(value: unknown): TvpValue | null {
   return value as TvpValue;
 }
 
-// One cell per column, reused for every row: a type writes a cell's bytes
-// as soon as it is handed the cell and keeps no reference to it.
-function cellsFor(columns: TvpColumn[]): ParameterData[] {
-  return columns.map((column) => ({ value: undefined, length: column.length, scale: column.scale, precision: column.precision }));
+// One writer per column, compiled once for all rows.
+function writersFor(columns: TvpColumn[], collation: Collation | undefined, options: InternalConnectionOptions): CellWriter[] {
+  return columns.map((column) => compileWriter(column.type, { length: column.length, scale: column.scale, precision: column.precision, collation }, options));
+}
+
+// A cell whose value is read from a source while the row is written: the
+// rest of its write, and which cell it is, so that the row can go on after.
+interface PendingCell {
+  index: number;
+  rest: AsyncIterable<void>;
+}
+
+function columnError(column: TvpColumn, rowIndex: number, error: unknown): Error {
+  return new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
 }
 
 function writeTvpTypeInfo(buffer: WritableTrackingBuffer, value: TvpValue | null) {
@@ -92,45 +102,69 @@ function writeColumnMetadata(buffer: WritableTrackingBuffer, value: TvpValue, op
   writeColumns(buffer, value.columns, options);
 }
 
-// Validates and writes a row cell by cell. A cell that fails validation
+// Validates and writes a row's cells from `from` on, one after the other.
+// Returns nothing once the row is complete, or the cell whose value is
+// read from a source, with the rest of its write: the caller drives that
+// rest and then calls again for the cells after it. A cell that fails
 // leaves the row half written, which does not matter: the request is
 // abandoned with the error and the buffer never reaches the wire.
-function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], cells: ParameterData[], row: TvpRow, rowIndex: number, collation: Collation | undefined, options: InternalConnectionOptions) {
-  if (!Array.isArray(row)) {
-    throw new InputError(`TVP row at index ${rowIndex} is not an array`);
-  }
-
-  // Every declared column must have a value: the row metadata covers all
-  // columns, so a shorter or longer row would desync the server's parse.
-  if (row.length !== columns.length) {
-    throw new InputError(`TVP row at index ${rowIndex} has ${row.length} value(s), but ${columns.length} column(s) are declared`);
-  }
-
-  buffer.writeBuffer(TVP_ROW_TOKEN);
-
-  for (let k = 0, len = row.length; k < len; k++) {
-    const column = columns[k];
-    const cell = cells[k];
-
-    try {
-      cell.value = column.type.validate(row[k], collation);
-    } catch (error) {
-      throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
+function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], writers: CellWriter[], row: TvpRow, rowIndex: number, from: number): PendingCell | undefined {
+  if (from === 0) {
+    if (!Array.isArray(row)) {
+      throw new InputError(`TVP row at index ${rowIndex} is not an array`);
     }
 
-    // TvpColumnData
-    writeValue(column.type, buffer, cell, options);
+    // Every declared column must have a value: the row metadata covers all
+    // columns, so a shorter or longer row would desync the server's parse.
+    if (row.length !== columns.length) {
+      throw new InputError(`TVP row at index ${rowIndex} has ${row.length} value(s), but ${columns.length} column(s) are declared`);
+    }
+
+    buffer.writeBuffer(TVP_ROW_TOKEN);
+  }
+
+  for (let k = from, len = row.length; k < len; k++) {
+    let rest: void | AsyncIterable<void>;
+    try {
+      // TvpColumnData
+      rest = writers[k](buffer, row[k]);
+    } catch (error) {
+      throw new InputError(`TVP column '${columns[k].name}' has invalid data at row index ${rowIndex}`, { cause: error });
+    }
+
+    if (rest !== undefined) {
+      return { index: k, rest };
+    }
+  }
+}
+
+// Finishes a row from a cell whose value is read from a source: drives the
+// rest of that cell's write, yielding at each of its yields, then writes
+// the cells after it, again for any further such cell.
+async function * finishRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], writers: CellWriter[], row: TvpRow, rowIndex: number, pending: PendingCell): AsyncGenerator<void, void> {
+  let cell: PendingCell | undefined = pending;
+  while (cell !== undefined) {
+    const column = columns[cell.index];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const _ of writeRest(cell.rest, (error) => columnError(column, rowIndex, error))) {
+      yield;
+    }
+    cell = writeRow(buffer, columns, writers, row, rowIndex, cell.index + 1);
   }
 }
 
 // Rows given as an array are written in a synchronous loop, so the only
-// asynchrony is the yield for every chunk's worth of rows.
+// asynchrony is the yield for every chunk's worth of rows, and the rest of
+// a cell that is read from a source.
 async function * writeRows(buffer: WritableTrackingBuffer, value: TvpValue, rows: TvpRow[], collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<void, void> {
   writeColumnMetadata(buffer, value, options);
-  const cells = cellsFor(value.columns);
+  const writers = writersFor(value.columns, collation, options);
 
   for (let i = 0, len = rows.length; i < len; i++) {
-    writeRow(buffer, value.columns, cells, rows[i], i, collation, options);
+    const pending = writeRow(buffer, value.columns, writers, rows[i], i, 0);
+    if (pending !== undefined) {
+      yield * finishRow(buffer, value.columns, writers, rows[i], i, pending);
+    }
 
     if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
       yield;
@@ -142,11 +176,15 @@ async function * writeRows(buffer: WritableTrackingBuffer, value: TvpValue, rows
 
 async function * writeRowsFrom(buffer: WritableTrackingBuffer, value: TvpValue, rows: AsyncIterable<TvpRow>, collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<void, void> {
   writeColumnMetadata(buffer, value, options);
-  const cells = cellsFor(value.columns);
+  const writers = writersFor(value.columns, collation, options);
 
   let rowIndex = 0;
   for await (const row of rows) {
-    writeRow(buffer, value.columns, cells, row, rowIndex++, collation, options);
+    const pending = writeRow(buffer, value.columns, writers, row, rowIndex, 0);
+    if (pending !== undefined) {
+      yield * finishRow(buffer, value.columns, writers, row, rowIndex, pending);
+    }
+    rowIndex++;
 
     if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
       yield;
@@ -202,9 +240,11 @@ const TVP: DataType = {
 
     const buffer = new WritableTrackingBuffer();
     writeColumns(buffer, value.columns, options);
-    const cells = cellsFor(value.columns);
+    const writers = writersFor(value.columns, parameter.collation, options);
     for (let i = 0, len = value.rows.length; i < len; i++) {
-      writeRow(buffer, value.columns, cells, value.rows[i], i, parameter.collation, options);
+      if (writeRow(buffer, value.columns, writers, value.rows[i], i, 0) !== undefined) {
+        throw new TypeError('A TVP cell read from a source can only be written through writeValue.');
+      }
     }
     buffer.writeBuffer(TVP_END_TOKEN);
 
