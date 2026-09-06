@@ -2,6 +2,7 @@ import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';
 import { writeValue } from './data-type';
+import { InputError } from './errors';
 
 export type Row = unknown[] | { [colName: string]: unknown };
 
@@ -114,11 +115,12 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     const isTextType = columns.map((c) => c.type.name === 'Text' || c.type.name === 'Image' || c.type.name === 'NText');
 
     const buffer = new WritableTrackingBuffer();
-    buffer.writeBuffer(bulkLoad.getColMetaData());
 
     let done = false;
     let closed = false;
     try {
+      buffer.writeBuffer(bulkLoad.getColMetaData());
+
       while (true) {
         let result = this.pending ?? iterator.next();
         this.pending = undefined;
@@ -159,7 +161,11 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
               buffer.writeBuffer(textPointerAndTimestampBuffer);
             }
 
-            writeValue(c.type, buffer, parameter, options);
+            try {
+              writeValue(c.type, buffer, parameter, options);
+            } catch (error) {
+              throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
+            }
           }
 
           // Checked after every cell, not only after every row, so that a
