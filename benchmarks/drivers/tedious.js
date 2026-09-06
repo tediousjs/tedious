@@ -118,6 +118,14 @@ class TediousConnection {
 }
 
 function connect(config, callback) {
+  // Allow experimenting with the packet size without editing the shared
+  // configuration file, e.g. `TEDIOUS_PACKET_SIZE=16384 node compare/run.js`.
+  if (process.env.TEDIOUS_PACKET_SIZE) {
+    config = Object.assign({}, config, {
+      options: Object.assign({}, config.options, { packetSize: Number(process.env.TEDIOUS_PACKET_SIZE) })
+    });
+  }
+
   const connection = new Connection(config);
 
   connection.connect((err) => {

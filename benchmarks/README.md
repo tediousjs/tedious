@@ -61,6 +61,10 @@ Set `ODBC_DRIVER` to use a different ODBC driver name (default:
 `ODBC Driver 18 for SQL Server`), or `MSNODESQLV8_CONNECTION_STRING` to provide
 a complete connection string yourself.
 
+Set `TEDIOUS_PACKET_SIZE` to override the `packetSize` option used for the
+`tedious` connections (e.g. `TEDIOUS_PACKET_SIZE=16384`), which makes a large
+difference for benchmarks that transfer a lot of data per request.
+
 ### Running
 
 Run the whole suite and print comparison tables:
