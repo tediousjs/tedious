@@ -5,7 +5,7 @@ import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import RpcRequestPayload from '../../src/rpcrequest-payload';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
-import { typeByName as TYPES, compileWriter, resolveParameter, writeValue, type DataType, type Parameter, type ColumnData } from '../../src/data-type';
+import { typeByName as TYPES, compileWriter, resolveParameter, type DataType, type Parameter, type ColumnData } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 import { Collation } from '../../src/collation';
 import { InputError } from '../../src/errors';
@@ -37,7 +37,7 @@ async function collect(payload: AsyncIterable<Buffer>) {
 function throughValidateAndWrite(type: DataType, column: ColumnData, value: unknown) {
   const buffer = new WritableTrackingBuffer();
   const cell = { ...column, value: type.validate(value, column.collation) };
-  assert.isUndefined(writeValue(type, buffer, cell, options));
+  assert.isUndefined(type.writeValue(buffer, cell, options));
   return buffer.data;
 }
 

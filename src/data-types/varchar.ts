@@ -4,11 +4,10 @@ import { type DataType, type ParameterData } from '../data-type';
 import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
-const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 
 // Each chunk is encoded on its own, as `Writable.prototype.write` would
 // encode it: a source must not split a UTF-16 surrogate pair across two
@@ -65,65 +64,6 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  generateTypeInfo(parameter) {
-    const buffer = Buffer.alloc(8);
-    buffer.writeUInt8(this.id, 0);
-
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(parameter.length!, 1);
-    } else {
-      buffer.writeUInt16LE(MAX, 1);
-    }
-
-    if (parameter.collation) {
-      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
-    }
-
-    return buffer;
-  },
-
-  generateParameterLength(parameter, options) {
-    const value = parameter.value as Buffer | null;
-
-    if (value == null) {
-      if (parameter.length! <= this.maximumLength) {
-        return NULL_LENGTH;
-      } else {
-        return MAX_NULL_LENGTH;
-      }
-    }
-
-    if (parameter.length! <= this.maximumLength) {
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(value.length, 0);
-      return buffer;
-    } else {
-      return UNKNOWN_PLP_LEN;
-    }
-  },
-
-  *generateParameterData(parameter, options) {
-    const value = parameter.value as Buffer | null;
-
-    if (value == null) {
-      return;
-    }
-
-    if (parameter.length! <= this.maximumLength) {
-      yield value;
-    } else {
-      if (value.length > 0) {
-        const buffer = Buffer.alloc(4);
-        buffer.writeUInt32LE(value.length, 0);
-        yield buffer;
-
-        yield value;
-      }
-
-      yield PLP_TERMINATOR;
-    }
-  },
-
   validate: function(value, collation): Buffer | null {
     if (value == null) {
       return null;
@@ -169,6 +109,22 @@ const VarChar: { maximumLength: number } & DataType = {
       data.collation = collation;
     }
     return data;
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(parameter.length!);
+    } else {
+      buffer.writeUInt16LE(MAX);
+    }
+
+    if (parameter.collation) {
+      buffer.writeBuffer(parameter.collation.toBuffer().subarray(0, 5));
+    } else {
+      buffer.writeBuffer(NO_COLLATION);
+    }
   },
 
   writeValue(buffer, parameter) {

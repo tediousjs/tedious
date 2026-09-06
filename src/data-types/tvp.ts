@@ -1,4 +1,4 @@
-import { type CellWriter, type DataType, type ParameterData, compileWriter, writeRest, writeTypeInfo } from '../data-type';
+import { type CellWriter, type DataType, type ParameterData, compileWriter, writeRest } from '../data-type';
 import { type InternalConnectionOptions } from '../connection';
 import { type Collation } from '../collation';
 import { InputError } from '../errors';
@@ -9,8 +9,6 @@ const TVP_TYPE_ID = 0xF3;
 
 const TVP_ROW_TOKEN = Buffer.from([0x01]);
 const TVP_END_TOKEN = Buffer.from([0x00]);
-
-const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 
 // A NULL table: no columns, and the end tokens of the column metadata and
 // of the rows.
@@ -89,7 +87,7 @@ function writeColumns(buffer: WritableTrackingBuffer, columns: TvpColumn[], opti
     // Flags
     buffer.writeUInt16LE(0x0000);
     // TYPE_INFO
-    writeTypeInfo(column.type, buffer, { value: undefined, length: column.length, precision: column.precision, scale: column.scale }, options);
+    column.type.writeTypeInfo(buffer, { value: undefined, length: column.length, precision: column.precision, scale: column.scale }, options);
     // ColName
     buffer.writeUInt8(0x00);
   }
@@ -203,52 +201,6 @@ const TVP: DataType = {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
     const schema = value.schema ? value.schema + '.' : '';
     return schema + value.name + ' readonly';
-  },
-
-  // The legacy serialization methods below are still required by the
-  // `DataType` interface. They write the same bytes as `writeTypeInfo` and
-  // `writeValue` through the same helpers, for rows given as an array.
-
-  generateTypeInfo(parameter) {
-    const buffer = new WritableTrackingBuffer();
-    writeTvpTypeInfo(buffer, parameter.value as TvpValue | null);
-    return buffer.data;
-  },
-
-  generateParameterLength(parameter) {
-    const value = parameter.value as TvpValue | null;
-    if (value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(2);
-    buffer.writeUInt16LE(value.columns.length, 0);
-    return buffer;
-  },
-
-  *generateParameterData(parameter, options) {
-    const value = parameter.value as TvpValue | null;
-    if (value == null) {
-      yield TVP_END_TOKEN;
-      yield TVP_END_TOKEN;
-      return;
-    }
-
-    if (!Array.isArray(value.rows)) {
-      throw new TypeError('A TVP whose rows are an async iterable can only be written through writeValue.');
-    }
-
-    const buffer = new WritableTrackingBuffer();
-    writeColumns(buffer, value.columns, options);
-    const writers = writersFor(value.columns, parameter.collation, options);
-    for (let i = 0, len = value.rows.length; i < len; i++) {
-      if (writeRow(buffer, value.columns, writers, value.rows[i], i, 0) !== undefined) {
-        throw new TypeError('A TVP cell read from a source can only be written through writeValue.');
-      }
-    }
-    buffer.writeBuffer(TVP_END_TOKEN);
-
-    yield * buffer.getBuffers();
   },
 
   validate(value) {

@@ -1,9 +1,7 @@
 import { type DataType } from '../data-type';
 import IntN from './intn';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
-const DATA_LENGTH = Buffer.from([0x08]);
-const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([IntN.id, 0x08]);
 const MAX_SAFE_BIGINT = 9223372036854775807n;
 const MIN_SAFE_BIGINT = -9223372036854775808n;
 
@@ -16,26 +14,19 @@ const BigInt: DataType = {
     return 'bigint';
   },
 
-  generateTypeInfo() {
-    return Buffer.from([IntN.id, 0x08]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as bigint | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const buffer = new WritableTrackingBuffer();
-    buffer.writeBigInt64LE(typeof parameter.value === 'bigint' ? parameter.value : globalThis.BigInt(parameter.value));
-    yield buffer.data;
+    buffer.writeUInt8(0x08);
+    buffer.writeBigInt64LE(value);
   },
 
   validate: function(value): null | bigint {

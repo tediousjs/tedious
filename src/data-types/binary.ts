@@ -35,29 +35,20 @@ const Binary: { maximumLength: number } & DataType = {
     }
   },
 
-  generateTypeInfo(parameter) {
-    const buffer = Buffer.alloc(3);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeUInt16LE(parameter.length!, 1);
-    return buffer;
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt16LE(parameter.length!);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(2);
-    buffer.writeUInt16LE(parameter.length!, 0);
-    return buffer;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Buffer | null;
+    if (value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
       return;
     }
 
-    yield parameter.value.slice(0, parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength);
+    buffer.writeUInt16LE(parameter.length!);
+    buffer.writeBuffer(value.subarray(0, parameter.length !== undefined ? Math.min(parameter.length, Binary.maximumLength) : Binary.maximumLength));
   },
 
   validate: function(value): Buffer | null {

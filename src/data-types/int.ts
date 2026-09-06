@@ -1,8 +1,6 @@
 import { type DataType } from '../data-type';
 import IntN from './intn';
 
-const NULL_LENGTH = Buffer.from([0x00]);
-const DATA_LENGTH = Buffer.from([0x04]);
 const TYPE_INFO = Buffer.from([IntN.id, 0x04]);
 
 const Int: DataType = {
@@ -12,28 +10,6 @@ const Int: DataType = {
 
   declaration: function() {
     return 'int';
-  },
-
-  generateTypeInfo() {
-    return Buffer.from([IntN.id, 0x04]);
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(Number(parameter.value), 0);
-    yield buffer;
   },
 
   writeTypeInfo(buffer) {

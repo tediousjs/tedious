@@ -1,12 +1,20 @@
 import { assert } from 'chai';
-import { typeByName } from '../../src/data-type';
+import { typeByName, type DataType, type ParameterData } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
+import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 
 const { Int, SmallInt, TinyInt, BigInt } = typeByName;
 
 // Test options - using type assertion since tests only exercise code paths
 // that use a subset of the full InternalConnectionOptions
 const options: InternalConnectionOptions = {} as InternalConnectionOptions;
+
+// The data `writeValue` writes for a parameter, after the length byte.
+function data(type: DataType, parameter: ParameterData) {
+  const buffer = new WritableTrackingBuffer();
+  type.writeValue(buffer, parameter, options);
+  return buffer.data.subarray(1);
+}
 
 describe('integer-data-types', function() {
   describe('int data type test', function() {
@@ -18,7 +26,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...Int.generateParameterData(item.param, options)]);
+        const buffer = data(Int, item.param);
         assert.equal(buffer.readInt32LE(0), item.expected);
       });
     });
@@ -33,7 +41,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...SmallInt.generateParameterData(item.param, options)]);
+        const buffer = data(SmallInt, item.param);
         assert.equal(buffer.readInt16LE(0), item.expected);
       });
     });
@@ -48,7 +56,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...TinyInt.generateParameterData(item.param, options)]);
+        const buffer = data(TinyInt, item.param);
         assert.equal(buffer.readInt8(0), item.expected);
       });
     });
@@ -62,7 +70,7 @@ describe('integer-data-types', function() {
 
     params.forEach(function(item) {
       it('test valid parameter values', function() {
-        const buffer = Buffer.concat([...BigInt.generateParameterData(item.param, options)]);
+        const buffer = data(BigInt, item.param);
         assert.equal(buffer.readBigInt64LE(0), item.expected);
       });
     });

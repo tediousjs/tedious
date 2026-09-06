@@ -1,7 +1,5 @@
 import { type DataType } from '../data-type';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
-
-const NULL_LENGTH = Buffer.from([0x00]);
+import { timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
 
 const Time: DataType = {
   id: 0x29,
@@ -22,68 +20,20 @@ const Time: DataType = {
     }
   },
 
-  generateTypeInfo(parameter) {
-    return Buffer.from([this.id, parameter.scale!]);
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt8(parameter.scale!);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    switch (parameter.scale) {
-      case 0:
-      case 1:
-      case 2:
-        return Buffer.from([0x03]);
-      case 3:
-      case 4:
-        return Buffer.from([0x04]);
-      case 5:
-      case 6:
-      case 7:
-        return Buffer.from([0x05]);
-      default:
-        throw new Error('invalid scale');
-    }
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as TemporalValue | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const buffer = new WritableTrackingBuffer();
-    const time = parameter.value;
-
-    let timestamp;
-    if (options.useUTC) {
-      timestamp = ((time.getUTCHours() * 60 + time.getUTCMinutes()) * 60 + time.getUTCSeconds()) * 1000 + time.getUTCMilliseconds();
-    } else {
-      timestamp = ((time.getHours() * 60 + time.getMinutes()) * 60 + time.getSeconds()) * 1000 + time.getMilliseconds();
-    }
-
-    timestamp = timestamp * Math.pow(10, parameter.scale! - 3);
-    timestamp += (parameter.value.nanosecondDelta != null ? parameter.value.nanosecondDelta : 0) * Math.pow(10, parameter.scale!);
-    timestamp = Math.round(timestamp);
-
-    switch (parameter.scale) {
-      case 0:
-      case 1:
-      case 2:
-        buffer.writeUInt24LE(timestamp);
-        break;
-      case 3:
-      case 4:
-        buffer.writeUInt32LE(timestamp);
-        break;
-      case 5:
-      case 6:
-      case 7:
-        buffer.writeUInt40LE(timestamp);
-    }
-
-    yield buffer.data;
+    buffer.writeUInt8(timeLength(parameter.scale));
+    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
   },
 
   validate: function(value): null | number | Date {
@@ -102,7 +52,6 @@ const Time: DataType = {
     return value;
   }
 };
-
 
 export default Time;
 module.exports = Time;
