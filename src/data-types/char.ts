@@ -2,6 +2,7 @@ import iconv from 'iconv-lite';
 import { type DataType } from '../data-type';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
+const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 
 const Char: { maximumLength: number } & DataType = {
   id: 0xAF,
@@ -73,6 +74,27 @@ const Char: { maximumLength: number } & DataType = {
     }
 
     yield Buffer.from(parameter.value, 'ascii');
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt16LE(parameter.length!);
+    if (parameter.collation) {
+      buffer.writeBuffer(parameter.collation.toBuffer().subarray(0, 5));
+    } else {
+      buffer.writeBuffer(NO_COLLATION);
+    }
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Buffer | null;
+    if (value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
+      return;
+    }
+
+    buffer.writeUInt16LE(value.length);
+    buffer.writeBuffer(value);
   },
 
   validate: function(value, collation): Buffer | null {

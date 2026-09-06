@@ -60,6 +60,22 @@ const Binary: { maximumLength: number } & DataType = {
     yield parameter.value.slice(0, parameter.length !== undefined ? Math.min(parameter.length, this.maximumLength) : this.maximumLength);
   },
 
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt16LE(parameter.length!);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Buffer | null;
+    if (value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
+      return;
+    }
+
+    buffer.writeUInt16LE(parameter.length!);
+    buffer.writeBuffer(value.subarray(0, parameter.length !== undefined ? Math.min(parameter.length, Binary.maximumLength) : Binary.maximumLength));
+  },
+
   validate: function(value): Buffer | null {
     if (value == null) {
       return null;

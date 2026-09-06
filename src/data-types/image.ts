@@ -46,6 +46,22 @@ const Image: DataType = {
     yield parameter.value;
   },
 
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeInt32LE(parameter.length!);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Buffer | null;
+    if (value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
+      return;
+    }
+
+    buffer.writeInt32LE(value.length);
+    buffer.writeBuffer(value);
+  },
+
   validate: function(value): null | Buffer {
     if (value == null) {
       return null;

@@ -2,6 +2,7 @@ import { type DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
 
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([0x24, 0x10]);
 const DATA_LENGTH = Buffer.from([0x10]);
 
 const UniqueIdentifier: DataType = {
@@ -35,6 +36,23 @@ const UniqueIdentifier: DataType = {
     }
 
     yield Buffer.from(guidToArray(parameter.value));
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as string | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(0x10);
+    for (const byte of guidToArray(value)) {
+      buffer.writeUInt8(byte);
+    }
   },
 
   validate: function(value): string | null {

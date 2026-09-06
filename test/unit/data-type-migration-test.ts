@@ -3,8 +3,11 @@ import { assert } from 'chai';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { typeByName as TYPES, type DataType, type ParameterData } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
+import { Collation } from '../../src/collation';
 
 type ColumnData = Omit<ParameterData, 'value'>;
+
+const collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xd0, 0x00, 0x34]));
 
 function parameter(column: ColumnData, value: unknown): ParameterData {
   return { ...column, value };
@@ -80,6 +83,16 @@ const cases: Case[] = [
   ['Numeric(19, 4)', TYPES.Numeric, { precision: 19, scale: 4 }, [null, ...decimals, 123456789012345]],
   ['Numeric(28, 6)', TYPES.Numeric, { precision: 28, scale: 6 }, [null, ...decimals, 1e20]],
   ['Numeric(38, 10)', TYPES.Numeric, { precision: 38, scale: 10 }, [null, ...decimals, 1e27]],
+  ['Char(10)', TYPES.Char, { length: 10, collation }, [null, '', 'abc', 'ünï']],
+  ['Char(10) without collation', TYPES.Char, { length: 10 }, [null]],
+  ['NChar(10)', TYPES.NChar, { length: 10, collation }, [null, '', 'abc', 'ünï', '\u{1F600}']],
+  ['Binary(3)', TYPES.Binary, { length: 3 }, [null, Buffer.from([1, 2, 3]), Buffer.from([1, 2, 3, 4, 5])]],
+  ['Binary(8000)', TYPES.Binary, { length: 8000 }, [null, Buffer.alloc(8000, 7), Buffer.alloc(9000, 7)]],
+  ['Text', TYPES.Text, { length: 3, collation }, [null, '', 'abc', 'ünï']],
+  ['Text without collation', TYPES.Text, { length: 3 }, [null]],
+  ['NText', TYPES.NText, { length: 3, collation }, [null, '', 'abc', 'ünï', '\u{1F600}']],
+  ['Image', TYPES.Image, { length: 3 }, [null, Buffer.alloc(0), Buffer.from([1, 2, 3])]],
+  ['UniqueIdentifier', TYPES.UniqueIdentifier, { length: 16 }, [null, '6F9619FF-8B86-D011-B42D-00C04FC964FF', '00000000-0000-0000-0000-000000000000']],
 ];
 
 describe('migrated data types', function() {
