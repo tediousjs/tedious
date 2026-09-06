@@ -26,7 +26,7 @@ function buildParameters() {
   return parameters;
 }
 
-function main({ n }) {
+async function main({ n }) {
   const parameters = buildParameters();
 
   bench.start();
@@ -37,7 +37,7 @@ function main({ n }) {
     const payload = new RpcRequestPayload('proc', resolved, txnDescriptor, options);
 
     let bytes = 0;
-    for (const chunk of payload) {
+    for await (const chunk of payload) {
       bytes += chunk.length;
     }
     if (bytes === 0) {

@@ -1,4 +1,5 @@
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import { isAsyncIterable, writePlpStream } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -8,6 +9,13 @@ const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const NO_COLLATION = Buffer.alloc(5);
 
+function encodeUcs2(chunk: unknown): Buffer {
+  if (typeof chunk !== 'string') {
+    throw new TypeError('Invalid string.');
+  }
+  return Buffer.from(chunk, 'ucs2');
+}
+
 const NVarChar: { maximumLength: number } & DataType = {
   id: 0xE7,
   type: 'NVARCHAR',
@@ -16,6 +24,10 @@ const NVarChar: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+
+    if (isAsyncIterable(value)) {
+      return 'nvarchar(max)';
+    }
 
     let length;
     if (parameter.length) {
@@ -156,6 +168,12 @@ const NVarChar: { maximumLength: number } & DataType = {
       return;
     }
 
+    // Read from its source while the request is written; `resolve` declared
+    // it as `nvarchar(max)`.
+    if (isAsyncIterable(parameter.value)) {
+      return writePlpStream(buffer, parameter.value, encodeUcs2);
+    }
+
     const value = parameter.value instanceof Buffer ? parameter.value : parameter.value.toString();
     const length = typeof value === 'string' ? value.length * 2 : value.length;
 
@@ -191,6 +209,26 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
 
     return value;
+  },
+
+  resolve(parameter, collation) {
+    if (isAsyncIterable(parameter.value)) {
+      // Read from its source while the request is written, and sent as
+      // `nvarchar(max)` since its length is not known up front.
+      const data: ParameterData = { value: parameter.value, length: MAX };
+      if (collation) {
+        data.collation = collation;
+      }
+      return data;
+    }
+
+    const value = this.validate(parameter.value, collation);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    if (collation) {
+      data.collation = collation;
+    }
+    return data;
   }
 };
 
