@@ -52,29 +52,10 @@ function validateTable(value: unknown): TvpValue | null {
   return value as TvpValue;
 }
 
-function validateRow(columns: TvpColumn[], row: TvpRow, rowIndex: number, collation: Collation | undefined): TvpRow {
-  if (!Array.isArray(row)) {
-    throw new InputError(`TVP row at index ${rowIndex} is not an array`);
-  }
-
-  // Every declared column must have a value: the row metadata covers all
-  // columns, so a shorter or longer row would desync the server's parse.
-  if (row.length !== columns.length) {
-    throw new InputError(`TVP row at index ${rowIndex} has ${row.length} value(s), but ${columns.length} column(s) are declared`);
-  }
-
-  const validated = new Array(row.length);
-  for (let k = 0, len = row.length; k < len; k++) {
-    const column = columns[k];
-
-    try {
-      validated[k] = column.type.validate(row[k], collation);
-    } catch (error) {
-      throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
-    }
-  }
-
-  return validated;
+// One cell per column, reused for every row: a type writes a cell's bytes
+// as soon as it is handed the cell and keeps no reference to it.
+function cellsFor(columns: TvpColumn[]): ParameterData[] {
+  return columns.map((column) => ({ value: undefined, length: column.length, scale: column.scale, precision: column.precision }));
 }
 
 function writeTvpTypeInfo(buffer: WritableTrackingBuffer, value: TvpValue | null) {
@@ -111,12 +92,31 @@ function writeColumnMetadata(buffer: WritableTrackingBuffer, value: TvpValue, op
   writeColumns(buffer, value.columns, options);
 }
 
-function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], row: TvpRow, options: InternalConnectionOptions) {
+// Validates and writes a row cell by cell. A cell that fails validation
+// leaves the row half written, which does not matter: the request is
+// abandoned with the error and the buffer never reaches the wire.
+function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], cells: ParameterData[], row: TvpRow, rowIndex: number, collation: Collation | undefined, options: InternalConnectionOptions) {
+  if (!Array.isArray(row)) {
+    throw new InputError(`TVP row at index ${rowIndex} is not an array`);
+  }
+
+  // Every declared column must have a value: the row metadata covers all
+  // columns, so a shorter or longer row would desync the server's parse.
+  if (row.length !== columns.length) {
+    throw new InputError(`TVP row at index ${rowIndex} has ${row.length} value(s), but ${columns.length} column(s) are declared`);
+  }
+
   buffer.writeBuffer(TVP_ROW_TOKEN);
 
   for (let k = 0, len = row.length; k < len; k++) {
     const column = columns[k];
-    const cell: ParameterData = { value: row[k], length: column.length, scale: column.scale, precision: column.precision };
+    const cell = cells[k];
+
+    try {
+      cell.value = column.type.validate(row[k], collation);
+    } catch (error) {
+      throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
+    }
 
     // TvpColumnData
     writeValue(column.type, buffer, cell, options);
@@ -127,9 +127,10 @@ function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], row: Tvp
 // asynchrony is the yield for every chunk's worth of rows.
 async function * writeRows(buffer: WritableTrackingBuffer, value: TvpValue, rows: TvpRow[], collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<void, void> {
   writeColumnMetadata(buffer, value, options);
+  const cells = cellsFor(value.columns);
 
   for (let i = 0, len = rows.length; i < len; i++) {
-    writeRow(buffer, value.columns, validateRow(value.columns, rows[i], i, collation), options);
+    writeRow(buffer, value.columns, cells, rows[i], i, collation, options);
 
     if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
       yield;
@@ -141,10 +142,11 @@ async function * writeRows(buffer: WritableTrackingBuffer, value: TvpValue, rows
 
 async function * writeRowsFrom(buffer: WritableTrackingBuffer, value: TvpValue, rows: AsyncIterable<TvpRow>, collation: Collation | undefined, options: InternalConnectionOptions): AsyncGenerator<void, void> {
   writeColumnMetadata(buffer, value, options);
+  const cells = cellsFor(value.columns);
 
   let rowIndex = 0;
   for await (const row of rows) {
-    writeRow(buffer, value.columns, validateRow(value.columns, row, rowIndex++, collation), options);
+    writeRow(buffer, value.columns, cells, row, rowIndex++, collation, options);
 
     if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
       yield;
@@ -200,8 +202,9 @@ const TVP: DataType = {
 
     const buffer = new WritableTrackingBuffer();
     writeColumns(buffer, value.columns, options);
+    const cells = cellsFor(value.columns);
     for (let i = 0, len = value.rows.length; i < len; i++) {
-      writeRow(buffer, value.columns, validateRow(value.columns, value.rows[i], i, parameter.collation), options);
+      writeRow(buffer, value.columns, cells, value.rows[i], i, parameter.collation, options);
     }
     buffer.writeBuffer(TVP_END_TOKEN);
 
