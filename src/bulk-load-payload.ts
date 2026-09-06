@@ -2,6 +2,7 @@ import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { compileWriter, writeRest } from './data-type';
 import { TYPE as TOKEN_TYPE } from './token/token';
+import { InputError } from './errors';
 
 export type Row = unknown[] | { [colName: string]: unknown };
 
@@ -119,11 +120,12 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     const writers = columns.map((c) => compileWriter(c.type, { length: c.length, scale: c.scale, precision: c.precision, collation: c.collation }, options));
 
     const buffer = new WritableTrackingBuffer();
-    buffer.writeBuffer(bulkLoad.getColMetaData());
 
     let done = false;
     let closed = false;
     try {
+      buffer.writeBuffer(bulkLoad.getColMetaData());
+
       while (true) {
         let result = this.pending ?? iterator.next();
         this.pending = undefined;
@@ -157,10 +159,16 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
               buffer.writeBuffer(textPointerAndTimestampBuffer);
             }
 
-            const rest = writers[i](buffer, value);
+            let rest: void | AsyncIterable<void>;
+            try {
+              rest = writers[i](buffer, value);
+            } catch (error) {
+              throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
+            }
+
             if (rest !== undefined) {
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              for await (const _ of writeRest(rest, (error) => error as Error)) {
+              for await (const _ of writeRest(rest, (error) => new InputError(`Column '${c.name}' could not be serialized`, { cause: error }))) {
                 for (const chunk of buffer.getBuffers()) {
                   yield chunk;
                 }

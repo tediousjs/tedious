@@ -2,7 +2,7 @@ import { assert } from 'chai';
 import { Readable } from 'stream';
 import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
-import { RequestError } from '../../src/errors';
+import { InputError, RequestError } from '../../src/errors';
 import Connection, { type InternalConnectionOptions } from '../../src/connection';
 import { type Request } from '../../src/tedious';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
@@ -14,6 +14,131 @@ import { typeByName as TYPES, type DataType } from '../../src/data-type';
 const connectionOptions = { tdsVersion: '7_2' } as InternalConnectionOptions;
 
 describe('BulkLoad', function() {
+  describe('serialization errors', function() {
+    function buildType(overrides: Partial<DataType>): DataType {
+      return {
+        id: 0xA5,
+        type: 'STUB',
+        name: 'Stub',
+
+        declaration() {
+          return 'stub';
+        },
+
+        generateTypeInfo() {
+          return Buffer.alloc(1);
+        },
+
+        generateParameterLength() {
+          return Buffer.alloc(0);
+        },
+
+        * generateParameterData() { },
+
+        validate(value) {
+          return value;
+        },
+
+        ...overrides
+      };
+    }
+
+    async function writeRow(type: DataType, rows: Iterable<unknown[]> = [[null]]): Promise<Error> {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('foo', type, { nullable: true });
+
+      const chunks: Buffer[] = [];
+      try {
+        for await (const chunk of new BulkLoadPayload(request, rows)) {
+          chunks.push(chunk);
+        }
+      } catch (err) {
+        return err as Error;
+      }
+      throw new Error('expected the bulk load to fail');
+    }
+
+    it('wraps errors thrown while generating the column metadata', async function() {
+      const cause = new RangeError('out of range');
+      const error = await writeRow(buildType({
+        generateTypeInfo() {
+          throw cause;
+        }
+      }));
+
+      assert.instanceOf(error, InputError);
+      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.cause, cause);
+    });
+
+    it('wraps errors thrown while generating row values', async function() {
+      const cause = new RangeError('out of range');
+      const error = await writeRow(buildType({
+        generateParameterLength() {
+          throw cause;
+        }
+      }));
+
+      assert.instanceOf(error, InputError);
+      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.cause, cause);
+    });
+
+    it('wraps errors thrown while generating row value chunks', async function() {
+      const cause = new RangeError('out of range');
+      const error = await writeRow(buildType({
+        * generateParameterData() {
+          throw cause;
+        }
+      }));
+
+      assert.instanceOf(error, InputError);
+      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.cause, cause);
+    });
+
+    it('closes the row source when the column metadata cannot be written', async function() {
+      let closed = false;
+      const rows = (function*() {
+        try {
+          yield [null];
+        } finally {
+          closed = true;
+        }
+      })();
+
+      const error = await writeRow(buildType({
+        generateTypeInfo() {
+          throw new RangeError('out of range');
+        }
+      }), rows);
+
+      assert.instanceOf(error, InputError);
+      assert.isTrue(closed);
+    });
+
+    it('closes the row source when a row value cannot be serialized', async function() {
+      let closed = false;
+      const rows = (function*() {
+        try {
+          yield [null];
+          yield [null];
+        } finally {
+          closed = true;
+        }
+      })();
+
+      const error = await writeRow(buildType({
+        generateParameterLength() {
+          throw new RangeError('out of range');
+        }
+      }), rows);
+
+      assert.instanceOf(error, InputError);
+      assert.isTrue(closed);
+    });
+  });
+
   describe('row serialization', function() {
     async function collect(payload: AsyncIterable<Buffer>) {
       const chunks: Buffer[] = [];

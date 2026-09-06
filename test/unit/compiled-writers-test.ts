@@ -231,7 +231,7 @@ describe('compiled cell writers', function() {
       await iterator.return!();
     });
 
-    it('fails the bulk load when the source fails, and closes the row source', async function() {
+    it('fails the bulk load with the column\'s InputError when the source fails, and closes the row source', async function() {
       let closed = false;
       async function * boom() {
         yield Buffer.from([1]);
@@ -251,7 +251,9 @@ describe('compiled cell writers', function() {
       } catch (err) {
         error = err;
       }
-      assert.instanceOf(error, RangeError);
+      assert.instanceOf(error, InputError);
+      assert.strictEqual((error as InputError).message, "Column 'blob' could not be serialized");
+      assert.instanceOf((error as InputError).cause, RangeError);
       assert.isTrue(closed);
     });
   });
