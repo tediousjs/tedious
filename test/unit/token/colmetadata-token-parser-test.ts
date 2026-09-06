@@ -15,7 +15,7 @@ describe('Colmetadata Token Parser', function() {
       const flags = 3;
       const columnName = 'name';
 
-      const buffer = new WritableTrackingBuffer(50, 'ucs2');
+      const buffer = new WritableTrackingBuffer();
 
       buffer.writeUInt8(0x81);
       // Column Count
@@ -25,7 +25,7 @@ describe('Colmetadata Token Parser', function() {
         buffer.writeUInt32LE(userType);
         buffer.writeUInt16LE(flags);
         buffer.writeUInt8(typeByName.Int.id);
-        buffer.writeBVarchar(columnName);
+        buffer.writeBVarchar(columnName, 'ucs2');
       }
 
       const parser = StreamParser.parseTokens([buffer.data], debug, options);
@@ -55,14 +55,14 @@ describe('Colmetadata Token Parser', function() {
     const flags = 3;
     const columnName = 'name';
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0x81);
     buffer.writeUInt16LE(numberOfColumns);
     buffer.writeUInt32LE(userType);
     buffer.writeUInt16LE(flags);
     buffer.writeUInt8(typeByName.Int.id);
-    buffer.writeBVarchar(columnName);
+    buffer.writeBVarchar(columnName, 'ucs2');
     // console.log(buffer.data)
 
     const parser = StreamParser.parseTokens([buffer.data], debug, options);
@@ -90,7 +90,7 @@ describe('Colmetadata Token Parser', function() {
     const collation = Buffer.from([0x09, 0x04, 0x50, 0x78, 0x9a]);
     const columnName = 'name';
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0x81);
     buffer.writeUInt16LE(numberOfColumns);
@@ -99,7 +99,7 @@ describe('Colmetadata Token Parser', function() {
     buffer.writeUInt8(typeByName.VarChar.id);
     buffer.writeUInt16LE(length);
     buffer.writeBuffer(collation);
-    buffer.writeBVarchar(columnName);
+    buffer.writeBVarchar(columnName, 'ucs2');
     // console.log(buffer)
 
 

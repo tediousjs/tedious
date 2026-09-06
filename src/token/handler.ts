@@ -5,6 +5,7 @@ import { type ColumnMetadata } from './colmetadata-token-parser';
 import {
   BeginTransactionEnvChangeToken,
   CharsetEnvChangeToken,
+  ColInfoToken,
   CollationChangeToken,
   ColMetadataToken,
   CommitTransactionEnvChangeToken,
@@ -29,6 +30,7 @@ import {
   RoutingEnvChangeToken,
   RowToken,
   SSPIToken,
+  TabNameToken,
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
@@ -38,6 +40,28 @@ export class UnexpectedTokenError extends Error {
     super('Unexpected token `' + token.name + '` in `' + handler.constructor.name + '`');
   }
 }
+
+/**
+ * Emits a warning (once per process) when a connection is established
+ * using TDS 7.1.
+ *
+ * @private
+ */
+export const tds71DeprecationWarning = {
+  emitted: false,
+
+  emit() {
+    if (this.emitted) {
+      return;
+    }
+    this.emitted = true;
+
+    process.emitWarning(
+      'Support for TDS 7.1 (used by SQL Server 2000) is deprecated and will be removed in a future version of `tedious`.',
+      { type: 'DeprecationWarning', code: 'TEDIOUS_DEP_TDS71' }
+    );
+  }
+};
 
 export class TokenHandler {
   onInfoMessage(token: InfoMessageToken) {
@@ -105,6 +129,14 @@ export class TokenHandler {
   }
 
   onColMetadata(token: ColMetadataToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onTabName(token: TabNameToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onColInfo(token: ColInfoToken) {
     throw new UnexpectedTokenError(this, token);
   }
 
@@ -339,6 +371,10 @@ export class Login7TokenHandler extends TokenHandler {
     // use negotiated version
     this.connection.config.options.tdsVersion = token.tdsVersion;
 
+    if (token.tdsVersion < '7_2') {
+      tds71DeprecationWarning.emit();
+    }
+
     this.loginAckReceived = true;
   }
 
@@ -458,6 +494,18 @@ export class RequestTokenHandler extends TokenHandler {
       } else {
         this.request.emit('columnMetadata', token.columns);
       }
+    }
+  }
+
+  onTabName(token: TabNameToken) {
+    if (!this.request.canceled) {
+      this.request.emit('tabName', token.tableNames);
+    }
+  }
+
+  onColInfo(token: ColInfoToken) {
+    if (!this.request.canceled) {
+      this.request.emit('colInfo', token.columns);
     }
   }
 

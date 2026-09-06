@@ -19,13 +19,13 @@ describe('Loginack Token Parser', function() {
       buildNumLow: 4
     };
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xad);
     buffer.writeUInt16LE(0); // Length written later
     buffer.writeUInt8(interfaceType);
     buffer.writeUInt32BE(version);
-    buffer.writeBVarchar(progName);
+    buffer.writeBVarchar(progName, 'ucs2');
     buffer.writeUInt8(progVersion.major);
     buffer.writeUInt8(progVersion.minor);
     buffer.writeUInt8(progVersion.buildNumHi);

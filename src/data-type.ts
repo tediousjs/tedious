@@ -41,6 +41,7 @@ import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
+import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 
 export interface Parameter {
   type: DataType;
@@ -77,9 +78,6 @@ export interface DataType {
   name: string;
 
   declaration(parameter: Parameter): string;
-  generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
-  generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
-  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
   validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
@@ -87,6 +85,145 @@ export interface DataType {
   resolveLength?: (parameter: Parameter) => number;
   resolvePrecision?: (parameter: Parameter) => number;
   resolveScale?: (parameter: Parameter) => number;
+
+  // The serialization contract below splits a parameter's handling into two
+  // phases: `resolve` validates the value and determines the declaration
+  // facts (length, precision, scale, collation) once, and `writeTypeInfo` /
+  // `writeValue` serialize the resolved parameter into a buffer. A type
+  // that does not implement `resolve` is adapted from its `validate` /
+  // `resolve*` methods by `resolveParameter` below.
+
+  /**
+   * Validates the parameter's value and resolves its declaration facts
+   * (length, precision, scale, collation) into a single struct that all
+   * serialization is derived from.
+   */
+  resolve?(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ParameterData;
+
+  /**
+   * Writes the TYPE_INFO of a resolved parameter.
+   */
+  writeTypeInfo(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
+
+  /**
+   * Writes the value of a resolved parameter (length prefix and data).
+   *
+   * A value that is fully in memory is written before this returns. A value
+   * that is read from a source while the request is written (an async
+   * iterable, accepted by the `max` types and by a TVP's rows) returns the
+   * rest of the write instead: an async iterable that yields whenever
+   * `buffer` holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`) or
+   * more, so that the caller can hand those bytes on before the rest of the
+   * value is read. Nothing of that rest runs before its first `next()`.
+   */
+  writeValue(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
+}
+
+/**
+ * A parameter whose value has been validated and whose declaration facts
+ * have been resolved: everything serialization needs.
+ */
+export interface ResolvedParameter {
+  name: string;
+  output: boolean;
+  type: DataType;
+  data: ParameterData;
+}
+
+/**
+ * Validates a parameter's value and resolves its declaration facts. This is
+ * the single place where a parameter's length, precision, scale and
+ * collation are determined.
+ */
+export function resolveParameter(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ResolvedParameter {
+  const type = parameter.type;
+
+  if (type.resolve) {
+    return { name: parameter.name, output: parameter.output, type, data: type.resolve(parameter, collation, options) };
+  }
+
+  // `validate` is deliberately not given the connection options: no caller
+  // ever passed them, so the `useUTC`-dependent range checks in the date and
+  // time types have never been active. Enabling them is a behaviour change
+  // to make on its own.
+  const value = type.validate(parameter.value, collation);
+  const validated: Parameter = { ...parameter, value };
+  const data: ParameterData = { value };
+
+  // An explicitly specified declaration fact wins, including an explicit
+  // zero; otherwise the type resolves it from the value.
+  if (parameter.length != null) {
+    data.length = parameter.length;
+  } else if (type.resolveLength) {
+    data.length = type.resolveLength(validated);
+  }
+
+  if (parameter.precision != null) {
+    data.precision = parameter.precision;
+  } else if (type.resolvePrecision) {
+    data.precision = type.resolvePrecision(validated);
+  }
+
+  if (parameter.scale != null) {
+    data.scale = parameter.scale;
+  } else if (type.resolveScale) {
+    data.scale = type.resolveScale(validated);
+  }
+
+  if (collation) {
+    data.collation = collation;
+  }
+
+  return { name: parameter.name, output: parameter.output, type, data };
+}
+
+/**
+ * Drives the rest of a write returned by `writeValue`, yielding at each of
+ * its yields. An error the rest throws is passed through `wrap` (e.g. to
+ * name the parameter it belongs to); an error thrown into this generator by
+ * its consumer keeps its identity, and a consumer that stops early closes
+ * the rest, and with it the value's source, as `for await` would.
+ */
+export async function * writeRest(rest: AsyncIterable<void>, wrap: (error: unknown) => Error): AsyncGenerator<void, void> {
+  const iterator = rest[Symbol.asyncIterator]();
+  let done = false;
+  try {
+    while (true) {
+      let result: IteratorResult<void>;
+      try {
+        result = await iterator.next();
+      } catch (error) {
+        // A generator that threw is finished; there is nothing to close.
+        done = true;
+        const wrapped = wrap(error);
+        throw wrapped;
+      }
+
+      if (result.done) {
+        done = true;
+        break;
+      }
+
+      yield;
+    }
+  } catch (error) {
+    // An error thrown into this generator at a yield closes the rest. A
+    // close that fails must not replace the error that is propagating.
+    if (!done && typeof iterator.return === 'function') {
+      done = true;
+      try {
+        await iterator.return();
+      } catch {
+        // The propagating error is what surfaces.
+      }
+    }
+    throw error;
+  } finally {
+    // The consumer stopped pulling.
+    if (!done && typeof iterator.return === 'function') {
+      await iterator.return();
+    }
+  }
 }
 
 export const TYPE = {

@@ -1,11 +1,12 @@
 import { EventEmitter } from 'events';
-import { type Parameter, type DataType } from './data-type';
+import { type Parameter, type DataType, type ResolvedParameter, resolveParameter } from './data-type';
 import { RequestError } from './errors';
 
-import Connection from './connection';
+import Connection, { type InternalConnectionOptions } from './connection';
 import { type Metadata } from './metadata-parser';
 import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
+import { type ColumnInfo } from './token/token';
 import { Collation } from './collation';
 
 /**
@@ -65,6 +66,12 @@ class Request extends EventEmitter {
    * @private
    */
   declare parametersByName: { [key: string]: Parameter };
+  /**
+   * The parameters as resolved by the last call to `validateParameters`.
+   *
+   * @private
+   */
+  declare resolvedParameters: ResolvedParameter[];
   /**
    * @private
    */
@@ -276,6 +283,38 @@ class Request extends EventEmitter {
       (orderColumns: number[]) => void
   ): this
 
+  /**
+   * This event gives the names of the base tables of the result set, if the query was
+   * executed in browse mode (e.g. with a `FOR BROWSE` clause or `SET NO_BROWSETABLE ON`).
+   */
+  on(
+    event: 'tabName',
+    listener:
+      /**
+       * @param tableNames
+       *   The names of the base tables referenced in the query, in the order the
+       *   `colInfo` event's `tableNum` values refer to them. Each name is given
+       *   as its individual parts (e.g. `['dbo', 'employees']`).
+       */
+      (tableNames: string[][]) => void
+  ): this
+
+  /**
+   * This event describes how the columns of the result set map back to the base tables
+   * given in the `tabName` event, if the query was executed in browse mode (e.g. with a
+   * `FOR BROWSE` clause or `SET NO_BROWSETABLE ON`).
+   */
+  on(
+    event: 'colInfo',
+    listener:
+      /**
+       * @param columns
+       *   One entry for each column in the result set, describing the base table
+       *   the column was derived from.
+       */
+      (columns: ColumnInfo[]) => void
+  ): this
+
   on(event: 'requestCompleted', listener: () => void): this
 
   on(event: 'cancel', listener: () => void): this
@@ -340,6 +379,14 @@ class Request extends EventEmitter {
    * @private
    */
   emit(event: 'order', orderColumns: number[]): boolean
+  /**
+   * @private
+   */
+  emit(event: 'tabName', tableNames: string[][]): boolean
+  /**
+   * @private
+   */
+  emit(event: 'colInfo', columns: ColumnInfo[]): boolean
   emit(event: string | symbol, ...args: any[]) {
     return super.emit(event, ...args);
   }
@@ -393,6 +440,20 @@ class Request extends EventEmitter {
    * @param value
    *   The value that the parameter is to be given. The Javascript type of the
    *   argument should match that documented for data types.
+   *
+   *   A `varchar(max)`, `nvarchar(max)` or `varbinary(max)` value, or the rows
+   *   of a table-valued parameter, can also be given as an async iterable
+   *   (e.g. a `Readable`) of chunks, or of rows. The source is read while the
+   *   request is being sent, so it does not have to fit in memory, and a
+   *   request that carries one can be executed only once.
+   *
+   *   Each chunk of a string source is encoded on its own, as `Writable.write`
+   *   would encode it, so a chunk must not end halfway through a UTF-16
+   *   surrogate pair. Text that Node.js decoded from UTF-8 (a `Readable` with
+   *   `encoding: 'utf8'`, `readline`, `TextDecoder`) never does; a string
+   *   sliced by index can. A `Buffer` chunk of 8 KB or more is sent by
+   *   reference, as `socket.write` would send it, so a source must not reuse
+   *   or modify a buffer it has yielded until the request has completed.
    *
    * @param options
    *   Additional type options. Optional.
@@ -456,16 +517,24 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  validateParameters(collation: Collation | undefined) {
+  validateParameters(collation: Collation | undefined, options: InternalConnectionOptions) {
+    const resolvedParameters: ResolvedParameter[] = [];
+
     for (let i = 0, len = this.parameters.length; i < len; i++) {
       const parameter = this.parameters[i];
 
+      let resolved;
       try {
-        parameter.value = parameter.type.validate(parameter.value, collation);
+        resolved = resolveParameter(parameter, collation, options);
       } catch (error: any) {
         throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
       }
+
+      parameter.value = resolved.data.value;
+      resolvedParameters.push(resolved);
     }
+
+    this.resolvedParameters = resolvedParameters;
   }
 
   /**

@@ -10,7 +10,7 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   const doneRowCountLow = doneRowCount % 0x100000000;
   const doneRowCountHi = ~~(doneRowCount / 0x100000000);
 
-  const buffer = new WritableTrackingBuffer(50, 'ucs2');
+  const buffer = new WritableTrackingBuffer();
 
   buffer.writeUInt8(0xfd);
   buffer.writeUInt16LE(status);

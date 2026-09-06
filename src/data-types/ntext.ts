@@ -1,6 +1,7 @@
 import { type DataType } from '../data-type';
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
+const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 
 const NText: DataType = {
   id: 0x63,
@@ -23,34 +24,25 @@ const NText: DataType = {
     }
   },
 
-  generateTypeInfo(parameter, _options) {
-    const buffer = Buffer.alloc(10);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeInt32LE(parameter.length!, 1);
-
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeInt32LE(parameter.length!);
     if (parameter.collation) {
-      parameter.collation.toBuffer().copy(buffer, 5, 0, 5);
+      buffer.writeBuffer(parameter.collation.toBuffer().subarray(0, 5));
+    } else {
+      buffer.writeBuffer(NO_COLLATION);
     }
-
-    return buffer;
   },
 
-  generateParameterLength(parameter, options) {
+  writeValue(buffer, parameter) {
     if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(Buffer.byteLength(parameter.value, 'ucs2'), 0);
-    return buffer;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
       return;
     }
 
-    yield Buffer.from(parameter.value.toString(), 'ucs2');
+    const value = String(parameter.value);
+    buffer.writeInt32LE(value.length * 2);
+    buffer.writeString(value, 'ucs2');
   },
 
   validate: function(value): string | null {

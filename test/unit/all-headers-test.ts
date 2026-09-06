@@ -29,7 +29,7 @@ describe('All Headers', function() {
       0x00
     ]);
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     const transactionDescriptor = Buffer.from([
       0x01,
       0x02,

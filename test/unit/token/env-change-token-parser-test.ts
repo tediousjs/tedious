@@ -12,13 +12,13 @@ describe('Env Change Token Parser', () => {
     const oldDb = 'old';
     const newDb = 'new';
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xe3);
     buffer.writeUInt16LE(0); // Length written later
     buffer.writeUInt8(0x01); // Database
-    buffer.writeBVarchar(newDb);
-    buffer.writeBVarchar(oldDb);
+    buffer.writeBVarchar(newDb, 'ucs2');
+    buffer.writeBVarchar(oldDb, 'ucs2');
 
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
@@ -39,13 +39,13 @@ describe('Env Change Token Parser', () => {
     const oldSize = '1024';
     const newSize = '2048';
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xe3);
     buffer.writeUInt16LE(0); // Length written later
     buffer.writeUInt8(0x04); // Packet size
-    buffer.writeBVarchar(newSize);
-    buffer.writeBVarchar(oldSize);
+    buffer.writeBVarchar(newSize, 'ucs2');
+    buffer.writeBVarchar(oldSize, 'ucs2');
 
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
@@ -63,7 +63,7 @@ describe('Env Change Token Parser', () => {
 
   it('should skip unknown env change types', async function() {
     const debug = new Debug();
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xe3);
     buffer.writeUInt16LE(0); // Length written later

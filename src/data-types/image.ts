@@ -21,29 +21,20 @@ const Image: DataType = {
     }
   },
 
-  generateTypeInfo(parameter) {
-    const buffer = Buffer.alloc(5);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeInt32LE(parameter.length!, 1);
-    return buffer;
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeInt32LE(parameter.length!);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(parameter.value.length!, 0);
-    return buffer;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Buffer | null;
+    if (value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
       return;
     }
 
-    yield parameter.value;
+    buffer.writeInt32LE(value.length);
+    buffer.writeBuffer(value);
   },
 
   validate: function(value): null | Buffer {

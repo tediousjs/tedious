@@ -1,11 +1,9 @@
 import { type DataType } from '../data-type';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
+import { daysSinceYearOne } from './temporal';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
-const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
-const NULL_LENGTH = Buffer.from([0x00]);
-const DATA_LENGTH = Buffer.from([0x03]);
+const TYPE_INFO = Buffer.from([0x28]);
 
 const Date: DataType = {
   id: 0x28,
@@ -16,36 +14,19 @@ const Date: DataType = {
     return 'date';
   },
 
-  generateTypeInfo: function() {
-    return Buffer.from([this.id]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as globalThis.Date | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
-
-    let date: LocalDate;
-    if (options.useUTC) {
-      date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
-    } else {
-      date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
-    }
-
-    const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
-    const buffer = Buffer.alloc(3);
-    buffer.writeUIntLE(days, 0, 3);
-    yield buffer;
+    buffer.writeUInt8(0x03);
+    buffer.writeUInt24LE(daysSinceYearOne(value, options.useUTC));
   },
 
   // TODO: value is technically of type 'unknown'.

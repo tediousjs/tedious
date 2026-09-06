@@ -3,8 +3,7 @@ import DateTimeN from './datetimen';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
-const NULL_LENGTH = Buffer.from([0x00]);
-const DATA_LENGTH = Buffer.from([0x08]);
+const TYPE_INFO = Buffer.from([DateTimeN.id, 0x08]);
 
 const DateTime: DataType = {
   id: 0x3D,
@@ -15,49 +14,27 @@ const DateTime: DataType = {
     return 'datetime';
   },
 
-  generateTypeInfo() {
-    return Buffer.from([DateTimeN.id, 0x08]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as Date | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const value = parameter.value as any; // Temporary solution. Remove 'any' later.
-
-    let date: LocalDate;
+    let days: number, milliseconds: number;
     if (options.useUTC) {
-      date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+      days = EPOCH_DATE.until(LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()), ChronoUnit.DAYS);
+      milliseconds = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
     } else {
-      date = LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+      days = EPOCH_DATE.until(LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate()), ChronoUnit.DAYS);
+      milliseconds = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
     }
 
-    let days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
-
-    let milliseconds, threeHundredthsOfSecond;
-    if (options.useUTC) {
-      let seconds = value.getUTCHours() * 60 * 60;
-      seconds += value.getUTCMinutes() * 60;
-      seconds += value.getUTCSeconds();
-      milliseconds = (seconds * 1000) + value.getUTCMilliseconds();
-    } else {
-      let seconds = value.getHours() * 60 * 60;
-      seconds += value.getMinutes() * 60;
-      seconds += value.getSeconds();
-      milliseconds = (seconds * 1000) + value.getMilliseconds();
-    }
-
-    threeHundredthsOfSecond = milliseconds / (3 + (1 / 3));
-    threeHundredthsOfSecond = Math.round(threeHundredthsOfSecond);
+    let threeHundredthsOfSecond = Math.round(milliseconds / (3 + (1 / 3)));
 
     // 25920000 equals one day
     if (threeHundredthsOfSecond === 25920000) {
@@ -65,10 +42,9 @@ const DateTime: DataType = {
       threeHundredthsOfSecond = 0;
     }
 
-    const buffer = Buffer.alloc(8);
-    buffer.writeInt32LE(days, 0);
-    buffer.writeUInt32LE(threeHundredthsOfSecond, 4);
-    yield buffer;
+    buffer.writeUInt8(0x08);
+    buffer.writeInt32LE(days);
+    buffer.writeUInt32LE(threeHundredthsOfSecond);
   },
 
   // TODO: type 'any' needs to be revisited.

@@ -33,9 +33,7 @@ class NTLMResponsePayload {
     const ntlmData = challenge.ntlmpacket;
     const server_data = ntlmData.target;
     const server_nonce = ntlmData.nonce;
-    const bufferLength = 64 + (domain.length * 2) + (username.length * 2) + lmv2len + ntlmv2len + 8 + 8 + 8 + 4 + server_data.length + 4;
-    const data = new WritableTrackingBuffer(bufferLength);
-    data.position = 0;
+    const data = new WritableTrackingBuffer();
     data.writeString('NTLMSSP\u0000', 'utf8');
     data.writeUInt32LE(0x03);
     const baseIdx = 64;
@@ -66,17 +64,17 @@ class NTLMResponsePayload {
     data.writeString(domain, 'ucs2');
     data.writeString(username, 'ucs2');
     const lmv2Data = this.lmv2Response(domain, username, password, server_nonce, client_nonce);
-    data.copyFrom(lmv2Data);
+    data.writeBuffer(lmv2Data);
     const genTime = new Date().getTime();
     const ntlmDataBuffer = this.ntlmv2Response(domain, username, password, server_nonce, server_data, client_nonce, genTime);
-    data.copyFrom(ntlmDataBuffer);
+    data.writeBuffer(ntlmDataBuffer);
     data.writeUInt32LE(0x0101);
     data.writeUInt32LE(0x0000);
     const timestamp = this.createTimestamp(genTime);
-    data.copyFrom(timestamp);
-    data.copyFrom(client_nonce);
+    data.writeBuffer(timestamp);
+    data.writeBuffer(client_nonce);
     data.writeUInt32LE(0x0000);
-    data.copyFrom(server_data);
+    data.writeBuffer(server_data);
     data.writeUInt32LE(0x0000);
     return data.data;
   }

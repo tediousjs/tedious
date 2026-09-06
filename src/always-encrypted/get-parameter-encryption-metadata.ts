@@ -4,7 +4,7 @@
 import { SQLServerEncryptionType, type CryptoMetadata, DescribeParameterEncryptionResultSet1, DescribeParameterEncryptionResultSet2 } from './types';
 import { CEKEntry } from './cek-entry';
 import { decryptSymmetricKey } from './key-crypto';
-import { typeByName as TYPES, type Parameter } from '../data-type';
+import { typeByName as TYPES, type Parameter, resolveParameter } from '../data-type';
 import Request from '../request';
 import Connection from '../connection';
 import RpcRequestPayload from '../rpcrequest-payload';
@@ -97,5 +97,7 @@ export const getParameterEncryptionMetadata = (connection: Connection, request: 
     resultRows.push(columns);
   });
 
-  connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest.sqlTextOrProcedure!, metadataRequest.parameters, connection.currentTransactionDescriptor(), connection.config.options, connection.databaseCollation));
+  // This request is built from raw `Parameter`s rather than a `Request`
+  // that has been through `validateParameters`, so they are resolved inline.
+  connection.makeRequest(metadataRequest, TYPE.RPC_REQUEST, new RpcRequestPayload(metadataRequest.sqlTextOrProcedure!, metadataRequest.parameters.map((parameter) => resolveParameter(parameter, connection.databaseCollation, connection.config.options)), connection.currentTransactionDescriptor(), connection.config.options));
 };

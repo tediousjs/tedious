@@ -4,8 +4,7 @@ import MoneyN from './moneyn';
 const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 
-const NULL_LENGTH = Buffer.from([0x00]);
-const DATA_LENGTH = Buffer.from([0x08]);
+const TYPE_INFO = Buffer.from([MoneyN.id, 0x08]);
 
 const Money: DataType = {
   id: 0x3C,
@@ -16,29 +15,22 @@ const Money: DataType = {
     return 'money';
   },
 
-  generateTypeInfo: function() {
-    return Buffer.from([MoneyN.id, 0x08]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as number | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const value = parameter.value * 10000;
-
-    const buffer = Buffer.alloc(8);
-    buffer.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32), 0);
-    buffer.writeInt32LE(value & -1, 4);
-    yield buffer;
+    // The value in ten-thousandths, as a high and a low 32-bit half.
+    const scaled = value * 10000;
+    buffer.writeUInt8(0x08);
+    buffer.writeInt32LE(Math.floor(scaled * SHIFT_RIGHT_32));
+    buffer.writeInt32LE(scaled & -1);
   },
 
   validate: function(value): number | null {

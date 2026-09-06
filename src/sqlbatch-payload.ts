@@ -17,7 +17,7 @@ class SqlBatchPayload implements Iterable<Buffer> {
 
   *[Symbol.iterator]() {
     if (this.options.tdsVersion >= '7_2') {
-      const buffer = new WritableTrackingBuffer(18, 'ucs2');
+      const buffer = new WritableTrackingBuffer();
       const outstandingRequestCount = 1;
 
       writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);

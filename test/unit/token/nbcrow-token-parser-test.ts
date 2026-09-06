@@ -17,7 +17,7 @@ describe('NBCRow Token Parser', function() {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
       const debug = new Debug();
-      const buffer = new WritableTrackingBuffer(0, 'ascii');
+      const buffer = new WritableTrackingBuffer();
       buffer.writeUInt8(0xd2);
 
       // Write the null bitmap
@@ -37,7 +37,7 @@ describe('NBCRow Token Parser', function() {
           type: dataTypeByName.VarChar,
           collation: new Collation(1033, 0, 0, 52)
         });
-        buffer.writeUsVarchar(i.toString());
+        buffer.writeUsVarchar(i.toString(), 'ascii');
       }
 
       const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);

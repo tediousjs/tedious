@@ -1,4 +1,5 @@
-import { type DataType } from '../data-type';
+import { type DataType, type ParameterData } from '../data-type';
+import { isAsyncIterable, writePlpStream } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -6,6 +7,13 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+function requireBuffer(chunk: unknown): Buffer {
+  if (!Buffer.isBuffer(chunk)) {
+    throw new TypeError('Invalid buffer.');
+  }
+  return chunk;
+}
 
 const VarBinary: { maximumLength: number } & DataType = {
   id: 0xA5,
@@ -15,6 +23,10 @@ const VarBinary: { maximumLength: number } & DataType = {
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
+    if (isAsyncIterable(value)) {
+      return 'varbinary(max)';
+    }
+
     let length;
     if (parameter.length) {
       length = parameter.length;
@@ -44,77 +56,50 @@ const VarBinary: { maximumLength: number } & DataType = {
     }
   },
 
-  generateTypeInfo: function(parameter) {
-    const buffer = Buffer.alloc(3);
-    buffer.writeUInt8(this.id, 0);
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
 
     if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(parameter.length!, 1);
+      buffer.writeUInt16LE(parameter.length!);
     } else {
-      buffer.writeUInt16LE(MAX, 1);
-    }
-
-    return buffer;
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      if (parameter.length! <= this.maximumLength) {
-        return NULL_LENGTH;
-      } else {
-        return MAX_NULL_LENGTH;
-      }
-    }
-
-    let value = parameter.value;
-    if (!Buffer.isBuffer(value)) {
-      value = value.toString();
-    }
-
-    const length = Buffer.byteLength(value, 'ucs2');
-
-    if (parameter.length! <= this.maximumLength) {
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(length, 0);
-      return buffer;
-    } else { // writePLPBody
-      return UNKNOWN_PLP_LEN;
+      buffer.writeUInt16LE(MAX);
     }
   },
 
-  * generateParameterData(parameter, options) {
+  writeValue(buffer, parameter) {
     if (parameter.value == null) {
+      buffer.writeBuffer(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
       return;
     }
 
-    let value = parameter.value;
+    // Read from its source while the request is written; `resolve` declared
+    // it as `varbinary(max)`.
+    if (isAsyncIterable(parameter.value)) {
+      return writePlpStream(buffer, parameter.value, requireBuffer);
+    }
+
+    const value = Buffer.isBuffer(parameter.value) ? parameter.value : parameter.value.toString();
+    const length = typeof value === 'string' ? value.length * 2 : value.length;
 
     if (parameter.length! <= this.maximumLength) {
-      if (Buffer.isBuffer(value)) {
-        yield value;
-      } else {
-        yield Buffer.from(value.toString(), 'ucs2');
+      buffer.writeUInt16LE(length);
+    } else {
+      buffer.writeBuffer(UNKNOWN_PLP_LEN);
+      if (length === 0) {
+        buffer.writeBuffer(PLP_TERMINATOR);
+        return;
       }
-    } else { // writePLPBody
-      if (!Buffer.isBuffer(value)) {
-        value = value.toString();
-      }
+      buffer.writeUInt32LE(length);
+    }
 
-      const length = Buffer.byteLength(value, 'ucs2');
+    if (typeof value === 'string') {
+      buffer.writeString(value, 'ucs2');
+    } else {
+      buffer.writeBuffer(value);
+    }
 
-      if (length > 0) {
-        const buffer = Buffer.alloc(4);
-        buffer.writeUInt32LE(length, 0);
-        yield buffer;
-
-        if (Buffer.isBuffer(value)) {
-          yield value;
-        } else {
-          yield Buffer.from(value, 'ucs2');
-        }
-      }
-
-      yield PLP_TERMINATOR;
+    if (parameter.length! > this.maximumLength) {
+      buffer.writeBuffer(PLP_TERMINATOR);
     }
   },
 
@@ -126,6 +111,20 @@ const VarBinary: { maximumLength: number } & DataType = {
       throw new TypeError('Invalid buffer.');
     }
     return value;
+  },
+
+  resolve(parameter) {
+    if (isAsyncIterable(parameter.value)) {
+      // The value is read from its source while the request is written. Its
+      // length is not known up front, so it is sent as `varbinary(max)`;
+      // an explicitly specified `length` is deliberately overridden.
+      return { value: parameter.value, length: MAX };
+    }
+
+    const value = this.validate(parameter.value, undefined);
+    const data: ParameterData = { value };
+    data.length = parameter.length != null ? parameter.length : this.resolveLength!({ ...parameter, value });
+    return data;
   }
 };
 

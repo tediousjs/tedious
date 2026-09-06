@@ -41,8 +41,8 @@ import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
-import { type Parameter, TYPES } from './data-type';
-import { BulkLoadPayload } from './bulk-load-payload';
+import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
+import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
 
@@ -814,7 +814,7 @@ export interface ConnectionOptions {
    * The version of TDS to use. If server doesn't support specified version, negotiated version is used instead.
    *
    * The versions are available from `require('tedious').TDS_VERSION`.
-   * * `7_1`
+   * * `7_1` (deprecated, support will be removed in a future version)
    * * `7_2`
    * * `7_3_A`
    * * `7_3_B`
@@ -838,7 +838,7 @@ export interface ConnectionOptions {
    * the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly
    * matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed.
    *
-   * (default: `true`)
+   * (default: `false`)
    */
   trustServerCertificate?: boolean;
 
@@ -1821,6 +1821,13 @@ class Connection extends EventEmitter {
     };
 
     this._onSocketError = (error) => {
+      // Nothing left to route once the connection is closed: `Final` has no
+      // `socketError` handler, and the error would only surface as noise
+      // after `close()`. (Mirrors `socketEnd()`.)
+      if (this.state === this.STATE.FINAL) {
+        return;
+      }
+
       this.dispatchEvent('socketError', error);
       process.nextTick(() => {
         this.emit('error', this.wrapSocketError(error));
@@ -2252,7 +2259,26 @@ class Connection extends EventEmitter {
 
       try {
         const onError = reject;
-        const onConnect = () => { resolve(encryptsocket); };
+        const onConnect = () => {
+          // Without this, Node's TLS layer is free to coalesce multiple back-to-back
+          // TDS packet writes into a single, larger TLS record. The non-strict `startTls`
+          // path (message-io.ts) caps max send fragment to the TDS packet size for the
+          // same reason; `wrapWithTls` (TDS 8.0 / encrypt: "strict") must match it.
+          //
+          // Without this fix, a LOGIN7 spanning multiple TDS packets (e.g. any FedAuth
+          // login carrying an Entra ID access token, which routinely exceeds one 4KB
+          // packet) reliably fails with ECONNRESET against Azure SQL once TLS is
+          // negotiated but before LOGINACK — see
+          // https://github.com/tediousjs/tedious/issues/1182. Single-packet logins
+          // (e.g. plain SQL auth with short credentials) are unaffected either way,
+          // which is why this bug reads as "FedAuth-specific" until you look closer.
+          //
+          // `setMaxSendFragment` silently no-ops for values outside 512-16384, so a
+          // `packetSize` above that (e.g. 32767, commonly used for bulk load) has to be
+          // clamped or it would leave the cap unset and reintroduce the bug it fixes.
+          encryptsocket.setMaxSendFragment(Math.min(this.config.options.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
+          resolve(encryptsocket);
+        };
 
         encryptsocket.once('error', onError);
         encryptsocket.once('secureConnect', onConnect);
@@ -2261,7 +2287,7 @@ class Connection extends EventEmitter {
           return await promise;
         } finally {
           encryptsocket.removeListener('error', onError);
-          encryptsocket.removeListener('connect', onConnect);
+          encryptsocket.removeListener('secureConnect', onConnect);
         }
       } finally {
         signal.removeEventListener('abort', onAbort);
@@ -2694,6 +2720,13 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * @private
+   */
+  resolveRequestParameter(parameter: Parameter): ResolvedParameter {
+    return resolveParameter(parameter, this.databaseCollation, this.config.options);
+  }
+
+  /**
    *  Execute the SQL represented by [[Request]].
    *
    * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
@@ -2710,7 +2743,7 @@ class Connection extends EventEmitter {
    */
   execSql(request: Request) {
     try {
-      request.validateParameters(this.databaseCollation);
+      request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
       request.error = error;
 
@@ -2722,9 +2755,9 @@ class Connection extends EventEmitter {
       return;
     }
 
-    const parameters: Parameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'statement',
       value: request.sqlTextOrProcedure,
@@ -2732,10 +2765,10 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
     if (request.parameters.length) {
-      parameters.push({
+      parameters.push(this.resolveRequestParameter({
         type: TYPES.NVarChar,
         name: 'params',
         value: request.makeParamsParameter(request.parameters),
@@ -2743,12 +2776,12 @@ class Connection extends EventEmitter {
         length: undefined,
         precision: undefined,
         scale: undefined
-      });
+      }));
 
-      parameters.push(...request.parameters);
+      parameters.push(...request.resolvedParameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2791,7 +2824,7 @@ class Connection extends EventEmitter {
    * // otherwise the bulk load will fail.
    * bulkLoad.addColumn('first_name', TYPES.NVarchar, { nullable: false });
    * bulkLoad.addColumn('last_name', TYPES.NVarchar, { nullable: false });
-   * bulkLoad.addColumn('date_of_birth', TYPES.Date, { nullable: false });
+   * bulkLoad.addColumn('day_of_birth', TYPES.Date, { nullable: false });
    *
    * // Execute a bulk load with a predefined list of rows.
    * //
@@ -2805,52 +2838,53 @@ class Connection extends EventEmitter {
    * ]);
    * ```
    *
+   * ### The row source
+   *
+   * The connection owns `rows` from this call on, the way a `for await`
+   * loop owns what it iterates. The first row is requested right away,
+   * the rest once the server has accepted the bulk load, and the source
+   * is closed through its iterator's `return()` whenever the bulk load
+   * does not run to completion: a row failed, the bulk load was canceled,
+   * the server rejected the `INSERT BULK` statement, or the connection
+   * was lost. For a Node.js stream that destroys the stream. A read that
+   * is still pending in the source cannot be interrupted; the source is
+   * closed once it has settled.
+   *
+   * An async generator that acquires what it reads from once it is
+   * started therefore releases it on every path, through its `finally`:
+   *
+   * ```js
+   * async function* employees() {
+   *   const file = await fs.promises.open('employees.csv');
+   *   try {
+   *     for await (const line of file.readLines()) {
+   *       const [first_name, last_name, day_of_birth] = line.split(',');
+   *       yield { first_name, last_name, day_of_birth: new Date(day_of_birth) };
+   *     }
+   *   } finally {
+   *     await file.close();
+   *   }
+   * }
+   *
+   * connection.execBulkLoad(bulkLoad, employees());
+   * ```
+   *
    * @param bulkLoad A previously created [[BulkLoad]].
    * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
    */
-  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>): void
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
 
-  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<unknown[] | { [columnName: string]: unknown }> | Iterable<unknown[] | { [columnName: string]: unknown }>) {
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>) {
     bulkLoad.executionStarted = true;
 
-    if (rows) {
-      if (bulkLoad.streamingMode) {
-        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that was put in streaming mode.");
-      }
-
-      if (bulkLoad.firstRowWritten) {
-        throw new Error("Connection.execBulkLoad can't be called with a BulkLoad that already has rows written to it.");
-      }
-
-      const rowStream = Readable.from(rows);
-
-      // Destroy the packet transform if an error happens in the row stream,
-      // e.g. if an error is thrown from within a generator or stream.
-      rowStream.on('error', (err) => {
-        bulkLoad.rowToPacketTransform.destroy(err);
-      });
-
-      // Destroy the row stream if an error happens in the packet transform,
-      // e.g. if the bulk load is cancelled.
-      bulkLoad.rowToPacketTransform.on('error', (err) => {
-        rowStream.destroy(err);
-      });
-
-      rowStream.pipe(bulkLoad.rowToPacketTransform);
-    } else if (!bulkLoad.streamingMode) {
-      // If the bulkload was not put into streaming mode by the user,
-      // we end the rowToPacketTransform here for them.
-      //
-      // If it was put into streaming mode, it's the user's responsibility
-      // to end the stream.
-      bulkLoad.rowToPacketTransform.end();
-    }
+    // Owns the row source from here on: the first row is requested now,
+    // the rest are read once the server has accepted the `INSERT BULK`
+    // statement, and the source is closed if that never happens.
+    const payload = new BulkLoadPayload(bulkLoad, rows ?? []);
 
     const onCancel = () => {
       request.cancel();
     };
-
-    const payload = new BulkLoadPayload(bulkLoad);
 
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
       bulkLoad.removeListener('cancel', onCancel);
@@ -2859,9 +2893,17 @@ class Connection extends EventEmitter {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
+        payload.close();
         bulkLoad.error = error;
         bulkLoad.callback(error);
         return;
+      }
+
+      if (bulkLoad.canceled || this.state !== this.STATE.LOGGED_IN) {
+        // `makeRequest` completes a canceled bulk load, or one on a
+        // connection that is no longer logged in, without reading its
+        // payload.
+        payload.close();
       }
 
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
@@ -2882,9 +2924,9 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type. Parameter values are ignored.
    */
   prepare(request: Request) {
-    const parameters: Parameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: 'handle',
       value: undefined,
@@ -2892,9 +2934,9 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'params',
       value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
@@ -2902,9 +2944,9 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'stmt',
       value: request.sqlTextOrProcedure,
@@ -2912,7 +2954,7 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
     request.preparing = true;
 
@@ -2925,7 +2967,7 @@ class Connection extends EventEmitter {
       }
     });
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2936,9 +2978,9 @@ class Connection extends EventEmitter {
    *   Parameter values are ignored.
    */
   unprepare(request: Request) {
-    const parameters: Parameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
-    parameters.push({
+    parameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: 'handle',
       // TODO: Abort if `request.handle` is not set
@@ -2947,9 +2989,9 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -2962,9 +3004,9 @@ class Connection extends EventEmitter {
    *   request is executed.
    */
   execute(request: Request, parameters?: { [key: string]: unknown }) {
-    const executeParameters: Parameter[] = [];
+    const executeParameters: ResolvedParameter[] = [];
 
-    executeParameters.push({
+    executeParameters.push(this.resolveRequestParameter({
       type: TYPES.Int,
       name: '',
       // TODO: Abort if `request.handle` is not set
@@ -2973,16 +3015,16 @@ class Connection extends EventEmitter {
       length: undefined,
       precision: undefined,
       scale: undefined
-    });
+    }));
 
     try {
       for (let i = 0, len = request.parameters.length; i < len; i++) {
         const parameter = request.parameters[i];
 
-        executeParameters.push({
+        executeParameters.push(this.resolveRequestParameter({
           ...parameter,
-          value: parameter.type.validate(parameters ? parameters[parameter.name] : null, this.databaseCollation)
-        });
+          value: parameters ? parameters[parameter.name] : null
+        }));
       }
     } catch (error: any) {
       request.error = error;
@@ -2995,7 +3037,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -3005,7 +3047,7 @@ class Connection extends EventEmitter {
    */
   callProcedure(request: Request) {
     try {
-      request.validateParameters(this.databaseCollation);
+      request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
       request.error = error;
 
@@ -3017,7 +3059,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.parameters, this.currentTransactionDescriptor(), this.config.options, this.databaseCollation));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
   }
 
   /**
@@ -3465,8 +3507,14 @@ class Connection extends EventEmitter {
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      // If the abort wins this race, the pending `once()` is left
+      // unobserved, and a parse error landing afterwards would reject it
+      // with nobody listening. Observe it so that cannot become an
+      // unhandled rejection (same idiom as `withAbortRace`).
+      const endOfMessage = once(tokenStreamParser, 'end');
+      endOfMessage.catch(() => {});
       await Promise.race([
-        once(tokenStreamParser, 'end'),
+        endOfMessage,
         signalAborted
       ]);
 
@@ -3495,8 +3543,14 @@ class Connection extends EventEmitter {
 
         const handler = new Login7TokenHandler(this);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        // If the abort wins this race, the pending `once()` is left
+        // unobserved, and a parse error landing afterwards would reject it
+        // with nobody listening. Observe it so that cannot become an
+        // unhandled rejection (same idiom as `withAbortRace`).
+        const endOfMessage = once(tokenStreamParser, 'end');
+        endOfMessage.catch(() => {});
         await Promise.race([
-          once(tokenStreamParser, 'end'),
+          endOfMessage,
           signalAborted
         ]);
 
@@ -3541,8 +3595,14 @@ class Connection extends EventEmitter {
 
       const handler = new Login7TokenHandler(this);
       const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      // If the abort wins this race, the pending `once()` is left
+      // unobserved, and a parse error landing afterwards would reject it
+      // with nobody listening. Observe it so that cannot become an
+      // unhandled rejection (same idiom as `withAbortRace`).
+      const endOfMessage = once(tokenStreamParser, 'end');
+      endOfMessage.catch(() => {});
       await Promise.race([
-        once(tokenStreamParser, 'end'),
+        endOfMessage,
         signalAborted
       ]);
 
@@ -3639,8 +3699,14 @@ class Connection extends EventEmitter {
       ]);
 
       const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+      // If the abort wins this race, the pending `once()` is left
+      // unobserved, and a parse error landing afterwards would reject it
+      // with nobody listening. Observe it so that cannot become an
+      // unhandled rejection (same idiom as `withAbortRace`).
+      const endOfMessage = once(tokenStreamParser, 'end');
+      endOfMessage.catch(() => {});
       await Promise.race([
-        once(tokenStreamParser, 'end'),
+        endOfMessage,
         signalAborted
       ]);
     });
@@ -3715,16 +3781,32 @@ Connection.prototype.STATE = {
         try {
           message = await this.messageIo.readMessage();
         } catch (err: any) {
-          this.dispatchEvent('socketError', err);
-          process.nextTick(() => {
-            this.emit('error', this.wrapSocketError(err));
-          });
+          this._onSocketError(err);
           return;
         }
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+
+        // A token parse failure leaves the connection at an undefined
+        // position in the TDS stream, so it cannot be recovered at the
+        // request level — treat it like a socket error. Without a listener
+        // here, a parse failure would surface as an unhandled `'error'`
+        // event on the parser's internal stream and crash the process.
+        const onParserError = (err: Error) => {
+          // The request is about to fail through the socket error path, so
+          // detach its listeners first: a late `cancel()` must not write an
+          // attention packet to the destroyed socket. (On the canceled-drain
+          // path below these were never attached, and removal is a no-op.)
+          this.request?.removeListener('cancel', this._cancelAfterRequestSent);
+          this.request?.removeListener('cancel', onCancel);
+          this.request?.removeListener('pause', onPause);
+          this.request?.removeListener('resume', onResume);
+
+          this._onSocketError(err);
+        };
+        tokenStreamParser.on('error', onParserError);
 
         // If the request was canceled after the request message was
         // fully sent off, an attention message was sent to the server.
@@ -3780,6 +3862,8 @@ Connection.prototype.STATE = {
         };
 
         const onEndOfMessage = () => {
+          tokenStreamParser.removeListener('error', onParserError);
+
           this.request?.removeListener('cancel', this._cancelAfterRequestSent);
           this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
@@ -3836,17 +3920,23 @@ Connection.prototype.STATE = {
         try {
           message = await this.messageIo.readMessage();
         } catch (err: any) {
-          this.dispatchEvent('socketError', err);
-          process.nextTick(() => {
-            this.emit('error', this.wrapSocketError(err));
-          });
+          this._onSocketError(err);
           return;
         }
 
         const handler = new AttentionTokenHandler(this, this.request!);
         const tokenStreamParser = this.createTokenStreamParser(message, handler);
 
-        await once(tokenStreamParser, 'end');
+        try {
+          await once(tokenStreamParser, 'end');
+        } catch (err: any) {
+          // A token parse failure in the attention response rejects the
+          // `once()`. Treat it like a socket error - the request fails with
+          // the parse error and the connection is closed - instead of the
+          // process dying on an unhandled rejection.
+          this._onSocketError(err);
+          return;
+        }
         // 3.2.5.7 Sent Attention State
         // Discard any data contained in the response, until we receive the attention response
         if (handler.attentionReceived) {

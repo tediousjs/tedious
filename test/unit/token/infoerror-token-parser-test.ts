@@ -17,16 +17,16 @@ describe('Infoerror token parser', function() {
     const procName = 'proc';
     const lineNumber = 6;
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xab);
     buffer.writeUInt16LE(0); // Length written later
     buffer.writeUInt32LE(number);
     buffer.writeUInt8(state);
     buffer.writeUInt8(class_);
-    buffer.writeUsVarchar(message);
-    buffer.writeBVarchar(serverName);
-    buffer.writeBVarchar(procName);
+    buffer.writeUsVarchar(message, 'ucs2');
+    buffer.writeBVarchar(serverName, 'ucs2');
+    buffer.writeBVarchar(procName, 'ucs2');
     buffer.writeUInt32LE(lineNumber);
 
     const data = buffer.data;

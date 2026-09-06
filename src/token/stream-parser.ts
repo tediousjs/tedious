@@ -1,8 +1,9 @@
 import Debug from '../debug';
 import { type InternalConnectionOptions } from '../connection';
 
-import { TYPE, ColMetadataToken, DoneProcToken, DoneToken, DoneInProcToken, ErrorMessageToken, InfoMessageToken, RowToken, type EnvChangeToken, LoginAckToken, ReturnStatusToken, OrderToken, FedAuthInfoToken, SSPIToken, ReturnValueToken, NBCRowToken, FeatureExtAckToken, Token } from './token';
+import { TYPE, ColInfoToken, ColMetadataToken, DoneProcToken, DoneToken, DoneInProcToken, ErrorMessageToken, InfoMessageToken, RowToken, type EnvChangeToken, LoginAckToken, ReturnStatusToken, OrderToken, FedAuthInfoToken, SSPIToken, ReturnValueToken, NBCRowToken, FeatureExtAckToken, TabNameToken, Token } from './token';
 
+import colInfoParser from './colinfo-token-parser';
 import colMetadataParser, { type ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
 import envChangeParser from './env-change-token-parser';
@@ -16,6 +17,7 @@ import returnValueParser from './returnvalue-token-parser';
 import rowParser from './row-token-parser';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
+import tabNameParser from './tabname-token-parser';
 import { NotEnoughDataError } from './helpers';
 
 export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
@@ -122,6 +124,14 @@ class Parser {
         return this.readFeatureExtAckToken();
       }
 
+      case TYPE.TABNAME: {
+        return this.readTabNameToken();
+      }
+
+      case TYPE.COLINFO: {
+        return this.readColInfoToken();
+      }
+
       default: {
         throw new Error('Unknown type: ' + type);
       }
@@ -137,6 +147,44 @@ class Parser {
       if (err instanceof NotEnoughDataError) {
         return this.waitForChunk().then(() => {
           return this.readFeatureExtAckToken();
+        });
+      }
+
+      throw err;
+    }
+
+    this.position = result.offset;
+    return result.value;
+  }
+
+  readTabNameToken(): TabNameToken | Promise<TabNameToken> {
+    let result;
+
+    try {
+      result = tabNameParser(this.buffer, this.position, this.options);
+    } catch (err: any) {
+      if (err instanceof NotEnoughDataError) {
+        return this.waitForChunk().then(() => {
+          return this.readTabNameToken();
+        });
+      }
+
+      throw err;
+    }
+
+    this.position = result.offset;
+    return result.value;
+  }
+
+  readColInfoToken(): ColInfoToken | Promise<ColInfoToken> {
+    let result;
+
+    try {
+      result = colInfoParser(this.buffer, this.position, this.options);
+    } catch (err: any) {
+      if (err instanceof NotEnoughDataError) {
+        return this.waitForChunk().then(() => {
+          return this.readColInfoToken();
         });
       }
 

@@ -9,7 +9,7 @@ const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 describe('Feature Ext Parser', () => {
   it('should parse federated authentication token', async function() {
     const debug = new Debug();
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
 
@@ -41,7 +41,7 @@ describe('Feature Ext Parser', () => {
 
   it('should parse UTF-8 support token', async function() {
     const debug = new Debug();
-    const buffer = new WritableTrackingBuffer(8);
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
     buffer.writeUInt8(0x0A); // UTF8_SUPPORT feature id

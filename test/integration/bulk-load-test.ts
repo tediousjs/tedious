@@ -4,7 +4,7 @@ import { assert } from 'chai';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
-import { RequestError } from '../../src/errors';
+import { InputError, RequestError } from '../../src/errors';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
@@ -151,7 +151,10 @@ describe('BulkLoad', function() {
 
     bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
 
-    const request = new Request('CREATE TABLE #tmpTestTable3 ([id] int,  CONSTRAINT chk_id CHECK (id BETWEEN 0 and 50 ))', (err) => {
+    // The constraint is left unnamed: constraint names on temporary tables
+    // are unique per database, so a named one collides between sessions
+    // running this test at the same time (e.g. the Azure CI jobs).
+    const request = new Request('CREATE TABLE #tmpTestTable3 ([id] int, CHECK (id BETWEEN 0 and 50))', (err) => {
       if (err) {
         return done(err);
       }
@@ -167,8 +170,12 @@ describe('BulkLoad', function() {
   });
 
   it('fires triggers if the `fireTriggers` option is set to `true`', async function() {
-    // Generate a random table name to avoid collisions when tests are run in parallel
+    // Generate a random table name to avoid collisions when tests are run in
+    // parallel against the same database (as the Azure CI jobs are). The
+    // trigger's name is derived from it for the same reason: trigger names
+    // are scoped to the schema, not to the table.
     const tableName = 'testTable' + Math.floor(Math.random() * 1000000);
+    const triggerName = tableName + 'Trigger';
 
     await new Promise<void>((resolve, reject) => {
       const dropTable = `DROP TABLE ${tableName}`;
@@ -204,7 +211,7 @@ describe('BulkLoad', function() {
 
     await new Promise<void>((resolve, reject) => {
       const createTrigger = `
-        CREATE TRIGGER bulkLoadTest on ${tableName}
+        CREATE TRIGGER ${triggerName} on ${tableName}
         AFTER INSERT
         AS
         INSERT INTO ${tableName} SELECT * FROM ${tableName};
@@ -555,6 +562,90 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('supports a bulk load with no rows', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 0);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, []);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('closes the row source if `cancel` was called before executing the bulk load', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
+      assert.isUndefined(rowCount);
+
+      // The source is closed through its iterator's `return()`, which
+      // destroys the stream a turn later.
+      setImmediate(() => {
+        assert.isTrue(source.destroyed);
+        done();
+      });
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      // The `INSERT BULK` statement itself goes through; the bulk load is
+      // then completed as canceled without its rows being read.
+      bulkLoad.cancel();
+      connection.execBulkLoad(bulkLoad, source);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('closes the row source if `cancel` is called immediately after executing the bulk load', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable5', (err) => {
+      assert.instanceOf(err, RequestError);
+      assert.strictEqual(err.message, 'Canceled.');
+      // The source is closed through its iterator's `return()`, which
+      // destroys the stream a turn later.
+      setImmediate(() => {
+        assert.isTrue(source.destroyed);
+        done();
+      });
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: true });
+
+    const request = new Request('CREATE TABLE #tmpTestTable5 ([id] int NULL)', (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, source);
+      bulkLoad.cancel();
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   it('should not do anything if canceled after completion', function(done) {
     const bulkLoad = connection.newBulkLoad('#tmpTestTable5', { keepNulls: true }, (err, rowCount) => {
       if (err) {
@@ -590,6 +681,48 @@ describe('BulkLoad', function() {
 
     verifyBulkLoadRequest.on('row', function(columns) {
       assert.strictEqual(columns[0].value, 1234);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
+  it('closes the row source when the `INSERT BULK` statement is rejected', function(done) {
+    const source = Readable.from([[1]], { objectMode: true });
+
+    const bulkLoad = connection.newBulkLoad('#does_not_exist', (err) => {
+      assert.instanceOf(err, Error);
+      // The source is closed through its iterator's `return()`, which
+      // destroys the stream a turn later.
+      setImmediate(() => {
+        assert.isTrue(source.destroyed);
+        done();
+      });
+    });
+
+    bulkLoad.addColumn('i', TYPES.Int, { nullable: false });
+
+    connection.execBulkLoad(bulkLoad, source);
+  });
+
+  it('reports an error a synchronous source throws on its first read through the callback', function(done) {
+    const expected = new TypeError('bad input');
+
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err) => {
+      assert.strictEqual(err, expected);
+
+      done();
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, (function*() {
+        throw expected;
+      })());
     });
 
     connection.execSqlBatch(request);
@@ -1554,12 +1687,14 @@ describe('BulkLoad', function() {
     });
   });
 
-  it('should not throw in _transform function', function(done) {
+  it('wraps a value the column type cannot serialize in an InputError naming the column', function(done) {
     const bulkLoad = connection.newBulkLoad(
       '#tmpTestTable',
       (err, rowCount) => {
-        assert.instanceOf(err, RangeError);
-        assert.strictEqual(err.message, 'The value of "value" is out of range. It must be >= 0 and <= 4294967295. Received 3_.40_282_346_638_528_86e_+42');
+        assert.instanceOf(err, InputError);
+        assert.match((err as Error).message, /Column 'value' could not be serialized/);
+        assert.instanceOf((err as Error).cause, RangeError);
+        assert.strictEqual(((err as Error).cause as Error).message, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
         assert.strictEqual(rowCount, 0);
         done();
       });

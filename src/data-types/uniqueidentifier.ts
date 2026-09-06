@@ -1,8 +1,7 @@
 import { type DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
 
-const NULL_LENGTH = Buffer.from([0x00]);
-const DATA_LENGTH = Buffer.from([0x10]);
+const TYPE_INFO = Buffer.from([0x24, 0x10]);
 
 const UniqueIdentifier: DataType = {
   id: 0x24,
@@ -17,24 +16,21 @@ const UniqueIdentifier: DataType = {
     return 16;
   },
 
-  generateTypeInfo() {
-    return Buffer.from([this.id, 0x10]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as string | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    yield Buffer.from(guidToArray(parameter.value));
+    buffer.writeUInt8(0x10);
+    for (const byte of guidToArray(value)) {
+      buffer.writeUInt8(byte);
+    }
   },
 
   validate: function(value): string | null {

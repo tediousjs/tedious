@@ -1,8 +1,7 @@
 import { type DataType } from '../data-type';
 import FloatN from './floatn';
 
-const NULL_LENGTH = Buffer.from([0x00]);
-const DATA_LENGTH = Buffer.from([0x04]);
+const TYPE_INFO = Buffer.from([FloatN.id, 0x04]);
 
 const Real: DataType = {
   id: 0x3B,
@@ -13,26 +12,19 @@ const Real: DataType = {
     return 'real';
   },
 
-  generateTypeInfo() {
-    return Buffer.from([FloatN.id, 0x04]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as number | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const buffer = Buffer.alloc(4);
-    buffer.writeFloatLE(parseFloat(parameter.value), 0);
-    yield buffer;
+    buffer.writeUInt8(0x04);
+    buffer.writeFloatLE(value);
   },
 
   validate: function(value): null | number {

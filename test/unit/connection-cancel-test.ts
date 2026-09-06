@@ -644,10 +644,11 @@ describe('Canceling a request', function() {
       bulkLoad.addColumn('a', TYPES.VarBinary, { length: 8000, nullable: false });
 
       // A row stream that never completes, so the bulk load message is
-      // still being sent when the request timeout expires. The first row
-      // is large enough to fill a packet, so the server starts receiving
-      // the bulk load message right away.
+      // still being sent when the request timeout expires. The first two
+      // rows fill a chunk, so the server starts receiving the bulk load
+      // message right away.
       connection.execBulkLoad(bulkLoad, (async function*() {
+        yield [Buffer.alloc(8000)];
         yield [Buffer.alloc(8000)];
 
         await new Promise<unknown>(() => {
@@ -809,10 +810,11 @@ describe('Canceling a request', function() {
       bulkLoad.addColumn('a', TYPES.VarBinary, { length: 8000, nullable: false });
 
       // A row stream that never completes, so the bulk load message
-      // stays in flight until the bulk load is canceled. The first row
-      // is large enough to fill a packet, so the server starts receiving
-      // the bulk load message right away.
+      // stays in flight until the bulk load is canceled. The first two
+      // rows fill a chunk, so the server starts receiving the bulk load
+      // message right away.
       connection.execBulkLoad(bulkLoad, (async function*() {
+        yield [Buffer.alloc(8000)];
         yield [Buffer.alloc(8000)];
 
         await new Promise<unknown>(() => {
@@ -1016,10 +1018,11 @@ describe('Canceling a request', function() {
 
       // A row stream that completes only once the error response has been
       // received, so the bulk load message is guaranteed to finish sending
-      // *after* the response started arriving. The first row is large
-      // enough to fill a packet, so the server starts receiving the bulk
-      // load message right away.
+      // *after* the response started arriving. The first two rows fill
+      // a chunk, so the server starts receiving the bulk load message
+      // right away.
       connection.execBulkLoad(bulkLoad, (async function*() {
+        yield [Buffer.alloc(8000)];
         yield [Buffer.alloc(8000)];
 
         await errorReceived;
