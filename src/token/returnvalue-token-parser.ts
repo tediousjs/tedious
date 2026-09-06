@@ -30,21 +30,14 @@ function returnParser(parser: Parser): ReturnValueToken {
 
   if (state === undefined || state.kind !== 'returnValue') {
     const buf = parser.buffer;
-    let offset = parser.position;
 
-    let paramOrdinal;
-    let paramName;
-    let metadata;
-
-    ({ offset, value: paramOrdinal } = readUInt16LE(buf, offset));
-    ({ offset, value: paramName } = readBVarChar(buf, offset));
+    const { offset: ordinalEnd, value: paramOrdinal } = readUInt16LE(buf, parser.position);
+    const { offset: nameEnd, value: name } = readBVarChar(buf, ordinalEnd);
     // status
-    ({ offset } = readUInt8(buf, offset));
-    ({ offset, value: metadata } = readMetadata(buf, offset, parser.options));
+    const { offset: statusEnd } = readUInt8(buf, nameEnd);
+    const { offset, value: metadata } = readMetadata(buf, statusEnd, parser.options);
 
-    if (paramName.charAt(0) === '@') {
-      paramName = paramName.slice(1);
-    }
+    const paramName = name.charAt(0) === '@' ? name.slice(1) : name;
 
     parser.position = offset;
     parser.commit();

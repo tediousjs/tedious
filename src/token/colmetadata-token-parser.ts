@@ -2,7 +2,7 @@ import { readMetadata, type Metadata } from '../metadata-parser';
 
 import Parser, { type ParserOptions } from './stream-parser';
 import { ColMetadataToken } from './token';
-import { NotEnoughDataError, Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
+import { Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
 
 export interface ColumnMetadata extends Metadata {
   /**

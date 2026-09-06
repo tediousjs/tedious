@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import StreamParser, { NEED_MORE_DATA, type ParserOptions } from './stream-parser';
 import Debug from '../debug';
-import { Token } from './token';
 import IncomingMessage, { type MessageSink } from '../incoming-message';
 import { TokenHandler } from './handler';
 

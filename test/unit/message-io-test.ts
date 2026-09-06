@@ -9,7 +9,6 @@ import { Duplex } from 'stream';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
-import Message from '../../src/message';
 import IncomingMessage from '../../src/incoming-message';
 import { Packet, TYPE } from '../../src/packet';
 

@@ -1,5 +1,5 @@
 import { Collation } from './collation';
-import Parser, { type ParserOptions } from './token/stream-parser';
+import { type ParserOptions } from './token/stream-parser';
 import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 

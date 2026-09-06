@@ -2,7 +2,6 @@ import BufferList from 'bl';
 import { assert } from 'chai';
 import IncomingMessageStream from '../../src/incoming-message-stream';
 import IncomingMessage from '../../src/incoming-message';
-import Message from '../../src/message';
 import Debug from '../../src/debug';
 import { ConnectionError } from '../../src/errors';
 
