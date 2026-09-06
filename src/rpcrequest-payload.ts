@@ -1,6 +1,6 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type ResolvedParameter, writeTypeInfo, writeValue } from './data-type';
+import { type ResolvedParameter, writeRest, writeTypeInfo, writeValue } from './data-type';
 import { type InternalConnectionOptions } from './connection';
 import { InputError } from './errors';
 
@@ -18,7 +18,7 @@ const STATUS = {
 /*
   s2.2.6.5
  */
-class RpcRequestPayload implements Iterable<Buffer> {
+class RpcRequestPayload implements AsyncIterable<Buffer> {
   declare procedure: string | number;
   declare parameters: ResolvedParameter[];
 
@@ -32,12 +32,66 @@ class RpcRequestPayload implements Iterable<Buffer> {
     this.txnDescriptor = txnDescriptor;
   }
 
-  [Symbol.iterator]() {
-    return this.generateData();
+  /**
+   * The request is written into one buffer whose contents are yielded once
+   * it holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`), checked
+   * after every parameter, and at the end. A large value written by
+   * reference stays by reference, so this costs no extra copy. A parameter
+   * whose value is read from a source while the request is written has the
+   * rest of that write returned by `writeValue`, and is driven here so that
+   * the buffer is handed on whenever the type says it is worth it.
+   *
+   * Chunks are yielded one by one rather than through `yield*`: an array
+   * iterator has no `throw` method, so an error a consumer throws into this
+   * generator during such a delegation would surface as a TypeError instead.
+   */
+  async *[Symbol.asyncIterator]() {
+    const buffer = new WritableTrackingBuffer();
+    this.writeHeader(buffer);
+
+    const parametersLength = this.parameters.length;
+    for (let i = 0; i < parametersLength; i++) {
+      const parameter = this.parameters[i];
+      this.writeParameterHeader(buffer, parameter);
+
+      let rest: void | AsyncIterable<void>;
+      try {
+        writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
+        rest = writeValue(parameter.type, buffer, parameter.data, this.options);
+      } catch (error) {
+        throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
+      }
+
+      // A value read from a source while the request is written: the type
+      // yields whenever the buffer is worth handing on.
+      if (rest !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of writeRest(rest, (error) => new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error }))) {
+          for (const chunk of buffer.getBuffers()) {
+            yield chunk;
+          }
+          buffer.consume(buffer.length);
+        }
+      }
+
+      if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+        for (const chunk of buffer.getBuffers()) {
+          yield chunk;
+        }
+        buffer.consume(buffer.length);
+      }
+    }
+
+    for (const chunk of buffer.getBuffers()) {
+      yield chunk;
+    }
   }
 
-  * generateData() {
-    const buffer = new WritableTrackingBuffer();
+  toString(indent = '') {
+    return indent + ('RPC Request - ' + this.procedure);
+  }
+
+  writeHeader(buffer: WritableTrackingBuffer) {
     if (this.options.tdsVersion >= '7_2') {
       const outstandingRequestCount = 1;
       writeToTrackingBuffer(buffer, this.txnDescriptor, outstandingRequestCount);
@@ -52,21 +106,9 @@ class RpcRequestPayload implements Iterable<Buffer> {
 
     const optionFlags = 0;
     buffer.writeUInt16LE(optionFlags);
-    yield buffer.data;
-
-    const parametersLength = this.parameters.length;
-    for (let i = 0; i < parametersLength; i++) {
-      yield * this.generateParameterData(this.parameters[i]);
-    }
   }
 
-  toString(indent = '') {
-    return indent + ('RPC Request - ' + this.procedure);
-  }
-
-  * generateParameterData(parameter: ResolvedParameter) {
-    const buffer = new WritableTrackingBuffer();
-
+  writeParameterHeader(buffer: WritableTrackingBuffer, parameter: ResolvedParameter) {
     if (parameter.name) {
       buffer.writeBVarchar('@' + parameter.name, 'ucs2');
     } else {
@@ -78,17 +120,6 @@ class RpcRequestPayload implements Iterable<Buffer> {
       statusFlags |= STATUS.BY_REF_VALUE;
     }
     buffer.writeUInt8(statusFlags);
-
-    try {
-      writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-      writeValue(parameter.type, buffer, parameter.data, this.options);
-    } catch (error) {
-      throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-    }
-
-    // Large values are referenced by the buffer rather than copied; handing
-    // out its chunks keeps them that way.
-    yield * buffer.getBuffers();
   }
 }
 

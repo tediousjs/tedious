@@ -111,8 +111,16 @@ export interface DataType {
 
   /**
    * Writes the value of a resolved parameter (length prefix and data).
+   *
+   * A value that is fully in memory is written before this returns. A value
+   * that is read from a source while the request is written (an async
+   * iterable, accepted by the `max` types and by a TVP's rows) returns the
+   * rest of the write instead: an async iterable that yields whenever
+   * `buffer` holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`) or
+   * more, so that the caller can hand those bytes on before the rest of the
+   * value is read. Nothing of that rest runs before its first `next()`.
    */
-  writeValue?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
+  writeValue?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
 }
 
 /**
@@ -185,17 +193,67 @@ export function writeTypeInfo(type: DataType, buffer: WritableTrackingBuffer, pa
 }
 
 /**
- * Writes the value of a resolved parameter (length prefix and data).
+ * Writes the value of a resolved parameter (length prefix and data), and
+ * returns the rest of the write for a value that is read from a source (see
+ * `DataType.writeValue`).
  */
-export function writeValue(type: DataType, buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void {
+export function writeValue(type: DataType, buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void> {
   if (type.writeValue) {
-    type.writeValue(buffer, parameter, options);
-    return;
+    return type.writeValue(buffer, parameter, options);
   }
 
   buffer.writeBuffer(type.generateParameterLength(parameter, options));
   for (const chunk of type.generateParameterData(parameter, options)) {
     buffer.writeBuffer(chunk);
+  }
+}
+
+/**
+ * Drives the rest of a write returned by `writeValue`, yielding at each of
+ * its yields. An error the rest throws is passed through `wrap` (e.g. to
+ * name the parameter it belongs to); an error thrown into this generator by
+ * its consumer keeps its identity, and a consumer that stops early closes
+ * the rest, and with it the value's source, as `for await` would.
+ */
+export async function * writeRest(rest: AsyncIterable<void>, wrap: (error: unknown) => Error): AsyncGenerator<void, void> {
+  const iterator = rest[Symbol.asyncIterator]();
+  let done = false;
+  try {
+    while (true) {
+      let result: IteratorResult<void>;
+      try {
+        result = await iterator.next();
+      } catch (error) {
+        // A generator that threw is finished; there is nothing to close.
+        done = true;
+        const wrapped = wrap(error);
+        throw wrapped;
+      }
+
+      if (result.done) {
+        done = true;
+        break;
+      }
+
+      yield;
+    }
+  } catch (error) {
+    // An error thrown into this generator at a yield closes the rest. A
+    // close that fails must not replace the error that is propagating.
+    if (!done && typeof iterator.return === 'function') {
+      done = true;
+      try {
+        await iterator.return();
+      } catch {
+        // The propagating error is what surfaces.
+      }
+    }
+    throw error;
+  } finally {
+    // The consumer stopped pulling.
+    if (!done && typeof iterator.return === 'function') {
+      await iterator.return();
+    }
   }
 }
 
