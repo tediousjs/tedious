@@ -4,6 +4,7 @@ import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([DateTimeN.id, 0x08]);
 const DATA_LENGTH = Buffer.from([0x08]);
 
 const DateTime: DataType = {
@@ -69,6 +70,39 @@ const DateTime: DataType = {
     buffer.writeInt32LE(days, 0);
     buffer.writeUInt32LE(threeHundredthsOfSecond, 4);
     yield buffer;
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as Date | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    let days: number, milliseconds: number;
+    if (options.useUTC) {
+      days = EPOCH_DATE.until(LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()), ChronoUnit.DAYS);
+      milliseconds = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
+    } else {
+      days = EPOCH_DATE.until(LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate()), ChronoUnit.DAYS);
+      milliseconds = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
+    }
+
+    let threeHundredthsOfSecond = Math.round(milliseconds / (3 + (1 / 3)));
+
+    // 25920000 equals one day
+    if (threeHundredthsOfSecond === 25920000) {
+      days += 1;
+      threeHundredthsOfSecond = 0;
+    }
+
+    buffer.writeUInt8(0x08);
+    buffer.writeInt32LE(days);
+    buffer.writeUInt32LE(threeHundredthsOfSecond);
   },
 
   // TODO: type 'any' needs to be revisited.

@@ -36,6 +36,18 @@ function nativeValue(type: DataType, column: ColumnData, validated: unknown, opt
 
 type Case = [string, DataType, ColumnData, unknown[]];
 
+const dates = [
+  new Date(Date.UTC(2020, 0, 2, 3, 4, 5, 6)),
+  new Date(Date.UTC(1999, 11, 31, 23, 59, 59, 999)),
+  new Date(Date.UTC(1970, 0, 1)),
+  new Date(Date.UTC(1900, 0, 2, 12)),
+  new Date(Date.UTC(2021, 6, 15, 12, 30)),
+  '2021-06-07T08:09:10.123Z'
+];
+
+// A value from the parser, with a sub-millisecond part.
+const precise = Object.assign(new Date(Date.UTC(2020, 0, 2, 3, 4, 5, 6)), { nanosecondDelta: 0.0001234 });
+
 // Every migrated type with inputs as a user would pass them.
 const cases: Case[] = [
   ['TinyInt', TYPES.TinyInt, {}, [null, undefined, 0, 1, 255, '42', 3.9]],
@@ -46,6 +58,18 @@ const cases: Case[] = [
   ['Float', TYPES.Float, {}, [null, 0, 1.5, -2.25, '3.5', 1e300, Number.MAX_VALUE]],
   ['Money', TYPES.Money, {}, [null, 0, 1.2345, -1.2345, '4.5', 123456789.5, -123456789.5, 922337203685477.5]],
   ['SmallMoney', TYPES.SmallMoney, {}, [null, 0, 1.2345, -1.2345, '4.5', 214748.36, -214748.36]],
+  ['Date', TYPES.Date, {}, [null, ...dates]],
+  ['Time(0)', TYPES.Time, { scale: 0 }, [null, ...dates, precise]],
+  ['Time(3)', TYPES.Time, { scale: 3 }, [null, ...dates, precise]],
+  ['Time(7)', TYPES.Time, { scale: 7 }, [null, ...dates, precise]],
+  ['DateTime', TYPES.DateTime, {}, [null, ...dates, new Date(Date.UTC(2020, 0, 1, 23, 59, 59, 999))]],
+  ['SmallDateTime', TYPES.SmallDateTime, {}, [null, ...dates]],
+  ['DateTime2(0)', TYPES.DateTime2, { scale: 0 }, [null, ...dates, precise]],
+  ['DateTime2(4)', TYPES.DateTime2, { scale: 4 }, [null, ...dates, precise]],
+  ['DateTime2(7)', TYPES.DateTime2, { scale: 7 }, [null, ...dates, precise]],
+  ['DateTimeOffset(0)', TYPES.DateTimeOffset, { scale: 0 }, [null, ...dates, precise]],
+  ['DateTimeOffset(4)', TYPES.DateTimeOffset, { scale: 4 }, [null, ...dates, precise]],
+  ['DateTimeOffset(7)', TYPES.DateTimeOffset, { scale: 7 }, [null, ...dates, precise]],
 ];
 
 describe('migrated data types', function() {

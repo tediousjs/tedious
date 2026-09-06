@@ -1,4 +1,5 @@
 import { type DataType } from '../data-type';
+import { daysSinceYearOne, timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
@@ -92,6 +93,24 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeInt16LE(offset);
     yield buffer.data;
   },
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt8(parameter.scale!);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as TemporalValue | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(timeLength(parameter.scale) + 5);
+    writeTimeOfDay(buffer, value, parameter.scale!, true);
+    buffer.writeUInt24LE(daysSinceYearOne(value, true));
+    buffer.writeInt16LE(-value.getTimezoneOffset());
+  },
+
   validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;

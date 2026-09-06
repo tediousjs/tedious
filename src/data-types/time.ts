@@ -1,4 +1,5 @@
 import { type DataType } from '../data-type';
+import { timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -86,6 +87,22 @@ const Time: DataType = {
     yield buffer.data;
   },
 
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt8(parameter.scale!);
+  },
+
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as TemporalValue | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(timeLength(parameter.scale));
+    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
+  },
+
   validate: function(value): null | number | Date {
     if (value == null) {
       return null;
@@ -102,7 +119,6 @@ const Time: DataType = {
     return value;
   }
 };
-
 
 export default Time;
 module.exports = Time;

@@ -6,6 +6,7 @@ const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([DateTimeN.id, 0x04]);
 
 const SmallDateTime: DataType = {
   id: 0x3A,
@@ -49,6 +50,32 @@ const SmallDateTime: DataType = {
     buffer.writeUInt16LE(minutes, 2);
 
     yield buffer;
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as Date | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    let days: number, minutes: number;
+    if (options.useUTC) {
+      days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+      minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
+    } else {
+      const dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+      days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+      minutes = (value.getHours() * 60) + value.getMinutes();
+    }
+
+    buffer.writeUInt8(0x04);
+    buffer.writeUInt16LE(days);
+    buffer.writeUInt16LE(minutes);
   },
 
   validate: function(value, collation, options): null | Date {

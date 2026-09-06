@@ -1,10 +1,12 @@
 import { type DataType } from '../data-type';
+import { daysSinceYearOne } from './temporal';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 
 // globalDate is to be used for JavaScript's global 'Date' object to avoid name clashing with the 'Date' constant below
 const globalDate = global.Date;
 const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([0x28]);
 const DATA_LENGTH = Buffer.from([0x03]);
 
 const Date: DataType = {
@@ -46,6 +48,21 @@ const Date: DataType = {
     const buffer = Buffer.alloc(3);
     buffer.writeUIntLE(days, 0, 3);
     yield buffer;
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as globalThis.Date | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(0x03);
+    buffer.writeUInt24LE(daysSinceYearOne(value, options.useUTC));
   },
 
   // TODO: value is technically of type 'unknown'.

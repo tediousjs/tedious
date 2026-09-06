@@ -1,4 +1,5 @@
 import { type DataType } from '../data-type';
+import { daysSinceYearOne, timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
 import { ChronoUnit, LocalDate } from '@js-joda/core';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
@@ -100,6 +101,23 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
     buffer.writeUInt24LE(days);
     yield buffer.data;
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt8(parameter.scale!);
+  },
+
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as TemporalValue | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(timeLength(parameter.scale) + 3);
+    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
+    buffer.writeUInt24LE(daysSinceYearOne(value, options.useUTC));
   },
 
   validate: function(value: any, collation, options): null | number {
