@@ -48,6 +48,8 @@ const dates = [
 // A value from the parser, with a sub-millisecond part.
 const precise = Object.assign(new Date(Date.UTC(2020, 0, 2, 3, 4, 5, 6)), { nanosecondDelta: 0.0001234 });
 
+const decimals = [0, 1.5, -1.5, 123456.78, -123456.78, '42', 0.001];
+
 // Every migrated type with inputs as a user would pass them.
 const cases: Case[] = [
   ['TinyInt', TYPES.TinyInt, {}, [null, undefined, 0, 1, 255, '42', 3.9]],
@@ -70,9 +72,30 @@ const cases: Case[] = [
   ['DateTimeOffset(0)', TYPES.DateTimeOffset, { scale: 0 }, [null, ...dates, precise]],
   ['DateTimeOffset(4)', TYPES.DateTimeOffset, { scale: 4 }, [null, ...dates, precise]],
   ['DateTimeOffset(7)', TYPES.DateTimeOffset, { scale: 7 }, [null, ...dates, precise]],
+  ['Decimal(9, 2)', TYPES.Decimal, { precision: 9, scale: 2 }, [null, ...decimals]],
+  ['Decimal(19, 4)', TYPES.Decimal, { precision: 19, scale: 4 }, [null, ...decimals, 123456789012345]],
+  ['Decimal(28, 6)', TYPES.Decimal, { precision: 28, scale: 6 }, [null, ...decimals, 1e20]],
+  ['Decimal(38, 10)', TYPES.Decimal, { precision: 38, scale: 10 }, [null, ...decimals, 1e27]],
+  ['Numeric(9, 2)', TYPES.Numeric, { precision: 9, scale: 2 }, [null, ...decimals]],
+  ['Numeric(19, 4)', TYPES.Numeric, { precision: 19, scale: 4 }, [null, ...decimals, 123456789012345]],
+  ['Numeric(28, 6)', TYPES.Numeric, { precision: 28, scale: 6 }, [null, ...decimals, 1e20]],
+  ['Numeric(38, 10)', TYPES.Numeric, { precision: 38, scale: 10 }, [null, ...decimals, 1e27]],
 ];
 
 describe('migrated data types', function() {
+  const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
+
+  it('Decimal and Numeric reject a value that does not fit as the legacy generator does', function() {
+    for (const [type, name] of [[TYPES.Decimal, 'DECIMAL'], [TYPES.Numeric, 'NUMERIC']] as const) {
+      for (const [precision, scale, value] of [[9, 2, 1e8], [19, 4, 1e16], [28, 6, 1e23], [38, 10, 1e29]] as const) {
+        const column = { precision, scale };
+        const message = `Value ${value} is out of range for ${name}(${precision}, ${scale}).`;
+        assert.throws(() => legacyValue(type, column, value, options), RangeError, message);
+        assert.throws(() => nativeValue(type, column, value, options), RangeError, message);
+      }
+    }
+  });
+
   for (const [name, type, column, values] of cases) {
     describe(name, function() {
       it('has the write contract', function() {

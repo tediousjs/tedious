@@ -1,4 +1,5 @@
 import { type DataType } from '../data-type';
+import { writeDecimal, writeDecimalTypeInfo } from './decimal-common';
 import DecimalN from './decimaln';
 
 const NULL_LENGTH = Buffer.from([0x00]);
@@ -102,6 +103,14 @@ const Decimal: DataType & { resolvePrecision: NonNullable<DataType['resolvePreci
       magnitude >>= 8n;
     }
     yield buffer;
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    writeDecimalTypeInfo(buffer, DecimalN.id, parameter.precision, parameter.scale);
+  },
+
+  writeValue(buffer, parameter) {
+    writeDecimal(buffer, parameter.value as number | null, parameter.precision, parameter.scale, 'DECIMAL');
   },
 
   validate: function(value): number | null {
