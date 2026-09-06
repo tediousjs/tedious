@@ -40,6 +40,10 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
    * whose value is streamed (`data.streamed`) is written into the same
    * buffer by the type's `writeValueStream`, which reads the value's source
    * as it goes and yields whenever the buffer is worth handing on.
+   *
+   * Chunks are yielded one by one rather than through `yield*`: an array
+   * iterator has no `throw` method, so an error a consumer throws into this
+   * generator during such a delegation would surface as a TypeError instead.
    */
   async *[Symbol.asyncIterator]() {
     const buffer = new WritableTrackingBuffer();
@@ -83,7 +87,9 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
               break;
             }
 
-            yield * buffer.getBuffers();
+            for (const chunk of buffer.getBuffers()) {
+              yield chunk;
+            }
             buffer.consume(buffer.length);
           }
         } finally {
@@ -96,12 +102,16 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       }
 
       if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
-        yield * buffer.getBuffers();
+        for (const chunk of buffer.getBuffers()) {
+          yield chunk;
+        }
         buffer.consume(buffer.length);
       }
     }
 
-    yield * buffer.getBuffers();
+    for (const chunk of buffer.getBuffers()) {
+      yield chunk;
+    }
   }
 
   toString(indent = '') {
