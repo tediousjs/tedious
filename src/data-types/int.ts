@@ -16,16 +16,6 @@ const Int: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    if (parameter.value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
-
-    buffer.writeUInt8(0x04);
-    buffer.writeInt32LE(Number(parameter.value));
-  },
-
   validate: function(value): number | null {
     if (value == null) {
       return null;
@@ -47,26 +37,15 @@ const Int: DataType = {
   },
 
   compileWriter() {
-    return (buffer, value) => {
+    return (buffer, raw) => {
+      const value = Int.validate(raw, undefined);
       if (value == null) {
         buffer.writeUInt8(0x00);
         return;
       }
 
-      if (typeof value !== 'number') {
-        value = Number(value);
-      }
-
-      if (isNaN(value as number)) {
-        throw new TypeError('Invalid number.');
-      }
-
-      if ((value as number) < -2147483648 || (value as number) > 2147483647) {
-        throw new TypeError('Value must be between -2147483648 and 2147483647, inclusive.');
-      }
-
       buffer.writeUInt8(0x04);
-      buffer.writeInt32LE((value as number) | 0);
+      buffer.writeInt32LE(value);
     };
   }
 };

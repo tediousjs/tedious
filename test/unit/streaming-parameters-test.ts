@@ -67,7 +67,7 @@ describe('streaming parameters', function() {
         assert.strictEqual(resolved.data.length, 65535);
         // A streamed value has no known length, so it is sent as a `max` type.
         assert.isAbove(resolved.data.length!, (type as { maximumLength: number }).maximumLength);
-        assert.isDefined(type.writeValue!(new WritableTrackingBuffer(), resolved.data, options));
+        assert.isDefined(type.compileWriter(resolved.data, options)(new WritableTrackingBuffer(), resolved.data.value));
       });
     }
 
@@ -85,7 +85,7 @@ describe('streaming parameters', function() {
 
     it('leaves an in-memory value unstreamed', function() {
       const resolved = resolveParameter(param({ type: TYPES.VarBinary, value: Buffer.from([1, 2, 3]) }), undefined, options);
-      assert.isUndefined(TYPES.VarBinary.writeValue!(new WritableTrackingBuffer(), resolved.data, options));
+      assert.isUndefined(TYPES.VarBinary.compileWriter(resolved.data, options)(new WritableTrackingBuffer(), resolved.data.value));
     });
   });
 
@@ -96,9 +96,12 @@ describe('streaming parameters', function() {
       let secondWritten = false;
       const recording: DataType = {
         ...TYPES.Int,
-        writeValue(buffer, parameter, options) {
-          secondWritten = true;
-          TYPES.Int.writeValue!(buffer, parameter, options);
+        compileWriter(column, options) {
+          const write = TYPES.Int.compileWriter(column, options);
+          return (buffer, value) => {
+            secondWritten = true;
+            write(buffer, value);
+          };
         }
       };
 

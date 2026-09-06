@@ -1,6 +1,6 @@
 import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
-import { compileWriter, writeRest } from './data-type';
+import { writeRest } from './data-type';
 import { TYPE as TOKEN_TYPE } from './token/token';
 import { InputError } from './errors';
 
@@ -117,7 +117,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
     // One writer per column, compiled once for all rows: it validates and
     // writes a cell, and returns the rest of the write for a cell whose
     // value is read from a source while the row is written.
-    const writers = columns.map((c) => compileWriter(c.type, { length: c.length, scale: c.scale, precision: c.precision, collation: c.collation }, options));
+    const writers = columns.map((c) => c.type.compileWriter({ length: c.length, scale: c.scale, precision: c.precision, collation: c.collation }, options));
 
     const buffer = new WritableTrackingBuffer();
 

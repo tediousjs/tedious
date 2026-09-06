@@ -2,8 +2,6 @@ import { type DataType, type ParameterData } from '../data-type';
 import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
-const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
@@ -78,43 +76,6 @@ const NVarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  writeValue(buffer, parameter) {
-    if (parameter.value == null) {
-      buffer.writeBuffer(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
-      return;
-    }
-
-    // Read from its source while the request is written; `resolve` declared
-    // it as `nvarchar(max)`.
-    if (isAsyncIterable(parameter.value)) {
-      return writePlpStream(buffer, parameter.value, encodeUcs2);
-    }
-
-    const value = parameter.value instanceof Buffer ? parameter.value : parameter.value.toString();
-    const length = typeof value === 'string' ? value.length * 2 : value.length;
-
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(length);
-    } else {
-      buffer.writeBuffer(UNKNOWN_PLP_LEN);
-      if (length === 0) {
-        buffer.writeBuffer(PLP_TERMINATOR);
-        return;
-      }
-      buffer.writeUInt32LE(length);
-    }
-
-    if (typeof value === 'string') {
-      buffer.writeString(value, 'ucs2');
-    } else {
-      buffer.writeBuffer(value);
-    }
-
-    if (parameter.length! > this.maximumLength) {
-      buffer.writeBuffer(PLP_TERMINATOR);
-    }
-  },
-
   validate: function(value): null | string {
     if (value == null) {
       return null;
@@ -149,14 +110,11 @@ const NVarChar: { maximumLength: number } & DataType = {
 
   compileWriter(column) {
     if (column.length! <= this.maximumLength) {
-      return (buffer, value) => {
+      return (buffer, raw) => {
+        const value = NVarChar.validate(raw, undefined);
         if (value == null) {
           buffer.writeBuffer(NULL_LENGTH);
           return;
-        }
-
-        if (typeof value !== 'string') {
-          throw new TypeError('Invalid string.');
         }
 
         buffer.writeUInt16LE(value.length * 2);
@@ -164,19 +122,16 @@ const NVarChar: { maximumLength: number } & DataType = {
       };
     }
 
-    // nvarchar(max): a string, or a source read while the row is written.
-    return (buffer, value) => {
+    // nvarchar(max): a string, or a source read while the request is written.
+    return (buffer, raw) => {
+      if (isAsyncIterable(raw)) {
+        return writePlpStream(buffer, raw, encodeUcs2);
+      }
+
+      const value = NVarChar.validate(raw, undefined);
       if (value == null) {
         buffer.writeBuffer(MAX_NULL_LENGTH);
         return;
-      }
-
-      if (isAsyncIterable(value)) {
-        return writePlpStream(buffer, value, encodeUcs2);
-      }
-
-      if (typeof value !== 'string') {
-        throw new TypeError('Invalid string.');
       }
 
       writePlpValue(buffer, Buffer.from(value, 'ucs2'));

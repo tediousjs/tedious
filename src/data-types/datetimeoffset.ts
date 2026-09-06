@@ -23,17 +23,20 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeUInt8(parameter.scale!);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as TemporalValue | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter(column) {
+    const scale = column.scale;
+    return (buffer, raw) => {
+      const value = DateTimeOffset.validate(raw, undefined) as TemporalValue | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(timeLength(parameter.scale) + 5);
-    writeTimeOfDay(buffer, value, parameter.scale!, true);
-    buffer.writeUInt24LE(daysSinceYearOne(value, true));
-    buffer.writeInt16LE(-value.getTimezoneOffset());
+      buffer.writeUInt8(timeLength(scale) + 5);
+      writeTimeOfDay(buffer, value, scale!, true);
+      buffer.writeUInt24LE(daysSinceYearOne(value, true));
+      buffer.writeInt16LE(-value.getTimezoneOffset());
+    };
   },
 
   validate: function(value: any, collation, options): null | number {

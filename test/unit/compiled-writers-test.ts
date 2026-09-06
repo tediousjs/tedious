@@ -5,7 +5,7 @@ import BulkLoad from '../../src/bulk-load';
 import { BulkLoadPayload } from '../../src/bulk-load-payload';
 import RpcRequestPayload from '../../src/rpcrequest-payload';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
-import { typeByName as TYPES, compileWriter, resolveParameter, type DataType, type Parameter, type ColumnData } from '../../src/data-type';
+import { typeByName as TYPES, resolveParameter, type DataType, type Parameter, type ColumnData } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 import { Collation } from '../../src/collation';
 import { InputError } from '../../src/errors';
@@ -33,44 +33,14 @@ async function collect(payload: AsyncIterable<Buffer>) {
   return Buffer.concat(chunks);
 }
 
-// The bytes `validate` followed by `writeValue` produce for one cell.
-function throughValidateAndWrite(type: DataType, column: ColumnData, value: unknown) {
-  const buffer = new WritableTrackingBuffer();
-  const cell = { ...column, value: type.validate(value, column.collation) };
-  assert.isUndefined(type.writeValue(buffer, cell, options));
-  return buffer.data;
-}
-
 function throughCompiledWriter(type: DataType, column: ColumnData, value: unknown) {
   const buffer = new WritableTrackingBuffer();
-  assert.isUndefined(compileWriter(type, column, options)(buffer, value));
+  assert.isUndefined(type.compileWriter(column, options)(buffer, value));
   return buffer.data;
 }
 
-describe('compiled cell writers', function() {
-  describe('write the same bytes as validate and writeValue', function() {
-    const cases: Array<[string, DataType, ColumnData, unknown[]]> = [
-      ['Int', TYPES.Int, {}, [null, 0, 1, -1, 2147483647, -2147483648, '42', 3.9]],
-      ['NVarChar(50)', TYPES.NVarChar, { length: 50, collation }, [null, '', 'abc', 'ünï', '\u{1F600}']],
-      ['NVarChar(max)', TYPES.NVarChar, { length: MAX, collation }, [null, '', 'abc', 'x'.repeat(10000)]],
-      ['VarBinary(50)', TYPES.VarBinary, { length: 50 }, [null, Buffer.alloc(0), Buffer.from([1, 2, 3])]],
-      ['VarBinary(max)', TYPES.VarBinary, { length: MAX }, [null, Buffer.alloc(0), Buffer.from([1, 2, 3]), Buffer.alloc(20000, 7)]],
-      ['VarChar(50)', TYPES.VarChar, { length: 50, collation }, [null, '', 'abc', 'ünï']],
-      ['VarChar(max)', TYPES.VarChar, { length: MAX, collation }, [null, '', 'abc', 'x'.repeat(10000)]],
-      // Types without a compiled writer of their own go through the adapter.
-      ['Bit', TYPES.Bit, {}, [null, true, false, 1, 0]],
-      ['Float', TYPES.Float, {}, [null, 0, 1.5, -2.25]],
-      ['DateTime', TYPES.DateTime, {}, [null, new Date(Date.UTC(2020, 0, 2, 3, 4, 5))]]
-    ];
-
-    for (const [name, type, column, values] of cases) {
-      it(name, function() {
-        for (const value of values) {
-          assert.deepEqual(throughCompiledWriter(type, column, value), throughValidateAndWrite(type, column, value), `value ${String(value).slice(0, 20)}`);
-        }
-      });
-    }
-
+describe('compiled writers', function() {
+  describe('validate the value', function() {
     it('rejects an invalid value with the error validate gives', function() {
       const cases: Array<[DataType, ColumnData, unknown, RegExp]> = [
         [TYPES.Int, {}, 'abc', /Invalid number/],
@@ -85,7 +55,7 @@ describe('compiled cell writers', function() {
       for (const [type, column, value, message] of cases) {
         let expected: Error | undefined;
         try {
-          throughValidateAndWrite(type, column, value);
+          type.validate(value, column.collation);
         } catch (err) {
           expected = err as Error;
         }
@@ -101,7 +71,7 @@ describe('compiled cell writers', function() {
 
     it('rejects a source for a column that is not max', function() {
       for (const [type, column] of [[TYPES.VarBinary, { length: 50 }], [TYPES.NVarChar, { length: 50, collation }], [TYPES.VarChar, { length: 50, collation }]] as const) {
-        assert.throws(() => compileWriter(type, column, options)(new WritableTrackingBuffer(), from([])), TypeError);
+        assert.throws(() => type.compileWriter(column, options)(new WritableTrackingBuffer(), from([])), TypeError);
       }
     });
 
@@ -115,7 +85,7 @@ describe('compiled cell writers', function() {
         [TYPES.VarChar, { length: MAX, collation }, ['abü', ''], 'abü']
       ] as const) {
         const buffer = new WritableTrackingBuffer();
-        const rest = compileWriter(type, column, options)(buffer, from([...chunks]));
+        const rest = type.compileWriter(column, options)(buffer, from([...chunks]));
         assert.isDefined(rest);
         let yields = 0;
         for await (const flush of rest!) {

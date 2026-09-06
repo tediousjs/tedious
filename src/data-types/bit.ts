@@ -16,15 +16,17 @@ const Bit: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as boolean | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = Bit.validate(raw, undefined) as boolean | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(0x01);
-    buffer.writeUInt8(value ? 0x01 : 0x00);
+      buffer.writeUInt8(0x01);
+      buffer.writeUInt8(value ? 0x01 : 0x00);
+    };
   },
 
   validate: function(value): null | boolean {

@@ -1,6 +1,7 @@
 import iconv from 'iconv-lite';
 
 import { type DataType, type ParameterData } from '../data-type';
+import { type Collation } from '../collation';
 import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
@@ -12,12 +13,12 @@ const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 // Each chunk is encoded on its own, as `Writable.prototype.write` would
 // encode it: a source must not split a UTF-16 surrogate pair across two
 // chunks (see `Request.addParameter`).
-function encoderFor(codepage: string): (chunk: unknown) => Buffer {
+function encoderFor(collation: Collation | undefined): (chunk: unknown) => Buffer {
   return (chunk) => {
     if (typeof chunk !== 'string') {
       throw new TypeError('Invalid string.');
     }
-    return iconv.encode(chunk, codepage);
+    return VarChar.validate(chunk, collation);
   };
 }
 
@@ -127,72 +128,41 @@ const VarChar: { maximumLength: number } & DataType = {
     }
   },
 
-  writeValue(buffer, parameter) {
-    if (parameter.value == null) {
-      buffer.writeBuffer(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
-      return;
-    }
-
-    // Read from its source while the request is written; `resolve` declared
-    // it as `varchar(max)` and checked the collation.
-    if (isAsyncIterable(parameter.value)) {
-      return writePlpStream(buffer, parameter.value, encoderFor(parameter.collation!.codepage!));
-    }
-
-    // `validate` encoded the value.
-    const value = parameter.value as Buffer;
-    if (parameter.length! <= this.maximumLength) {
-      buffer.writeUInt16LE(value.length);
-      buffer.writeBuffer(value);
-    } else {
-      writePlpValue(buffer, value);
-    }
-  },
-
   compileWriter(column) {
     const collation = column.collation;
-    const codepage = collation?.codepage;
-
-    // A cell is encoded like `validate` would, once its value is known to
-    // be a string; the collation is only needed then.
-    function encode(value: unknown): Buffer {
-      if (typeof value !== 'string') {
-        throw new TypeError('Invalid string.');
-      }
-      if (!collation) {
-        throw new Error('No collation was set by the server for the current connection.');
-      }
-      if (!codepage) {
-        throw new Error('The collation set by the server has no associated encoding.');
-      }
-      return iconv.encode(value, codepage);
-    }
 
     if (column.length! <= this.maximumLength) {
-      return (buffer, value) => {
+      return (buffer, raw) => {
+        // A buffer is the value as `validate` encoded it, for a parameter
+        // resolved before the request is written.
+        // A buffer is the value as `validate` encoded it, for a parameter
+      // resolved before the request is written.
+      const value = Buffer.isBuffer(raw) ? raw : VarChar.validate(raw, collation);
         if (value == null) {
           buffer.writeBuffer(NULL_LENGTH);
           return;
         }
 
-        const bytes = encode(value);
-        buffer.writeUInt16LE(bytes.length);
-        buffer.writeBuffer(bytes);
+        buffer.writeUInt16LE(value.length);
+        buffer.writeBuffer(value);
       };
     }
 
-    // varchar(max): a string, or a source read while the row is written.
-    return (buffer, value) => {
+    // varchar(max): a string, or a source read while the request is written.
+    return (buffer, raw) => {
+      if (isAsyncIterable(raw)) {
+        return writePlpStream(buffer, raw, encoderFor(collation));
+      }
+
+      // A buffer is the value as `validate` encoded it, for a parameter
+      // resolved before the request is written.
+      const value = Buffer.isBuffer(raw) ? raw : VarChar.validate(raw, collation);
       if (value == null) {
         buffer.writeBuffer(MAX_NULL_LENGTH);
         return;
       }
 
-      if (isAsyncIterable(value)) {
-        return writePlpStream(buffer, value, encode);
-      }
-
-      writePlpValue(buffer, encode(value));
+      writePlpValue(buffer, value);
     };
   }
 };

@@ -1,4 +1,4 @@
-import { type CellWriter, type DataType, type ParameterData, compileWriter, writeRest } from '../data-type';
+import { type CellWriter, type DataType, type ParameterData, writeRest } from '../data-type';
 import { type InternalConnectionOptions } from '../connection';
 import { type Collation } from '../collation';
 import { InputError } from '../errors';
@@ -52,7 +52,7 @@ function validateTable(value: unknown): TvpValue | null {
 
 // One writer per column, compiled once for all rows.
 function writersFor(columns: TvpColumn[], collation: Collation | undefined, options: InternalConnectionOptions): CellWriter[] {
-  return columns.map((column) => compileWriter(column.type, { length: column.length, scale: column.scale, precision: column.precision, collation }, options));
+  return columns.map((column) => column.type.compileWriter({ length: column.length, scale: column.scale, precision: column.precision, collation }, options));
 }
 
 // A cell whose value is read from a source while the row is written: the
@@ -208,8 +208,8 @@ const TVP: DataType = {
   },
 
   resolve(parameter, collation) {
-    // A TVP's `writeValue` always returns the rest of the write, whether
-    // its rows are an array or an async iterable.
+    // A TVP's rows are written as the rest of the write, whether they are
+    // an array or an async iterable.
     const data: ParameterData<TvpValue | null> = { value: validateTable(parameter.value) };
     if (collation) {
       data.collation = collation;
@@ -222,20 +222,19 @@ const TVP: DataType = {
     writeTvpTypeInfo(buffer, parameter.value as TvpValue | null);
   },
 
-  async * writeValue(buffer, parameter, options) {
-    const value = parameter.value as TvpValue | null;
+  compileWriter(column, options) {
+    const collation = column.collation;
+    return (buffer, raw) => {
+      const value = validateTable(raw);
+      if (value == null) {
+        buffer.writeBuffer(NULL_TABLE);
+        return;
+      }
 
-    if (value == null) {
-      buffer.writeBuffer(NULL_TABLE);
-      return;
-    }
-
-    if (Array.isArray(value.rows)) {
-      yield * writeRows(buffer, value, value.rows, parameter.collation, options);
-      return;
-    }
-
-    yield * writeRowsFrom(buffer, value, value.rows, parameter.collation, options);
+      return Array.isArray(value.rows) ?
+        writeRows(buffer, value, value.rows, collation, options) :
+        writeRowsFrom(buffer, value, value.rows, collation, options);
+    };
   }
 };
 
