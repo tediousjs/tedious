@@ -5,6 +5,7 @@ const SHIFT_LEFT_32 = (1 << 16) * (1 << 16);
 const SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
 
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([MoneyN.id, 0x08]);
 const DATA_LENGTH = Buffer.from([0x08]);
 
 const Money: DataType = {
@@ -39,6 +40,24 @@ const Money: DataType = {
     buffer.writeInt32LE(Math.floor(value * SHIFT_RIGHT_32), 0);
     buffer.writeInt32LE(value & -1, 4);
     yield buffer;
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as number | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    // The value in ten-thousandths, as a high and a low 32-bit half.
+    const scaled = value * 10000;
+    buffer.writeUInt8(0x08);
+    buffer.writeInt32LE(Math.floor(scaled * SHIFT_RIGHT_32));
+    buffer.writeInt32LE(scaled & -1);
   },
 
   validate: function(value): number | null {

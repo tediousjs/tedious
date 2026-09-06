@@ -42,6 +42,10 @@ const cases: Case[] = [
   ['SmallInt', TYPES.SmallInt, {}, [null, 0, 1, -1, 32767, -32768, '42', 3.9]],
   ['BigInt', TYPES.BigInt, {}, [null, 0, 1, -1, 9007199254740991, '42', 9223372036854775807n, -9223372036854775808n]],
   ['Bit', TYPES.Bit, {}, [null, true, false, 1, 0, 'x', '']],
+  ['Real', TYPES.Real, {}, [null, 0, 1.5, -2.25, '3.5', 1e10, 3.4e38]],
+  ['Float', TYPES.Float, {}, [null, 0, 1.5, -2.25, '3.5', 1e300, Number.MAX_VALUE]],
+  ['Money', TYPES.Money, {}, [null, 0, 1.2345, -1.2345, '4.5', 123456789.5, -123456789.5, 922337203685477.5]],
+  ['SmallMoney', TYPES.SmallMoney, {}, [null, 0, 1.2345, -1.2345, '4.5', 214748.36, -214748.36]],
 ];
 
 describe('migrated data types', function() {

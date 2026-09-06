@@ -3,6 +3,7 @@ import MoneyN from './moneyn';
 
 const DATA_LENGTH = Buffer.from([0x04]);
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([MoneyN.id, 0x04]);
 
 const SmallMoney: DataType = {
   id: 0x7A,
@@ -33,6 +34,21 @@ const SmallMoney: DataType = {
     const buffer = Buffer.alloc(4);
     buffer.writeInt32LE(parameter.value * 10000, 0);
     yield buffer;
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as number | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(0x04);
+    buffer.writeInt32LE(value * 10000);
   },
 
   validate: function(value): null | number {
