@@ -4,81 +4,70 @@ import Parser from './stream-parser';
 
 import { ReturnValueToken } from './token';
 
-import { readMetadata } from '../metadata-parser';
-import { isPLPStream, readPLPStream, readValue } from '../value-parser';
-import { NotEnoughDataError, readBVarChar, readUInt16LE, readUInt8 } from './helpers';
-import * as iconv from 'iconv-lite';
+import { readMetadata, type Metadata } from '../metadata-parser';
+import { isPLPStream, readPLPStream, readValue, type PLPState } from '../value-parser';
+import { readBVarChar, readUInt16LE, readUInt8 } from './helpers';
+import { plpValue } from './row-token-parser';
 
-async function returnParser(parser: Parser): Promise<ReturnValueToken> {
-  let paramName;
-  let paramOrdinal;
-  let metadata;
+/**
+ * The progress of a partially parsed return value token: the header has
+ * been read, the value is being read.
+ */
+export interface ReturnValueState {
+  kind: 'returnValue';
+  paramOrdinal: number;
+  paramName: string;
+  metadata: Metadata;
+  plp: PLPState | undefined;
+}
 
-  while (true) {
+/**
+ * Parses a return value token. Resumable: once the header has been read,
+ * it is kept on the parser while the value is read.
+ */
+function returnParser(parser: Parser): ReturnValueToken {
+  let state = parser.tokenState;
+
+  if (state === undefined || state.kind !== 'returnValue') {
     const buf = parser.buffer;
     let offset = parser.position;
 
-    try {
-      ({ offset, value: paramOrdinal } = readUInt16LE(buf, offset));
-      ({ offset, value: paramName } = readBVarChar(buf, offset));
-      // status
-      ({ offset } = readUInt8(buf, offset));
-      ({ offset, value: metadata } = readMetadata(buf, offset, parser.options));
+    let paramOrdinal;
+    let paramName;
+    let metadata;
 
-      if (paramName.charAt(0) === '@') {
-        paramName = paramName.slice(1);
-      }
-    } catch (err) {
-      if (err instanceof NotEnoughDataError) {
-        await parser.waitForChunk();
-        continue;
-      }
+    ({ offset, value: paramOrdinal } = readUInt16LE(buf, offset));
+    ({ offset, value: paramName } = readBVarChar(buf, offset));
+    // status
+    ({ offset } = readUInt8(buf, offset));
+    ({ offset, value: metadata } = readMetadata(buf, offset, parser.options));
 
-      throw err;
+    if (paramName.charAt(0) === '@') {
+      paramName = paramName.slice(1);
     }
 
     parser.position = offset;
-    break;
+    parser.commit();
+
+    state = parser.tokenState = { kind: 'returnValue', paramOrdinal, paramName, metadata, plp: undefined };
   }
+
+  const metadata = state.metadata;
 
   let value;
-  while (true) {
-    const buf = parser.buffer;
-    let offset = parser.position;
-
-    if (isPLPStream(metadata)) {
-      const chunks = await readPLPStream(parser);
-
-      if (chunks === null) {
-        value = chunks;
-      } else if (metadata.type.name === 'NVarChar' || metadata.type.name === 'Xml') {
-        value = Buffer.concat(chunks).toString('ucs2');
-      } else if (metadata.type.name === 'VarChar') {
-        value = iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
-      } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
-        value = Buffer.concat(chunks);
-      }
-    } else {
-      try {
-        ({ value, offset } = readValue(buf, offset, metadata, parser.options));
-      } catch (err) {
-        if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
-          continue;
-        }
-
-        throw err;
-      }
-
-      parser.position = offset;
-    }
-
-    break;
+  if (isPLPStream(metadata)) {
+    value = plpValue(readPLPStream(parser, state), metadata);
+  } else {
+    const result = readValue(parser.buffer, parser.position, metadata, parser.options);
+    parser.position = result.offset;
+    value = result.value;
   }
 
+  parser.tokenState = undefined;
+
   return new ReturnValueToken({
-    paramOrdinal: paramOrdinal,
-    paramName: paramName,
+    paramOrdinal: state.paramOrdinal,
+    paramName: state.paramName,
     metadata: metadata,
     value: value
   });

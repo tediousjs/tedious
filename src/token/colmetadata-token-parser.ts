@@ -76,60 +76,11 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
   }, offset);
 }
 
-async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  let columnCount;
-
-  while (true) {
-    let offset;
-
-    try {
-      ({ offset, value: columnCount } = readUInt16LE(parser.buffer, parser.position));
-    } catch (err) {
-      if (err instanceof NotEnoughDataError) {
-        await parser.waitForChunk();
-        continue;
-      }
-
-      throw err;
-    }
-
-    parser.position = offset;
-    break;
-  }
-
-  const columns: ColumnMetadata[] = [];
-  for (let i = 0; i < columnCount; i++) {
-    while (true) {
-      let column: ColumnMetadata;
-      let offset;
-
-      try {
-        ({ offset, value: column } = readColumn(parser.buffer, parser.position, parser.options, i));
-      } catch (err: any) {
-        if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
-          continue;
-        }
-
-        throw err;
-      }
-
-      parser.position = offset;
-      columns.push(column);
-
-      break;
-    }
-  }
-
-  return new ColMetadataToken(columns);
-}
-
 /**
- * Synchronous variant of `colMetadataParser` for parsers that have the
- * complete message buffered. Throws `NotEnoughDataError` if the data is
- * truncated.
+ * Parses a column metadata token. Not resumable: if the buffered data runs
+ * out, parsing is retried from the start of the token.
  */
-export function colMetadataParserSync(parser: Parser): ColMetadataToken {
+function colMetadataParser(parser: Parser): ColMetadataToken {
   let columnCount;
   ({ offset: parser.position, value: columnCount } = readUInt16LE(parser.buffer, parser.position));
 
@@ -145,4 +96,3 @@ export function colMetadataParserSync(parser: Parser): ColMetadataToken {
 
 export default colMetadataParser;
 module.exports = colMetadataParser;
-module.exports.colMetadataParserSync = colMetadataParserSync;

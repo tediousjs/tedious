@@ -1,6 +1,7 @@
 import BufferList from 'bl';
 import { assert } from 'chai';
 import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessage from '../../src/incoming-message';
 import Message from '../../src/message';
 import Debug from '../../src/debug';
 import { ConnectionError } from '../../src/errors';
@@ -23,7 +24,7 @@ describe('IncomingMessageStream', function() {
     const incoming = new IncomingMessageStream(new Debug());
 
     incoming.on('data', function(message) {
-      assert.instanceOf(message, Message);
+      assert.instanceOf(message, IncomingMessage);
       assert.strictEqual(message.type, 0x11);
       assert.strictEqual(message.resetConnection, false);
 
@@ -81,7 +82,7 @@ describe('IncomingMessageStream', function() {
 
     let messageEnded = false;
     incoming.on('data', function(message) {
-      assert.instanceOf(message, Message);
+      assert.instanceOf(message, IncomingMessage);
 
       message.on('end', function() {
         messageEnded = true;
@@ -145,7 +146,7 @@ describe('IncomingMessageStream', function() {
 
     let messageEnded = false;
     incoming.on('data', function(message) {
-      assert.instanceOf(message, Message);
+      assert.instanceOf(message, IncomingMessage);
 
       message.on('end', function() {
         messageEnded = true;

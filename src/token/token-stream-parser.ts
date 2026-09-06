@@ -1,126 +1,131 @@
 import { EventEmitter } from 'events';
-import StreamParser, { type ParserOptions } from './stream-parser';
+import StreamParser, { NEED_MORE_DATA, type ParserOptions } from './stream-parser';
 import Debug from '../debug';
 import { Token } from './token';
-import { Readable } from 'stream';
-import Message from '../message';
+import IncomingMessage, { type MessageSink } from '../incoming-message';
 import { TokenHandler } from './handler';
 
 /**
-  Buffers and parses tokens from a TDS message, delivering each token to
-  the given handler.
+  Parses the tokens of an incoming message and delivers them to a handler.
 
-  A message that arrived complete in a single packet is parsed synchronously
-  and its tokens are delivered to the handler directly. Everything else is
-  parsed incrementally as the message is read from its stream.
+  The parser attaches itself to the message as a sink, so that it receives
+  the message's data synchronously as it arrives, and parses and delivers
+  all complete tokens right away. Delivery can be paused, in which case the
+  remaining data is held back (and, via backpressure, no longer read from
+  the socket) until the parser is resumed.
 */
-export class Parser extends EventEmitter {
+export class Parser extends EventEmitter implements MessageSink {
   declare debug: Debug;
   declare options: ParserOptions;
-  declare parser: Readable | undefined;
+  declare parser: StreamParser;
+  declare handler: TokenHandler;
 
   declare paused: boolean;
-  declare continueSync: (() => void) | undefined;
+  declare ended: boolean;
+  declare failed: boolean;
+  declare message: IncomingMessage | undefined;
 
-  constructor(message: Message, debug: Debug, handler: TokenHandler, options: ParserOptions) {
+  constructor(message: IncomingMessage | Iterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions) {
     super();
 
     this.debug = debug;
     this.options = options;
+    this.handler = handler;
+    this.parser = new StreamParser(debug, options);
+
     this.paused = false;
-    this.continueSync = undefined;
+    this.ended = false;
+    this.failed = false;
+    this.message = undefined;
 
-    const completeData = message.completeData;
-    if (completeData !== undefined) {
-      this.parser = undefined;
-
-      // Defer parsing so that the caller can attach its listeners first.
+    // Attach in a microtask so that the caller can register its listeners
+    // before any token (or the end of the message) is delivered.
+    if (message instanceof IncomingMessage) {
+      this.message = message;
       queueMicrotask(() => {
-        this.parseComplete(message, completeData, handler);
+        message.attach(this);
       });
+    } else {
+      // A plain sequence of chunks (used by tests).
+      queueMicrotask(() => {
+        for (const chunk of message) {
+          if (!this.push(chunk)) {
+            throw new Error('Parsing a plain sequence of chunks cannot be paused');
+          }
+        }
+        this.end();
+      });
+    }
+  }
 
+  push(data: Buffer): boolean {
+    if (this.failed) {
+      return true;
+    }
+
+    this.parser.push(data);
+    return this.drain();
+  }
+
+  end() {
+    if (this.failed) {
       return;
     }
 
-    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options));
+    this.ended = true;
 
-    this.parser.on('data', (token: Token) => {
-      debug.token(token);
-      handler[token.handlerName as keyof TokenHandler](token as any);
-    });
+    if (this.paused) {
+      // The end of the message is delivered once the parser is resumed
+      // and all buffered data has been parsed.
+      return;
+    }
 
-    this.parser.on('drain', () => {
-      this.emit('drain');
-    });
-
-    this.parser.on('end', () => {
-      this.emit('end');
-    });
-
-    this.parser.on('error', (error: Error) => {
-      this.emit('error', error);
-    });
+    this.finish();
   }
 
   /**
-   * Parses a message whose data is completely available, delivering tokens
-   * to the handler synchronously. Individual tokens that can only be parsed
-   * asynchronously are awaited, after which parsing continues.
+   * Parses and delivers all complete tokens from the buffered data.
+   * Returns `false` if delivery was paused before all data was consumed.
    */
-  parseComplete(message: Message, data: Buffer, handler: TokenHandler) {
-    const parser = new StreamParser([], this.debug, this.options);
-    parser.buffer = data;
-    parser.position = 0;
-    parser.complete = true;
+  drain(): boolean {
+    const parser = this.parser;
+    const handler = this.handler;
+    const debug = this.debug;
 
-    const deliver = (token: Token) => {
-      this.debug.token(token);
-      handler[token.handlerName as keyof TokenHandler](token as any);
-    };
-
-    const step = () => {
+    while (!this.paused) {
+      let token;
       try {
-        while (parser.position < parser.buffer.length) {
-          if (this.paused) {
-            this.continueSync = step;
-            return;
-          }
-
-          const type = parser.buffer.readUInt8(parser.position);
-          parser.position += 1;
-
-          const token = parser.readToken(type);
-          if (token instanceof Promise) {
-            token.then((token) => {
-              if (token !== undefined) {
-                deliver(token);
-              }
-
-              step();
-            }, (err) => {
-              this.emit('error', err);
-            });
-
-            return;
-          }
-
-          if (token !== undefined) {
-            deliver(token);
-          }
-        }
+        token = parser.parseNext();
       } catch (err) {
-        this.emit('error', err);
-        return;
+        this.fail(err as Error);
+        return true;
       }
 
-      // Let the message stream end, so that the next message can be
-      // processed.
-      message.resume();
+      if (token === NEED_MORE_DATA) {
+        return true;
+      }
 
-      this.emit('end');
-    };
+      if (token !== undefined) {
+        debug.token(token);
+        handler[token.handlerName as keyof TokenHandler](token as any);
+      }
+    }
 
-    step();
+    return false;
+  }
+
+  finish() {
+    if (!this.parser.isEmpty()) {
+      this.fail(new Error('unexpected end of message'));
+      return;
+    }
+
+    this.emit('end');
+  }
+
+  fail(err: Error) {
+    this.failed = true;
+    this.emit('error', err);
   }
 
   declare on: (
@@ -130,24 +135,27 @@ export class Parser extends EventEmitter {
 
   pause() {
     this.paused = true;
-
-    if (this.parser) {
-      this.parser.pause();
-    }
   }
 
   resume() {
-    this.paused = false;
-
-    if (this.parser) {
-      this.parser.resume();
+    if (!this.paused) {
       return;
     }
 
-    const continueSync = this.continueSync;
-    if (continueSync) {
-      this.continueSync = undefined;
-      continueSync();
+    this.paused = false;
+
+    if (!this.drain()) {
+      // Paused again while delivering the buffered tokens.
+      return;
+    }
+
+    if (this.ended) {
+      this.finish();
+      return;
+    }
+
+    if (this.message !== undefined) {
+      this.message.continueSink();
     }
   }
 }

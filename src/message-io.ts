@@ -8,6 +8,7 @@ import { EventEmitter } from 'events';
 import Debug from './debug';
 
 import Message from './message';
+import IncomingMessage from './incoming-message';
 import { Packet, TYPE } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
@@ -32,7 +33,7 @@ class MessageIO extends EventEmitter {
     encrypted: Duplex;
   };
 
-  declare incomingMessageIterator: AsyncIterableIterator<Message>;
+  declare incomingMessageIterator: AsyncIterableIterator<IncomingMessage>;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -219,7 +220,7 @@ class MessageIO extends EventEmitter {
   /**
    * Read the next incoming message from the socket.
    */
-  async readMessage(): Promise<Message> {
+  async readMessage(): Promise<IncomingMessage> {
     const result = await this.incomingMessageIterator.next();
 
     if (result.done) {
