@@ -8,7 +8,7 @@ import { EventEmitter } from 'events';
 import Debug from './debug';
 
 import Message from './message';
-import { TYPE } from './packet';
+import { Packet, TYPE } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
@@ -178,6 +178,33 @@ class MessageIO extends EventEmitter {
       securePair.cleartext.once('secureConnect', onSecureConnect);
       securePair.encrypted.once('readable', onReadable);
     });
+  }
+
+  /**
+   * The largest amount of message data that fits into a single packet.
+   */
+  maxSinglePacketDataLength() {
+    return this.outgoingMessageStream.packetSize - Packet.HEADER_LENGTH;
+  }
+
+  /**
+   * Writes a message that fits into a single packet directly to the
+   * underlying (possibly TLS wrapped) socket, bypassing the outgoing
+   * message stream. The caller has to ensure that no other message is
+   * currently being written.
+   */
+  writeSinglePacketMessage(packetType: number, chunks: Buffer[], resetConnection: boolean) {
+    const packet = new Packet(packetType);
+    packet.packetId(1);
+    packet.resetConnection(resetConnection);
+    packet.last(true);
+    packet.addData(chunks.length === 1 ? chunks[0] : Buffer.concat(chunks));
+
+    this.debug.packet('Sent', packet);
+    this.debug.data(packet);
+
+    const sink = this.securePair ? this.securePair.cleartext : this.socket;
+    sink.write(packet.buffer);
   }
 
   // TODO listen for 'drain' event when socket.write returns false.

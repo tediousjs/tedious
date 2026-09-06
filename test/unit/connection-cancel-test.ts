@@ -368,7 +368,12 @@ describe('Canceling a request', function() {
     connection.connect((err) => {
       assert.isUndefined(err);
 
-      const request = new Request('select 1', (err) => {
+      // A request that fits into a single packet is written synchronously
+      // and can no longer be canceled before it was sent - use a request
+      // spanning multiple packets to exercise that path.
+      const multiPacketSql = 'select 1 -- ' + 'x'.repeat(8192);
+
+      const request = new Request(multiPacketSql, (err) => {
         assert.instanceOf(err, RequestError);
         assert.strictEqual(err.code, 'ECANCEL');
 

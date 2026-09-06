@@ -3300,6 +3300,25 @@ class Connection extends EventEmitter {
 
       this.createRequestTimer();
 
+      // Fast path: a payload that can be written synchronously and fits
+      // into a single packet is written directly, without going through
+      // the message and outgoing message streams.
+      const chunks = this.buildPayloadSync(payload);
+      if (chunks !== undefined) {
+        this.messageIo.writeSinglePacketMessage(packetType, chunks, this.resetConnectionOnNextRequest === true);
+        this.resetConnectionOnNextRequest = false;
+
+        request.removeListener('cancel', onCancel);
+        request.prependOnceListener('cancel', this._cancelAfterRequestSent);
+
+        this.debug.payload(function() {
+          return payload!.toString('  ');
+        });
+
+        this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
+        return;
+      }
+
       const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
       this.messageIo.outgoingMessageStream.write(message);
       this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
@@ -3330,6 +3349,37 @@ class Connection extends EventEmitter {
       });
       payloadStream.pipe(message);
     }
+  }
+
+  /**
+   * Returns the chunks of `payload` if it can be written synchronously and
+   * fits into a single packet, `undefined` otherwise.
+   *
+   * @private
+   */
+  buildPayloadSync(payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { buildSync?: () => Buffer[] | undefined }): Buffer[] | undefined {
+    let chunks: Buffer[] | undefined;
+
+    if (typeof payload.buildSync === 'function') {
+      chunks = payload.buildSync();
+    } else if (typeof (payload as Iterable<Buffer>)[Symbol.iterator] === 'function') {
+      chunks = Array.from(payload as Iterable<Buffer>);
+    }
+
+    if (chunks === undefined) {
+      return undefined;
+    }
+
+    let length = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      length += chunks[i].length;
+    }
+
+    if (length > this.messageIo.maxSinglePacketDataLength()) {
+      return undefined;
+    }
+
+    return chunks;
   }
 
   /**

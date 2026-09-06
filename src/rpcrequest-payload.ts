@@ -87,6 +87,40 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     }
   }
 
+  /**
+   * Writes the whole request synchronously and returns its chunks.
+   *
+   * Returns `undefined` when this is not possible: when a parameter's value
+   * has to be read from a source while the request is written, or when
+   * writing a parameter fails. In both cases nothing has been consumed from
+   * any source yet, and the request can still be written via the async
+   * iterator (which surfaces any error through the regular path).
+   */
+  buildSync(): Buffer[] | undefined {
+    const buffer = new WritableTrackingBuffer();
+    this.writeHeader(buffer);
+
+    const parametersLength = this.parameters.length;
+    for (let i = 0; i < parametersLength; i++) {
+      const parameter = this.parameters[i];
+      this.writeParameterHeader(buffer, parameter);
+
+      let rest: void | AsyncIterable<void>;
+      try {
+        parameter.type.writeTypeInfo(buffer, parameter.data, this.options);
+        rest = parameter.type.writeValue(buffer, parameter.data, this.options);
+      } catch {
+        return undefined;
+      }
+
+      if (rest !== undefined) {
+        return undefined;
+      }
+    }
+
+    return buffer.getBuffers();
+  }
+
   toString(indent = '') {
     return indent + ('RPC Request - ' + this.procedure);
   }
