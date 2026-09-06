@@ -2099,6 +2099,13 @@ class Connection extends EventEmitter {
 
           socket.setKeepAlive(true, KEEP_ALIVE_INITIAL_DELAY);
 
+          // Requests are written to the socket one TDS packet at a time. With
+          // Nagle's algorithm enabled, a trailing partial packet would be held
+          // back until the server acknowledges the preceding packet, which
+          // combined with the server's delayed ACK stalls every request that
+          // spans more than one packet by up to ~40ms.
+          socket.setNoDelay(true);
+
           this.messageIo = new MessageIO(socket, this.config.options.packetSize, this.debug);
           this.messageIo.on('secure', (cleartext) => { this.emit('secure', cleartext); });
 
