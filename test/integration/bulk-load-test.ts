@@ -1713,8 +1713,13 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        // A cell is validated and written in one step, so a bad value
+        // surfaces as the column's InputError, with the validation error
+        // as its cause, like a parameter's does.
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err.message, "Column 'value' could not be serialized");
+        assert.instanceOf((err as InputError).cause, TypeError);
+        assert.strictEqual(((err as InputError).cause as TypeError).message, 'Invalid date.');
 
         done();
       }
@@ -1729,8 +1734,8 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(((err as InputError).cause as TypeError).message, 'Invalid date.');
 
         assert.strictEqual(rowCount, 0);
 
