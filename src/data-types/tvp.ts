@@ -197,7 +197,7 @@ const TVP: DataType = {
     }
 
     if (!Array.isArray(value.rows)) {
-      throw new TypeError('A TVP whose rows are an async iterable can only be written through writeValueStream.');
+      throw new TypeError('A TVP whose rows are an async iterable can only be written through writeValue.');
     }
 
     const buffer = new WritableTrackingBuffer();
