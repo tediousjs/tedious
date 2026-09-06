@@ -14,6 +14,10 @@ const {
 
 const { Connection } = require('tedious');
 
+// Interval (in milliseconds) at which memory usage is sampled while a
+// benchmark is running.
+const MEMORY_SAMPLE_INTERVAL = 10;
+
 // The `Benchmark` class is taken from Node.js - see
 // https://github.com/nodejs/node/blob/0f96dc266fd0cd8c1baa82ce7eb951c11b29a331/benchmark/common.js
 // Copyright Node.js contributors. All rights reserved.
@@ -56,6 +60,13 @@ function Benchmark(fn, configs, options) {
       totalDuration: 0
     }
   };
+
+  // Memory usage is sampled periodically while the benchmark is running, so
+  // that peak usage during the measured window can be reported. Native
+  // allocations (e.g. from ODBC based drivers) do not show up in the V8 heap,
+  // so the resident set size is tracked as well.
+  this._memoryStats = null;
+  this._memorySampler = null;
 
   this._observer = new PerformanceObserver((list) => {
     const entries = list.getEntries();
@@ -200,7 +211,32 @@ Benchmark.prototype.start = function() {
   this._started = true;
   this._observer.observe({ entryTypes: ['gc'], buffered: false });
 
+  const initial = process.memoryUsage();
+  this._memoryStats = {
+    start: initial,
+    peak: Object.assign({}, initial),
+    samples: 1
+  };
+
+  this._memorySampler = setInterval(() => {
+    this._sampleMemory();
+  }, MEMORY_SAMPLE_INTERVAL);
+  this._memorySampler.unref();
+
   this._time = process.hrtime();
+};
+
+Benchmark.prototype._sampleMemory = function() {
+  const usage = process.memoryUsage();
+  const peak = this._memoryStats.peak;
+
+  for (const key of Object.keys(usage)) {
+    if (usage[key] > peak[key]) {
+      peak[key] = usage[key];
+    }
+  }
+
+  this._memoryStats.samples += 1;
 };
 
 Benchmark.prototype.end = function(operations) {
@@ -225,6 +261,10 @@ Benchmark.prototype.end = function(operations) {
 
   this._observer.disconnect();
 
+  clearInterval(this._memorySampler);
+  this._sampleMemory();
+  this._memoryStats.end = process.memoryUsage();
+
   const time = elapsed[0] + elapsed[1] / 1e9;
   const rate = operations / time;
   this.report(rate, elapsed);
@@ -246,7 +286,14 @@ function formatResult(data) {
   gcInfo += ` major: ${data.gcStats[NODE_PERFORMANCE_GC_MAJOR].count} - ${data.gcStats[NODE_PERFORMANCE_GC_MAJOR].totalDuration}ms,`;
   gcInfo += ` incremental: ${data.gcStats[NODE_PERFORMANCE_GC_INCREMENTAL].count} - ${data.gcStats[NODE_PERFORMANCE_GC_INCREMENTAL].totalDuration}ms)`;
 
-  return `${data.name}${conf}: ${rate} ${gcInfo}`;
+  const peak = data.memoryStats.peak;
+  const memoryInfo = `(peak rss: ${formatBytes(peak.rss)}, peak heap: ${formatBytes(peak.heapUsed)}, peak external: ${formatBytes(peak.external)})`;
+
+  return `${data.name}${conf}: ${rate} ${gcInfo} ${memoryInfo}`;
+}
+
+function formatBytes(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
 function sendResult(data) {
@@ -266,7 +313,8 @@ Benchmark.prototype.report = function(rate, elapsed) {
     rate: rate,
     time: elapsed[0] + elapsed[1] / 1e9,
     type: 'report',
-    gcStats: this._gcStats
+    gcStats: this._gcStats,
+    memoryStats: this._memoryStats
   });
 };
 
@@ -285,3 +333,4 @@ function createConnection(cb) {
 
 module.exports.createBenchmark = createBenchmark;
 module.exports.createConnection = createConnection;
+module.exports.formatBytes = formatBytes;

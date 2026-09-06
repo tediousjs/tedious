@@ -63,11 +63,18 @@ a complete connection string yourself.
 
 ### Running
 
-Run the whole suite and print a comparison table:
+Run the whole suite and print comparison tables:
 
 ```sh
 node benchmarks/compare/run.js
 ```
+
+The runner prints two tables: the throughput of each driver (in operations
+per second, plus the ratio between the drivers), and the garbage collection
+activity (number of collections and total pause time) and peak memory usage
+(resident set size, V8 heap and external memory) observed while each
+benchmark was running. Every benchmark samples memory usage at a short
+interval between `bench.start()` and `bench.end()`.
 
 Individual benchmarks can be selected by name, and `key=value` arguments are
 forwarded to the benchmarks:
@@ -108,6 +115,11 @@ node benchmarks/compare/select-many-rows.js driver=msnodesqlv8 n=100
   TDS login on every iteration, and the login round trip dominates the result.
 - `msnodesqlv8` needs table metadata to perform bulk inserts and cannot resolve
   it for temporary tables, so `bulk-load` uses a regular table in `tempdb`.
+- Memory is sampled from within the benchmark process. Native allocations
+  made by `msnodesqlv8` and the ODBC driver do not appear on the V8 heap, so
+  compare the resident set size when looking at total memory usage. Peak
+  values include whatever the process had allocated before the measurement
+  started (e.g. test data), which is the same for both drivers.
 - The drivers are given comparable, but not identical, work: `tedious` is
   asked to collect all rows of a result set through its `row` event, while
   `msnodesqlv8` returns the rows of a result set from its `query` callback.

@@ -16,6 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const child_process = require('child_process');
 
+const { formatBytes } = require('../common');
 const { DRIVERS } = require('../drivers');
 
 const args = process.argv.slice(2);
@@ -88,11 +89,16 @@ function printResults() {
       groups.set(key, {
         name: result.name.replace(/^compare\//, '').replace(/\.js$/, ''),
         conf: confString,
-        rates: {}
+        rates: {},
+        gc: {},
+        memory: {}
       });
     }
 
-    groups.get(key).rates[driver] = result.rate;
+    const group = groups.get(key);
+    group.rates[driver] = result.rate;
+    group.gc[driver] = summarizeGc(result.gcStats);
+    group.memory[driver] = result.memoryStats;
   }
 
   const drivers = DRIVERS.filter((driver) => results.some((result) => result.conf.driver === driver));
@@ -117,12 +123,82 @@ function printResults() {
   }
 
   console.log();
+  console.log('## Throughput');
+  console.log();
   console.log(formatTable(rows));
 
   if (drivers.length === 2) {
     console.log();
     console.log(`Values > 1.00x mean ${drivers[0]} performed more operations per second than ${drivers[1]}.`);
   }
+
+  printGcAndMemory(groups, drivers);
+}
+
+function summarizeGc(gcStats) {
+  let count = 0;
+  let duration = 0;
+
+  for (const kind of Object.keys(gcStats)) {
+    count += gcStats[kind].count;
+    duration += gcStats[kind].totalDuration;
+  }
+
+  return { count, duration };
+}
+
+function formatGc(gc) {
+  if (!gc) {
+    return 'n/a';
+  }
+
+  return `${gc.count} / ${gc.duration.toFixed(1)}ms`;
+}
+
+function formatMemory(memory, key) {
+  if (!memory) {
+    return 'n/a';
+  }
+
+  return formatBytes(memory.peak[key]);
+}
+
+function printGcAndMemory(groups, drivers) {
+  const header = ['benchmark', 'config'];
+  for (const driver of drivers) {
+    header.push(`${driver} gc (count / pause)`);
+  }
+  for (const driver of drivers) {
+    header.push(`${driver} peak rss`);
+  }
+  for (const driver of drivers) {
+    header.push(`${driver} peak heap`);
+  }
+  for (const driver of drivers) {
+    header.push(`${driver} peak external`);
+  }
+
+  const rows = [header];
+
+  for (const group of groups.values()) {
+    rows.push([
+      group.name,
+      group.conf,
+      ...drivers.map((driver) => formatGc(group.gc[driver])),
+      ...drivers.map((driver) => formatMemory(group.memory[driver], 'rss')),
+      ...drivers.map((driver) => formatMemory(group.memory[driver], 'heapUsed')),
+      ...drivers.map((driver) => formatMemory(group.memory[driver], 'external'))
+    ]);
+  }
+
+  console.log();
+  console.log('## GC and memory');
+  console.log();
+  console.log(formatTable(rows));
+  console.log();
+  console.log('GC shows the number of collections and total pause time during the measured window.');
+  console.log('Memory shows the peak values sampled during the measured window. Native allocations');
+  console.log('(e.g. ODBC buffers) are not visible on the V8 heap but are included in the resident set size.');
 }
 
 (function next(i) {
