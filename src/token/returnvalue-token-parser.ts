@@ -1,24 +1,31 @@
 // s2.2.7.16
 
 import Parser from './stream-parser';
-
 import { ReturnValueToken } from './token';
 
 import { readMetadata, type Metadata } from '../metadata-parser';
-import { isPLPStream, readPLPStream, readValue, type PLPState } from '../value-parser';
+import { isPLPStream, readPLPValue, readValue, type PLPState } from '../value-parser';
 import { readBVarChar, readUInt16LE, readUInt8 } from './helpers';
-import { plpValue } from './row-token-parser';
 
 /**
- * The progress of a partially parsed return value token: the header has
- * been read, the value is being read.
+ * The progress of a return value token being parsed: its header has been
+ * read, its value is being read.
  */
-export interface ReturnValueState {
-  kind: 'returnValue';
-  paramOrdinal: number;
-  paramName: string;
-  metadata: Metadata;
-  plp: PLPState | undefined;
+export class ReturnValueState {
+  declare paramOrdinal: number;
+  declare paramName: string;
+  declare metadata: Metadata;
+  /**
+   * The progress of the value, if it is a PLP value.
+   */
+  declare plp: PLPState | undefined;
+
+  constructor(paramOrdinal: number, paramName: string, metadata: Metadata) {
+    this.paramOrdinal = paramOrdinal;
+    this.paramName = paramName;
+    this.metadata = metadata;
+    this.plp = undefined;
+  }
 }
 
 /**
@@ -28,7 +35,7 @@ export interface ReturnValueState {
 function returnParser(parser: Parser): ReturnValueToken {
   let state = parser.tokenState;
 
-  if (state === undefined || state.kind !== 'returnValue') {
+  if (!(state instanceof ReturnValueState)) {
     const buf = parser.buffer;
 
     const { offset: ordinalEnd, value: paramOrdinal } = readUInt16LE(buf, parser.position);
@@ -42,14 +49,14 @@ function returnParser(parser: Parser): ReturnValueToken {
     parser.position = offset;
     parser.commit();
 
-    state = parser.tokenState = { kind: 'returnValue', paramOrdinal, paramName, metadata, plp: undefined };
+    state = parser.tokenState = new ReturnValueState(paramOrdinal, paramName, metadata);
   }
 
   const metadata = state.metadata;
 
   let value;
   if (isPLPStream(metadata)) {
-    value = plpValue(readPLPStream(parser, state), metadata);
+    value = readPLPValue(parser, state, metadata);
   } else {
     const result = readValue(parser.buffer, parser.position, metadata, parser.options);
     parser.position = result.offset;
@@ -68,3 +75,4 @@ function returnParser(parser: Parser): ReturnValueToken {
 
 export default returnParser;
 module.exports = returnParser;
+module.exports.ReturnValueState = ReturnValueState;

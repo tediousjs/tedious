@@ -13,8 +13,9 @@ import featureExtAckParser from './feature-ext-ack-parser';
 import loginAckParser from './loginack-token-parser';
 import orderParser from './order-token-parser';
 import returnStatusParser from './returnstatus-token-parser';
-import returnValueParser, { type ReturnValueState } from './returnvalue-token-parser';
-import rowParser, { type RowState } from './row-token-parser';
+import returnValueParser, { ReturnValueState } from './returnvalue-token-parser';
+import rowParser from './row-token-parser';
+import { RowState } from './row-state';
 import nbcRowParser from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 import tabNameParser from './tabname-token-parser';
@@ -127,6 +128,19 @@ class Parser {
    */
   commit() {
     this.committed = this.position;
+  }
+
+  /**
+   * The state of the row (or NBC row) token being parsed, starting a new
+   * one if none is in progress.
+   */
+  rowState(): RowState {
+    const state = this.tokenState;
+    if (state instanceof RowState) {
+      return state;
+    }
+
+    return this.tokenState = new RowState(this.colMetadata.length);
   }
 
   /**

@@ -816,9 +816,38 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
   return new Result(date, offset);
 }
 
+/**
+ * Reads a partially length-prefixed value (see `readPLPStream`) and
+ * converts it into the JavaScript value for `metadata`'s type.
+ */
+function readPLPValue(parser: Parser, holder: { plp: PLPState | undefined }, metadata: Metadata): unknown {
+  const chunks = readPLPStream(parser, holder);
+
+  if (chunks === null) {
+    return null;
+  }
+
+  switch (metadata.type.name) {
+    case 'NVarChar':
+    case 'Xml':
+      return Buffer.concat(chunks).toString('ucs2');
+
+    case 'VarChar':
+      return iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
+
+    case 'VarBinary':
+    case 'UDT':
+      return Buffer.concat(chunks);
+
+    default:
+      throw new Error(sprintf('Unsupported PLP type %s', metadata.type.name));
+  }
+}
+
 module.exports.readValue = readValue;
+module.exports.readPLPValue = readPLPValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
 
 
-export { readValue, isPLPStream, readPLPStream };
+export { readValue, isPLPStream, readPLPStream, readPLPValue };

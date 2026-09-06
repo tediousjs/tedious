@@ -1,11 +1,8 @@
 // s2.2.7.13 (introduced in TDS 7.3.B)
 
 import Parser from './stream-parser';
-
 import { NBCRowToken } from './token';
-
 import { NotEnoughDataError } from './helpers';
-import { rowState, readColumn, columnsToToken } from './row-token-parser';
 
 /**
  * Parses a NBC (null bitmap compressed) row token. Resumable in the same
@@ -13,7 +10,7 @@ import { rowState, readColumn, columnsToToken } from './row-token-parser';
  */
 function nbcRowParser(parser: Parser): NBCRowToken {
   const colMetadata = parser.colMetadata;
-  const state = rowState(parser);
+  const state = parser.rowState();
 
   let bitmap = state.bitmap;
   if (bitmap === undefined) {
@@ -32,16 +29,14 @@ function nbcRowParser(parser: Parser): NBCRowToken {
     const index = state.index;
 
     if (bitmap[index >> 3] & (1 << (index & 7))) {
-      state.columns[index] = { value: null, metadata: colMetadata[index] };
-      state.index += 1;
-      continue;
+      state.skipColumn(colMetadata[index]);
+    } else {
+      state.readColumn(parser, colMetadata[index]);
     }
-
-    readColumn(parser, state, colMetadata[index]);
   }
 
   parser.tokenState = undefined;
-  return columnsToToken(parser, state.columns, (columns) => new NBCRowToken(columns));
+  return new NBCRowToken(state.finish(parser.options));
 }
 
 export default nbcRowParser;
