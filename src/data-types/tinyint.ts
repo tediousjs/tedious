@@ -3,6 +3,7 @@ import IntN from './intn';
 
 const DATA_LENGTH = Buffer.from([0x01]);
 const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([IntN.id, 0x01]);
 
 const TinyInt: DataType = {
   id: 0x30,
@@ -33,6 +34,21 @@ const TinyInt: DataType = {
     const buffer = Buffer.alloc(1);
     buffer.writeUInt8(Number(parameter.value), 0);
     yield buffer;
+  },
+
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as number | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
+      return;
+    }
+
+    buffer.writeUInt8(0x01);
+    buffer.writeUInt8(value);
   },
 
   validate: function(value): number | null {

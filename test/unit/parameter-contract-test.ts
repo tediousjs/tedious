@@ -141,10 +141,15 @@ describe('Parameter serialization contract', function() {
 
   describe('legacy types are adapted', function() {
     it('serializes via the legacy methods', function() {
-      assert.isUndefined(TYPES.BigInt.writeValue);
+      // A type that only implements the legacy trio, as a type from outside
+      // tedious might.
+      const type: DataType = { ...TYPES.BigInt };
+      delete type.writeTypeInfo;
+      delete type.writeValue;
 
-      const resolved = resolveParameter({ type: TYPES.BigInt, name: 'p', value: 123456789, output: false }, undefined, options);
-      assert.deepEqual(contractBytes(TYPES.BigInt, resolved.data), legacyBytes(TYPES.BigInt, resolved.data));
+      const resolved = resolveParameter({ type, name: 'p', value: 123456789, output: false }, undefined, options);
+      assert.deepEqual(contractBytes(type, resolved.data), legacyBytes(type, resolved.data));
+      assert.deepEqual(contractBytes(type, resolved.data), contractBytes(TYPES.BigInt, resolved.data));
     });
   });
 });
