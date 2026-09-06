@@ -64,10 +64,10 @@ describe('streaming parameters', function() {
     ] as const) {
       it(name, function() {
         const resolved = resolveParameter(param({ type, value: Readable.from([]) }), collationArg, options);
-        assert.strictEqual(resolved.data.streamed, true);
+        assert.strictEqual(resolved.data.length, 65535);
         // A streamed value has no known length, so it is sent as a `max` type.
         assert.isAbove(resolved.data.length!, (type as { maximumLength: number }).maximumLength);
-        assert.strictEqual(typeof resolved.type.writeValueStream, 'function');
+        assert.isDefined(type.writeValue!(new WritableTrackingBuffer(), resolved.data, options));
       });
     }
 
@@ -85,7 +85,7 @@ describe('streaming parameters', function() {
 
     it('leaves an in-memory value unstreamed', function() {
       const resolved = resolveParameter(param({ type: TYPES.VarBinary, value: Buffer.from([1, 2, 3]) }), undefined, options);
-      assert.notStrictEqual(resolved.data.streamed, true);
+      assert.isUndefined(TYPES.VarBinary.writeValue!(new WritableTrackingBuffer(), resolved.data, options));
     });
   });
 

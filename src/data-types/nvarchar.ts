@@ -9,6 +9,13 @@ const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const NO_COLLATION = Buffer.alloc(5);
 
+function encodeUcs2(chunk: unknown): Buffer {
+  if (typeof chunk !== 'string') {
+    throw new TypeError('Invalid string.');
+  }
+  return Buffer.from(chunk, 'ucs2');
+}
+
 const NVarChar: { maximumLength: number } & DataType = {
   id: 0xE7,
   type: 'NVARCHAR',
@@ -161,6 +168,12 @@ const NVarChar: { maximumLength: number } & DataType = {
       return;
     }
 
+    // Read from its source while the request is written; `resolve` declared
+    // it as `nvarchar(max)`.
+    if (isAsyncIterable(parameter.value)) {
+      return writePlpStream(buffer, parameter.value, encodeUcs2);
+    }
+
     const value = parameter.value instanceof Buffer ? parameter.value : parameter.value.toString();
     const length = typeof value === 'string' ? value.length * 2 : value.length;
 
@@ -202,7 +215,7 @@ const NVarChar: { maximumLength: number } & DataType = {
     if (isAsyncIterable(parameter.value)) {
       // Read from its source while the request is written, and sent as
       // `nvarchar(max)` since its length is not known up front.
-      const data: ParameterData = { value: parameter.value, length: MAX, streamed: true };
+      const data: ParameterData = { value: parameter.value, length: MAX };
       if (collation) {
         data.collation = collation;
       }
@@ -216,15 +229,6 @@ const NVarChar: { maximumLength: number } & DataType = {
       data.collation = collation;
     }
     return data;
-  },
-
-  writeValueStream(buffer, parameter) {
-    return writePlpStream(buffer, parameter.value as AsyncIterable<unknown>, (chunk) => {
-      if (typeof chunk !== 'string') {
-        throw new TypeError('Invalid string.');
-      }
-      return Buffer.from(chunk, 'ucs2');
-    });
   }
 };
 

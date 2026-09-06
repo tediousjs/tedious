@@ -1,6 +1,6 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type ResolvedParameter, writeTypeInfo, writeValue } from './data-type';
+import { type ResolvedParameter, writeRest, writeTypeInfo, writeValue } from './data-type';
 import { type InternalConnectionOptions } from './connection';
 import { InputError } from './errors';
 
@@ -37,9 +37,9 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
    * it holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`), checked
    * after every parameter, and at the end. A large value written by
    * reference stays by reference, so this costs no extra copy. A parameter
-   * whose value is streamed (`data.streamed`) is written into the same
-   * buffer by the type's `writeValueStream`, which reads the value's source
-   * as it goes and yields whenever the buffer is worth handing on.
+   * whose value is read from a source while the request is written has the
+   * rest of that write returned by `writeValue`, and is driven here so that
+   * the buffer is handed on whenever the type says it is worth it.
    *
    * Chunks are yielded one by one rather than through `yield*`: an array
    * iterator has no `throw` method, so an error a consumer throws into this
@@ -54,64 +54,23 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       const parameter = this.parameters[i];
       this.writeParameterHeader(buffer, parameter);
 
+      let rest: void | AsyncIterable<void>;
       try {
         writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-
-        if (!parameter.data.streamed) {
-          writeValue(parameter.type, buffer, parameter.data, this.options);
-        }
+        rest = writeValue(parameter.type, buffer, parameter.data, this.options);
       } catch (error) {
         throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
       }
 
-      if (parameter.data.streamed) {
-        // The type yields whenever the buffer is worth handing on. Only the
-        // type's reads are wrapped as the parameter's error; the yields to
-        // the consumer stay outside that `try`, so an error the consumer
-        // throws into this generator is not relabeled as the parameter's.
-        const flushes = parameter.type.writeValueStream!(buffer, parameter.data, this.options)[Symbol.asyncIterator]();
-        let done = false;
-        try {
-          while (true) {
-            let result: IteratorResult<void>;
-            try {
-              result = await flushes.next();
-            } catch (error) {
-              // A generator that threw is finished; there is nothing to close.
-              done = true;
-              throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
-            }
-
-            if (result.done) {
-              done = true;
-              break;
-            }
-
-            for (const chunk of buffer.getBuffers()) {
-              yield chunk;
-            }
-            buffer.consume(buffer.length);
+      // A value read from a source while the request is written: the type
+      // yields whenever the buffer is worth handing on.
+      if (rest !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of writeRest(rest, (error) => new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error }))) {
+          for (const chunk of buffer.getBuffers()) {
+            yield chunk;
           }
-        } catch (error) {
-          // An error thrown into the generator at a yield closes the type's
-          // generator, and with it the value's source. A close that fails
-          // must not replace the error that is propagating, as `for await`
-          // keeps the original error too.
-          if (!done && typeof flushes.return === 'function') {
-            done = true;
-            try {
-              await flushes.return();
-            } catch {
-              // The propagating error is what surfaces.
-            }
-          }
-          throw error;
-        } finally {
-          // The consumer stopped pulling: close the type's generator, and
-          // with it the value's source, as `for await` would.
-          if (!done && typeof flushes.return === 'function') {
-            await flushes.return();
-          }
+          buffer.consume(buffer.length);
         }
       }
 

@@ -1,7 +1,7 @@
 import iconv from 'iconv-lite';
 
 import { type DataType, type ParameterData } from '../data-type';
-import { isAsyncIterable, writePlpStream } from './plp-stream';
+import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -9,6 +9,18 @@ const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+// Each chunk is encoded on its own, as `Writable.prototype.write` would
+// encode it: a source must not split a UTF-16 surrogate pair across two
+// chunks (see `Request.addParameter`).
+function encoderFor(codepage: string): (chunk: unknown) => Buffer {
+  return (chunk) => {
+    if (typeof chunk !== 'string') {
+      throw new TypeError('Invalid string.');
+    }
+    return iconv.encode(chunk, codepage);
+  };
+}
 
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
@@ -147,7 +159,7 @@ const VarChar: { maximumLength: number } & DataType = {
         throw new Error('The collation set by the server has no associated encoding.');
       }
 
-      return { value: parameter.value, length: MAX, streamed: true, collation };
+      return { value: parameter.value, length: MAX, collation };
     }
 
     const value = this.validate(parameter.value, collation);
@@ -159,21 +171,26 @@ const VarChar: { maximumLength: number } & DataType = {
     return data;
   },
 
-  // An async generator, like the other streamed types, so that nothing runs
-  // before the payload's first `next()`.
-  async * writeValueStream(buffer, parameter) {
-    // `resolve` rejected a streamed value without a collation or codepage.
-    const codepage = parameter.collation!.codepage!;
+  writeValue(buffer, parameter) {
+    if (parameter.value == null) {
+      buffer.writeBuffer(parameter.length! <= this.maximumLength ? NULL_LENGTH : MAX_NULL_LENGTH);
+      return;
+    }
 
-    // Each chunk is encoded on its own, as `Writable.prototype.write` would
-    // encode it: a source must not split a UTF-16 surrogate pair across two
-    // chunks (see `Request.addParameter`).
-    yield * writePlpStream(buffer, parameter.value as AsyncIterable<unknown>, (chunk) => {
-      if (typeof chunk !== 'string') {
-        throw new TypeError('Invalid string.');
-      }
-      return iconv.encode(chunk, codepage);
-    });
+    // Read from its source while the request is written; `resolve` declared
+    // it as `varchar(max)` and checked the collation.
+    if (isAsyncIterable(parameter.value)) {
+      return writePlpStream(buffer, parameter.value, encoderFor(parameter.collation!.codepage!));
+    }
+
+    // `validate` encoded the value.
+    const value = parameter.value as Buffer;
+    if (parameter.length! <= this.maximumLength) {
+      buffer.writeUInt16LE(value.length);
+      buffer.writeBuffer(value);
+    } else {
+      writePlpValue(buffer, value);
+    }
   }
 };
 

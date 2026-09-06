@@ -13,10 +13,23 @@ export function isAsyncIterable(value: unknown): value is AsyncIterable<unknown>
 }
 
 /**
- * Writes a streamed PLP value into `buffer`: the unknown-length marker, then
- * one length-prefixed chunk per non-empty encoded piece read from `source`,
- * then the terminator. Yields whenever the buffer holds a chunk's worth, as
- * `DataType.writeValueStream` promises.
+ * Writes an in-memory PLP value into `buffer`: the unknown-length marker,
+ * the bytes as one chunk if there are any, then the terminator.
+ */
+export function writePlpValue(buffer: WritableTrackingBuffer, bytes: Buffer) {
+  buffer.writeBuffer(UNKNOWN_PLP_LEN);
+  if (bytes.length > 0) {
+    buffer.writeUInt32LE(bytes.length);
+    buffer.writeBuffer(bytes);
+  }
+  buffer.writeBuffer(PLP_TERMINATOR);
+}
+
+/**
+ * Writes a PLP value read from `source` into `buffer`: the unknown-length
+ * marker, then one length-prefixed chunk per non-empty encoded piece, then
+ * the terminator. Yields whenever the buffer holds a chunk's worth, as the
+ * rest of a `DataType.writeValue` promises.
  */
 export async function * writePlpStream(buffer: WritableTrackingBuffer, source: AsyncIterable<unknown>, encode: (chunk: unknown) => Buffer): AsyncGenerator<void, void> {
   buffer.writeBuffer(UNKNOWN_PLP_LEN);

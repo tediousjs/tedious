@@ -169,7 +169,7 @@ const TVP: DataType = {
 
   // The legacy serialization methods below are still required by the
   // `DataType` interface. They write the same bytes as `writeTypeInfo` and
-  // `writeValueStream` through the same helpers, for rows given as an array.
+  // `writeValue` through the same helpers, for rows given as an array.
 
   generateTypeInfo(parameter) {
     const buffer = new WritableTrackingBuffer();
@@ -216,10 +216,9 @@ const TVP: DataType = {
   },
 
   resolve(parameter, collation) {
-    // A TVP always serializes through `writeValueStream` (it has no
-    // synchronous `writeValue`), whether its rows are an array or an async
-    // iterable, so it is always `streamed`.
-    const data: ParameterData<TvpValue | null> = { value: validateTable(parameter.value), streamed: true };
+    // A TVP's `writeValue` always returns the rest of the write, whether
+    // its rows are an array or an async iterable.
+    const data: ParameterData<TvpValue | null> = { value: validateTable(parameter.value) };
     if (collation) {
       data.collation = collation;
     }
@@ -231,7 +230,7 @@ const TVP: DataType = {
     writeTvpTypeInfo(buffer, parameter.value as TvpValue | null);
   },
 
-  async * writeValueStream(buffer, parameter, options) {
+  async * writeValue(buffer, parameter, options) {
     const value = parameter.value as TvpValue | null;
 
     if (value == null) {
