@@ -37,7 +37,6 @@ import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
-import IncomingMessage from './incoming-message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
@@ -2231,8 +2230,12 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: IncomingMessage, handler: TokenHandler) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options);
+  /**
+   * Reads the next incoming message and parses its tokens, delivering them
+   * to `handler`.
+   */
+  createTokenStreamParser(handler: TokenHandler, signal?: AbortSignal) {
+    return new TokenStreamParser(this.messageIo.readMessage(signal), this.debug, handler, this.config.options);
   }
 
   async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -3499,20 +3502,15 @@ class Connection extends EventEmitter {
    */
   async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
     return await withAbortRace(signal, async (signalAborted) => {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
-
       const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      const tokenStreamParser = this.createTokenStreamParser(handler, signal);
       // If the abort wins this race, the pending `once()` is left
       // unobserved, and a parse error landing afterwards would reject it
       // with nobody listening. Observe it so that cannot become an
       // unhandled rejection (same idiom as `withAbortRace`).
-      const endOfMessage = once(tokenStreamParser, 'end');
+      const endOfMessage = once(tokenStreamParser, 'end').catch((err) => {
+        throw this.wrapSocketError(err);
+      });
       endOfMessage.catch(() => {});
       await Promise.race([
         endOfMessage,
@@ -3535,20 +3533,15 @@ class Connection extends EventEmitter {
   async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
     return await withAbortRace(signal, async (signalAborted) => {
       while (true) {
-        const message = await Promise.race([
-          this.messageIo.readMessage().catch((err) => {
-            throw this.wrapSocketError(err);
-          }),
-          signalAborted
-        ]);
-
         const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        const tokenStreamParser = this.createTokenStreamParser(handler, signal);
         // If the abort wins this race, the pending `once()` is left
         // unobserved, and a parse error landing afterwards would reject it
         // with nobody listening. Observe it so that cannot become an
         // unhandled rejection (same idiom as `withAbortRace`).
-        const endOfMessage = once(tokenStreamParser, 'end');
+        const endOfMessage = once(tokenStreamParser, 'end').catch((err) => {
+          throw this.wrapSocketError(err);
+        });
         endOfMessage.catch(() => {});
         await Promise.race([
           endOfMessage,
@@ -3587,20 +3580,15 @@ class Connection extends EventEmitter {
    */
   async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
     return await withAbortRace(signal, async (signalAborted) => {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
-
       const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
+      const tokenStreamParser = this.createTokenStreamParser(handler, signal);
       // If the abort wins this race, the pending `once()` is left
       // unobserved, and a parse error landing afterwards would reject it
       // with nobody listening. Observe it so that cannot become an
       // unhandled rejection (same idiom as `withAbortRace`).
-      const endOfMessage = once(tokenStreamParser, 'end');
+      const endOfMessage = once(tokenStreamParser, 'end').catch((err) => {
+        throw this.wrapSocketError(err);
+      });
       endOfMessage.catch(() => {});
       await Promise.race([
         endOfMessage,
@@ -3692,19 +3680,14 @@ class Connection extends EventEmitter {
     await withAbortRace(signal, async (signalAborted) => {
       this.sendInitialSql();
 
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
-
-      const tokenStreamParser = this.createTokenStreamParser(message, new InitialSqlTokenHandler(this));
+      const tokenStreamParser = this.createTokenStreamParser(new InitialSqlTokenHandler(this), signal);
       // If the abort wins this race, the pending `once()` is left
       // unobserved, and a parse error landing afterwards would reject it
       // with nobody listening. Observe it so that cannot become an
       // unhandled rejection (same idiom as `withAbortRace`).
-      const endOfMessage = once(tokenStreamParser, 'end');
+      const endOfMessage = once(tokenStreamParser, 'end').catch((err) => {
+        throw this.wrapSocketError(err);
+      });
       endOfMessage.catch(() => {});
       await Promise.race([
         endOfMessage,
@@ -3778,17 +3761,12 @@ Connection.prototype.STATE = {
     name: 'SentClientRequest',
     enter: function() {
       (async () => {
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          this._onSocketError(err);
-          return;
-        }
-        // request timer is stopped on first data package
-        this.clearRequestTimer();
+        const tokenStreamParser = this.createTokenStreamParser(new RequestTokenHandler(this, this.request!));
 
-        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+        // request timer is stopped on first data package
+        tokenStreamParser.once('start', () => {
+          this.clearRequestTimer();
+        });
 
         // A token parse failure leaves the connection at an undefined
         // position in the TDS stream, so it cannot be recovered at the
@@ -3858,8 +3836,13 @@ Connection.prototype.STATE = {
           // The `_cancelAfterRequestSent` callback will have sent a
           // attention message, so now we need to also switch to
           // the `SENT_ATTENTION` state to make sure the attention ack
-          // message is processed correctly.
-          this.transitionTo(this.STATE.SENT_ATTENTION);
+          // message is processed correctly. The attention acknowledgement
+          // follows the (remainder of the) current response on the stream,
+          // so it can only be read once the current response has been
+          // read to its end.
+          tokenStreamParser.once('end', () => {
+            this.transitionTo(this.STATE.SENT_ATTENTION);
+          });
         };
 
         const onEndOfMessage = () => {
@@ -3917,16 +3900,8 @@ Connection.prototype.STATE = {
         // acknowledgement. Reading more than one message would consume the
         // response belonging to the next request and desynchronize the
         // message stream - so don't turn this into a loop.
-        let message;
-        try {
-          message = await this.messageIo.readMessage();
-        } catch (err: any) {
-          this._onSocketError(err);
-          return;
-        }
-
         const handler = new AttentionTokenHandler(this, this.request!);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
+        const tokenStreamParser = this.createTokenStreamParser(handler);
 
         try {
           await once(tokenStreamParser, 'end');

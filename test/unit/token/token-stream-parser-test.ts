@@ -3,7 +3,6 @@ import { Parser } from '../../../src/token/token-stream-parser';
 import { TYPE, DatabaseEnvChangeToken } from '../../../src/token/token';
 import { type ParserOptions } from '../../../src/token/stream-parser';
 import { TokenHandler } from '../../../src/token/handler';
-import type IncomingMessage from '../../../src/incoming-message';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { assert } from 'chai';
 
@@ -39,9 +38,7 @@ describe('Token Stream Parser', () => {
   it('should parse envChange token', function(done) {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
-
-    // Cast to IncomingMessage since tests use a simplified input instead of full Message
-    const parser = new Parser([buffer] as unknown as IncomingMessage, debug, new TestDatabaseChangeHandler(), options);
+    const parser = new Parser([buffer], debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
@@ -49,9 +46,7 @@ describe('Token Stream Parser', () => {
   it('should parse token split across buffers', function(done) {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
-
-    // Cast to IncomingMessage since tests use a simplified input instead of full Message
-    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as unknown as IncomingMessage, debug, new TestDatabaseChangeHandler(), options);
+    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)], debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
@@ -61,9 +56,7 @@ describe('Token Stream Parser', () => {
     const buffer = createDbChangeBuffer();
 
     const chunks = Array.from(buffer, (byte) => Buffer.from([byte]));
-
-    // Cast to IncomingMessage since tests use a simplified input instead of full Message
-    const parser = new Parser(chunks as unknown as IncomingMessage, debug, new TestDatabaseChangeHandler(), options);
+    const parser = new Parser(chunks, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });

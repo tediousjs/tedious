@@ -9,11 +9,9 @@ import { EventEmitter } from 'events';
 import Debug from './debug';
 
 import Message from './message';
-import IncomingMessage from './incoming-message';
 import { HEADER_LENGTH, OFFSET, Packet, STATUS, TYPE } from './packet';
 import { ConnectionError } from './errors';
 
-import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
 
 class MessageIO extends EventEmitter {
@@ -27,7 +25,6 @@ class MessageIO extends EventEmitter {
 
   declare tlsNegotiationComplete: boolean;
 
-  declare private incomingMessageStream: IncomingMessageStream;
   declare outgoingMessageStream: OutgoingMessageStream;
 
   declare securePair?: {
@@ -35,7 +32,11 @@ class MessageIO extends EventEmitter {
     encrypted: Duplex;
   };
 
-  declare incomingMessageIterator: AsyncIterableIterator<IncomingMessage>;
+  /**
+   * The stream incoming messages are read from: the socket, or the
+   * cleartext side of the TLS layer once TLS has been negotiated.
+   */
+  declare input: Readable;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -45,12 +46,10 @@ class MessageIO extends EventEmitter {
 
     this.tlsNegotiationComplete = false;
 
-    this.incomingMessageStream = new IncomingMessageStream(this.debug);
-    this.incomingMessageIterator = this.incomingMessageStream[Symbol.asyncIterator]();
+    this.input = socket;
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
-    this.socket.pipe(this.incomingMessageStream);
     this.outgoingMessageStream.pipe(this.socket);
   }
 
@@ -123,12 +122,11 @@ class MessageIO extends EventEmitter {
         securePair.cleartext.setMaxSendFragment(Math.min(this.outgoingMessageStream.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
 
         this.outgoingMessageStream.unpipe(this.socket);
-        this.socket.unpipe(this.incomingMessageStream);
 
         this.socket.pipe(securePair.encrypted);
         securePair.encrypted.pipe(this.socket);
 
-        securePair.cleartext.pipe(this.incomingMessageStream);
+        this.input = securePair.cleartext;
         this.outgoingMessageStream.pipe(securePair.cleartext);
 
         this.tlsNegotiationComplete = true;
@@ -162,7 +160,9 @@ class MessageIO extends EventEmitter {
         this.outgoingMessageStream.write(message);
         message.end();
 
-        this.readMessage().then(async (response) => {
+        (async () => {
+          const response = this.readMessage();
+
           // Setup readable handler for the next round of handshaking.
           // If we encounter a `secureConnect` on the cleartext side
           // of the secure pair, the `readable` handler is cleared
@@ -174,7 +174,7 @@ class MessageIO extends EventEmitter {
             // encrypted end of the secure pair.
             securePair.encrypted.write(data);
           }
-        }).catch(onError);
+        })().catch(onError);
       };
 
       securePair.cleartext.once('error', onError);
@@ -193,16 +193,11 @@ class MessageIO extends EventEmitter {
   }
 
   /**
-   * Read the next incoming message from the socket.
+   * Reads the next incoming message, as an async iterable of the contents
+   * of its packets.
    */
-  async readMessage(): Promise<IncomingMessage> {
-    const result = await this.incomingMessageIterator.next();
-
-    if (result.done) {
-      throw new Error('unexpected end of message stream');
-    }
-
-    return result.value;
+  readMessage(signal?: AbortSignal): AsyncGenerator<Buffer, void, undefined> {
+    return readMessage(this.input, signal ? { debug: this.debug, signal } : { debug: this.debug });
   }
 }
 

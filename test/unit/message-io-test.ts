@@ -10,8 +10,6 @@ import BufferListStream from 'bl';
 
 import Debug from '../../src/debug';
 import MessageIO, { readMessage, writeMessage } from '../../src/message-io';
-import Message from '../../src/message';
-import IncomingMessage from '../../src/incoming-message';
 import { Packet, TYPE } from '../../src/packet';
 import { ConnectionError } from '../../src/errors';
 
@@ -1136,8 +1134,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, IncomingMessage);
+          const message = io.readMessage();
 
           const chunks = [];
           for await (const chunk of message) {
@@ -1167,8 +1164,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, IncomingMessage);
+          const message = io.readMessage();
 
           const chunks = [];
           for await (const chunk of message) {
@@ -1206,8 +1202,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, IncomingMessage);
+          const message = io.readMessage();
 
           const receivedData: Buffer[] = [];
           for await (const chunk of message) {
@@ -1252,8 +1247,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, IncomingMessage);
+          const message = io.readMessage();
 
           const receivedData: Buffer[] = [];
           for await (const chunk of message) {
@@ -1299,8 +1293,7 @@ describe('MessageIO', function() {
         (async () => {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
-          const message = await io.readMessage();
-          assert.instanceOf(message, IncomingMessage);
+          const message = io.readMessage();
 
           const receivedData: Buffer[] = [];
           for await (const chunk of message) {
@@ -1348,7 +1341,7 @@ describe('MessageIO', function() {
      */
     async function forwardTlsHandshake(io: MessageIO, rounds: number) {
       for (let i = 0; i < rounds; i++) {
-        const message = await io.readMessage();
+        const message = io.readMessage();
         for await (const chunk of message) {
           securePair.encrypted.write(chunk);
         }
@@ -1385,7 +1378,7 @@ describe('MessageIO', function() {
           const onSecure = once(securePair.cleartext, 'secure');
 
           {
-            const message = await io.readMessage();
+            const message = io.readMessage();
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -1402,7 +1395,7 @@ describe('MessageIO', function() {
           }
 
           {
-            const message = await io.readMessage();
+            const message = io.readMessage();
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -1438,7 +1431,7 @@ describe('MessageIO', function() {
           io.sendMessage(TYPE.LOGIN7, payload);
 
           // Receive response (via TLS)
-          const message = await io.readMessage();
+          const message = io.readMessage();
 
           const chunks: Buffer[] = [];
           for await (const chunk of message) {
@@ -1457,7 +1450,7 @@ describe('MessageIO', function() {
           const onSecure = once(securePair.cleartext, 'secure');
 
           {
-            const message = await io.readMessage();
+            const message = io.readMessage();
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -1474,7 +1467,7 @@ describe('MessageIO', function() {
           }
 
           {
-            const message = await io.readMessage();
+            const message = io.readMessage();
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
             }
@@ -1698,7 +1691,7 @@ describe('MessageIO', function() {
           const io = new MessageIO(serverConnection, packetSize, debug);
 
           {
-            const message = await io.readMessage();
+            const message = io.readMessage();
 
             for await (const chunk of message) {
               securePair.encrypted.write(chunk);
