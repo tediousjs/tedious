@@ -1,5 +1,5 @@
 import { Collation } from './collation';
-import Parser, { type ParserOptions } from './token/stream-parser';
+import { type ParserOptions } from './token/stream-parser';
 import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 
@@ -354,30 +354,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
   }
 }
 
-function metadataParse(parser: Parser, options: ParserOptions, callback: (metadata: Metadata) => void) {
-  (async () => {
-    while (true) {
-      let result;
-      try {
-        result = readMetadata(parser.buffer, parser.position, options);
-      } catch (err: any) {
-        if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
-          continue;
-        }
-
-        throw err;
-      }
-
-      parser.position = result.offset;
-      return callback(result.value);
-    }
-  })();
-}
-
-export default metadataParse;
 export { readCollation, readMetadata };
 
-module.exports = metadataParse;
+module.exports = {};
 module.exports.readCollation = readCollation;
 module.exports.readMetadata = readMetadata;
