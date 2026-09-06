@@ -48,53 +48,6 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  generateTypeInfo: function(parameter) {
-    const buffer = Buffer.alloc(8);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeUInt16LE(parameter.length! * 2, 1);
-
-    if (parameter.collation) {
-      parameter.collation.toBuffer().copy(buffer, 3, 0, 5);
-    }
-
-    return buffer;
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    const { value } = parameter;
-    if (value instanceof Buffer) {
-      const length = value.length;
-      const buffer = Buffer.alloc(2);
-
-      buffer.writeUInt16LE(length, 0);
-
-      return buffer;
-    } else {
-      const length = Buffer.byteLength(value.toString(), 'ucs2');
-
-      const buffer = Buffer.alloc(2);
-      buffer.writeUInt16LE(length, 0);
-      return buffer;
-    }
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    const value = parameter.value;
-    if (value instanceof Buffer) {
-      yield value;
-    } else {
-      yield Buffer.from(value, 'ucs2');
-    }
-  },
-
   writeTypeInfo(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeUInt16LE(parameter.length! * 2);

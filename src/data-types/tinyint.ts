@@ -1,8 +1,6 @@
 import { type DataType } from '../data-type';
 import IntN from './intn';
 
-const DATA_LENGTH = Buffer.from([0x01]);
-const NULL_LENGTH = Buffer.from([0x00]);
 const TYPE_INFO = Buffer.from([IntN.id, 0x01]);
 
 const TinyInt: DataType = {
@@ -12,28 +10,6 @@ const TinyInt: DataType = {
 
   declaration: function() {
     return 'tinyint';
-  },
-
-  generateTypeInfo() {
-    return Buffer.from([IntN.id, 0x01]);
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    const buffer = Buffer.alloc(1);
-    buffer.writeUInt8(Number(parameter.value), 0);
-    yield buffer;
   },
 
   writeTypeInfo(buffer) {

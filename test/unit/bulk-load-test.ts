@@ -25,15 +25,11 @@ describe('BulkLoad', function() {
           return 'stub';
         },
 
-        generateTypeInfo() {
-          return Buffer.alloc(1);
+        writeTypeInfo(buffer) {
+          buffer.writeUInt8(0x00);
         },
 
-        generateParameterLength() {
-          return Buffer.alloc(0);
-        },
-
-        * generateParameterData() { },
+        writeValue() { },
 
         validate(value) {
           return value;
@@ -58,10 +54,10 @@ describe('BulkLoad', function() {
       throw new Error('expected the bulk load to fail');
     }
 
-    it('wraps errors thrown while generating the column metadata', async function() {
+    it('wraps errors thrown while writing the column metadata', async function() {
       const cause = new RangeError('out of range');
       const error = await writeRow(buildType({
-        generateTypeInfo() {
+        writeTypeInfo() {
           throw cause;
         }
       }));
@@ -71,10 +67,10 @@ describe('BulkLoad', function() {
       assert.strictEqual(error.cause, cause);
     });
 
-    it('wraps errors thrown while generating row values', async function() {
+    it('wraps errors thrown while writing row values', async function() {
       const cause = new RangeError('out of range');
       const error = await writeRow(buildType({
-        generateParameterLength() {
+        writeValue() {
           throw cause;
         }
       }));
@@ -84,18 +80,6 @@ describe('BulkLoad', function() {
       assert.strictEqual(error.cause, cause);
     });
 
-    it('wraps errors thrown while generating row value chunks', async function() {
-      const cause = new RangeError('out of range');
-      const error = await writeRow(buildType({
-        * generateParameterData() {
-          throw cause;
-        }
-      }));
-
-      assert.instanceOf(error, InputError);
-      assert.match(error.message, /Column 'foo' could not be serialized/);
-      assert.strictEqual(error.cause, cause);
-    });
 
     it('closes the row source when the column metadata cannot be written', async function() {
       let closed = false;
@@ -108,7 +92,7 @@ describe('BulkLoad', function() {
       })();
 
       const error = await writeRow(buildType({
-        generateTypeInfo() {
+        writeTypeInfo() {
           throw new RangeError('out of range');
         }
       }), rows);
@@ -117,7 +101,7 @@ describe('BulkLoad', function() {
       assert.isTrue(closed);
     });
 
-    it('closes the row source when a row value cannot be serialized', async function() {
+    it('closes the row source when a row value cannot be written', async function() {
       let closed = false;
       const rows = (function*() {
         try {
@@ -129,7 +113,7 @@ describe('BulkLoad', function() {
       })();
 
       const error = await writeRow(buildType({
-        generateParameterLength() {
+        writeValue() {
           throw new RangeError('out of range');
         }
       }), rows);
@@ -225,10 +209,7 @@ describe('BulkLoad', function() {
         request.columns.forEach((column, i) => {
           const value = column.type.validate(row[i], column.collation);
           const parameter = { length: column.length, scale: column.scale, precision: column.precision, value };
-          buffer.writeBuffer(column.type.generateParameterLength(parameter, connectionOptions));
-          for (const chunk of column.type.generateParameterData(parameter, connectionOptions)) {
-            buffer.writeBuffer(chunk);
-          }
+          column.type.writeValue(buffer, parameter, connectionOptions);
         });
         expected.push(buffer.slice());
       }

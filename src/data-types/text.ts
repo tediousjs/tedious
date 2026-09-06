@@ -26,40 +26,6 @@ const Text: DataType = {
     }
   },
 
-  generateTypeInfo(parameter, _options) {
-    const buffer = Buffer.alloc(10);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeInt32LE(parameter.length!, 1);
-
-    if (parameter.collation) {
-      parameter.collation.toBuffer().copy(buffer, 5, 0, 5);
-    }
-
-    return buffer;
-  },
-
-  generateParameterLength(parameter, options) {
-    const value = parameter.value as Buffer | null;
-
-    if (value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(value.length, 0);
-    return buffer;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    const value = parameter.value as Buffer | null;
-
-    if (value == null) {
-      return;
-    }
-
-    yield value;
-  },
-
   writeTypeInfo(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeInt32LE(parameter.length!);

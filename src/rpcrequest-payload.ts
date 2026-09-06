@@ -1,6 +1,6 @@
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { writeToTrackingBuffer } from './all-headers';
-import { type ResolvedParameter, writeRest, writeTypeInfo, writeValue } from './data-type';
+import { type ResolvedParameter, writeRest } from './data-type';
 import { type InternalConnectionOptions } from './connection';
 import { InputError } from './errors';
 
@@ -56,8 +56,8 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
 
       let rest: void | AsyncIterable<void>;
       try {
-        writeTypeInfo(parameter.type, buffer, parameter.data, this.options);
-        rest = writeValue(parameter.type, buffer, parameter.data, this.options);
+        parameter.type.writeTypeInfo(buffer, parameter.data, this.options);
+        rest = parameter.type.writeValue(buffer, parameter.data, this.options);
       } catch (error) {
         throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
       }

@@ -21,31 +21,6 @@ const Image: DataType = {
     }
   },
 
-  generateTypeInfo(parameter) {
-    const buffer = Buffer.alloc(5);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeInt32LE(parameter.length!, 1);
-    return buffer;
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(parameter.value.length!, 0);
-    return buffer;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    yield parameter.value;
-  },
-
   writeTypeInfo(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeInt32LE(parameter.length!);

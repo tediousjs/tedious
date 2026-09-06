@@ -1,7 +1,6 @@
 import BulkLoad from './bulk-load';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { TYPE as TOKEN_TYPE } from './token/token';
-import { writeValue } from './data-type';
 import { InputError } from './errors';
 
 export type Row = unknown[] | { [colName: string]: unknown };
@@ -162,7 +161,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
             }
 
             try {
-              writeValue(c.type, buffer, parameter, options);
+              c.type.writeValue(buffer, parameter, options);
             } catch (error) {
               throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
             }

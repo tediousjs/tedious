@@ -24,36 +24,6 @@ const NText: DataType = {
     }
   },
 
-  generateTypeInfo(parameter, _options) {
-    const buffer = Buffer.alloc(10);
-    buffer.writeUInt8(this.id, 0);
-    buffer.writeInt32LE(parameter.length!, 1);
-
-    if (parameter.collation) {
-      parameter.collation.toBuffer().copy(buffer, 5, 0, 5);
-    }
-
-    return buffer;
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(Buffer.byteLength(parameter.value, 'ucs2'), 0);
-    return buffer;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    yield Buffer.from(parameter.value.toString(), 'ucs2');
-  },
-
   writeTypeInfo(buffer, parameter) {
     buffer.writeUInt8(this.id);
     buffer.writeInt32LE(parameter.length!);

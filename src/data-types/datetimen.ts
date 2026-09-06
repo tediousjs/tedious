@@ -9,15 +9,11 @@ const DateTimeN: DataType = {
     throw new Error('not implemented');
   },
 
-  generateTypeInfo() {
+  writeTypeInfo() {
     throw new Error('not implemented');
   },
 
-  generateParameterLength() {
-    throw new Error('not implemented');
-  },
-
-  generateParameterData() {
+  writeValue() {
     throw new Error('not implemented');
   },
 

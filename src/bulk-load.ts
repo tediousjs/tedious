@@ -4,7 +4,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 
 import { TYPE as TOKEN_TYPE } from './token/token';
 
-import { type DataType, type Parameter, writeTypeInfo } from './data-type';
+import { type DataType, type Parameter } from './data-type';
 import { InputError } from './errors';
 import { Collation } from './collation';
 
@@ -443,7 +443,7 @@ class BulkLoad extends EventEmitter {
 
       // TYPE_INFO
       try {
-        writeTypeInfo(c.type, tBuf, c, this.options);
+        c.type.writeTypeInfo(tBuf, c, this.options);
       } catch (error) {
         throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
       }

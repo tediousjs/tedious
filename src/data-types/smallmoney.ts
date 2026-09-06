@@ -1,8 +1,6 @@
 import { type DataType } from '../data-type';
 import MoneyN from './moneyn';
 
-const DATA_LENGTH = Buffer.from([0x04]);
-const NULL_LENGTH = Buffer.from([0x00]);
 const TYPE_INFO = Buffer.from([MoneyN.id, 0x04]);
 
 const SmallMoney: DataType = {
@@ -12,28 +10,6 @@ const SmallMoney: DataType = {
 
   declaration: function() {
     return 'smallmoney';
-  },
-
-  generateTypeInfo: function() {
-    return Buffer.from([MoneyN.id, 0x04]);
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    const buffer = Buffer.alloc(4);
-    buffer.writeInt32LE(parameter.value * 10000, 0);
-    yield buffer;
   },
 
   writeTypeInfo(buffer) {

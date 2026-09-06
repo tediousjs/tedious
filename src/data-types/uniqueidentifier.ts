@@ -1,9 +1,7 @@
 import { type DataType } from '../data-type';
 import { guidToArray } from '../guid-parser';
 
-const NULL_LENGTH = Buffer.from([0x00]);
 const TYPE_INFO = Buffer.from([0x24, 0x10]);
-const DATA_LENGTH = Buffer.from([0x10]);
 
 const UniqueIdentifier: DataType = {
   id: 0x24,
@@ -16,26 +14,6 @@ const UniqueIdentifier: DataType = {
 
   resolveLength: function() {
     return 16;
-  },
-
-  generateTypeInfo() {
-    return Buffer.from([this.id, 0x10]);
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    yield Buffer.from(guidToArray(parameter.value));
   },
 
   writeTypeInfo(buffer) {

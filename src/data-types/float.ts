@@ -1,7 +1,6 @@
 import { type DataType } from '../data-type';
 import FloatN from './floatn';
 
-const NULL_LENGTH = Buffer.from([0x00]);
 const TYPE_INFO = Buffer.from([FloatN.id, 0x08]);
 
 const Float: DataType = {
@@ -11,28 +10,6 @@ const Float: DataType = {
 
   declaration: function() {
     return 'float';
-  },
-
-  generateTypeInfo() {
-    return Buffer.from([FloatN.id, 0x08]);
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return Buffer.from([0x08]);
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    const buffer = Buffer.alloc(8);
-    buffer.writeDoubleLE(parseFloat(parameter.value), 0);
-    yield buffer;
   },
 
   writeTypeInfo(buffer) {

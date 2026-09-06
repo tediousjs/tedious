@@ -1,8 +1,6 @@
 import { type DataType } from '../data-type';
 import BitN from './bitn';
 
-const DATA_LENGTH = Buffer.from([0x01]);
-const NULL_LENGTH = Buffer.from([0x00]);
 const TYPE_INFO = Buffer.from([BitN.id, 0x01]);
 
 const Bit: DataType = {
@@ -12,26 +10,6 @@ const Bit: DataType = {
 
   declaration: function() {
     return 'bit';
-  },
-
-  generateTypeInfo() {
-    return Buffer.from([BitN.id, 0x01]);
-  },
-
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
-      return;
-    }
-
-    yield parameter.value ? Buffer.from([0x01]) : Buffer.from([0x00]);
   },
 
   writeTypeInfo(buffer) {

@@ -13,11 +13,10 @@ const txnDescriptor = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]);
 /**
  * The RPC request serialization as it was before parameters were resolved
  * up front: every parameter's declaration facts are resolved and its bytes
- * generated through the `generate*` methods while the request is being
- * written. Kept here as the reference the new payload must match byte for
- * byte.
+ * written while the request is being written. Kept here as the reference
+ * the payload must match byte for byte.
  */
-function * legacyPayload(procedure: string | number, parameters: Parameter[], options: InternalConnectionOptions, collation: Collation | undefined) {
+async function * referencePayload(procedure: string | number, parameters: Parameter[], options: InternalConnectionOptions, collation: Collation | undefined) {
   const buffer = new WritableTrackingBuffer();
   if (options.tdsVersion >= '7_2') {
     writeToTrackingBuffer(buffer, txnDescriptor, 1);
@@ -70,9 +69,14 @@ function * legacyPayload(procedure: string | number, parameters: Parameter[], op
       param.collation = collation;
     }
 
-    yield type.generateTypeInfo(param, options);
-    yield type.generateParameterLength(param, options);
-    yield * type.generateParameterData(param, options);
+    const bytes = new WritableTrackingBuffer();
+    type.writeTypeInfo(bytes, param, options);
+    const rest = type.writeValue(bytes, param, options);
+    if (rest !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _ of rest) { }
+    }
+    yield bytes.data;
   }
 }
 
@@ -148,7 +152,7 @@ describe('RpcRequestPayload', function() {
           const options = { tdsVersion, useUTC: true } as InternalConnectionOptions;
           const params = parameters(useCollation);
 
-          const expected = await collect(legacyPayload(procedure, params, options, useCollation ? collation : undefined));
+          const expected = await collect(referencePayload(procedure, params, options, useCollation ? collation : undefined));
 
           const resolved = params.map((parameter) => resolveParameter(parameter, useCollation ? collation : undefined, options));
           const actual = await collect(new RpcRequestPayload(procedure, resolved, txnDescriptor, options));
@@ -163,7 +167,7 @@ describe('RpcRequestPayload', function() {
     const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
 
     for (const parameter of parameters(true)) {
-      const expected = await collect(legacyPayload('p', [parameter], options, collation));
+      const expected = await collect(referencePayload('p', [parameter], options, collation));
       const actual = await collect(new RpcRequestPayload('p', [resolveParameter(parameter, collation, options)], txnDescriptor, options));
       assert.deepEqual(actual, expected, `parameter ${parameter.name || '(unnamed)'} of type ${parameter.type.name}`);
     }
@@ -179,15 +183,13 @@ describe('RpcRequestPayload', function() {
 
   it('reports serialization errors as InputError naming the parameter', async function() {
     const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
-    // A legacy-style type (no native `writeValue`) whose data generation fails.
+    // A type whose value write fails.
     const type: DataType = {
       ...TYPES.Int,
-      * generateParameterData(): Generator<Buffer, void> {
+      writeValue() {
         throw new RangeError('boom');
       }
     };
-    delete type.writeValue;
-    delete type.writeTypeInfo;
     const resolved = resolveParameter({ type, name: 'broken', value: 1, output: false }, undefined, options);
 
     let error: unknown;
