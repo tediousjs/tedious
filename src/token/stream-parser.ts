@@ -4,7 +4,7 @@ import { type InternalConnectionOptions } from '../connection';
 import { TYPE, ColInfoToken, ColMetadataToken, DoneProcToken, DoneToken, DoneInProcToken, ErrorMessageToken, InfoMessageToken, RowToken, type EnvChangeToken, LoginAckToken, ReturnStatusToken, OrderToken, FedAuthInfoToken, SSPIToken, ReturnValueToken, NBCRowToken, FeatureExtAckToken, TabNameToken, Token } from './token';
 
 import colInfoParser from './colinfo-token-parser';
-import colMetadataParser, { type ColumnMetadata } from './colmetadata-token-parser';
+import colMetadataParser, { colMetadataParserSync, type ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
 import envChangeParser from './env-change-token-parser';
 import { errorParser, infoParser } from './infoerror-token-parser';
@@ -14,8 +14,8 @@ import loginAckParser from './loginack-token-parser';
 import orderParser from './order-token-parser';
 import returnStatusParser from './returnstatus-token-parser';
 import returnValueParser from './returnvalue-token-parser';
-import rowParser from './row-token-parser';
-import nbcRowParser from './nbcrow-token-parser';
+import rowParser, { rowParserSync } from './row-token-parser';
+import nbcRowParser, { nbcRowParserSync } from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 import tabNameParser from './tabname-token-parser';
 import { NotEnoughDataError } from './helpers';
@@ -30,6 +30,13 @@ class Parser {
   iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
   buffer: Buffer;
   position: number;
+
+  /**
+   * Whether `buffer` holds the complete message. When set, tokens are
+   * parsed synchronously and truncated data is an error rather than a
+   * reason to wait for more.
+   */
+  complete: boolean;
 
   static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
     const parser = new Parser(iterable, debug, options);
@@ -195,18 +202,29 @@ class Parser {
     return result.value;
   }
 
-  async readNbcRowToken(): Promise<NBCRowToken> {
-    return await nbcRowParser(this);
+  readNbcRowToken(): NBCRowToken | Promise<NBCRowToken> {
+    if (this.complete) {
+      return nbcRowParserSync(this);
+    }
+
+    return nbcRowParser(this);
   }
 
   async readReturnValueToken(): Promise<ReturnValueToken> {
     return await returnValueParser(this);
   }
 
-  async readColMetadataToken(): Promise<ColMetadataToken> {
-    const token = await colMetadataParser(this);
-    this.colMetadata = token.columns;
-    return token;
+  readColMetadataToken(): ColMetadataToken | Promise<ColMetadataToken> {
+    if (this.complete) {
+      const token = colMetadataParserSync(this);
+      this.colMetadata = token.columns;
+      return token;
+    }
+
+    return colMetadataParser(this).then((token) => {
+      this.colMetadata = token.columns;
+      return token;
+    });
   }
 
   readSSPIToken(): SSPIToken | Promise<SSPIToken> {
@@ -324,6 +342,10 @@ class Parser {
   }
 
   readRowToken(): RowToken | Promise<RowToken> {
+    if (this.complete) {
+      return rowParserSync(this);
+    }
+
     return rowParser(this);
   }
 
@@ -431,6 +453,7 @@ class Parser {
 
     this.buffer = Buffer.alloc(0);
     this.position = 0;
+    this.complete = false;
   }
 
   async waitForChunk() {

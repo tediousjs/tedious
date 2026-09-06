@@ -788,4 +788,60 @@ module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
 
-export { readValue, isPLPStream, readPLPStream };
+/**
+ * Synchronous variant of `readPLPStream` for parsers that have the complete
+ * message buffered. Throws `NotEnoughDataError` if the data is truncated.
+ */
+function readPLPStreamSync(parser: Parser): null | Buffer[] {
+  const buffer = parser.buffer;
+  let position = parser.position;
+
+  if (buffer.length < position + 8) {
+    throw new NotEnoughDataError(position + 8);
+  }
+
+  const expectedLength = buffer.readBigUInt64LE(position);
+  position += 8;
+
+  if (expectedLength === PLP_NULL) {
+    parser.position = position;
+    return null;
+  }
+
+  const chunks: Buffer[] = [];
+  let currentLength = 0;
+
+  while (true) {
+    if (buffer.length < position + 4) {
+      throw new NotEnoughDataError(position + 4);
+    }
+
+    const chunkLength = buffer.readUInt32LE(position);
+    position += 4;
+
+    if (!chunkLength) {
+      break;
+    }
+
+    if (buffer.length < position + chunkLength) {
+      throw new NotEnoughDataError(position + chunkLength);
+    }
+
+    chunks.push(buffer.slice(position, position + chunkLength));
+    position += chunkLength;
+    currentLength += chunkLength;
+  }
+
+  if (expectedLength !== UNKNOWN_PLP_LEN) {
+    if (currentLength !== Number(expectedLength)) {
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + currentLength + ' bytes');
+    }
+  }
+
+  parser.position = position;
+  return chunks;
+}
+
+module.exports.readPLPStreamSync = readPLPStreamSync;
+
+export { readValue, isPLPStream, readPLPStream, readPLPStreamSync };

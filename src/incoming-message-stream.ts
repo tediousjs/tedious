@@ -65,6 +65,12 @@ class IncomingMessageStream extends Transform {
         let message = this.currentMessage;
         if (message === undefined) {
           this.currentMessage = message = new Message({ type: packet.type(), resetConnection: false });
+
+          if (packet.isLast()) {
+            // The whole message arrived in a single packet.
+            message.completeData = packet.data();
+          }
+
           this.push(message);
         }
 
