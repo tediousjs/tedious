@@ -4,8 +4,7 @@ import DateTimeN from './datetimen';
 const EPOCH_DATE = new Date(1900, 0, 1);
 const UTC_EPOCH_DATE = new Date(Date.UTC(1900, 0, 1));
 
-const DATA_LENGTH = Buffer.from([0x04]);
-const NULL_LENGTH = Buffer.from([0x00]);
+const TYPE_INFO = Buffer.from([DateTimeN.id, 0x04]);
 
 const SmallDateTime: DataType = {
   id: 0x3A,
@@ -16,39 +15,30 @@ const SmallDateTime: DataType = {
     return 'smalldatetime';
   },
 
-  generateTypeInfo() {
-    return Buffer.from([DateTimeN.id, 0x04]);
+  writeTypeInfo(buffer) {
+    buffer.writeBuffer(TYPE_INFO);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    return DATA_LENGTH;
-  },
-
-  generateParameterData: function*(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter, options) {
+    const value = parameter.value as Date | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const buffer = Buffer.alloc(4);
-
-    let days: number, dstDiff: number, minutes: number;
+    let days: number, minutes: number;
     if (options.useUTC) {
-      days = Math.floor((parameter.value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-      minutes = (parameter.value.getUTCHours() * 60) + parameter.value.getUTCMinutes();
+      days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+      minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
     } else {
-      dstDiff = -(parameter.value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-      days = Math.floor((parameter.value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-      minutes = (parameter.value.getHours() * 60) + parameter.value.getMinutes();
+      const dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+      days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+      minutes = (value.getHours() * 60) + value.getMinutes();
     }
 
-    buffer.writeUInt16LE(days, 0);
-    buffer.writeUInt16LE(minutes, 2);
-
-    yield buffer;
+    buffer.writeUInt8(0x04);
+    buffer.writeUInt16LE(days);
+    buffer.writeUInt16LE(minutes);
   },
 
   validate: function(value, collation, options): null | Date {

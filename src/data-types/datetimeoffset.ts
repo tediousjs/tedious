@@ -1,9 +1,5 @@
 import { type DataType } from '../data-type';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
-import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
-
-const EPOCH_DATE = LocalDate.ofYearDay(1, 1);
-const NULL_LENGTH = Buffer.from([0x00]);
+import { daysSinceYearOne, timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
 
 const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2B,
@@ -22,76 +18,24 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     }
   },
 
-  generateTypeInfo(parameter) {
-    return Buffer.from([this.id, parameter.scale!]);
+  writeTypeInfo(buffer, parameter) {
+    buffer.writeUInt8(this.id);
+    buffer.writeUInt8(parameter.scale!);
   },
 
-  generateParameterLength(parameter, options) {
-    if (parameter.value == null) {
-      return NULL_LENGTH;
-    }
-
-    switch (parameter.scale) {
-      case 0:
-      case 1:
-      case 2:
-        return Buffer.from([0x08]);
-
-      case 3:
-      case 4:
-        return Buffer.from([0x09]);
-
-      case 5:
-      case 6:
-      case 7:
-        return Buffer.from([0x0A]);
-
-      default:
-        throw new Error('invalid scale');
-    }
-  },
-
-  * generateParameterData(parameter, options) {
-    if (parameter.value == null) {
+  writeValue(buffer, parameter) {
+    const value = parameter.value as TemporalValue | null;
+    if (value == null) {
+      buffer.writeUInt8(0x00);
       return;
     }
 
-    const value = parameter.value;
-    let scale = parameter.scale;
-
-    const buffer = new WritableTrackingBuffer();
-    scale = scale!;
-
-    let timestamp: number;
-    timestamp = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getMilliseconds();
-    timestamp = timestamp * Math.pow(10, scale - 3);
-    timestamp += (value.nanosecondDelta != null ? value.nanosecondDelta : 0) * Math.pow(10, scale);
-    timestamp = Math.round(timestamp);
-
-    switch (scale) {
-      case 0:
-      case 1:
-      case 2:
-        buffer.writeUInt24LE(timestamp);
-        break;
-      case 3:
-      case 4:
-        buffer.writeUInt32LE(timestamp);
-        break;
-      case 5:
-      case 6:
-      case 7:
-        buffer.writeUInt40LE(timestamp);
-    }
-
-    const date = LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
-    const days = EPOCH_DATE.until(date, ChronoUnit.DAYS);
-    buffer.writeUInt24LE(days);
-
-    const offset = -value.getTimezoneOffset();
-    buffer.writeInt16LE(offset);
-    yield buffer.data;
+    buffer.writeUInt8(timeLength(parameter.scale) + 5);
+    writeTimeOfDay(buffer, value, parameter.scale!, true);
+    buffer.writeUInt24LE(daysSinceYearOne(value, true));
+    buffer.writeInt16LE(-value.getTimezoneOffset());
   },
+
   validate: function(value: any, collation, options): null | number {
     if (value == null) {
       return null;

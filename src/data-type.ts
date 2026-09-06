@@ -78,9 +78,6 @@ export interface DataType {
   name: string;
 
   declaration(parameter: Parameter): string;
-  generateTypeInfo(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
-  generateParameterLength(parameter: ParameterData, options: InternalConnectionOptions): Buffer;
-  generateParameterData(parameter: ParameterData, options: InternalConnectionOptions): Generator<Buffer, void>;
   validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
 
   hasTableName?: boolean;
@@ -92,10 +89,9 @@ export interface DataType {
   // The serialization contract below splits a parameter's handling into two
   // phases: `resolve` validates the value and determines the declaration
   // facts (length, precision, scale, collation) once, and `writeTypeInfo` /
-  // `writeValue` serialize the resolved parameter into a buffer. Types that
-  // do not implement these are adapted from their `validate` / `resolve*` /
-  // `generate*` methods by `resolveParameter`, `writeTypeInfo` and
-  // `writeValue` below.
+  // `writeValue` serialize the resolved parameter into a buffer. A type
+  // that does not implement `resolve` is adapted from its `validate` /
+  // `resolve*` methods by `resolveParameter` below.
 
   /**
    * Validates the parameter's value and resolves its declaration facts
@@ -107,7 +103,7 @@ export interface DataType {
   /**
    * Writes the TYPE_INFO of a resolved parameter.
    */
-  writeTypeInfo?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
+  writeTypeInfo(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
 
   /**
    * Writes the value of a resolved parameter (length prefix and data).
@@ -120,7 +116,7 @@ export interface DataType {
    * more, so that the caller can hand those bytes on before the rest of the
    * value is read. Nothing of that rest runs before its first `next()`.
    */
-  writeValue?(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
+  writeValue(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
 }
 
 /**
@@ -179,33 +175,6 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
   }
 
   return { name: parameter.name, output: parameter.output, type, data };
-}
-
-/**
- * Writes the TYPE_INFO of a resolved parameter.
- */
-export function writeTypeInfo(type: DataType, buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void {
-  if (type.writeTypeInfo) {
-    type.writeTypeInfo(buffer, parameter, options);
-  } else {
-    buffer.writeBuffer(type.generateTypeInfo(parameter, options));
-  }
-}
-
-/**
- * Writes the value of a resolved parameter (length prefix and data), and
- * returns the rest of the write for a value that is read from a source (see
- * `DataType.writeValue`).
- */
-export function writeValue(type: DataType, buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void> {
-  if (type.writeValue) {
-    return type.writeValue(buffer, parameter, options);
-  }
-
-  buffer.writeBuffer(type.generateParameterLength(parameter, options));
-  for (const chunk of type.generateParameterData(parameter, options)) {
-    buffer.writeBuffer(chunk);
-  }
 }
 
 /**
