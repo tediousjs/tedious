@@ -14,7 +14,72 @@ import { ConnectionError } from './errors';
 
 import OutgoingMessageStream from './outgoing-message-stream';
 
+/**
+ * Iterates over the contents of the packets of one incoming message.
+ */
+class MessageReader implements AsyncIterableIterator<Buffer> {
+  declare io: MessageIO;
+  declare signal: AbortSignal | undefined;
+  declare done: boolean;
+
+  constructor(io: MessageIO, signal: AbortSignal | undefined) {
+    this.io = io;
+    this.signal = signal;
+    this.done = false;
+  }
+
+  [Symbol.asyncIterator]() {
+    return this;
+  }
+
+  next(): Promise<IteratorResult<Buffer, void>> {
+    const io = this.io;
+
+    while (true) {
+      if (this.done) {
+        return Promise.resolve({ done: true, value: undefined });
+      }
+
+      if (this.signal?.aborted) {
+        return Promise.reject(this.signal.reason);
+      }
+
+      let chunk;
+      try {
+        chunk = io.takePackets(this);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+
+      if (chunk !== null) {
+        return Promise.resolve({ done: false, value: chunk });
+      }
+
+      if (io.inputError) {
+        return Promise.reject(io.inputError);
+      }
+
+      if (io.inputClosed) {
+        return Promise.reject(new Error('Premature close'));
+      }
+
+      return io.waitForData(this.signal).then(() => this.next());
+    }
+  }
+
+  return(): Promise<IteratorResult<Buffer, void>> {
+    this.done = true;
+    return Promise.resolve({ done: true, value: undefined });
+  }
+}
+
 class MessageIO extends EventEmitter {
+  /**
+   * The amount of received data that is buffered before the input is
+   * paused until a reader has consumed it.
+   */
+  static readonly INPUT_HIGH_WATER_MARK = 64 * 1024;
+
   // Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
   // (A static class property rather than a named export, as the `module.exports`
   // assignment at the bottom of this file would clobber named exports for CJS consumers.)
@@ -37,6 +102,20 @@ class MessageIO extends EventEmitter {
    * cleartext side of the TLS layer once TLS has been negotiated.
    */
   declare input: Readable;
+  /**
+   * Received data that has not been handed to a message reader yet.
+   */
+  declare received: BufferList;
+  declare inputError: Error | undefined;
+  declare inputClosed: boolean;
+  /**
+   * Settles when more data arrives on the input, or the input fails.
+   */
+  declare dataWaiter: PromiseWithResolvers<void> | undefined;
+
+  declare onInputData: (chunk: Buffer) => void;
+  declare onInputError: (err: Error) => void;
+  declare onInputClose: () => void;
 
   constructor(socket: Socket, packetSize: number, debug: Debug) {
     super();
@@ -46,7 +125,33 @@ class MessageIO extends EventEmitter {
 
     this.tlsNegotiationComplete = false;
 
-    this.input = socket;
+    this.received = new BufferList();
+    this.inputError = undefined;
+    this.inputClosed = false;
+    this.dataWaiter = undefined;
+
+    this.onInputData = (chunk: Buffer) => {
+      this.received.append(chunk);
+
+      if (this.received.length >= MessageIO.INPUT_HIGH_WATER_MARK) {
+        // Hold the input back until a reader has consumed the buffered data.
+        this.input.pause();
+      }
+
+      this.wakeReader();
+    };
+
+    this.onInputError = (err: Error) => {
+      this.inputError = err;
+      this.wakeReader();
+    };
+
+    this.onInputClose = () => {
+      this.inputClosed = true;
+      this.wakeReader();
+    };
+
+    this.setInput(socket);
 
     this.outgoingMessageStream = new OutgoingMessageStream(this.debug, { packetSize: packetSize });
 
@@ -123,10 +228,13 @@ class MessageIO extends EventEmitter {
 
         this.outgoingMessageStream.unpipe(this.socket);
 
+        // Switch the input before piping the socket into the TLS layer, so
+        // that no data is seen by both.
+        this.setInput(securePair.cleartext);
+
         this.socket.pipe(securePair.encrypted);
         securePair.encrypted.pipe(this.socket);
 
-        this.input = securePair.cleartext;
         this.outgoingMessageStream.pipe(securePair.cleartext);
 
         this.tlsNegotiationComplete = true;
@@ -193,11 +301,116 @@ class MessageIO extends EventEmitter {
   }
 
   /**
-   * Reads the next incoming message, as an async iterable of the contents
-   * of its packets.
+   * Switches the stream incoming data is read from. Data already received
+   * from the previous input but not handed to a reader is handed back to it.
    */
-  readMessage(signal?: AbortSignal): AsyncGenerator<Buffer, void, undefined> {
-    return readMessage(this.input, signal ? { debug: this.debug, signal } : { debug: this.debug });
+  setInput(input: Readable) {
+    const previous = this.input as Readable | undefined;
+    if (previous !== undefined) {
+      previous.removeListener('data', this.onInputData);
+      previous.removeListener('error', this.onInputError);
+      previous.removeListener('close', this.onInputClose);
+
+      if (this.received.length) {
+        previous.unshift(this.received.slice());
+        this.received.consume(this.received.length);
+      }
+    }
+
+    this.input = input;
+    input.on('data', this.onInputData);
+    input.on('error', this.onInputError);
+    input.on('close', this.onInputClose);
+  }
+
+  wakeReader() {
+    const waiter = this.dataWaiter;
+    if (waiter !== undefined) {
+      this.dataWaiter = undefined;
+      waiter.resolve();
+    }
+  }
+
+  /**
+   * Waits for more data to arrive on the input.
+   */
+  waitForData(signal: AbortSignal | undefined): Promise<void> {
+    if (this.dataWaiter === undefined) {
+      this.dataWaiter = Promise.withResolvers<void>();
+    }
+
+    if (signal === undefined) {
+      return this.dataWaiter.promise;
+    }
+
+    const waiter = this.dataWaiter;
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        reject(signal.reason);
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      waiter.promise.then(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Frames the complete packets of the current message that have been
+   * received so far and returns their contents as one buffer, or `null` if
+   * no complete packet has been received. Sets `reader.done` once the last
+   * packet of the message was framed.
+   */
+  takePackets(reader: MessageReader): Buffer | null {
+    const received = this.received;
+    let chunks: Buffer[] | undefined;
+    let chunk: Buffer | null = null;
+
+    while (!reader.done && received.length >= HEADER_LENGTH) {
+      const length = received.readUInt16BE(2);
+      if (length < HEADER_LENGTH) {
+        throw new ConnectionError('Unable to process incoming packet');
+      }
+
+      if (received.length < length) {
+        break;
+      }
+
+      const data = received.slice(0, length);
+      received.consume(length);
+
+      if (this.debug.haveListeners()) {
+        const packet = new Packet(data);
+        this.debug.packet('Received', packet);
+        this.debug.data(packet);
+      }
+
+      if (data[OFFSET.Status] & STATUS.EOM) {
+        reader.done = true;
+      }
+
+      const payload = data.subarray(HEADER_LENGTH);
+      if (chunk === null) {
+        chunk = payload;
+      } else {
+        (chunks ??= [chunk]).push(payload);
+      }
+    }
+
+    if (this.input.isPaused() && received.length < MessageIO.INPUT_HIGH_WATER_MARK) {
+      this.input.resume();
+    }
+
+    return chunks !== undefined ? Buffer.concat(chunks) : chunk;
+  }
+
+  /**
+   * Reads the next incoming message, as an async iterable of the contents
+   * of its packets. Packets received together are handed out together.
+   */
+  readMessage(signal?: AbortSignal): AsyncIterable<Buffer> {
+    return new MessageReader(this, signal);
   }
 }
 
