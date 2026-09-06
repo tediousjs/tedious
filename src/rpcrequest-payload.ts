@@ -92,6 +92,20 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
             }
             buffer.consume(buffer.length);
           }
+        } catch (error) {
+          // An error thrown into the generator at a yield closes the type's
+          // generator, and with it the value's source. A close that fails
+          // must not replace the error that is propagating, as `for await`
+          // keeps the original error too.
+          if (!done && typeof flushes.return === 'function') {
+            done = true;
+            try {
+              await flushes.return();
+            } catch {
+              // The propagating error is what surfaces.
+            }
+          }
+          throw error;
         } finally {
           // The consumer stopped pulling: close the type's generator, and
           // with it the value's source, as `for await` would.

@@ -249,6 +249,33 @@ describe('streaming parameters', function() {
     assert.isTrue(closed);
   });
 
+  it('keeps the consumer\'s error when closing the source fails as well', async function() {
+    // A source whose cleanup rejects when it is closed early.
+    const chunks: AsyncIterable<Buffer> = {
+      [Symbol.asyncIterator]() {
+        return {
+          next: async () => ({ value: Buffer.alloc(WritableTrackingBuffer.CHUNK_SIZE, 1), done: false }),
+          return: async () => {
+            throw new Error('cleanup failed');
+          }
+        };
+      }
+    };
+    const resolved = resolveParameter(param({ name: 'blob', value: chunks }), undefined, options);
+    const iterator = new RpcRequestPayload('p', [resolved], txnDescriptor, options)[Symbol.asyncIterator]();
+    assert.isFalse((await iterator.next()).done);
+
+    const consumerError = new Error('consumer gave up');
+    let error: unknown;
+    try {
+      await iterator.throw(consumerError);
+    } catch (err) {
+      error = err;
+    }
+
+    assert.strictEqual(error, consumerError);
+  });
+
   it('surfaces a TVP async row validation failure as InputError', async function() {
     const columns = [{ name: 'n', type: TYPES.TinyInt }];
     async function * rows() {
