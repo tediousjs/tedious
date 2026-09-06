@@ -18,15 +18,19 @@ const Date: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as globalThis.Date | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter(column, options) {
+    const collation = column.collation;
+    const useUTC = options.useUTC;
+    return (buffer, raw) => {
+      const value = Date.validate(raw, collation) as globalThis.Date | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(0x03);
-    buffer.writeUInt24LE(daysSinceYearOne(value, options.useUTC));
+      buffer.writeUInt8(0x03);
+      buffer.writeUInt24LE(daysSinceYearOne(value, useUTC));
+    };
   },
 
   // TODO: value is technically of type 'unknown'.

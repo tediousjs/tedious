@@ -443,9 +443,10 @@ class Request extends EventEmitter {
    *
    *   A `varchar(max)`, `nvarchar(max)` or `varbinary(max)` value, or the rows
    *   of a table-valued parameter, can also be given as an async iterable
-   *   (e.g. a `Readable`) of chunks, or of rows. The source is read while the
-   *   request is being sent, so it does not have to fit in memory, and a
-   *   request that carries one can be executed only once.
+   *   (e.g. a `Readable`) of chunks, or of rows, and so can the value of a
+   *   `max` column within a table-valued parameter's row. The source is read
+   *   while the request is being sent, so it does not have to fit in memory,
+   *   and a request that carries one can be executed only once.
    *
    *   Each chunk of a string source is encoded on its own, as `Writable.write`
    *   would encode it, so a chunk must not end halfway through a UTF-16

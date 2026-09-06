@@ -2835,6 +2835,11 @@ class Connection extends EventEmitter {
    * is still pending in the source cannot be interrupted; the source is
    * closed once it has settled.
    *
+   * A cell of a `varchar(max)`, `nvarchar(max)` or `varbinary(max)` column
+   * can itself be an async iterable of chunks, read while the row is
+   * written, under the same rules as such a parameter value (see
+   * [[Request.addParameter]]).
+   *
    * An async generator that acquires what it reads from once it is
    * started therefore releases it on every path, through its `finally`:
    *

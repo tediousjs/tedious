@@ -19,26 +19,30 @@ const SmallDateTime: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as Date | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter(column, options) {
+    const collation = column.collation;
+    const useUTC = options.useUTC;
+    return (buffer, raw) => {
+      const value = SmallDateTime.validate(raw, collation) as Date | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    let days: number, minutes: number;
-    if (options.useUTC) {
-      days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
-      minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
-    } else {
-      const dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
-      days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
-      minutes = (value.getHours() * 60) + value.getMinutes();
-    }
+      let days: number, minutes: number;
+      if (useUTC) {
+        days = Math.floor((value.getTime() - UTC_EPOCH_DATE.getTime()) / (1000 * 60 * 60 * 24));
+        minutes = (value.getUTCHours() * 60) + value.getUTCMinutes();
+      } else {
+        const dstDiff = -(value.getTimezoneOffset() - EPOCH_DATE.getTimezoneOffset()) * 60 * 1000;
+        days = Math.floor((value.getTime() - EPOCH_DATE.getTime() + dstDiff) / (1000 * 60 * 60 * 24));
+        minutes = (value.getHours() * 60) + value.getMinutes();
+      }
 
-    buffer.writeUInt8(0x04);
-    buffer.writeUInt16LE(days);
-    buffer.writeUInt16LE(minutes);
+      buffer.writeUInt8(0x04);
+      buffer.writeUInt16LE(days);
+      buffer.writeUInt16LE(minutes);
+    };
   },
 
   validate: function(value, collation, options): null | Date {

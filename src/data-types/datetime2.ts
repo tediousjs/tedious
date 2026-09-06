@@ -25,16 +25,20 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     buffer.writeUInt8(parameter.scale!);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as TemporalValue | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter(column, options) {
+    const scale = column.scale;
+    const useUTC = options.useUTC;
+    return (buffer, raw) => {
+      const value = DateTime2.validate(raw, undefined) as TemporalValue | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(timeLength(parameter.scale) + 3);
-    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
-    buffer.writeUInt24LE(daysSinceYearOne(value, options.useUTC));
+      buffer.writeUInt8(timeLength(scale) + 3);
+      writeTimeOfDay(buffer, value, scale!, useUTC);
+      buffer.writeUInt24LE(daysSinceYearOne(value, useUTC));
+    };
   },
 
   validate: function(value: any, collation, options): null | number {

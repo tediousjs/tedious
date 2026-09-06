@@ -72,6 +72,19 @@ export interface ParameterData<T = any> {
   value: T;
 }
 
+/**
+ * The declaration facts a writer is compiled from: those of a parameter, or
+ * of a TVP or bulk load column whose cells are written one after the other.
+ */
+export type ColumnData = Omit<ParameterData, 'value'>;
+
+/**
+ * Writes one value into `buffer`: validates it and writes its length prefix
+ * and data. A value read from a source while the request is written returns
+ * the rest of the write (see `DataType.compileWriter`).
+ */
+export type CellWriter = (buffer: WritableTrackingBuffer, value: unknown) => void | AsyncIterable<void>;
+
 export interface DataType {
   id: number;
   type: string;
@@ -89,7 +102,7 @@ export interface DataType {
   // The serialization contract below splits a parameter's handling into two
   // phases: `resolve` validates the value and determines the declaration
   // facts (length, precision, scale, collation) once, and `writeTypeInfo` /
-  // `writeValue` serialize the resolved parameter into a buffer. A type
+  // `compileWriter` serialize the resolved parameter into a buffer. A type
   // that does not implement `resolve` is adapted from its `validate` /
   // `resolve*` methods by `resolveParameter` below.
 
@@ -106,17 +119,23 @@ export interface DataType {
   writeTypeInfo(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void;
 
   /**
-   * Writes the value of a resolved parameter (length prefix and data).
+   * Builds the writer for the values of a parameter or column whose
+   * declaration facts (length, precision, scale, collation) are known: the
+   * writer validates one value and writes it (length prefix and data), with
+   * the facts resolved once, here, rather than per value. A TVP or bulk load
+   * column compiles its writer once for all of its cells; a parameter gets
+   * one for its single value.
    *
-   * A value that is fully in memory is written before this returns. A value
-   * that is read from a source while the request is written (an async
-   * iterable, accepted by the `max` types and by a TVP's rows) returns the
-   * rest of the write instead: an async iterable that yields whenever
-   * `buffer` holds a chunk's worth (`WritableTrackingBuffer.CHUNK_SIZE`) or
-   * more, so that the caller can hand those bytes on before the rest of the
-   * value is read. Nothing of that rest runs before its first `next()`.
+   * A value that is fully in memory is written before the writer returns. A
+   * value that is read from a source while the request is written (an async
+   * iterable, accepted by the `max` types and by a TVP's rows) makes the
+   * writer return the rest of the write instead: an async iterable that
+   * yields whenever `buffer` holds a chunk's worth
+   * (`WritableTrackingBuffer.CHUNK_SIZE`) or more, so that the caller can
+   * hand those bytes on before the rest of the value is read. Nothing of
+   * that rest runs before its first `next()`.
    */
-  writeValue(buffer: WritableTrackingBuffer, parameter: ParameterData, options: InternalConnectionOptions): void | AsyncIterable<void>;
+  compileWriter(column: ColumnData, options: InternalConnectionOptions): CellWriter;
 }
 
 /**
@@ -178,7 +197,7 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
 }
 
 /**
- * Drives the rest of a write returned by `writeValue`, yielding at each of
+ * Drives the rest of a write returned by a compiled writer, yielding at each of
  * its yields. An error the rest throws is passed through `wrap` (e.g. to
  * name the parameter it belongs to); an error thrown into this generator by
  * its consumer keeps its identity, and a consumer that stops early closes
