@@ -1486,6 +1486,10 @@ describe('MessageIO', function() {
           // Verify that server side was successful at this point
           await onSecure;
 
+          // The raw connection is now driven by the TLS layer, so the
+          // message reader must no longer read from it.
+          io.detachInput();
+
           // Set up TLS encryption
           serverConnection.pipe(securePair.encrypted);
           securePair.encrypted.pipe(serverConnection);

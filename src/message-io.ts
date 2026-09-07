@@ -101,7 +101,7 @@ class MessageIO extends EventEmitter {
    * The stream incoming messages are read from: the socket, or the
    * cleartext side of the TLS layer once TLS has been negotiated.
    */
-  declare input: Readable;
+  declare input: Readable | undefined;
   /**
    * Received data that has not been handed to a message reader yet.
    */
@@ -113,7 +113,7 @@ class MessageIO extends EventEmitter {
    */
   declare dataWaiter: PromiseWithResolvers<void> | undefined;
 
-  declare onInputData: (chunk: Buffer) => void;
+  declare onInputReadable: () => void;
   declare onInputError: (err: Error) => void;
   declare onInputClose: () => void;
 
@@ -130,14 +130,10 @@ class MessageIO extends EventEmitter {
     this.inputClosed = false;
     this.dataWaiter = undefined;
 
-    this.onInputData = (chunk: Buffer) => {
-      this.received.append(chunk);
-
-      if (this.received.length >= MessageIO.INPUT_HIGH_WATER_MARK) {
-        // Hold the input back until a reader has consumed the buffered data.
-        this.input.pause();
-      }
-
+    // Paused mode: data stays in the stream's own buffer until a reader
+    // pulls it with `read()`, so the stream stops reading from the socket
+    // by itself once its high water mark is reached.
+    this.onInputReadable = () => {
       this.wakeReader();
     };
 
@@ -305,22 +301,33 @@ class MessageIO extends EventEmitter {
    * from the previous input but not handed to a reader is handed back to it.
    */
   setInput(input: Readable) {
-    const previous = this.input as Readable | undefined;
-    if (previous !== undefined) {
-      previous.removeListener('data', this.onInputData);
-      previous.removeListener('error', this.onInputError);
-      previous.removeListener('close', this.onInputClose);
-
-      if (this.received.length) {
-        previous.unshift(this.received.slice());
-        this.received.consume(this.received.length);
-      }
-    }
+    this.detachInput();
 
     this.input = input;
-    input.on('data', this.onInputData);
+    input.on('readable', this.onInputReadable);
     input.on('error', this.onInputError);
     input.on('close', this.onInputClose);
+  }
+
+  /**
+   * Stops reading from the current input. Data already received from it
+   * but not handed to a reader is handed back to it, so that it can be
+   * consumed by whatever reads from the input next.
+   */
+  detachInput() {
+    const input = this.input as Readable | undefined;
+    if (input === undefined) {
+      return;
+    }
+
+    input.removeListener('readable', this.onInputReadable);
+    input.removeListener('error', this.onInputError);
+    input.removeListener('close', this.onInputClose);
+
+    if (this.received.length) {
+      input.unshift(this.received.slice());
+      this.received.consume(this.received.length);
+    }
   }
 
   wakeReader() {
@@ -367,6 +374,15 @@ class MessageIO extends EventEmitter {
     let chunks: Buffer[] | undefined;
     let chunk: Buffer | null = null;
 
+    // Pull whatever the stream has buffered.
+    const input = this.input;
+    if (input !== undefined) {
+      let data;
+      while ((data = input.read()) !== null) {
+        received.append(data);
+      }
+    }
+
     while (!reader.done && received.length >= HEADER_LENGTH) {
       const length = received.readUInt16BE(2);
       if (length < HEADER_LENGTH) {
@@ -396,10 +412,6 @@ class MessageIO extends EventEmitter {
       } else {
         (chunks ??= [chunk]).push(payload);
       }
-    }
-
-    if (this.input.isPaused() && received.length < MessageIO.INPUT_HIGH_WATER_MARK) {
-      this.input.resume();
     }
 
     return chunks !== undefined ? Buffer.concat(chunks) : chunk;
