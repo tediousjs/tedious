@@ -4,6 +4,8 @@ import { readValue } from '../../src/value-parser';
 import { type Metadata } from '../../src/metadata-parser';
 import { type ParserOptions } from '../../src/token/stream-parser';
 import { type DataType, typeByName as dataTypeByName } from '../../src/data-type';
+import { codepageByLanguageId, codepageBySortId } from '../../src/collation';
+import iconv from 'iconv-lite';
 
 const utcOptions = { useUTC: true } as ParserOptions;
 const localOptions = { useUTC: false } as ParserOptions;
@@ -330,6 +332,157 @@ describe('readValue', function() {
       const value = result.value as Date;
 
       assert.strictEqual(value.getTime(), new Date(1900, 0, 3, 0, 0, 45).getTime());
+    });
+  });
+
+  describe('for `varchar` and `char` values', function() {
+    function buildCharMetadata(type: DataType, codepage: string): Metadata {
+      const metadata = buildMetadata(type);
+      metadata.collation = { codepage } as unknown as Metadata['collation'];
+      return metadata;
+    }
+
+    function buildCharBuffer(data: Buffer): Buffer {
+      const buf = Buffer.alloc(2 + data.length);
+      buf.writeUInt16LE(data.length, 0);
+      data.copy(buf, 2);
+      return buf;
+    }
+
+    it('should parse ASCII values in different codepages', function() {
+      const data = Buffer.from('user12345@example.com, The quick brown fox!', 'latin1');
+
+      for (const codepage of ['CP1252', 'CP437', 'CP850', 'CP932', 'CP936', 'utf8']) {
+        const buf = buildCharBuffer(data);
+        const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, codepage), utcOptions);
+
+        assert.strictEqual(result.value, 'user12345@example.com, The quick brown fox!', codepage);
+        assert.strictEqual(result.offset, buf.length, codepage);
+      }
+    });
+
+    it('should parse values containing non-ASCII single-byte characters', function() {
+      // "café" in CP1252: 0xE9 is "é"
+      const buf = buildCharBuffer(Buffer.from([0x63, 0x61, 0x66, 0xE9]));
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'CP1252'), utcOptions);
+
+      assert.strictEqual(result.value, 'café');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse values containing multi-byte characters', function() {
+      // "あA" in CP932 (Shift-JIS): 0x82 0xA0 is "あ"
+      const buf = buildCharBuffer(Buffer.from([0x82, 0xA0, 0x41]));
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'CP932'), utcOptions);
+
+      assert.strictEqual(result.value, 'あA');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should decode ASCII bytes natively for every codepage a collation can produce', function() {
+      // The native fast path in `readChars` is gated on a hardcoded list of
+      // ASCII compatible codepages. Verify that every codepage that can come
+      // out of the collation tables (plus the `utf8` fallback encoding)
+      // actually decodes the 7-bit ASCII range identically to ASCII, and
+      // that `readValue` takes the same result either way.
+      const codepages = new Set([...Object.values(codepageByLanguageId), ...Object.values(codepageBySortId), 'utf-8', 'utf8']);
+
+      const probe = Buffer.alloc(128);
+      for (let i = 0; i < 128; i++) {
+        probe[i] = i;
+      }
+
+      for (const codepage of codepages) {
+        assert.strictEqual(iconv.decode(probe, codepage), probe.toString('latin1'), codepage);
+
+        const buf = buildCharBuffer(Buffer.from('plain ASCII value', 'latin1'));
+        const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, codepage), utcOptions);
+        assert.strictEqual(result.value, 'plain ASCII value', codepage);
+      }
+    });
+
+    it('should parse ASCII values in codepages that do not decode ASCII bytes as ASCII', function() {
+      // In UTF-16BE, the ASCII bytes "ab" decode to a single character (U+6162).
+      const buf = buildCharBuffer(Buffer.from('ab', 'latin1'));
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-16be'), utcOptions);
+
+      assert.strictEqual(result.value, '慢');
+    });
+
+    it('should parse empty values', function() {
+      const buf = buildCharBuffer(Buffer.alloc(0));
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'CP1252'), utcOptions);
+
+      assert.strictEqual(result.value, '');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse `NULL` values', function() {
+      const buf = Buffer.alloc(2);
+      buf.writeUInt16LE(0xFFFF, 0);
+
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'CP1252'), utcOptions);
+
+      assert.isNull(result.value);
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse `char` values', function() {
+      const buf = buildCharBuffer(Buffer.from('fixed     ', 'latin1'));
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.Char, 'CP1252'), utcOptions);
+
+      assert.strictEqual(result.value, 'fixed     ');
+    });
+
+    it('should parse UTF-8 values', function() {
+      const data = Buffer.from('Müller – 東京 🚀');
+      const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
+
+      assert.strictEqual(result.value, 'Müller – 東京 🚀');
+    });
+
+    it('should preserve a leading byte order mark', function() {
+      // U+FEFF at the start of a value is part of the stored data, not an
+      // encoding marker - it must be returned, matching how `nvarchar`
+      // values are handled.
+      const data = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from('héllo')]);
+
+      for (let i = 0; i < 3; i++) {
+        const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
+        assert.strictEqual(result.value, '\uFEFFhéllo', `iteration ${i}`);
+      }
+    });
+
+    it('should parse malformed UTF-8 values like iconv does', function() {
+      const cases = [
+        Buffer.from([0x61, 0xE3, 0x81]), // "a" + truncated 3-byte sequence
+        Buffer.from([0x61, 0x80, 0x62]), // lone continuation byte
+        Buffer.from([0xF0, 0x9F, 0x62]), // truncated 4-byte sequence
+        Buffer.from([0xC0, 0xAF]) // overlong encoding
+      ];
+
+      for (const data of cases) {
+        const result = readValue(buildCharBuffer(data), 0, buildCharMetadata(dataTypeByName.VarChar, 'utf-8'), utcOptions);
+        assert.strictEqual(result.value, iconv.decode(data, 'utf-8'), data.toString('hex'));
+      }
+    });
+
+    it('should parse values independently of previously parsed values', function() {
+      // A value that ends in a truncated CP932 multi-byte sequence...
+      const truncated = Buffer.concat([iconv.encode('テスト', 'CP932'), Buffer.from([0x82])]);
+      const first = readValue(buildCharBuffer(truncated), 0, buildCharMetadata(dataTypeByName.VarChar, 'CP932'), utcOptions);
+      assert.strictEqual(first.value, iconv.decode(truncated, 'CP932'));
+
+      // ...must not leak into the decoding of the next value.
+      const second = readValue(buildCharBuffer(Buffer.from([0x82, 0xA0, 0x41])), 0, buildCharMetadata(dataTypeByName.VarChar, 'CP932'), utcOptions);
+      assert.strictEqual(second.value, 'あA');
+    });
+
+    it('should parse values that are ASCII except for the final byte', function() {
+      const buf = buildCharBuffer(Buffer.from([0x61, 0x62, 0x63, 0xFC])); // "abcü" in CP1252
+      const result = readValue(buf, 0, buildCharMetadata(dataTypeByName.VarChar, 'CP1252'), utcOptions);
+
+      assert.strictEqual(result.value, 'abcü');
     });
   });
 });
