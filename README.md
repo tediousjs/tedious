@@ -53,6 +53,9 @@ We'd like to learn more about how you use tedious:
 ## Contributing
 We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
 
+## Security
+Please report security vulnerabilities privately. See our [security policy](SECURITY.md) for reporting instructions.
+
 <a name="license"></a>
 ## License
 
