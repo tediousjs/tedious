@@ -684,6 +684,12 @@ export interface ConnectionOptions {
    * A string value that can be only set to 'strict', which indicates the usage TDS 8.0 protocol. Otherwise,
    * a boolean determining whether or not the connection will be encrypted.
    *
+   * When set to `true`, encryption is required: if the server does not
+   * support or does not enable encryption during the PRELOGIN handshake, the
+   * connection fails with an `EENCRYPT` error instead of continuing over an
+   * unencrypted socket. When set to `false`, encryption is disabled and the
+   * connection fails if the server requires encryption.
+   *
    * (default: `true`)
    */
   encrypt?: string | boolean;
@@ -3391,7 +3397,16 @@ class Connection extends EventEmitter {
       if (preloginPayload.fedAuthRequired === 1) {
         this.fedAuthRequired = true;
       }
-      if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
+      // With `encrypt: 'strict'` (TDS 8.0), the socket was already wrapped
+      // with TLS before the PRELOGIN exchange, so there's nothing left to
+      // negotiate here.
+      if (this.config.options.encrypt === 'strict') {
+        return;
+      }
+
+      const serverEncryption = preloginPayload.encryptionString;
+
+      if (serverEncryption === 'ON' || serverEncryption === 'REQ') {
         if (!this.config.options.encrypt) {
           throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
         }
@@ -3403,6 +3418,27 @@ class Connection extends EventEmitter {
           }),
           signalAborted
         ]);
+      } else if (this.config.options.encrypt) {
+        // We requested encryption (`ENCRYPT_ON`), but the server answered
+        // with `ENCRYPT_OFF`, `ENCRYPT_NOT_SUP`, an unknown value, or no
+        // `ENCRYPTION` option at all. Per MS-TDS, the client must treat this
+        // as an error and must not continue with the login. Continuing here
+        // would send the LOGIN7 packet (including credentials) in plaintext,
+        // silently downgrading a connection that was configured to require
+        // encryption.
+        let serverResponse;
+        if (serverEncryption !== undefined) {
+          serverResponse = `ENCRYPT_${serverEncryption}`;
+        } else if (preloginPayload.encryption !== undefined) {
+          serverResponse = `unknown encryption value 0x${preloginPayload.encryption.toString(16).padStart(2, '0')}`;
+        } else {
+          serverResponse = 'no encryption option';
+        }
+
+        throw new ConnectionError(
+          `Server does not support encryption (server responded with ${serverResponse}), but 'encrypt' config option is set to true.`,
+          'EENCRYPT'
+        );
       }
     });
   }
