@@ -1,14 +1,12 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { FeatureExtAckToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Feature Ext Parser', () => {
   it('should parse federated authentication token', async function() {
-    const debug = new Debug();
     const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
@@ -27,7 +25,7 @@ describe('Feature Ext Parser', () => {
 
     buffer.writeUInt8(0xFF); // terminator
 
-    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -40,7 +38,6 @@ describe('Feature Ext Parser', () => {
   });
 
   it('should parse UTF-8 support token', async function() {
-    const debug = new Debug();
     const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
@@ -50,7 +47,7 @@ describe('Feature Ext Parser', () => {
 
     buffer.writeUInt8(0xFF); // TERMINATOR
 
-    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;

@@ -1,7 +1,6 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { TabNameToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 describe('TabName Token Parser', function() {
@@ -15,7 +14,7 @@ describe('TabName Token Parser', function() {
     buffer.writeUInt8(1);
     buffer.writeUsVarchar('employees', 'ucs2');
 
-    const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -35,7 +34,7 @@ describe('TabName Token Parser', function() {
     buffer.writeUsVarchar('dbo', 'ucs2');
     buffer.writeUsVarchar('employees', 'ucs2');
 
-    const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -56,7 +55,7 @@ describe('TabName Token Parser', function() {
     buffer.writeUInt8(1);
     buffer.writeUsVarchar('teams', 'ucs2');
 
-    const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -77,7 +76,7 @@ describe('TabName Token Parser', function() {
     buffer.writeUInt8(1);
     buffer.writeUsVarchar('employees', 'ucs2');
 
-    const parser = StreamParser.parseTokens([buffer.data], new Debug(), { tdsVersion: '7_1' } as ParserOptions);
+    const parser = StreamParser.parseTokens([buffer.data], { tdsVersion: '7_1' } as ParserOptions);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -96,7 +95,7 @@ describe('TabName Token Parser', function() {
     buffer.writeUInt8(1);
     buffer.writeUsVarchar('employees', 'ucs2');
 
-    const parser = StreamParser.parseTokens([buffer.data], new Debug(), options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
 
     let error;
     try {
@@ -120,7 +119,7 @@ describe('TabName Token Parser', function() {
 
     const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
 
-    const parser = StreamParser.parseTokens(chunks, new Debug(), options);
+    const parser = StreamParser.parseTokens(chunks, options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;

@@ -5,7 +5,7 @@ import { TYPE } from './data-type';
 import iconv from 'iconv-lite';
 import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
-import { NotEnoughDataError, Result, readBigInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
+import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -584,49 +584,92 @@ function readNChars(buf: Buffer, offset: number, dataLength: number): Result<str
   return new Result(buf.toString('ucs2', offset, offset + dataLength), offset + dataLength);
 }
 
-async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
-  while (parser.buffer.length < parser.position + 8) {
-    await parser.waitForChunk();
+/**
+ * Reads a PLP (partially length-prefixed) value.
+ *
+ * PLP values can be arbitrarily large and span many chunks of incoming data,
+ * so they are read incrementally: whatever part of the value is available is
+ * consumed right away, and the reader's progress is kept across calls. If the
+ * available data runs out, `NotEnoughDataError` is thrown and `read` can be
+ * called again once more data has arrived.
+ */
+class PLPReader {
+  declare metadata: Metadata;
+
+  // The value's total length as announced by the server, or `undefined`
+  // while it has not been read yet.
+  declare expectedLength: bigint | undefined;
+
+  declare chunks: Buffer[];
+  declare length: number;
+
+  // Number of bytes of the current PLP chunk that have not been read yet.
+  declare chunkRemaining: number;
+
+  constructor(metadata: Metadata) {
+    this.metadata = metadata;
+    this.expectedLength = undefined;
+    this.chunks = [];
+    this.length = 0;
+    this.chunkRemaining = 0;
   }
 
-  const expectedLength = parser.buffer.readBigUInt64LE(parser.position);
-  parser.position += 8;
+  read(parser: Parser): unknown {
+    if (this.expectedLength === undefined) {
+      const { value, offset } = readBigUInt64LE(parser.buffer, parser.position);
+      parser.position = offset;
+      this.expectedLength = value;
+    }
 
-  if (expectedLength === PLP_NULL) {
-    return null;
+    if (this.expectedLength === PLP_NULL) {
+      return null;
+    }
+
+    while (true) {
+      if (this.chunkRemaining === 0) {
+        const { value: chunkLength, offset } = readUInt32LE(parser.buffer, parser.position);
+        parser.position = offset;
+
+        if (chunkLength === 0) {
+          break;
+        }
+
+        this.chunkRemaining = chunkLength;
+      }
+
+      const buf = parser.buffer;
+      const start = parser.position;
+      const end = Math.min(start + this.chunkRemaining, buf.length);
+      if (start === end) {
+        throw new NotEnoughDataError(start + 1);
+      }
+
+      this.chunks.push(buf.subarray(start, end));
+      this.length += end - start;
+      this.chunkRemaining -= end - start;
+      parser.position = end;
+    }
+
+    if (this.expectedLength !== UNKNOWN_PLP_LEN && this.length !== Number(this.expectedLength)) {
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + this.expectedLength + ', but got ' + this.length + ' bytes');
+    }
+
+    // `Buffer.concat` always copies, so the value never keeps the (possibly
+    // much larger) incoming data buffers alive.
+    const data = Buffer.concat(this.chunks, this.length);
+
+    switch (this.metadata.type.name) {
+      case 'NVarChar':
+      case 'Xml':
+        return data.toString('ucs2');
+
+      case 'VarChar':
+        return iconv.decode(data, this.metadata.collation?.codepage ?? DEFAULT_ENCODING);
+
+      default:
+        return data;
+    }
   }
-
-  const chunks: Buffer[] = [];
-  let currentLength = 0;
-
-  while (true) {
-    while (parser.buffer.length < parser.position + 4) {
-      await parser.waitForChunk();
-    }
-
-    const chunkLength = parser.buffer.readUInt32LE(parser.position);
-    parser.position += 4;
-
-    if (!chunkLength) {
-      break;
-    }
-
-    while (parser.buffer.length < parser.position + chunkLength) {
-      await parser.waitForChunk();
-    }
-
-    chunks.push(parser.buffer.slice(parser.position, parser.position + chunkLength));
-    parser.position += chunkLength;
-    currentLength += chunkLength;
-  }
-
-  if (expectedLength !== UNKNOWN_PLP_LEN) {
-    if (currentLength !== Number(expectedLength)) {
-      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + currentLength + ' bytes');
-    }
-  }
-
-  return chunks;
 }
 
 // Epoch offsets for building UTC `Date` values via plain arithmetic, which
@@ -786,6 +829,6 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
 
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
-module.exports.readPLPStream = readPLPStream;
+module.exports.PLPReader = PLPReader;
 
-export { readValue, isPLPStream, readPLPStream };
+export { readValue, isPLPStream, PLPReader };

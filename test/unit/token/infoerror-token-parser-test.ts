@@ -1,14 +1,12 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { InfoMessageToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Infoerror token parser', function() {
   it('should have correct info', async function() {
-    const debug = new Debug();
     const number = 3;
     const state = 4;
     const class_ = 5;
@@ -32,7 +30,7 @@ describe('Infoerror token parser', function() {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], debug, options);
+    const parser = StreamParser.parseTokens([data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;

@@ -2,7 +2,6 @@ import { typeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { ColMetadataToken } from '../../../src/token/token';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
@@ -10,7 +9,6 @@ const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 describe('Colmetadata Token Parser', function() {
   describe('parsing the column metadata for a result with many columns', function() {
     it('should parse them correctly', async function() {
-      const debug = new Debug();
       const userType = 2;
       const flags = 3;
       const columnName = 'name';
@@ -28,7 +26,7 @@ describe('Colmetadata Token Parser', function() {
         buffer.writeBVarchar(columnName, 'ucs2');
       }
 
-      const parser = StreamParser.parseTokens([buffer.data], debug, options);
+      const parser = StreamParser.parseTokens([buffer.data], options);
 
       const result = await parser.next();
       assert.isFalse(result.done);
@@ -49,7 +47,6 @@ describe('Colmetadata Token Parser', function() {
   });
 
   it('should parse Int column metadata', async function() {
-    const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -65,7 +62,7 @@ describe('Colmetadata Token Parser', function() {
     buffer.writeBVarchar(columnName, 'ucs2');
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
 
     const result = await parser.next();
     assert.isFalse(result.done);
@@ -82,7 +79,6 @@ describe('Colmetadata Token Parser', function() {
   });
 
   it('should parse VarChar column metadata', async function() {
-    const debug = new Debug();
     const numberOfColumns = 1;
     const userType = 2;
     const flags = 3;
@@ -103,7 +99,7 @@ describe('Colmetadata Token Parser', function() {
     // console.log(buffer)
 
 
-    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
