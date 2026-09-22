@@ -577,21 +577,34 @@ export class SSPIToken extends Token {
   }
 }
 
-// When values are streamed, a row is not delivered as a single `ROW` or
-// `NBCROW` token. Instead, it is delivered as a sequence of tokens:
+// When values are streamed, a row without any (non-`null`) PLP values is
+// still delivered as a single `ROW` or `NBCROW` token. A row with PLP values
+// is delivered as a sequence of tokens instead:
 //
-//   RowStartToken
-//   for each column, either:
+//   RowStartToken                                       (the values before the first PLP value)
+//   ValueStartToken, ValueChunkToken*, ValueEndToken    (the first PLP value)
+//   for each following column, either:
 //     ColumnValueToken                                  (a value read as a whole)
-//     ValueStartToken, ValueChunkToken*, ValueEndToken  (a streamed PLP value)
+//     ValueStartToken, ValueChunkToken*, ValueEndToken  (a PLP value)
 //   RowEndToken
+//
+// A `RETURNVALUE` token with a (non-`null`) PLP value is delivered as:
+//
+//   ReturnValueStartToken, ValueChunkToken*, ValueEndToken
 
 export class RowStartToken extends Token {
   declare name: 'ROW_START';
   declare handlerName: 'onRowStart';
 
-  constructor() {
+  /**
+   * The values of the columns before the first streamed value.
+   */
+  declare columns: Array<{ value: unknown, metadata: ColumnMetadata }>;
+
+  constructor(columns: Array<{ value: unknown, metadata: ColumnMetadata }>) {
     super('ROW_START', 'onRowStart');
+
+    this.columns = columns;
   }
 }
 
@@ -628,6 +641,29 @@ export class ValueStartToken extends Token {
     super('VALUE_START', 'onValueStart');
 
     this.index = index;
+    this.metadata = metadata;
+    this.length = length;
+  }
+}
+
+export class ReturnValueStartToken extends Token {
+  declare name: 'RETURNVALUE_START';
+  declare handlerName: 'onReturnValueStart';
+
+  declare paramOrdinal: number;
+  declare paramName: string;
+  declare metadata: Metadata;
+
+  /**
+   * The value's total length in bytes, if the server announced it.
+   */
+  declare length: number | undefined;
+
+  constructor({ paramOrdinal, paramName, metadata, length }: { paramOrdinal: number, paramName: string, metadata: Metadata, length: number | undefined }) {
+    super('RETURNVALUE_START', 'onReturnValueStart');
+
+    this.paramOrdinal = paramOrdinal;
+    this.paramName = paramName;
     this.metadata = metadata;
     this.length = length;
   }

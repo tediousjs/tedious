@@ -3,7 +3,7 @@ import { assert } from 'chai';
 import Parser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { Readable } from 'stream';
 
-import { ColumnValueToken, DoneToken, NBCRowToken, ReturnValueToken, RowToken, type Token, ValueChunkToken, ValueStartToken } from '../../../src/token/token';
+import { ColumnValueToken, DoneToken, NBCRowToken, ReturnValueStartToken, ReturnValueToken, RowStartToken, RowToken, type Token, ValueChunkToken, ValueStartToken } from '../../../src/token/token';
 import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
@@ -247,7 +247,13 @@ describe('Stream Parser', function() {
       const summary: unknown[] = [];
 
       for (const token of tokens) {
-        if (token instanceof ColumnValueToken) {
+        if (token instanceof RowStartToken) {
+          summary.push(['ROW_START', token.columns.map((c) => c.value)]);
+        } else if (token instanceof ReturnValueStartToken) {
+          summary.push(['RETURNVALUE_START', token.paramName, token.length]);
+        } else if (token instanceof RowToken || token instanceof NBCRowToken) {
+          summary.push([token.name, token.columns.map((c: { value: unknown }) => c.value)]);
+        } else if (token instanceof ColumnValueToken) {
           summary.push(['COLUMN_VALUE', token.index, token.value]);
         } else if (token instanceof ValueStartToken) {
           summary.push(['VALUE_START', token.index, token.length]);
@@ -258,6 +264,8 @@ describe('Stream Parser', function() {
           } else {
             summary.push(['VALUE_DATA', token.data]);
           }
+        } else if (token instanceof ReturnValueToken) {
+          summary.push(token);
         } else {
           summary.push(token.name);
         }
@@ -287,8 +295,7 @@ describe('Stream Parser', function() {
       const tokens = parseByteByByte(buffer.data, colMetadata, true);
 
       assert.deepEqual(summarize(tokens), [
-        'ROW_START',
-        ['COLUMN_VALUE', 0, 7],
+        ['ROW_START', [7]],
         ['VALUE_START', 1, 100],
         ['VALUE_DATA', binary],
         'VALUE_END',
@@ -297,6 +304,64 @@ describe('Stream Parser', function() {
         ['COLUMN_VALUE', 3, null],
         'ROW_END',
         'DONE'
+      ]);
+    });
+
+    it('returns rows without streamed values as single tokens', function() {
+      const colMetadata = [
+        column('a', dataTypeByName.Int),
+        column('b', dataTypeByName.VarBinary, 0xFFFF)
+      ];
+
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD1);
+      buffer.writeInt32LE(1);
+      buffer.writeBigUInt64LE(0xFFFFFFFFFFFFFFFFn); // null
+      buffer.writeUInt8(0xD2);
+      buffer.writeUInt8(0b00000010); // `b` is null
+      buffer.writeInt32LE(2);
+
+      const tokens = parseByteByByte(buffer.data, colMetadata, true);
+
+      assert.deepEqual(summarize(tokens), [
+        ['ROW', [1, null]],
+        ['NBCROW', [2, null]]
+      ]);
+    });
+
+    it('streams PLP values of return values', function() {
+      function writeReturnValue(buffer: WritableTrackingBuffer, name: string, type: number, write: () => void) {
+        buffer.writeUInt8(0xAC);
+        buffer.writeUInt16LE(1); // ordinal
+        buffer.writeBVarchar(name, 'ucs2');
+        buffer.writeUInt8(0x01); // status
+        buffer.writeUInt32LE(0); // user type
+        buffer.writeUInt16LE(0); // flags
+        buffer.writeUInt8(type);
+        write();
+      }
+
+      const buffer = new WritableTrackingBuffer();
+      writeReturnValue(buffer, '@a', 0x38, () => { // Int
+        buffer.writeInt32LE(42);
+      });
+      writeReturnValue(buffer, '@b', 0xA5, () => { // VarBinary(max)
+        buffer.writeUInt16LE(0xFFFF);
+        writePLP(buffer, Buffer.from('hello'), 2);
+      });
+      writeReturnValue(buffer, '@c', 0xA5, () => { // VarBinary(max), null
+        buffer.writeUInt16LE(0xFFFF);
+        buffer.writeBigUInt64LE(0xFFFFFFFFFFFFFFFFn);
+      });
+
+      const tokens = parseByteByByte(buffer.data, [], true);
+
+      assert.deepEqual(summarize(tokens).map((t) => (t instanceof ReturnValueToken ? [t.paramName, t.value] : t)), [
+        ['a', 42],
+        ['RETURNVALUE_START', 'b', 5],
+        ['VALUE_DATA', Buffer.from('hello')],
+        'VALUE_END',
+        ['c', null]
       ]);
     });
 
@@ -315,9 +380,7 @@ describe('Stream Parser', function() {
       const tokens = parseByteByByte(buffer.data, colMetadata, true);
 
       assert.deepEqual(summarize(tokens), [
-        'ROW_START',
-        ['COLUMN_VALUE', 0, null],
-        ['COLUMN_VALUE', 1, null],
+        ['ROW_START', [null, null]],
         ['VALUE_START', 2, 3],
         ['VALUE_DATA', Buffer.from('abc')],
         'VALUE_END',
@@ -357,7 +420,7 @@ describe('Stream Parser', function() {
       assert.instanceOf(parser.read(), RowToken);
 
       parser.streamValues = true;
-      assert.deepEqual(summarize(readAll(parser)), ['ROW_START', ['COLUMN_VALUE', 0, 1], 'ROW_END']);
+      assert.deepEqual(summarize(readAll(parser)), [['ROW', [1]]]);
 
       parser.end();
     });

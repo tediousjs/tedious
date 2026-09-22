@@ -31,6 +31,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
+import { ResponseReader, type PullResponse } from './pull-response';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
@@ -2701,6 +2702,8 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSqlBatch(request: Request) {
+    request.startExecution();
+
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
@@ -2727,6 +2730,8 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   execSql(request: Request) {
+    request.startExecution();
+
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -2989,6 +2994,8 @@ class Connection extends EventEmitter {
    *   request is executed.
    */
   execute(request: Request, parameters?: { [key: string]: unknown }) {
+    request.startExecution();
+
     const executeParameters: ResolvedParameter[] = [];
 
     executeParameters.push(this.resolveRequestParameter({
@@ -3031,6 +3038,8 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    */
   callProcedure(request: Request) {
+    request.startExecution();
+
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -3239,6 +3248,17 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+    // A pulled request whose consumer stopped at its output parameters is
+    // still in progress. Its remaining response is discarded before the next
+    // request is made.
+    const current = this.request;
+    if (this.state === this.STATE.SENT_CLIENT_REQUEST && current instanceof Request && current.pull?.parked) {
+      current.pull.discard().then(() => {
+        this.makeRequest(request, packetType, payload);
+      });
+      return;
+    }
+
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
@@ -3262,7 +3282,7 @@ class Connection extends EventEmitter {
       this.attentionSent = false;
       request.connection! = this;
       request.rowCount! = 0;
-      request.rows! = [];
+      request.collectedRows! = [];
       request.rst! = [];
 
       const onCancel = () => {
@@ -3322,6 +3342,66 @@ class Connection extends EventEmitter {
         message.end();
       });
       payloadStream.pipe(message);
+    }
+  }
+
+  /**
+   * Hand the response of a pulled request to its consumer.
+   *
+   * @private
+   */
+  startPullResponse(message: Message, request: Request, response: PullResponse) {
+    const reader = new ResponseReader(message, new RequestTokenHandler(this, request), this.debug, this.config.options);
+
+    // Whether an attention message was sent, whose acknowledgement completes
+    // the request (in the `SENT_ATTENTION` state).
+    let attentionPending = false;
+
+    const onCancel = () => {
+      // Nobody consumes the response of a canceled request anymore, but it
+      // still needs to be read completely.
+      reader.drain();
+
+      if (this.attentionSent) {
+        attentionPending = true;
+        this.transitionTo(this.STATE.SENT_ATTENTION);
+      }
+    };
+
+    reader.onEnd = (error) => {
+      request.removeListener('cancel', onCancel);
+
+      if (error) {
+        request.removeListener('cancel', this._cancelAfterRequestSent);
+        this._onSocketError(error);
+        return;
+      }
+
+      if (attentionPending) {
+        return;
+      }
+
+      request.removeListener('cancel', this._cancelAfterRequestSent);
+
+      // If the request was canceled before its request message was fully
+      // sent, this response belongs to the ignored message and a cancel timer
+      // is running - the response's arrival completes the cancellation.
+      this.clearCancelTimer();
+
+      this.transitionTo(this.STATE.LOGGED_IN);
+      this.request = undefined;
+      if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+        this.inTransaction = false;
+      }
+      request.callback(request.error, request.rowCount, request.collectedRows);
+    };
+
+    response.setReader(reader);
+
+    if (request.canceled) {
+      onCancel();
+    } else {
+      request.once('cancel', onCancel);
     }
   }
 
@@ -3797,6 +3877,11 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
+        if (this.request instanceof Request && this.request.pull !== undefined) {
+          this.startPullResponse(message, this.request, this.request.pull);
+          return;
+        }
+
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
         // A token parse failure leaves the connection at an undefined
@@ -3891,7 +3976,7 @@ Connection.prototype.STATE = {
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
             this.inTransaction = false;
           }
-          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.collectedRows);
         };
 
         tokenStreamParser.once('end', onEndOfMessage);

@@ -12,7 +12,7 @@ import featureExtAckParser from './feature-ext-ack-parser';
 import loginAckParser from './loginack-token-parser';
 import orderParser from './order-token-parser';
 import returnStatusParser from './returnstatus-token-parser';
-import { ReturnValueTokenReader } from './returnvalue-token-parser';
+import { ReturnValueTokenReader, StreamedReturnValueReader } from './returnvalue-token-parser';
 import { RowTokenReader, StreamedRowReader } from './row-token-parser';
 import { NBCRowTokenReader } from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
@@ -55,10 +55,9 @@ class Parser {
   declare options: ParserOptions;
   declare colMetadata: ColumnMetadata[];
 
-  // Whether rows are read as a sequence of tokens that stream PLP values
-  // piece by piece (see `RowStartToken`), instead of as `ROW` or `NBCROW`
-  // tokens holding all values in full. Can be changed at any time, and
-  // applies to all rows that were not started yet.
+  // Whether PLP values of rows and return values are streamed piece by piece
+  // (see `RowStartToken`), instead of being read in full. Can be changed at
+  // any time, and applies to all tokens that were not started yet.
   declare streamValues: boolean;
 
   // The data that is currently being parsed, and the position of the first
@@ -245,7 +244,7 @@ class Parser {
         return this.startTokenReader(new ColMetadataTokenReader());
 
       case TYPE.RETURNVALUE:
-        return this.startTokenReader(new ReturnValueTokenReader());
+        return this.startTokenReader(this.streamValues ? new StreamedReturnValueReader() : new ReturnValueTokenReader());
 
       case TYPE.ROW:
         return this.startTokenReader(this.streamValues ? new StreamedRowReader(false) : new RowTokenReader());

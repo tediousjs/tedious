@@ -26,6 +26,7 @@ import {
   PacketSizeEnvChangeToken,
   ResetConnectionEnvChangeToken,
   ReturnStatusToken,
+  ReturnValueStartToken,
   ReturnValueToken,
   RollbackTransactionEnvChangeToken,
   RoutingEnvChangeToken,
@@ -175,6 +176,10 @@ export class TokenHandler {
   }
 
   onRowEnd(token: RowEndToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onReturnValueStart(token: ReturnValueStartToken) {
     throw new UnexpectedTokenError(this, token);
   }
 
@@ -548,7 +553,7 @@ export class RequestTokenHandler extends TokenHandler {
   onRow(token: RowToken | NBCRowToken) {
     if (!this.request.canceled) {
       if (this.connection.config.options.rowCollectionOnRequestCompletion) {
-        this.request.rows!.push(token.columns);
+        this.request.collectedRows!.push(token.columns);
       }
 
       if (this.connection.config.options.rowCollectionOnDone) {

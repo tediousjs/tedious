@@ -697,21 +697,29 @@ class PLPReader {
       this.chunks.push(chunk);
     }
 
-    // `Buffer.concat` always copies, so the value never keeps the (possibly
-    // much larger) incoming data buffers alive.
-    const data = Buffer.concat(this.chunks, this.length);
+    return decodePLPValue(this.chunks, this.length, this.metadata);
+  }
+}
 
-    switch (this.metadata.type.name) {
-      case 'NVarChar':
-      case 'Xml':
-        return data.toString('ucs2');
+/**
+ * Convert the pieces of a PLP value's data into the value's JavaScript
+ * representation.
+ */
+function decodePLPValue(chunks: Buffer[], length: number, metadata: Metadata): unknown {
+  // `Buffer.concat` always copies, so the value never keeps the (possibly
+  // much larger) incoming data buffers alive.
+  const data = Buffer.concat(chunks, length);
 
-      case 'VarChar':
-        return iconv.decode(data, this.metadata.collation?.codepage ?? DEFAULT_ENCODING);
+  switch (metadata.type.name) {
+    case 'NVarChar':
+    case 'Xml':
+      return data.toString('ucs2');
 
-      default:
-        return data;
-    }
+    case 'VarChar':
+      return iconv.decode(data, metadata.collation?.codepage ?? DEFAULT_ENCODING);
+
+    default:
+      return data;
   }
 }
 
@@ -873,5 +881,6 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.PLPReader = PLPReader;
+module.exports.decodePLPValue = decodePLPValue;
 
-export { readValue, isPLPStream, PLPReader };
+export { readValue, isPLPStream, PLPReader, decodePLPValue };

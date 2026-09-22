@@ -8,6 +8,7 @@ import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/ty
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { type ColumnInfo } from './token/token';
 import { Collation } from './collation';
+import { PullResponse, ResultSetIterator, RowIterator, type OutputParameters, type RequestSummary } from './pull-response';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -87,7 +88,15 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare userCallback: CompletionCallback;
+  declare userCallback: CompletionCallback | undefined;
+
+  /**
+   * The response of the current execution, for requests that are consumed
+   * by pulling (see [[rows]]).
+   *
+   * @private
+   */
+  declare pull: PullResponse | undefined;
   /**
    * @private
    */
@@ -108,7 +117,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare rows?: Array<any>;
+  declare collectedRows?: Array<any>;
   /**
    * @private
    */
@@ -397,8 +406,11 @@ class Request extends EventEmitter {
    *
    * @param callback
    *   The callback to execute once the request has been fully completed.
+   *
+   *   Without a callback, the request's response is consumed by pulling,
+   *   via [[rows]], [[results]], [[outputParameters]] or [[finish]].
    */
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
+  constructor(sqlTextOrProcedure: string | undefined, callback?: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -412,6 +424,7 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
+    this.pull = undefined;
     this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
     this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
@@ -423,7 +436,11 @@ class Request extends EventEmitter {
           this.emit('prepared');
         }
       } else {
-        this.userCallback(err, rowCount, rows);
+        if (this.userCallback !== undefined) {
+          this.userCallback(err, rowCount, rows);
+        } else {
+          this.pull?.complete(err);
+        }
         this.emit('requestCompleted');
       }
     };
@@ -571,6 +588,105 @@ class Request extends EventEmitter {
 
     this.canceled = true;
     this.emit('cancel');
+  }
+
+  /**
+   * Whether the request's response is consumed by pulling.
+   *
+   * @private
+   */
+  isPulled(): boolean {
+    return this.userCallback === undefined && !this.preparing;
+  }
+
+  /**
+   * Called by the connection when the request is executed.
+   *
+   * @private
+   */
+  startExecution() {
+    this.pull = this.isPulled() ? new PullResponse(this) : undefined;
+  }
+
+  /**
+   * The response of the current execution, for pulling.
+   */
+  private pullResponse(): PullResponse {
+    if (this.userCallback !== undefined) {
+      throw new Error('The response of a request with a completion callback can not be pulled. Create the request without a callback instead.');
+    }
+
+    if (this.listenerCount('row') > 0) {
+      throw new Error('The response of a request with `row` event listeners can not be pulled.');
+    }
+
+    if (this.pull === undefined) {
+      throw new Error('The request has not been executed.');
+    }
+
+    return this.pull;
+  }
+
+  /**
+   * Iterate the rows of the request's result set.
+   *
+   * ```js
+   * const request = new Request('SELECT id, name FROM users');
+   * connection.execSql(request);
+   *
+   * for await (const row of request.rows()) {
+   *   console.log(row.get('id'), row.get('name'));
+   * }
+   * ```
+   *
+   * The loop ending means the request has completed. Errors of the request
+   * are thrown by the loop. Stopping the loop early cancels the request.
+   *
+   * Throws if the request returns more than one result set, use [[results]]
+   * for those.
+   */
+  rows(): RowIterator {
+    const response = this.pullResponse();
+    response.consumed = true;
+    return new RowIterator(response);
+  }
+
+  /**
+   * Iterate the result sets of the request, each of which is an async
+   * iterator of its rows.
+   *
+   * ```js
+   * for await (const resultSet of request.results()) {
+   *   for await (const row of resultSet) {
+   *     // ...
+   *   }
+   * }
+   * ```
+   */
+  results(): ResultSetIterator {
+    const response = this.pullResponse();
+    response.consumed = true;
+    return new ResultSetIterator(response);
+  }
+
+  /**
+   * Read the request's return status and output parameters, skipping any
+   * result sets that were not read yet.
+   *
+   * Output parameters are read one after the other: parameters before the
+   * first `max` type parameter can be accessed right away via `get`, the
+   * ones after via `stream` or `await read`.
+   */
+  outputParameters(): Promise<OutputParameters> {
+    return this.pullResponse().outputParameters();
+  }
+
+  /**
+   * Read the rest of the request's response, discarding any rows, and return
+   * a summary of it.
+   */
+  finish(): Promise<RequestSummary> {
+    return this.pullResponse().finish();
   }
 
   /**
