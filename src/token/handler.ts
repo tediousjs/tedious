@@ -8,6 +8,7 @@ import {
   ColInfoToken,
   CollationChangeToken,
   ColMetadataToken,
+  ColumnValueToken,
   CommitTransactionEnvChangeToken,
   DatabaseEnvChangeToken,
   DatabaseMirroringPartnerEnvChangeToken,
@@ -28,10 +29,15 @@ import {
   ReturnValueToken,
   RollbackTransactionEnvChangeToken,
   RoutingEnvChangeToken,
+  RowEndToken,
+  RowStartToken,
   RowToken,
   SSPIToken,
   TabNameToken,
-  Token
+  Token,
+  ValueChunkToken,
+  ValueEndToken,
+  ValueStartToken
 } from './token';
 import BulkLoad from '../bulk-load';
 
@@ -145,6 +151,30 @@ export class TokenHandler {
   }
 
   onRow(token: RowToken | NBCRowToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onRowStart(token: RowStartToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onColumnValue(token: ColumnValueToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onValueStart(token: ValueStartToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onValueChunk(token: ValueChunkToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onValueEnd(token: ValueEndToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onRowEnd(token: RowEndToken) {
     throw new UnexpectedTokenError(this, token);
   }
 

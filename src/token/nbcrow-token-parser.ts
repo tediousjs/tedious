@@ -3,8 +3,7 @@
 import Parser, { type TokenReader } from './stream-parser';
 
 import { NBCRowToken } from './token';
-import { NotEnoughDataError } from './helpers';
-import { ColumnValuesReader, toColumnsMap } from './row-token-parser';
+import { ColumnValuesReader, readNullBitmap, toColumnsMap } from './row-token-parser';
 
 /**
  * Reads an `NBCROW` token - a `ROW` token prefixed with a bitmap that flags
@@ -19,16 +18,7 @@ export class NBCRowTokenReader extends ColumnValuesReader implements TokenReader
   }
 
   read(parser: Parser): NBCRowToken {
-    if (this.nullBitmap === undefined) {
-      const start = parser.position;
-      const end = start + Math.ceil(parser.colMetadata.length / 8);
-      if (parser.buffer.length < end) {
-        throw new NotEnoughDataError(end);
-      }
-
-      this.nullBitmap = parser.buffer.subarray(start, end);
-      parser.position = end;
-    }
+    this.nullBitmap ??= readNullBitmap(parser);
 
     this.readColumns(parser, this.nullBitmap);
     return new NBCRowToken(parser.options.useColumnNames ? toColumnsMap(this.columns) : this.columns);

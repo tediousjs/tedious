@@ -576,3 +576,93 @@ export class SSPIToken extends Token {
     this.ntlmpacketBuffer = ntlmpacketBuffer;
   }
 }
+
+// When values are streamed, a row is not delivered as a single `ROW` or
+// `NBCROW` token. Instead, it is delivered as a sequence of tokens:
+//
+//   RowStartToken
+//   for each column, either:
+//     ColumnValueToken                                  (a value read as a whole)
+//     ValueStartToken, ValueChunkToken*, ValueEndToken  (a streamed PLP value)
+//   RowEndToken
+
+export class RowStartToken extends Token {
+  declare name: 'ROW_START';
+  declare handlerName: 'onRowStart';
+
+  constructor() {
+    super('ROW_START', 'onRowStart');
+  }
+}
+
+export class ColumnValueToken extends Token {
+  declare name: 'COLUMN_VALUE';
+  declare handlerName: 'onColumnValue';
+
+  declare index: number;
+  declare metadata: ColumnMetadata;
+  declare value: unknown;
+
+  constructor(index: number, metadata: ColumnMetadata, value: unknown) {
+    super('COLUMN_VALUE', 'onColumnValue');
+
+    this.index = index;
+    this.metadata = metadata;
+    this.value = value;
+  }
+}
+
+export class ValueStartToken extends Token {
+  declare name: 'VALUE_START';
+  declare handlerName: 'onValueStart';
+
+  declare index: number;
+  declare metadata: ColumnMetadata;
+
+  /**
+   * The value's total length in bytes, if the server announced it.
+   */
+  declare length: number | undefined;
+
+  constructor(index: number, metadata: ColumnMetadata, length: number | undefined) {
+    super('VALUE_START', 'onValueStart');
+
+    this.index = index;
+    this.metadata = metadata;
+    this.length = length;
+  }
+}
+
+export class ValueChunkToken extends Token {
+  declare name: 'VALUE_CHUNK';
+  declare handlerName: 'onValueChunk';
+
+  /**
+   * A piece of the value's raw data.
+   */
+  declare data: Buffer;
+
+  constructor(data: Buffer) {
+    super('VALUE_CHUNK', 'onValueChunk');
+
+    this.data = data;
+  }
+}
+
+export class ValueEndToken extends Token {
+  declare name: 'VALUE_END';
+  declare handlerName: 'onValueEnd';
+
+  constructor() {
+    super('VALUE_END', 'onValueEnd');
+  }
+}
+
+export class RowEndToken extends Token {
+  declare name: 'ROW_END';
+  declare handlerName: 'onRowEnd';
+
+  constructor() {
+    super('ROW_END', 'onRowEnd');
+  }
+}

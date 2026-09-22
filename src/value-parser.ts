@@ -590,8 +590,11 @@ function readNChars(buf: Buffer, offset: number, dataLength: number): Result<str
  * PLP values can be arbitrarily large and span many chunks of incoming data,
  * so they are read incrementally: whatever part of the value is available is
  * consumed right away, and the reader's progress is kept across calls. If the
- * available data runs out, `NotEnoughDataError` is thrown and `read` can be
- * called again once more data has arrived.
+ * available data runs out, `NotEnoughDataError` is thrown and the reader can
+ * be called again once more data has arrived.
+ *
+ * The value can either be read as a whole via `read`, or be streamed piece by
+ * piece via `readLength` and `readChunk`.
  */
 class PLPReader {
   declare metadata: Metadata;
@@ -600,7 +603,10 @@ class PLPReader {
   // while it has not been read yet.
   declare expectedLength: bigint | undefined;
 
+  // The pieces of the value read so far, when reading the whole value.
   declare chunks: Buffer[];
+
+  // Number of bytes of the value read so far.
   declare length: number;
 
   // Number of bytes of the current PLP chunk that have not been read yet.
@@ -614,44 +620,81 @@ class PLPReader {
     this.chunkRemaining = 0;
   }
 
-  read(parser: Parser): unknown {
+  /**
+   * Whether the value is `null`. Only valid after `readLength`.
+   */
+  get isNull(): boolean {
+    return this.expectedLength === PLP_NULL;
+  }
+
+  /**
+   * The value's total length in bytes, if the server announced it. Only valid
+   * after `readLength`.
+   */
+  get totalLength(): number | undefined {
+    return this.expectedLength === UNKNOWN_PLP_LEN ? undefined : Number(this.expectedLength);
+  }
+
+  /**
+   * Read the value's total length, which precedes the value's data.
+   */
+  readLength(parser: Parser) {
     if (this.expectedLength === undefined) {
       const { value, offset } = readBigUInt64LE(parser.buffer, parser.position);
       parser.position = offset;
       this.expectedLength = value;
     }
+  }
 
-    if (this.expectedLength === PLP_NULL) {
+  /**
+   * Read the next available piece of the value's data, or return `undefined`
+   * once all of the data was read.
+   *
+   * The returned buffer references the incoming data without copying it.
+   */
+  readChunk(parser: Parser): Buffer | undefined {
+    if (this.chunkRemaining === 0) {
+      const { value: chunkLength, offset } = readUInt32LE(parser.buffer, parser.position);
+      parser.position = offset;
+
+      if (chunkLength === 0) {
+        if (this.totalLength !== undefined && this.length !== this.totalLength) {
+          throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + this.expectedLength + ', but got ' + this.length + ' bytes');
+        }
+
+        return undefined;
+      }
+
+      this.chunkRemaining = chunkLength;
+    }
+
+    const buf = parser.buffer;
+    const start = parser.position;
+    const end = Math.min(start + this.chunkRemaining, buf.length);
+    if (start === end) {
+      throw new NotEnoughDataError(start + 1);
+    }
+
+    parser.position = end;
+    this.length += end - start;
+    this.chunkRemaining -= end - start;
+
+    return buf.subarray(start, end);
+  }
+
+  /**
+   * Read the whole value.
+   */
+  read(parser: Parser): unknown {
+    this.readLength(parser);
+
+    if (this.isNull) {
       return null;
     }
 
-    while (true) {
-      if (this.chunkRemaining === 0) {
-        const { value: chunkLength, offset } = readUInt32LE(parser.buffer, parser.position);
-        parser.position = offset;
-
-        if (chunkLength === 0) {
-          break;
-        }
-
-        this.chunkRemaining = chunkLength;
-      }
-
-      const buf = parser.buffer;
-      const start = parser.position;
-      const end = Math.min(start + this.chunkRemaining, buf.length);
-      if (start === end) {
-        throw new NotEnoughDataError(start + 1);
-      }
-
-      this.chunks.push(buf.subarray(start, end));
-      this.length += end - start;
-      this.chunkRemaining -= end - start;
-      parser.position = end;
-    }
-
-    if (this.expectedLength !== UNKNOWN_PLP_LEN && this.length !== Number(this.expectedLength)) {
-      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + this.expectedLength + ', but got ' + this.length + ' bytes');
+    let chunk;
+    while ((chunk = this.readChunk(parser)) !== undefined) {
+      this.chunks.push(chunk);
     }
 
     // `Buffer.concat` always copies, so the value never keeps the (possibly

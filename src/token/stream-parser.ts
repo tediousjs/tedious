@@ -13,7 +13,7 @@ import loginAckParser from './loginack-token-parser';
 import orderParser from './order-token-parser';
 import returnStatusParser from './returnstatus-token-parser';
 import { ReturnValueTokenReader } from './returnvalue-token-parser';
-import { RowTokenReader } from './row-token-parser';
+import { RowTokenReader, StreamedRowReader } from './row-token-parser';
 import { NBCRowTokenReader } from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 import tabNameParser from './tabname-token-parser';
@@ -37,6 +37,10 @@ type TokenParser = (buf: Buffer, offset: number, options: ParserOptions) => Resu
  */
 export interface TokenReader {
   read(parser: Parser): Token;
+
+  // Set by readers that return a sequence of tokens (like streamed rows)
+  // while more tokens follow.
+  hasMore?: boolean;
 }
 
 /**
@@ -50,6 +54,12 @@ export interface TokenReader {
 class Parser {
   declare options: ParserOptions;
   declare colMetadata: ColumnMetadata[];
+
+  // Whether rows are read as a sequence of tokens that stream PLP values
+  // piece by piece (see `RowStartToken`), instead of as `ROW` or `NBCROW`
+  // tokens holding all values in full. Can be changed at any time, and
+  // applies to all rows that were not started yet.
+  declare streamValues: boolean;
 
   // The data that is currently being parsed, and the position of the first
   // byte in it that has not been consumed yet.
@@ -73,6 +83,7 @@ class Parser {
   constructor(options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
     this.options = options;
     this.colMetadata = colMetadata;
+    this.streamValues = false;
 
     this.buffer = Buffer.alloc(0);
     this.position = 0;
@@ -134,8 +145,13 @@ class Parser {
         throw err;
       }
 
-      this.tokenReader = undefined;
-      this.bytesNeeded = 1;
+      if (this.tokenReader?.hasMore) {
+        // The next token might not need any more data (e.g. `RowEndToken`).
+        this.bytesNeeded = 0;
+      } else {
+        this.tokenReader = undefined;
+        this.bytesNeeded = 1;
+      }
 
       // Some tokens (e.g. unknown `ENVCHANGE` types) are skipped.
       if (token !== undefined) {
@@ -232,10 +248,10 @@ class Parser {
         return this.startTokenReader(new ReturnValueTokenReader());
 
       case TYPE.ROW:
-        return this.startTokenReader(new RowTokenReader());
+        return this.startTokenReader(this.streamValues ? new StreamedRowReader(false) : new RowTokenReader());
 
       case TYPE.NBCROW:
-        return this.startTokenReader(new NBCRowTokenReader());
+        return this.startTokenReader(this.streamValues ? new StreamedRowReader(true) : new NBCRowTokenReader());
 
       default:
         throw new Error('Unknown type: ' + type);
