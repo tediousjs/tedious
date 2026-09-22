@@ -1,14 +1,12 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { DatabaseEnvChangeToken, PacketSizeEnvChangeToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Env Change Token Parser', () => {
   it('should parse database change', async function() {
-    const debug = new Debug();
     const oldDb = 'old';
     const newDb = 'new';
 
@@ -23,7 +21,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], debug, options);
+    const parser = StreamParser.parseTokens([data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -35,7 +33,6 @@ describe('Env Change Token Parser', () => {
   });
 
   it('should parse packet size change', async function() {
-    const debug = new Debug();
     const oldSize = '1024';
     const newSize = '2048';
 
@@ -50,7 +47,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], debug, options);
+    const parser = StreamParser.parseTokens([data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -62,7 +59,6 @@ describe('Env Change Token Parser', () => {
   });
 
   it('should skip unknown env change types', async function() {
-    const debug = new Debug();
     const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xe3);
@@ -72,7 +68,7 @@ describe('Env Change Token Parser', () => {
     const data = buffer.data;
     data.writeUInt16LE(data.length - 3, 1);
 
-    const parser = StreamParser.parseTokens([data], debug, options);
+    const parser = StreamParser.parseTokens([data], options);
     const result = await parser.next();
 
     assert.isTrue(result.done);

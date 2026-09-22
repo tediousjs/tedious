@@ -5,7 +5,6 @@ import { NBCRowToken } from '../../../src/token/token';
 import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { Collation } from '../../../src/collation';
 
 const options = {
@@ -16,7 +15,6 @@ const options = {
 describe('NBCRow Token Parser', function() {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
-      const debug = new Debug();
       const buffer = new WritableTrackingBuffer();
       buffer.writeUInt8(0xd2);
 
@@ -40,7 +38,7 @@ describe('NBCRow Token Parser', function() {
         buffer.writeUsVarchar(i.toString(), 'ascii');
       }
 
-      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+      const parser = Parser.parseTokens([buffer.data], options, colMetadata);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;

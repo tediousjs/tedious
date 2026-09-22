@@ -1,7 +1,6 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { DoneToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
@@ -18,8 +17,7 @@ function parse(status: number, curCmd: number, doneRowCount: number) {
   buffer.writeUInt32LE(doneRowCountLow);
   buffer.writeUInt32LE(doneRowCountHi);
 
-  const debug = new Debug();
-  const parser = StreamParser.parseTokens([buffer.data], debug, options);
+  const parser = StreamParser.parseTokens([buffer.data], options);
   return parser;
 }
 

@@ -1,14 +1,12 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { OrderToken } from '../../../src/token/token';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('Order Token Parser', function() {
   it('should have one column', async function() {
-    const debug = new Debug();
     const numberOfColumns = 1;
     const length = numberOfColumns * 2;
     const column = 3;
@@ -20,7 +18,7 @@ describe('Order Token Parser', function() {
     buffer.writeUInt16LE(column);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -31,7 +29,6 @@ describe('Order Token Parser', function() {
   });
 
   it('should have two columns', async function() {
-    const debug = new Debug();
     const numberOfColumns = 2;
     const length = numberOfColumns * 2;
     const column1 = 3;
@@ -45,7 +42,7 @@ describe('Order Token Parser', function() {
     buffer.writeUInt16LE(column2);
     // console.log(buffer.data)
 
-    const parser = StreamParser.parseTokens([buffer.data], debug, options);
+    const parser = StreamParser.parseTokens([buffer.data], options);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;

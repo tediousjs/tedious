@@ -1,8 +1,8 @@
 import { readMetadata, type Metadata } from '../metadata-parser';
 
-import Parser, { type ParserOptions } from './stream-parser';
+import Parser, { type ParserOptions, type TokenReader } from './stream-parser';
 import { ColMetadataToken } from './token';
-import { NotEnoughDataError, Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
+import { Result, readBVarChar, readUInt16LE, readUInt8, readUsVarChar } from './helpers';
 
 export interface ColumnMetadata extends Metadata {
   /**
@@ -76,53 +76,33 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
   }, offset);
 }
 
-async function colMetadataParser(parser: Parser): Promise<ColMetadataToken> {
-  let columnCount;
+/**
+ * Reads a `COLMETADATA` token column by column, so that tokens describing many
+ * columns are not parsed again from the start whenever they span chunks.
+ */
+export class ColMetadataTokenReader implements TokenReader {
+  declare columnCount: number | undefined;
+  declare columns: ColumnMetadata[];
 
-  while (true) {
-    let offset;
-
-    try {
-      ({ offset, value: columnCount } = readUInt16LE(parser.buffer, parser.position));
-    } catch (err) {
-      if (err instanceof NotEnoughDataError) {
-        await parser.waitForChunk();
-        continue;
-      }
-
-      throw err;
-    }
-
-    parser.position = offset;
-    break;
+  constructor() {
+    this.columnCount = undefined;
+    this.columns = [];
   }
 
-  const columns: ColumnMetadata[] = [];
-  for (let i = 0; i < columnCount; i++) {
-    while (true) {
-      let column: ColumnMetadata;
-      let offset;
-
-      try {
-        ({ offset, value: column } = readColumn(parser.buffer, parser.position, parser.options, i));
-      } catch (err: any) {
-        if (err instanceof NotEnoughDataError) {
-          await parser.waitForChunk();
-          continue;
-        }
-
-        throw err;
-      }
-
+  read(parser: Parser): ColMetadataToken {
+    if (this.columnCount === undefined) {
+      const { value, offset } = readUInt16LE(parser.buffer, parser.position);
       parser.position = offset;
-      columns.push(column);
-
-      break;
+      this.columnCount = value;
     }
+
+    while (this.columns.length < this.columnCount) {
+      const { value, offset } = readColumn(parser.buffer, parser.position, parser.options, this.columns.length);
+      parser.position = offset;
+      this.columns.push(value);
+    }
+
+    parser.colMetadata = this.columns;
+    return new ColMetadataToken(this.columns);
   }
-
-  return new ColMetadataToken(columns);
 }
-
-export default colMetadataParser;
-module.exports = colMetadataParser;

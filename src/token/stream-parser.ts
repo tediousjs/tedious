@@ -1,10 +1,9 @@
-import Debug from '../debug';
 import { type InternalConnectionOptions } from '../connection';
 
-import { TYPE, ColInfoToken, ColMetadataToken, DoneProcToken, DoneToken, DoneInProcToken, ErrorMessageToken, InfoMessageToken, RowToken, type EnvChangeToken, LoginAckToken, ReturnStatusToken, OrderToken, FedAuthInfoToken, SSPIToken, ReturnValueToken, NBCRowToken, FeatureExtAckToken, TabNameToken, Token } from './token';
+import { TYPE, type Token } from './token';
 
 import colInfoParser from './colinfo-token-parser';
-import colMetadataParser, { type ColumnMetadata } from './colmetadata-token-parser';
+import { ColMetadataTokenReader, type ColumnMetadata } from './colmetadata-token-parser';
 import { doneParser, doneInProcParser, doneProcParser } from './done-token-parser';
 import envChangeParser from './env-change-token-parser';
 import { errorParser, infoParser } from './infoerror-token-parser';
@@ -13,439 +12,246 @@ import featureExtAckParser from './feature-ext-ack-parser';
 import loginAckParser from './loginack-token-parser';
 import orderParser from './order-token-parser';
 import returnStatusParser from './returnstatus-token-parser';
-import returnValueParser from './returnvalue-token-parser';
-import rowParser from './row-token-parser';
-import nbcRowParser from './nbcrow-token-parser';
+import { ReturnValueTokenReader } from './returnvalue-token-parser';
+import { RowTokenReader } from './row-token-parser';
+import { NBCRowTokenReader } from './nbcrow-token-parser';
 import sspiParser from './sspi-token-parser';
 import tabNameParser from './tabname-token-parser';
-import { NotEnoughDataError } from './helpers';
+import { NotEnoughDataError, type Result } from './helpers';
 
 export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
 
+/**
+ * Parses a token that is short enough to simply be parsed again from its
+ * start if it is not fully available yet.
+ */
+type TokenParser = (buf: Buffer, offset: number, options: ParserOptions) => Result<Token | undefined>;
+
+/**
+ * Parses a token that can grow arbitrarily large, and thus needs to be parsed
+ * incrementally.
+ *
+ * The reader starts parsing right after the token's type byte and keeps its
+ * progress across calls: if `read` throws a `NotEnoughDataError`, it is
+ * called again once more data has arrived.
+ */
+export interface TokenReader {
+  read(parser: Parser): Token;
+}
+
+/**
+ * A push-based parser for the tokens contained in a TDS token stream.
+ *
+ * Data is pushed into the parser as it arrives via `write`, and parsed tokens
+ * are pulled out via `read`. Tokens are parsed lazily, one at a time, so any
+ * effects of handling a token (e.g. the TDS version negotiated via the
+ * `LOGINACK` token) apply to the parsing of all tokens that follow it.
+ */
 class Parser {
-  debug: Debug;
-  colMetadata: ColumnMetadata[];
-  options: ParserOptions;
+  declare options: ParserOptions;
+  declare colMetadata: ColumnMetadata[];
 
-  iterator: AsyncIterator<Buffer, any, undefined> | Iterator<Buffer, any, undefined>;
-  buffer: Buffer;
-  position: number;
+  // The data that is currently being parsed, and the position of the first
+  // byte in it that has not been consumed yet.
+  declare buffer: Buffer;
+  declare position: number;
 
-  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
-    const parser = new Parser(iterable, debug, options);
-    parser.colMetadata = colMetadata;
+  // Chunks that were written, but not yet appended to `buffer`.
+  declare pending: Buffer[];
+  declare pendingLength: number;
 
+  // The number of unconsumed bytes required for parsing to make progress.
+  //
+  // Incomplete data is not appended to `buffer` until at least this many
+  // bytes are available, so that a large token arriving across many chunks is
+  // not parsed again (and copied again) for every chunk.
+  declare bytesNeeded: number;
+
+  // The reader of an incrementally parsed token that is not complete yet.
+  declare tokenReader: TokenReader | undefined;
+
+  constructor(options: ParserOptions, colMetadata: ColumnMetadata[] = []) {
+    this.options = options;
+    this.colMetadata = colMetadata;
+
+    this.buffer = Buffer.alloc(0);
+    this.position = 0;
+
+    this.pending = [];
+    this.pendingLength = 0;
+
+    this.bytesNeeded = 1;
+    this.tokenReader = undefined;
+  }
+
+  /**
+   * Parse all tokens from the given chunks of data.
+   */
+  static async *parseTokens(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, options: ParserOptions, colMetadata?: ColumnMetadata[]): AsyncGenerator<Token, void, undefined> {
+    const parser = new Parser(options, colMetadata);
+
+    for await (const chunk of iterable) {
+      parser.write(chunk);
+
+      let token;
+      while ((token = parser.read()) !== undefined) {
+        yield token;
+      }
+    }
+
+    parser.end();
+  }
+
+  /**
+   * Add a chunk of data to be parsed.
+   */
+  write(chunk: Buffer) {
+    this.pending.push(chunk);
+    this.pendingLength += chunk.length;
+  }
+
+  /**
+   * Parse the next token, or return `undefined` if more data needs to be
+   * written first.
+   */
+  read(): Token | undefined {
     while (true) {
+      if (this.buffer.length - this.position < this.bytesNeeded && !this.appendPending()) {
+        return undefined;
+      }
+
+      let token;
       try {
-        await parser.waitForChunk();
-      } catch (err: unknown) {
-        if (parser.position === parser.buffer.length) {
-          return;
+        token = this.tokenReader !== undefined ? this.tokenReader.read(this) : this.readToken();
+      } catch (err) {
+        if (err instanceof NotEnoughDataError) {
+          // Always wait for at least one more byte, so parsing never retries
+          // without new data.
+          this.bytesNeeded = Math.max(err.byteCount, this.buffer.length + 1) - this.position;
+          continue;
         }
 
         throw err;
       }
 
-      while (parser.buffer.length >= parser.position + 1) {
-        const type = parser.buffer.readUInt8(parser.position);
-        parser.position += 1;
+      this.tokenReader = undefined;
+      this.bytesNeeded = 1;
 
-        const token = parser.readToken(type);
-        if (token !== undefined) {
-          yield token;
-        }
+      // Some tokens (e.g. unknown `ENVCHANGE` types) are skipped.
+      if (token !== undefined) {
+        return token;
       }
     }
   }
 
-  readToken(type: number): Token | undefined | Promise<Token | undefined> {
-    switch (type) {
-      case TYPE.DONE: {
-        return this.readDoneToken();
-      }
-
-      case TYPE.DONEPROC: {
-        return this.readDoneProcToken();
-      }
-
-      case TYPE.DONEINPROC: {
-        return this.readDoneInProcToken();
-      }
-
-      case TYPE.ERROR: {
-        return this.readErrorToken();
-      }
-
-      case TYPE.INFO: {
-        return this.readInfoToken();
-      }
-
-      case TYPE.ENVCHANGE: {
-        return this.readEnvChangeToken();
-      }
-
-      case TYPE.LOGINACK: {
-        return this.readLoginAckToken();
-      }
-
-      case TYPE.RETURNSTATUS: {
-        return this.readReturnStatusToken();
-      }
-
-      case TYPE.ORDER: {
-        return this.readOrderToken();
-      }
-
-      case TYPE.FEDAUTHINFO: {
-        return this.readFedAuthInfoToken();
-      }
-
-      case TYPE.SSPI: {
-        return this.readSSPIToken();
-      }
-
-      case TYPE.COLMETADATA: {
-        return this.readColMetadataToken();
-      }
-
-      case TYPE.RETURNVALUE: {
-        return this.readReturnValueToken();
-      }
-
-      case TYPE.ROW: {
-        return this.readRowToken();
-      }
-
-      case TYPE.NBCROW: {
-        return this.readNbcRowToken();
-      }
-
-      case TYPE.FEATUREEXTACK: {
-        return this.readFeatureExtAckToken();
-      }
-
-      case TYPE.TABNAME: {
-        return this.readTabNameToken();
-      }
-
-      case TYPE.COLINFO: {
-        return this.readColInfoToken();
-      }
-
-      default: {
-        throw new Error('Unknown type: ' + type);
-      }
-    }
-  }
-
-  readFeatureExtAckToken(): FeatureExtAckToken | Promise<FeatureExtAckToken> {
-    let result;
-
-    try {
-      result = featureExtAckParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readFeatureExtAckToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readTabNameToken(): TabNameToken | Promise<TabNameToken> {
-    let result;
-
-    try {
-      result = tabNameParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readTabNameToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readColInfoToken(): ColInfoToken | Promise<ColInfoToken> {
-    let result;
-
-    try {
-      result = colInfoParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readColInfoToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  async readNbcRowToken(): Promise<NBCRowToken> {
-    return await nbcRowParser(this);
-  }
-
-  async readReturnValueToken(): Promise<ReturnValueToken> {
-    return await returnValueParser(this);
-  }
-
-  async readColMetadataToken(): Promise<ColMetadataToken> {
-    const token = await colMetadataParser(this);
-    this.colMetadata = token.columns;
-    return token;
-  }
-
-  readSSPIToken(): SSPIToken | Promise<SSPIToken> {
-    let result;
-
-    try {
-      result = sspiParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readSSPIToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readFedAuthInfoToken(): FedAuthInfoToken | Promise<FedAuthInfoToken> {
-    let result;
-
-    try {
-      result = fedAuthInfoParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readFedAuthInfoToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readOrderToken(): OrderToken | Promise<OrderToken> {
-    let result;
-
-    try {
-      result = orderParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readOrderToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readReturnStatusToken(): ReturnStatusToken | Promise<ReturnStatusToken> {
-    let result;
-
-    try {
-      result = returnStatusParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readReturnStatusToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readLoginAckToken(): LoginAckToken | Promise<LoginAckToken> {
-    let result;
-
-    try {
-      result = loginAckParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readLoginAckToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readEnvChangeToken(): EnvChangeToken | undefined | Promise<EnvChangeToken | undefined> {
-    let result;
-
-    try {
-      result = envChangeParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readEnvChangeToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readRowToken(): RowToken | Promise<RowToken> {
-    return rowParser(this);
-  }
-
-  readInfoToken(): InfoMessageToken | Promise<InfoMessageToken> {
-    let result;
-
-    try {
-      result = infoParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readInfoToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readErrorToken(): ErrorMessageToken | Promise<ErrorMessageToken> {
-    let result;
-
-    try {
-      result = errorParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readErrorToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readDoneInProcToken(): DoneInProcToken | Promise<DoneInProcToken> {
-    let result;
-
-    try {
-      result = doneInProcParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readDoneInProcToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readDoneProcToken(): DoneProcToken | Promise<DoneProcToken> {
-    let result;
-
-    try {
-      result = doneProcParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readDoneProcToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  readDoneToken(): DoneToken | Promise<DoneToken> {
-    let result;
-
-    try {
-      result = doneParser(this.buffer, this.position, this.options);
-    } catch (err: any) {
-      if (err instanceof NotEnoughDataError) {
-        return this.waitForChunk().then(() => {
-          return this.readDoneToken();
-        });
-      }
-
-      throw err;
-    }
-
-    this.position = result.offset;
-    return result.value;
-  }
-
-  constructor(iterable: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, options: ParserOptions) {
-    this.debug = debug;
-    this.colMetadata = [];
-    this.options = options;
-
-    this.iterator = ((iterable as AsyncIterable<Buffer>)[Symbol.asyncIterator] || (iterable as Iterable<Buffer>)[Symbol.iterator]).call(iterable);
-
-    this.buffer = Buffer.alloc(0);
-    this.position = 0;
-  }
-
-  async waitForChunk() {
-    const result = await this.iterator.next();
-    if (result.done) {
+  /**
+   * Signal that all data was written.
+   *
+   * Throws if the data ended in the middle of a token.
+   */
+  end() {
+    if (this.tokenReader !== undefined || this.position < this.buffer.length || this.pendingLength > 0) {
       throw new Error('unexpected end of data');
     }
+  }
 
-    if (this.position === this.buffer.length) {
-      this.buffer = result.value;
+  /**
+   * Append the pending chunks to the unconsumed data, if that makes enough
+   * data available for parsing to make progress.
+   */
+  appendPending(): boolean {
+    const remaining = this.buffer.length - this.position;
+    if (remaining + this.pendingLength < this.bytesNeeded) {
+      return false;
+    }
+
+    if (remaining === 0 && this.pending.length === 1) {
+      this.buffer = this.pending[0];
     } else {
-      this.buffer = Buffer.concat([this.buffer.slice(this.position), result.value]);
+      this.pending.unshift(this.buffer.subarray(this.position));
+      this.buffer = Buffer.concat(this.pending, remaining + this.pendingLength);
     }
 
     this.position = 0;
+    this.pending = [];
+    this.pendingLength = 0;
+
+    return true;
+  }
+
+  readToken(): Token | undefined {
+    const type = this.buffer[this.position];
+
+    switch (type) {
+      case TYPE.DONE:
+        return this.parseToken(doneParser);
+
+      case TYPE.DONEPROC:
+        return this.parseToken(doneProcParser);
+
+      case TYPE.DONEINPROC:
+        return this.parseToken(doneInProcParser);
+
+      case TYPE.ERROR:
+        return this.parseToken(errorParser);
+
+      case TYPE.INFO:
+        return this.parseToken(infoParser);
+
+      case TYPE.ENVCHANGE:
+        return this.parseToken(envChangeParser);
+
+      case TYPE.LOGINACK:
+        return this.parseToken(loginAckParser);
+
+      case TYPE.RETURNSTATUS:
+        return this.parseToken(returnStatusParser);
+
+      case TYPE.ORDER:
+        return this.parseToken(orderParser);
+
+      case TYPE.FEDAUTHINFO:
+        return this.parseToken(fedAuthInfoParser);
+
+      case TYPE.SSPI:
+        return this.parseToken(sspiParser);
+
+      case TYPE.FEATUREEXTACK:
+        return this.parseToken(featureExtAckParser);
+
+      case TYPE.TABNAME:
+        return this.parseToken(tabNameParser);
+
+      case TYPE.COLINFO:
+        return this.parseToken(colInfoParser);
+
+      case TYPE.COLMETADATA:
+        return this.startTokenReader(new ColMetadataTokenReader());
+
+      case TYPE.RETURNVALUE:
+        return this.startTokenReader(new ReturnValueTokenReader());
+
+      case TYPE.ROW:
+        return this.startTokenReader(new RowTokenReader());
+
+      case TYPE.NBCROW:
+        return this.startTokenReader(new NBCRowTokenReader());
+
+      default:
+        throw new Error('Unknown type: ' + type);
+    }
+  }
+
+  parseToken(parser: TokenParser): Token | undefined {
+    const result = parser(this.buffer, this.position + 1, this.options);
+    this.position = result.offset;
+    return result.value;
+  }
+
+  startTokenReader(reader: TokenReader): Token {
+    this.position += 1;
+    this.tokenReader = reader;
+    return reader.read(this);
   }
 }
 

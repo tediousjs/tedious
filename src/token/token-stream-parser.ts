@@ -1,39 +1,67 @@
 import { EventEmitter } from 'events';
 import StreamParser, { type ParserOptions } from './stream-parser';
 import Debug from '../debug';
-import { Token } from './token';
-import { Readable } from 'stream';
 import Message from '../message';
 import { TokenHandler } from './handler';
 
+/**
+ * Parses the tokens of a message and dispatches them to a `TokenHandler`.
+ *
+ * Emits `'end'` once all tokens were handled, or `'error'` if parsing or
+ * handling a token failed.
+ */
 export class Parser extends EventEmitter {
   declare debug: Debug;
   declare options: ParserOptions;
-  declare parser: Readable;
 
-  constructor(message: Message, debug: Debug, handler: TokenHandler, options: ParserOptions) {
+  declare paused: boolean;
+  declare onResume: (() => void) | undefined;
+
+  constructor(message: Message | Iterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions) {
     super();
 
     this.debug = debug;
     this.options = options;
 
-    this.parser = Readable.from(StreamParser.parseTokens(message, this.debug, this.options));
-    this.parser.on('data', (token: Token) => {
-      debug.token(token);
-      handler[token.handlerName as keyof TokenHandler](token as any);
-    });
+    this.paused = false;
+    this.onResume = undefined;
 
-    this.parser.on('drain', () => {
-      this.emit('drain');
-    });
-
-    this.parser.on('end', () => {
+    this.run(message, handler).then(() => {
       this.emit('end');
-    });
-
-    this.parser.on('error', (error: Error) => {
+    }, (error: Error) => {
       this.emit('error', error);
     });
+  }
+
+  async run(message: Message | Iterable<Buffer>, handler: TokenHandler) {
+    const parser = new StreamParser(this.options);
+
+    // Iterate manually - unlike `for await`, this does not destroy the message
+    // if parsing fails.
+    const iterator: AsyncIterator<Buffer> | Iterator<Buffer> = Symbol.asyncIterator in message ? message[Symbol.asyncIterator]() : message[Symbol.iterator]();
+
+    let result;
+    while (!(result = await iterator.next()).done) {
+      parser.write(result.value);
+
+      while (true) {
+        while (this.paused) {
+          await new Promise<void>((resolve) => {
+            this.onResume = resolve;
+          });
+        }
+
+        const token = parser.read();
+        if (token === undefined) {
+          break;
+        }
+
+        this.debug.token(token);
+        handler[token.handlerName](token as any);
+      }
+    }
+
+    parser.end();
   }
 
   declare on: (
@@ -42,10 +70,14 @@ export class Parser extends EventEmitter {
   );
 
   pause() {
-    return this.parser.pause();
+    this.paused = true;
   }
 
   resume() {
-    return this.parser.resume();
+    this.paused = false;
+
+    const onResume = this.onResume;
+    this.onResume = undefined;
+    onResume?.();
   }
 }
