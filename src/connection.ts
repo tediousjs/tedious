@@ -26,7 +26,7 @@ import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
-import Request, { type CallbackRequest, type PulledRequest } from './request';
+import Request, { type CallbackRequest, type ExecutionOptions, type PulledRequest } from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
@@ -2708,8 +2708,9 @@ class Connection extends EventEmitter {
    * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSqlBatch(request: PulledRequest): Response;
+  execSqlBatch(request: PulledRequest, options?: ExecutionOptions): Response;
   /**
    * Execute the SQL batch represented by [[Request]].
    * There is no param support, and unlike [[execSql]],
@@ -2718,8 +2719,9 @@ class Connection extends EventEmitter {
    * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSqlBatch(request: CallbackRequest): void;
+  execSqlBatch(request: CallbackRequest, options?: ExecutionOptions): void;
   /**
    * Execute the SQL batch represented by [[Request]].
    * There is no param support, and unlike [[execSql]],
@@ -2728,11 +2730,12 @@ class Connection extends EventEmitter {
    * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSqlBatch(request: Request): Response | void;
+  execSqlBatch(request: Request, options?: ExecutionOptions): Response | void;
 
-  execSqlBatch(request: Request): Response | void {
-    const response = request.startExecution();
+  execSqlBatch(request: Request, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
 
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
 
@@ -2760,8 +2763,9 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSql(request: PulledRequest): Response;
+  execSql(request: PulledRequest, options?: ExecutionOptions): Response;
   /**
    *  Execute the SQL represented by [[Request]].
    *
@@ -2776,8 +2780,9 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSql(request: CallbackRequest): void;
+  execSql(request: CallbackRequest, options?: ExecutionOptions): void;
   /**
    *  Execute the SQL represented by [[Request]].
    *
@@ -2792,11 +2797,12 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSql(request: Request): Response | void;
+  execSql(request: Request, options?: ExecutionOptions): Response | void;
 
-  execSql(request: Request): Response | void {
-    const response = request.startExecution();
+  execSql(request: Request, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
 
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
@@ -2984,8 +2990,9 @@ class Connection extends EventEmitter {
    * @returns For requests without a completion callback, the prepared
    *   statement, once the statement was prepared - it is executed and
    *   unprepared via the returned [[PreparedStatement]].
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  prepare(request: PulledRequest): Promise<PreparedStatement>;
+  prepare(request: PulledRequest, options?: ExecutionOptions): Promise<PreparedStatement>;
   /**
    * Prepare the SQL represented by the request.
    *
@@ -2998,8 +3005,9 @@ class Connection extends EventEmitter {
    * @returns For requests without a completion callback, the prepared
    *   statement, once the statement was prepared - it is executed and
    *   unprepared via the returned [[PreparedStatement]].
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  prepare(request: CallbackRequest): void;
+  prepare(request: CallbackRequest, options?: ExecutionOptions): void;
   /**
    * Prepare the SQL represented by the request.
    *
@@ -3012,10 +3020,11 @@ class Connection extends EventEmitter {
    * @returns For requests without a completion callback, the prepared
    *   statement, once the statement was prepared - it is executed and
    *   unprepared via the returned [[PreparedStatement]].
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  prepare(request: Request): Promise<PreparedStatement> | void;
+  prepare(request: Request, options?: ExecutionOptions): Promise<PreparedStatement> | void;
 
-  prepare(request: Request): Promise<PreparedStatement> | void {
+  prepare(request: Request, options?: ExecutionOptions): Promise<PreparedStatement> | void {
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -3048,7 +3057,7 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
-    const response = request.startExecution(false);
+    const response = request.startExecution(false, options?.signal);
     request.preparing = true;
 
     // The prepared statement's handle is stored by the `RequestTokenHandler`.
@@ -3097,8 +3106,9 @@ class Connection extends EventEmitter {
    *   parameters that were added to the [[Request]] before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execute(request: PulledRequest, parameters?: { [key: string]: unknown }): Response;
+  execute(request: PulledRequest, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response;
   /**
    * Execute previously prepared SQL, using the supplied parameters.
    *
@@ -3107,8 +3117,9 @@ class Connection extends EventEmitter {
    *   parameters that were added to the [[Request]] before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execute(request: CallbackRequest, parameters?: { [key: string]: unknown }): void;
+  execute(request: CallbackRequest, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): void;
   /**
    * Execute previously prepared SQL, using the supplied parameters.
    *
@@ -3117,11 +3128,12 @@ class Connection extends EventEmitter {
    *   parameters that were added to the [[Request]] before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }): Response | void;
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response | void;
 
-  execute(request: Request, parameters?: { [key: string]: unknown }): Response | void {
-    const response = request.startExecution();
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
 
     const executeParameters: ResolvedParameter[] = [];
 
@@ -3165,23 +3177,26 @@ class Connection extends EventEmitter {
    * Call a stored procedure represented by [[Request]].
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  callProcedure(request: PulledRequest): Response;
+  callProcedure(request: PulledRequest, options?: ExecutionOptions): Response;
   /**
    * Call a stored procedure represented by [[Request]].
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  callProcedure(request: CallbackRequest): void;
+  callProcedure(request: CallbackRequest, options?: ExecutionOptions): void;
   /**
    * Call a stored procedure represented by [[Request]].
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  callProcedure(request: Request): Response | void;
+  callProcedure(request: Request, options?: ExecutionOptions): Response | void;
 
-  callProcedure(request: Request): Response | void {
-    const response = request.startExecution();
+  callProcedure(request: Request, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
 
     try {
       request.validateParameters(this.databaseCollation, this.config.options);

@@ -830,6 +830,164 @@ describe('pulling responses', function() {
     });
   });
 
+  describe('abort signals', function() {
+    const MANY_ROWS = 'SELECT TOP 50000 a.object_id FROM sys.all_objects a CROSS JOIN sys.all_objects b';
+
+    it('cancels a request whose signal is aborted while its rows are read', async function() {
+      const controller = new AbortController();
+      const reason = new Error('stop');
+
+      {
+        await using response = connection.execSql(new Request(MANY_ROWS), { signal: controller.signal });
+
+        let count = 0;
+        let error: unknown;
+        try {
+          for await (const row of response.rows()) {
+            row.get(0);
+            if (++count === 10) {
+              controller.abort(reason);
+            }
+          }
+        } catch (err) {
+          error = err;
+        }
+
+        assert.strictEqual(error, reason);
+        assert.isBelow(count, 50000);
+      }
+
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('does not raise the reason again when disposing an aborted response', async function() {
+      const controller = new AbortController();
+
+      let error: any;
+      try {
+        await using response = connection.execSql(new Request(MANY_ROWS), { signal: controller.signal });
+
+        try {
+          for await (const row of response.rows()) {
+            row.get(0);
+            throw new Error('boom');
+          }
+        } catch (err) {
+          controller.abort(err);
+          throw err;
+        }
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error.message, 'boom');
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('does not drain the rest of the response after a loop was stopped early', async function() {
+      const controller = new AbortController();
+      const response = connection.execSql(new Request(MANY_ROWS), { signal: controller.signal });
+
+      for await (const row of response.rows()) {
+        row.get(0);
+        break;
+      }
+
+      controller.abort();
+
+      let error: any;
+      try {
+        await response.finish();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error.name, 'AbortError');
+      assert.isBelow(response.request.rowCount!, 50000);
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('does not send a request whose signal was aborted already', async function() {
+      const reason = new Error('stop');
+      const response = connection.execSql(new Request('SELECT 1'), { signal: AbortSignal.abort(reason) });
+
+      let error: unknown;
+      try {
+        await response.finish();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error, reason);
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('fails with a timeout signal\'s reason', async function() {
+      const response = connection.execSql(new Request("WAITFOR DELAY '00:00:05'"), { signal: AbortSignal.timeout(100) });
+
+      let error: any;
+      try {
+        await response.finish();
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error.name, 'TimeoutError');
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('ignores signals aborted after the request completed', async function() {
+      const controller = new AbortController();
+      const response = connection.execSql(new Request('SELECT 1'), { signal: controller.signal });
+
+      const { rowCount } = await response.finish();
+      controller.abort();
+
+      assert.strictEqual(rowCount, 1);
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('cancels an execution of a prepared statement', async function() {
+      const request = new Request(MANY_ROWS);
+      await using statement = await connection.prepare(request);
+
+      const controller = new AbortController();
+      const reason = new Error('stop');
+      {
+        await using response = statement.execute({}, { signal: controller.signal });
+
+        let error: unknown;
+        try {
+          for await (const row of response.rows()) {
+            row.get(0);
+            controller.abort(reason);
+          }
+        } catch (err) {
+          error = err;
+        }
+
+        assert.strictEqual(error, reason);
+      }
+
+      const { rowCount } = await statement.execute().finish();
+      assert.strictEqual(rowCount, 50000);
+    });
+
+    it('cancels requests with a completion callback', async function() {
+      const controller = new AbortController();
+
+      const error = await new Promise<Error | null | undefined>((resolve) => {
+        const request = new Request("WAITFOR DELAY '00:00:05'", (err) => { resolve(err); });
+        connection.execSql(request, { signal: controller.signal });
+        setTimeout(() => { controller.abort(); }, 100);
+      });
+
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual((error as RequestError).code, 'ECANCEL');
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+  });
+
   describe('misuse', function() {
     it('returns no response for a request that has a callback', async function() {
       let completed!: () => void;

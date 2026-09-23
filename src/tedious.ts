@@ -1,6 +1,6 @@
 import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
-import Request, { type CallbackRequest, type PulledRequest } from './request';
+import Request, { type CallbackRequest, type ExecutionOptions, type PulledRequest } from './request';
 import { type OutputParameters, type PreparedStatement, type RequestSummary, type Response, type ResultSet, type Row } from './pull-response';
 import { name } from './library';
 
@@ -36,6 +36,7 @@ export type {
   ConnectionConfiguration,
   ConnectionOptions,
   CallbackRequest,
+  ExecutionOptions,
   OutputParameters,
   PreparedStatement,
   PulledRequest,

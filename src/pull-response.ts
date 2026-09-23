@@ -1,6 +1,6 @@
 import type Debug from './debug';
 import type Request from './request';
-import type { PulledRequest } from './request';
+import type { ExecutionOptions, PulledRequest } from './request';
 import type Connection from './connection';
 import { RequestError } from './errors';
 import { type Metadata } from './metadata-parser';
@@ -1069,7 +1069,6 @@ export class RowIterator implements AsyncIterableIterator<Row> {
     this.finished = true;
 
     if (await this.response.nextResultSet() !== undefined) {
-      await this.response.skipResultSets().catch(() => undefined);
       throw new Error('The request returned more than one result set. Use `results()` to read all of them.');
     }
 
@@ -1077,16 +1076,12 @@ export class RowIterator implements AsyncIterableIterator<Row> {
   }
 
   /**
-   * Called when a loop is stopped early: skips the rest of the result sets,
-   * so the request runs to completion. Any error of the request is raised by
-   * `finish()`.
+   * Called when a loop is stopped early. The rest of the response is read
+   * (and discarded) by `finish()`, so it can still be canceled until then,
+   * e.g. via the execution's abort signal.
    */
   async return(): Promise<IteratorReturnResult<undefined>> {
-    if (!this.finished) {
-      this.finished = true;
-      await this.response.skipResultSets().catch(() => undefined);
-    }
-
+    this.finished = true;
     return DONE;
   }
 }
@@ -1126,16 +1121,12 @@ export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
   }
 
   /**
-   * Called when a loop is stopped early: skips the rest of the result sets,
-   * so the request runs to completion. Any error of the request is raised by
-   * `finish()`.
+   * Called when a loop is stopped early. The rest of the response is read
+   * (and discarded) by `finish()`, so it can still be canceled until then,
+   * e.g. via the execution's abort signal.
    */
   async return(): Promise<IteratorReturnResult<undefined>> {
-    if (!this.finished) {
-      this.finished = true;
-      await this.response.skipResultSets().catch(() => undefined);
-    }
-
+    this.finished = true;
     return DONE;
   }
 }
@@ -1203,6 +1194,12 @@ export class Response {
   // Called once `finish` completed.
   declare onFinished: () => void;
 
+  // Whether the execution was aborted via its abort signal, and the signal's
+  // reason, which replaces the resulting cancellation error.
+  declare aborted: boolean;
+  declare abortReason: unknown;
+  declare removeAbortListener: () => void;
+
   constructor(request: Request, pulled: boolean) {
     this.request = request;
     this.pulled = pulled;
@@ -1232,6 +1229,39 @@ export class Response {
     this.finishPromise = undefined;
     this.summary = undefined;
     this.onFinished = () => {};
+
+    this.aborted = false;
+    this.abortReason = undefined;
+    this.removeAbortListener = () => {};
+  }
+
+  /**
+   * Cancel the request once the given signal is aborted, unless the request
+   * completed already.
+   */
+  listenForAbort(signal: AbortSignal) {
+    if (signal.aborted) {
+      this.abort(signal.reason);
+      return;
+    }
+
+    const onAbort = () => {
+      this.abort(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    this.removeAbortListener = () => {
+      signal.removeEventListener('abort', onAbort);
+    };
+  }
+
+  abort(reason: unknown) {
+    if (this.completed) {
+      return;
+    }
+
+    this.aborted = true;
+    this.abortReason = reason;
+    this.request.cancel();
   }
 
   /**
@@ -1247,6 +1277,14 @@ export class Response {
    */
   complete(error: Error | null | undefined) {
     this.completed = true;
+    this.removeAbortListener();
+
+    // An aborted request fails with the abort signal's reason, rather than
+    // a generic cancellation error.
+    if (this.aborted && error instanceof RequestError && error.code === 'ECANCEL') {
+      error = this.abortReason as Error;
+    }
+
     this.completionError = error ?? undefined;
 
     if (this.reader === undefined) {
@@ -1344,19 +1382,6 @@ export class Response {
   }
 
   /**
-   * Skip the rest of the result sets, up to the output parameters, and wait
-   * for the request to complete unless output parameters follow. Used when a
-   * consumer stops reading early.
-   */
-  async skipResultSets() {
-    while (await this.nextResultSet() !== undefined) {
-      // skip the remaining result sets
-    }
-
-    await this.end();
-  }
-
-  /**
    * Iterate the rows of the response's result set.
    *
    * The loop ending means the request has completed. Errors of the request
@@ -1395,11 +1420,22 @@ export class Response {
 
   /**
    * Finish the response when it goes out of scope, via `await using`. See
-   * [[finish]].
+   * [[finish]] - except that the reason of an aborted execution is not
+   * raised again.
    */
   async [Symbol.asyncDispose](): Promise<void> {
-    if (this.pulled) {
+    if (!this.pulled) {
+      return;
+    }
+
+    try {
       await this.finish();
+    } catch (err) {
+      // Whoever aborted the request knows about it already - and commonly
+      // aborted it because of an error that is leaving the scope right now.
+      if (!(this.aborted && err === this.abortReason)) {
+        throw err;
+      }
     }
   }
 
@@ -1539,12 +1575,12 @@ export class PreparedStatement {
   /**
    * Execute the statement with the given parameter values.
    */
-  execute(parameters?: { [key: string]: unknown }): Response {
+  execute(parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response {
     if (this.unpreparing !== undefined) {
       throw new Error('The statement was unprepared.');
     }
 
-    return this.response = this.connection.execute(this.request, parameters);
+    return this.response = this.connection.execute(this.request, parameters, options);
   }
 
   /**

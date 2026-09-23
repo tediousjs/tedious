@@ -41,6 +41,17 @@ export interface ParameterOptions {
   scale?: number;
 }
 
+/**
+ * Options of a single execution of a [[Request]].
+ */
+export interface ExecutionOptions {
+  /**
+   * Cancels the execution when aborted. The execution then fails with the
+   * signal's reason.
+   */
+  signal?: AbortSignal | undefined;
+}
+
 interface RequestOptions {
   statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
 }
@@ -602,8 +613,12 @@ class RequestClass extends EventEmitter {
    *
    * @private
    */
-  startExecution(pulled = this.userCallback === undefined): Response {
-    return this.response = new Response(this, pulled);
+  startExecution(pulled = this.userCallback === undefined, signal?: AbortSignal): Response {
+    const response = this.response = new Response(this, pulled);
+    if (signal !== undefined) {
+      response.listenForAbort(signal);
+    }
+    return response;
   }
 
   /**
