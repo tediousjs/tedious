@@ -104,6 +104,54 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
+  it('allows executing a prepared statement again after an execution was canceled', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    let executions = 0;
+    const request = new Request('select @param', function(err, rowCount) {
+      executions += 1;
+
+      if (executions === 1) {
+        assert.instanceOf(err, Error);
+        assert.strictEqual((err as any).code, 'ECANCEL');
+
+        connection.execute(request, { param: 2 });
+      } else if (executions === 2) {
+        assert.ifError(err);
+        assert.strictEqual(rowCount, 1);
+
+        connection.unprepare(request);
+      } else {
+        // `unprepare` completed.
+        assert.ifError(err);
+        connection.close();
+      }
+    });
+    request.addParameter('param', TYPES.Int);
+
+    request.on('prepared', function() {
+      connection.execute(request, { param: 1 });
+      request.cancel();
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
   it('does not leak memory via EventEmitter listeners when reusing a request many times', function(done) {
     const config = getConfig();
 

@@ -415,6 +415,11 @@ class Request extends EventEmitter {
     this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
     this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
+      // A cancellation only applies to the execution it was made for, so it
+      // must not fail later executions of the request - including ones that
+      // are started from the callback or event listeners below.
+      this.canceled = false;
+
       if (this.preparing) {
         this.preparing = false;
         if (err) {
