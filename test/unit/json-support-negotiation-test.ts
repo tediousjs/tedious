@@ -65,10 +65,11 @@ async function drainMessage(message: Message): Promise<void> {
 /**
  * Handles the PRELOGIN / LOGIN7 / initial SQL exchange of a single client
  * connection, acknowledging JSONSUPPORT with the given feature data in the
- * LOGIN7 response. The initial SQL is only answered if the client sends it,
- * i.e. if the login succeeded.
+ * LOGIN7 response, or not acknowledging it at all if there is none. The
+ * initial SQL is only answered if the client sends it, i.e. if the login
+ * succeeded.
  */
-async function handleConnection(connection: net.Socket, jsonSupportAckData: Buffer): Promise<void> {
+async function handleConnection(connection: net.Socket, jsonSupportAckData: Buffer | undefined): Promise<void> {
   const debug = new Debug();
   const incomingMessageStream = new IncomingMessageStream(debug);
   const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
@@ -98,8 +99,14 @@ async function handleConnection(connection: net.Socket, jsonSupportAckData: Buff
 
     await drainMessage(message);
 
+    const tokens = [buildLoginAckToken()];
+    if (jsonSupportAckData !== undefined) {
+      tokens.push(buildJsonSupportAckToken(jsonSupportAckData));
+    }
+    tokens.push(buildDoneToken());
+
     const responseMessage = new Message({ type: 0x04 });
-    responseMessage.end(Buffer.concat([buildLoginAckToken(), buildJsonSupportAckToken(jsonSupportAckData), buildDoneToken()]));
+    responseMessage.end(Buffer.concat(tokens));
     outgoingMessageStream.write(responseMessage);
   }
 
@@ -141,9 +148,10 @@ describe('JSONSUPPORT negotiation', function() {
 
   /**
    * Connects to the fake server, which acknowledges JSONSUPPORT with the
-   * given feature data, and reports the outcome of `connect()`.
+   * given feature data (or not at all), and reports the outcome of
+   * `connect()`.
    */
-  function performLogin(jsonSupportAckData: Buffer, callback: (err: Error | undefined, connection: Connection) => void) {
+  function performLogin(jsonSupportAckData: Buffer | undefined, callback: (err: Error | undefined, connection: Connection) => void) {
     server.once('connection', (socket) => {
       handleConnection(socket, jsonSupportAckData).catch((err) => {
         callback(err, connection);
@@ -178,6 +186,17 @@ describe('JSONSUPPORT negotiation', function() {
       }
 
       assert.isTrue(connection.serverSupportsJson);
+      done();
+    });
+  });
+
+  it('logs in without json support when the server does not acknowledge JSONSUPPORT', function(done) {
+    performLogin(undefined, (err, connection) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.isFalse(connection.serverSupportsJson);
       done();
     });
   });

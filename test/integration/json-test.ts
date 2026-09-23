@@ -1,7 +1,9 @@
 import { assert } from 'chai';
+import { Readable } from 'stream';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { RequestError } from '../../src/errors';
 import { typeByName as TYPES } from '../../src/data-type';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
@@ -16,8 +18,41 @@ const config = {
   }
 };
 
+// "Type json is not a defined system type."
+const UNDEFINED_TYPE_ERROR = 243;
+
 describe('json data type', function() {
   let connection: Connection;
+
+  // Whether JSONSUPPORT is expected to be negotiated, decided without
+  // looking at `serverSupportsJson`, which is what is under test: the server
+  // has the `json` data type, and JSONSUPPORT was requested at login, which
+  // requires TDS 7.4.
+  let expectJsonSupport: boolean;
+
+  before(function(done) {
+    const probeConnection = new Connection(config);
+
+    probeConnection.connect((err) => {
+      if (err) {
+        return done(err);
+      }
+
+      const request = new Request('SELECT CAST(\'{}\' AS json)', (err) => {
+        probeConnection.close();
+
+        if (err && !(err instanceof RequestError && err.number === UNDEFINED_TYPE_ERROR)) {
+          return done(err);
+        }
+
+        const tdsVersionSupportsJson = !config.options.tdsVersion || config.options.tdsVersion >= '7_4';
+        expectJsonSupport = !err && tdsVersionSupportsJson;
+        done();
+      });
+
+      probeConnection.execSql(request);
+    });
+  });
 
   beforeEach(function(done) {
     connection = new Connection(config);
@@ -38,81 +73,132 @@ describe('json data type', function() {
     }
   });
 
+  it('negotiates JSON support exactly when the server has the json data type', function() {
+    assert.strictEqual(connection.serverSupportsJson, expectJsonSupport);
+  });
+
   describe('on servers that support the json data type', function() {
     beforeEach(function() {
-      if (!connection.serverSupportsJson) {
+      if (!expectJsonSupport) {
         this.skip();
       }
     });
 
-    it('returns json columns as strings', function(done) {
-      const request = new Request('SELECT CAST(\'{"a":[1,"ü"]}\' AS json)', (err) => {
-        done(err);
+    // Runs `sql` with the given parameters and returns the first column of
+    // every row.
+    function query(sql: string, addParameters: (request: Request) => void, callback: (err: Error | null | undefined, values: unknown[], types: string[]) => void) {
+      const values: unknown[] = [];
+      const types: string[] = [];
+
+      const request = new Request(sql, (err) => {
+        callback(err, values, types);
       });
+      addParameters(request);
 
       request.on('row', (columns) => {
-        assert.strictEqual(columns[0].metadata.type.name, 'JSON');
-        assert.isString(columns[0].value);
-        assert.deepEqual(JSON.parse(columns[0].value), { a: [1, 'ü'] });
+        values.push(columns[0].value);
+        types.push(columns[0].metadata.type.name);
       });
 
       connection.execSql(request);
+    }
+
+    it('returns json columns as strings', function(done) {
+      query('SELECT CAST(\'{"a":[1,"ü"]}\' AS json)', () => {}, (err, values, types) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.deepEqual(types, ['JSON']);
+        assert.isString(values[0]);
+        assert.deepEqual(JSON.parse(values[0] as string), { a: [1, 'ü'] });
+        done();
+      });
     });
 
     it('returns null json values as `null`', function(done) {
-      const request = new Request('SELECT CAST(NULL AS json)', (err) => {
-        done(err);
-      });
+      query('SELECT CAST(NULL AS json)', () => {}, (err, values, types) => {
+        if (err) {
+          return done(err);
+        }
 
-      request.on('row', (columns) => {
-        assert.strictEqual(columns[0].metadata.type.name, 'JSON');
-        assert.isNull(columns[0].value);
+        assert.deepEqual(types, ['JSON']);
+        assert.deepEqual(values, [null]);
+        done();
       });
-
-      connection.execSql(request);
     });
 
     it('round-trips string parameter values', function(done) {
       const value = '{"a":[1,"ü"],"b":null}';
 
-      const request = new Request('SELECT @p', (err) => {
-        done(err);
-      });
-      request.addParameter('p', TYPES.JSON, value);
+      query('SELECT @p', (request) => {
+        request.addParameter('p', TYPES.JSON, value);
+      }, (err, values) => {
+        if (err) {
+          return done(err);
+        }
 
-      request.on('row', (columns) => {
-        assert.deepEqual(JSON.parse(columns[0].value), JSON.parse(value));
+        assert.lengthOf(values, 1);
+        assert.deepEqual(JSON.parse(values[0] as string), JSON.parse(value));
+        done();
       });
-
-      connection.execSql(request);
     });
 
     it('round-trips object parameter values', function(done) {
       const value = { a: [1, 'ü'], b: null };
 
-      const request = new Request('SELECT @p', (err) => {
-        done(err);
-      });
-      request.addParameter('p', TYPES.JSON, value);
+      query('SELECT @p', (request) => {
+        request.addParameter('p', TYPES.JSON, value);
+      }, (err, values) => {
+        if (err) {
+          return done(err);
+        }
 
-      request.on('row', (columns) => {
-        assert.deepEqual(JSON.parse(columns[0].value), value);
+        assert.lengthOf(values, 1);
+        assert.deepEqual(JSON.parse(values[0] as string), value);
+        done();
       });
-
-      connection.execSql(request);
     });
 
     it('round-trips `null` parameter values', function(done) {
-      const request = new Request('SELECT @p', (err) => {
-        done(err);
-      });
-      request.addParameter('p', TYPES.JSON, null);
+      query('SELECT @p', (request) => {
+        request.addParameter('p', TYPES.JSON, null);
+      }, (err, values) => {
+        if (err) {
+          return done(err);
+        }
 
-      request.on('row', (columns) => {
-        assert.isNull(columns[0].value);
+        assert.deepEqual(values, [null]);
+        done();
       });
+    });
 
-      connection.execSql(request);
+    it('round-trips parameter values read from a stream', function(done) {
+      const value = { a: 'ü'.repeat(10000), b: [1, 2, 3] };
+      const text = JSON.stringify(value);
+      const source = Readable.from([text.slice(0, 5000), text.slice(5000, 15000), text.slice(15000)]);
+
+      query('SELECT @p', (request) => {
+        request.addParameter('p', TYPES.JSON, source);
+      }, (err, values) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.lengthOf(values, 1);
+        assert.deepEqual(JSON.parse(values[0] as string), value);
+        done();
+      });
+    });
+
+    it('rejects string parameter values that are not valid JSON text', function(done) {
+      query('SELECT @p', (request) => {
+        request.addParameter('p', TYPES.JSON, 'not json');
+      }, (err, values) => {
+        assert.instanceOf(err, RequestError);
+        assert.lengthOf(values, 0);
+        done();
+      });
     });
 
     it('bulk loads json values', function(done) {
@@ -129,6 +215,7 @@ describe('json data type', function() {
             return done(err);
           }
 
+          assert.lengthOf(values, 3);
           assert.deepEqual(JSON.parse(values[0] as string), { a: [1, 'ü'] });
           assert.deepEqual(JSON.parse(values[1] as string), { b: 2 });
           assert.isNull(values[2]);
@@ -173,6 +260,7 @@ describe('json data type', function() {
               return done(err ?? dropErr);
             }
 
+            assert.lengthOf(values, 2);
             assert.deepEqual(JSON.parse(values[0] as string), { a: [1, 'ü'] });
             assert.isNull(values[1]);
             done();
@@ -252,7 +340,7 @@ describe('json data type', function() {
 
   describe('on servers that do not support the json data type', function() {
     beforeEach(function() {
-      if (connection.serverSupportsJson) {
+      if (expectJsonSupport) {
         this.skip();
       }
     });
