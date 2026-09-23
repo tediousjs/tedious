@@ -104,6 +104,97 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
+  it('returns output parameters of executions', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    const outputs: unknown[] = [];
+    let executions = 0;
+
+    const request = new Request('SET @out = @in * 2', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      if (++executions < 2) {
+        connection.execute(request, { in: 21 });
+      } else {
+        assert.deepEqual(outputs, [20, 42]);
+        connection.close();
+      }
+    });
+    request.addParameter('in', TYPES.Int);
+    request.addOutputParameter('out', TYPES.Int);
+
+    request.on('returnValue', (parameterName, value) => {
+      if (parameterName === 'out') {
+        outputs.push(value);
+      }
+    });
+
+    request.on('prepared', function() {
+      connection.execute(request, { in: 10 });
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
+  it('does not add `returnValue` listeners when preparing a request', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection(config);
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    let preparations = 0;
+
+    const request = new Request('select 1', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      // `unprepare` completed.
+      if (preparations < 3) {
+        connection.prepare(request);
+      } else {
+        assert.strictEqual(request.listenerCount('returnValue'), 0);
+        connection.close();
+      }
+    });
+
+    request.on('prepared', function() {
+      preparations += 1;
+      connection.unprepare(request);
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
   it('does not leak memory via EventEmitter listeners when reusing a request many times', function(done) {
     const config = getConfig();
 
