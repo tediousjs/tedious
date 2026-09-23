@@ -65,7 +65,7 @@ describe('Feature Ext Parser', () => {
 
   it('should parse JSON support token', async function() {
     const debug = new Debug();
-    const buffer = new WritableTrackingBuffer(8);
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
     buffer.writeUInt8(0x0D); // JSON_SUPPORT feature id
@@ -89,7 +89,7 @@ describe('Feature Ext Parser', () => {
 
   it('should preserve the raw data of JSON support tokens with unknown versions', async function() {
     const debug = new Debug();
-    const buffer = new WritableTrackingBuffer(8);
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
     buffer.writeUInt8(0x0D); // JSON_SUPPORT feature id

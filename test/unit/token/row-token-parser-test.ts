@@ -1445,7 +1445,7 @@ describe('Row Token Parser', function() {
     const value = '{"a":"\u00fc"}';
     const payload = Buffer.from(value, 'utf8');
 
-    const buffer = new WritableTrackingBuffer(0);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeUInt64LE(payload.length); // PLP total length
     buffer.writeUInt32LE(payload.length); // chunk length
@@ -1479,7 +1479,7 @@ describe('Row Token Parser', function() {
       collation: undefined
     }];
 
-    const buffer = new WritableTrackingBuffer(0);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.alloc(8, 0xFF)); // PLP null
 

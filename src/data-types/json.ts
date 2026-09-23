@@ -1,7 +1,6 @@
 import { type DataType } from '../data-type';
+import { writePlpValue } from './plp-stream';
 
-const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-const PLP_TERMINATOR = Buffer.from([0x00, 0x00, 0x00, 0x00]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
 const Json: DataType = {
@@ -13,36 +12,18 @@ const Json: DataType = {
     return 'json';
   },
 
-  generateTypeInfo() {
-    return Buffer.from([this.id]);
+  writeTypeInfo(buffer) {
+    buffer.writeUInt8(this.id);
   },
 
-  generateParameterLength(parameter, options) {
-    const value = parameter.value as Buffer | null;
-
-    if (value == null) {
-      return MAX_NULL_LENGTH;
-    }
-
-    return UNKNOWN_PLP_LEN;
-  },
-
-  *generateParameterData(parameter, options) {
-    const value = parameter.value as Buffer | null;
-
-    if (value == null) {
+  writeValue(buffer, parameter) {
+    if (parameter.value == null) {
+      buffer.writeBuffer(MAX_NULL_LENGTH);
       return;
     }
 
-    if (value.length > 0) {
-      const buffer = Buffer.alloc(4);
-      buffer.writeUInt32LE(value.length, 0);
-      yield buffer;
-
-      yield value;
-    }
-
-    yield PLP_TERMINATOR;
+    // `validate` serialized and encoded the value.
+    writePlpValue(buffer, parameter.value as Buffer);
   },
 
   validate: function(value): Buffer | null {

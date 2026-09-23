@@ -74,7 +74,7 @@ describe('NBCRow Token Parser', function() {
     const value = '{"a":"\u00fc"}';
     const payload = Buffer.from(value, 'utf8');
 
-    const buffer = new WritableTrackingBuffer(0);
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xd2);
     buffer.writeUInt8(0x00); // null bitmap - column is not null
     buffer.writeUInt64LE(payload.length); // PLP total length

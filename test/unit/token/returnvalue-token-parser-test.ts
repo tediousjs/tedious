@@ -16,10 +16,10 @@ describe('ReturnValue Token Parser', function() {
     const value = '{"a":"ü"}';
     const payload = Buffer.from(value, 'utf8');
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xAC); // RETURNVALUE token
     buffer.writeUInt16LE(1); // paramOrdinal
-    buffer.writeBVarchar('@out'); // paramName
+    buffer.writeBVarchar('@out', 'ucs2'); // paramName
     buffer.writeUInt8(0x01); // status
     buffer.writeUInt32LE(0); // userType
     buffer.writeUInt16LE(0); // flags
@@ -45,10 +45,10 @@ describe('ReturnValue Token Parser', function() {
   it('should parse null json values', async function() {
     const debug = new Debug();
 
-    const buffer = new WritableTrackingBuffer(0, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
     buffer.writeUInt8(0xAC); // RETURNVALUE token
     buffer.writeUInt16LE(1); // paramOrdinal
-    buffer.writeBVarchar('@out'); // paramName
+    buffer.writeBVarchar('@out', 'ucs2'); // paramName
     buffer.writeUInt8(0x01); // status
     buffer.writeUInt32LE(0); // userType
     buffer.writeUInt16LE(0); // flags

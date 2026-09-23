@@ -130,14 +130,14 @@ describe('Colmetadata Token Parser', function() {
     const flags = 0;
     const columnName = 'col1';
 
-    const buffer = new WritableTrackingBuffer(50, 'ucs2');
+    const buffer = new WritableTrackingBuffer();
 
     buffer.writeUInt8(0x81);
     buffer.writeUInt16LE(numberOfColumns);
     buffer.writeUInt32LE(userType);
     buffer.writeUInt16LE(flags);
     buffer.writeUInt8(typeByName.JSON.id);
-    buffer.writeBVarchar(columnName);
+    buffer.writeBVarchar(columnName, 'ucs2');
 
     const parser = StreamParser.parseTokens([buffer.data], debug, options);
 

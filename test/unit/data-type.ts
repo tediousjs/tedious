@@ -1770,46 +1770,46 @@ describe('JSON', function() {
     });
   });
 
-  describe('.generateTypeInfo', function() {
-    it('returns the JSON type token without additional metadata', function() {
-      const result = TYPES.JSON.generateTypeInfo({ value: null }, options);
+  describe('.writeTypeInfo', function() {
+    it('writes the JSON type token without additional metadata', function() {
+      const result = typeInfo(TYPES.JSON, { value: null }, options);
       assert.deepEqual(result, Buffer.from([0xF4]));
     });
   });
 
-  describe('.generateParameterLength', function() {
-    it('returns the PLP null length for `null` values', function() {
-      const result = TYPES.JSON.generateParameterLength({ value: null }, options);
-      assert.deepEqual(result, Buffer.from('ffffffffffffffff', 'hex'));
+  describe('.writeValue length field', function() {
+    it('writes the PLP null length for `null` values', function() {
+      const { length } = serialize(TYPES.JSON, { value: null }, options);
+      assert.deepEqual(length, Buffer.from('ffffffffffffffff', 'hex'));
     });
 
-    it('returns the unknown PLP length for non-null values', function() {
-      const result = TYPES.JSON.generateParameterLength({ value: Buffer.from('{"a":1}') }, options);
-      assert.deepEqual(result, Buffer.from('feffffffffffffff', 'hex'));
+    it('writes the unknown PLP length for non-null values', function() {
+      const { length } = serialize(TYPES.JSON, { value: Buffer.from('{"a":1}') }, options);
+      assert.deepEqual(length, Buffer.from('feffffffffffffff', 'hex'));
     });
   });
 
-  describe('.generateParameterData', function() {
-    it('generates no data for `null` values', function() {
-      const buffer = Buffer.concat([...TYPES.JSON.generateParameterData({ value: null }, options)]);
-      assert.deepEqual(buffer, Buffer.alloc(0));
+  describe('.writeValue data', function() {
+    it('writes no data for `null` values', function() {
+      const { data } = serialize(TYPES.JSON, { value: null }, options);
+      assert.deepEqual(data, Buffer.alloc(0));
     });
 
-    it('generates only the PLP terminator for empty values', function() {
-      const buffer = Buffer.concat([...TYPES.JSON.generateParameterData({ value: Buffer.alloc(0) }, options)]);
-      assert.deepEqual(buffer, Buffer.from('00000000', 'hex'));
+    it('writes only the PLP terminator for empty values', function() {
+      const { data } = serialize(TYPES.JSON, { value: Buffer.alloc(0) }, options);
+      assert.deepEqual(data, Buffer.from('00000000', 'hex'));
     });
 
-    it('generates a single length-prefixed chunk followed by the PLP terminator', function() {
+    it('writes a single length-prefixed chunk followed by the PLP terminator', function() {
       const value = Buffer.from('{"a":1}', 'utf8');
-      const buffer = Buffer.concat([...TYPES.JSON.generateParameterData({ value: value }, options)]);
+      const { data } = serialize(TYPES.JSON, { value: value }, options);
 
       const expected = Buffer.concat([
         Buffer.from('07000000', 'hex'),
         value,
         Buffer.from('00000000', 'hex')
       ]);
-      assert.deepEqual(buffer, expected);
+      assert.deepEqual(data, expected);
     });
   });
 
