@@ -678,15 +678,47 @@ class Request extends EventEmitter {
    * ones after via `stream` or `await read`.
    */
   outputParameters(): Promise<OutputParameters> {
-    return this.pullResponse().outputParameters();
+    const response = this.pullResponse();
+    response.consumed = true;
+    return response.outputParameters();
   }
 
   /**
    * Read the rest of the request's response, discarding any rows, and return
    * a summary of it.
+   *
+   * A request without a completion callback must be finished before the next
+   * request can be made on the connection - either by calling `finish`, or by
+   * declaring the request with `await using`, which finishes it once it goes
+   * out of scope.
+   *
+   * The request's error is raised by `finish` only if the response was not
+   * read via [[rows]], [[results]] or [[outputParameters]] - those raise it
+   * themselves. `finish` can be called any number of times, and raises an
+   * error at most once.
    */
   finish(): Promise<RequestSummary> {
     return this.pullResponse().finish();
+  }
+
+  /**
+   * Finish the request when it goes out of scope, via `await using`:
+   *
+   * ```js
+   * await using request = new Request('SELECT id FROM users');
+   * connection.execSql(request);
+   *
+   * for await (const row of request.rows()) {
+   *   // ...
+   * }
+   * ```
+   *
+   * See [[finish]].
+   */
+  async [Symbol.asyncDispose](): Promise<void> {
+    if (this.userCallback === undefined && this.pull !== undefined) {
+      await this.pull.finish();
+    }
   }
 
   /**

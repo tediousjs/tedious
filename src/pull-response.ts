@@ -483,6 +483,26 @@ abstract class ValueSequence {
   }
 
   /**
+   * Read all values that were not read yet in full.
+   */ readRemaining(): MaybePromise<void> {
+    while (true) {
+      if (this.pending !== undefined) {
+        const reading = this.readPendingValue();
+        if (reading !== undefined) {
+          return reading.then(() => this.readRemaining());
+        }
+      } else if (this.complete) {
+        return;
+      } else {
+        const readingAhead = this.readAhead();
+        if (readingAhead !== undefined) {
+          return readingAhead.then(() => this.readRemaining());
+        }
+      }
+    }
+  }
+
+  /**
    * Skip values until at least `count` values were read (or skipped).
    */
   skipTo(count: number): MaybePromise<void> {
@@ -679,23 +699,6 @@ export class Row extends ValueSequence {
     }
   }
 
-  readRemaining(): MaybePromise<void> {
-    while (true) {
-      if (this.pending !== undefined) {
-        const reading = this.readPendingValue();
-        if (reading !== undefined) {
-          return reading.then(() => this.readRemaining());
-        }
-      } else if (this.complete) {
-        return;
-      } else {
-        const readingAhead = this.readAhead();
-        if (readingAhead !== undefined) {
-          return readingAhead.then(() => this.readRemaining());
-        }
-      }
-    }
-  }
 }
 
 /**
@@ -1101,9 +1104,16 @@ export class PullResponse {
   // Whether a consumer (`rows()` or `results()`) was used.
   declare consumed: boolean;
 
-  // Whether the response is waiting at its output parameters, which nobody
-  // asked for (yet).
-  declare parked: boolean;
+  // Whether the request's error was already raised to the consumer (or the
+  // consumer canceled the request), so `finish` does not raise it again.
+  declare errorDelivered: boolean;
+
+  declare outputParametersPromise: Promise<OutputParameters> | undefined;
+  declare finishPromise: Promise<RequestSummary> | undefined;
+  declare summary: RequestSummary | undefined;
+
+  // Called once `finish` completed.
+  declare onFinished: () => void;
 
   constructor(request: Request) {
     this.request = request;
@@ -1125,7 +1135,11 @@ export class PullResponse {
 
     this.resultSet = undefined;
     this.consumed = false;
-    this.parked = false;
+    this.errorDelivered = false;
+    this.outputParametersPromise = undefined;
+    this.finishPromise = undefined;
+    this.summary = undefined;
+    this.onFinished = () => {};
   }
 
   /**
@@ -1142,7 +1156,6 @@ export class PullResponse {
   complete(error: Error | null | undefined) {
     this.completed = true;
     this.completionError = error ?? undefined;
-    this.parked = false;
 
     if (this.reader === undefined) {
       this.rejectReader(error ?? new RequestError('The request completed without a response.', 'EINVALIDSTATE'));
@@ -1164,6 +1177,7 @@ export class PullResponse {
     await this.completion;
 
     if (this.completionError !== undefined) {
+      this.errorDelivered = true;
       throw this.completionError;
     }
   }
@@ -1211,13 +1225,13 @@ export class PullResponse {
     const reader = await this.getReader();
 
     if (!reader.ended && !this.completed) {
-      // Stopped at the output parameters.
+      // Stopped at the output parameters, which are read via
+      // `outputParameters()` or `finish()`.
       if (this.request.error !== undefined) {
         await this.discard();
         await this.settled();
       }
 
-      this.parked = true;
       return DONE;
     }
 
@@ -1230,8 +1244,6 @@ export class PullResponse {
    * complete.
    */
   async discard() {
-    this.parked = false;
-
     const reader = await Promise.resolve(this.getReader()).catch(() => undefined);
     if (reader !== undefined && !reader.ended) {
       await reader.drain();
@@ -1245,7 +1257,8 @@ export class PullResponse {
    * complete. Used when a consumer stops early.
    */
   async abort() {
-    this.parked = false;
+    // The consumer does not need to learn about its own cancellation.
+    this.errorDelivered = true;
 
     if (!this.completed) {
       this.request.cancel();
@@ -1254,9 +1267,11 @@ export class PullResponse {
     await this.completion;
   }
 
-  async outputParameters(): Promise<OutputParameters> {
-    this.parked = false;
+  outputParameters(): Promise<OutputParameters> {
+    return this.outputParametersPromise ??= this.readOutputParameters();
+  }
 
+  async readOutputParameters(): Promise<OutputParameters> {
     while (await this.nextResultSet() !== undefined) {
       // skip the remaining result sets
     }
@@ -1274,21 +1289,57 @@ export class PullResponse {
     return outputParameters;
   }
 
-  async finish(): Promise<RequestSummary> {
-    const outputParameters = await this.outputParameters();
-
-    const values: { [name: string]: unknown } = {};
-    for (const name of outputParameters.names) {
-      values[name] = await outputParameters.read(name);
+  /**
+   * Read the rest of the response and wait for the request to complete.
+   * Can be called any number of times.
+   */
+  finish(): Promise<RequestSummary> {
+    if (this.finishPromise === undefined) {
+      return this.finishPromise = this.readSummary().finally(() => {
+        this.onFinished();
+      });
     }
 
-    // No output parameters (or `null` ones only) leave the rest of the
-    // response to be read here.
-    await outputParameters.finish();
+    // An error was raised by the first call already.
+    return this.finishPromise.catch(() => this.summary!);
+  }
 
-    return {
+  async readSummary(): Promise<RequestSummary> {
+    // Consumers that pulled the response (e.g. via a `rows()` loop) received
+    // the request's error from there, so it is not raised again.
+    const errorDelivered = this.consumed || this.errorDelivered;
+
+    const values: { [name: string]: unknown } = {};
+    let returnStatus;
+
+    try {
+      const outputParameters = await this.outputParameters();
+      returnStatus = outputParameters.returnStatus;
+
+      await outputParameters.readRemaining();
+      await outputParameters.finish();
+
+      for (const [name, index] of outputParameters.positions) {
+        const value = outputParameters.items[index].value;
+        if (value !== STREAMED) {
+          values[name] = value;
+        }
+      }
+    } catch (err) {
+      // Wait for the request to complete even if reading failed, so the
+      // connection can be used again once `finish` returned.
+      await this.discard();
+
+      this.summary = { rowCount: this.request.rowCount ?? 0, returnStatus: returnStatus, outputParameters: values };
+
+      if (!(errorDelivered && err === this.completionError)) {
+        throw err;
+      }
+    }
+
+    return this.summary = {
       rowCount: this.request.rowCount ?? 0,
-      returnStatus: outputParameters.returnStatus,
+      returnStatus: returnStatus,
       outputParameters: values
     };
   }

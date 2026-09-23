@@ -955,6 +955,13 @@ class Connection extends EventEmitter {
    * @private
    */
   declare isSqlBatch: boolean;
+
+  /**
+   * A request consumed by pulling that was sent, but not finished yet.
+   *
+   * @private
+   */
+  declare unfinishedRequest: Request | undefined;
   /**
    * @private
    */
@@ -1797,6 +1804,7 @@ class Connection extends EventEmitter {
     // equivalent behavior for TDS versions before 7.2.
     this.transactionDepth = 0;
     this.isSqlBatch = false;
+    this.unfinishedRequest = undefined;
     this.closed = false;
     this.messageBuffer = Buffer.alloc(0);
 
@@ -3248,22 +3256,15 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
-    // A pulled request whose consumer stopped at its output parameters is
-    // still in progress. Its remaining response is discarded before the next
-    // request is made.
-    const current = this.request;
-    if (this.state === this.STATE.SENT_CLIENT_REQUEST && current instanceof Request && current.pull?.parked) {
-      current.pull.discard().then(() => {
-        this.makeRequest(request, packetType, payload);
-      });
-      return;
-    }
-
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
 
-    if (this.state !== this.STATE.LOGGED_IN) {
+    if (this.unfinishedRequest !== undefined) {
+      const message = 'The previous request was not finished. Call `finish()` on it, or declare it with `await using`.';
+      this.debug.log(message);
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    } else if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(new RequestError(message, 'EINVALIDSTATE'));
@@ -3280,6 +3281,18 @@ class Connection extends EventEmitter {
 
       this.request = request;
       this.attentionSent = false;
+
+      // A pulled request is in progress until its consumer finished it.
+      const response = request instanceof Request ? request.pull : undefined;
+      if (response !== undefined) {
+        this.unfinishedRequest = request as Request;
+        response.onFinished = () => {
+          if (this.unfinishedRequest === request) {
+            this.unfinishedRequest = undefined;
+          }
+        };
+      }
+
       request.connection! = this;
       request.rowCount! = 0;
       request.collectedRows! = [];

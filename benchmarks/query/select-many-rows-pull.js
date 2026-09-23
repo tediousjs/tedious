@@ -46,6 +46,8 @@ function main({ n, size }) {
               row.get(1);
               await row.read(2);
             }
+
+            await request.finish();
           }
 
           bench.end(n);
