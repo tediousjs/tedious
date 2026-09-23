@@ -352,3 +352,11 @@ export class Collation {
     return this.buffer;
   }
 }
+
+/**
+ * `Latin1_General_100_BIN2_UTF8`, the collation the `json` data type is fixed
+ * to. Sent in the `varchar(max)` TYPE_INFO that is substituted for `json`
+ * columns in bulk loads and TVPs, so that the server decodes their
+ * PLP-encoded data as UTF-8.
+ */
+export const JSON_COLLATION = new Collation(0x0409, Flags.BINARY2 | Flags.UTF8, 2, 0);

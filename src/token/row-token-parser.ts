@@ -30,6 +30,8 @@ async function rowParser(parser: Parser): Promise<RowToken> {
           columns.push({ value: iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8'), metadata });
         } else if (metadata.type.name === 'VarBinary' || metadata.type.name === 'UDT') {
           columns.push({ value: Buffer.concat(chunks), metadata });
+        } else if (metadata.type.name === 'JSON') {
+          columns.push({ value: Buffer.concat(chunks).toString('utf8'), metadata });
         }
       } else {
         let result;

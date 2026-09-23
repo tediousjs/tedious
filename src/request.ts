@@ -441,7 +441,7 @@ class Request extends EventEmitter {
    *   The value that the parameter is to be given. The Javascript type of the
    *   argument should match that documented for data types.
    *
-   *   A `varchar(max)`, `nvarchar(max)` or `varbinary(max)` value, or the rows
+   *   A `varchar(max)`, `nvarchar(max)`, `varbinary(max)` or `json` value, or the rows
    *   of a table-valued parameter, can also be given as an async iterable
    *   (e.g. a `Readable`) of chunks, or of rows. The source is read while the
    *   request is being sent, so it does not have to fit in memory, and a

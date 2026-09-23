@@ -42,6 +42,7 @@ import { type CryptoMetadata } from './always-encrypted/types';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import Json from './data-types/json';
 
 export interface Parameter {
   type: DataType;
@@ -266,6 +267,7 @@ export const TYPE = {
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
+  [Json.id]: Json
 };
 
 /**
@@ -537,6 +539,13 @@ export const TYPE = {
  *     <td>✓</td>
  *     <td>-</td>
  *   </tr>
+ *   <tr>
+ *     <td><code>json</code><sup>5</sup></td>
+ *     <td><code>[[TYPES.JSON]]</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
  * </tbody>
  * </table>
  *
@@ -569,6 +578,26 @@ export const TYPE = {
  *       Note that the order of bytes is not the same as the character representation. See
  *       <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
  *       for an example of the different ordering of bytes.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>JSON</h4>
+ *     <p>
+ *       Requires a server that supports the <code>json</code> data type (SQL Server 2025 or Azure SQL) and TDS 7.4.
+ *       Values are always returned as a string of JSON text; they are not parsed.
+ *     </p>
+ *     <p>
+ *       A parameter value that is a string is sent as JSON text, not as a JSON string value: <code>'[1, 2]'</code> is
+ *       an array, and <code>'abc'</code> is rejected by the server as invalid JSON. Any other value is serialized
+ *       with <code>JSON.stringify</code>, so properties whose value is <code>undefined</code>, a function or a symbol are
+ *       omitted, and <code>toJSON</code> methods (e.g. <code>Date</code>'s) are applied. Values that
+ *       <code>JSON.stringify</code> would silently change are rejected instead: <code>Buffer</code>s, typed arrays and
+ *       <code>ArrayBuffer</code>s, <code>Map</code>s, <code>Set</code>s and other non-array iterables,
+ *       <code>NaN</code> and <code>Infinity</code>.
+ *     </p>
+ *     <p>
+ *       A parameter value can also be an async iterable (e.g. a <code>Readable</code> with <code>encoding: 'utf8'</code>)
+ *       of string chunks of JSON text, which is read while the request is sent.
  *     </p>
  *   </li>
  * </ol>
@@ -604,7 +633,8 @@ export const TYPES = {
   DateTimeOffset,
   UDT,
   TVP,
-  Variant
+  Variant,
+  JSON: Json
 };
 
 export const typeByName = TYPES;

@@ -183,6 +183,47 @@ describe('streaming parameters', function() {
     });
   });
 
+  describe('json', function() {
+    it('streams string chunks as UTF-8, matching the in-memory serialization of the same value', async function() {
+      const value = '{"a":[1,"ü"],"b":"' + 'x'.repeat(20000) + '"}';
+      const chunks = [value.slice(0, 7), '', value.slice(7, 12000), value.slice(12000)];
+
+      const resolved = resolveParameter(param({ type: TYPES.JSON, value: from(chunks) }), collation, options);
+      assert.isDefined(TYPES.JSON.writeValue(new WritableTrackingBuffer(), resolved.data, options));
+
+      const streamed = await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+      const inMemory = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.JSON, value }), collation, options)], txnDescriptor, options));
+      assert.deepEqual(plpData(streamed), Buffer.from(value, 'utf8'));
+      assert.deepEqual(plpData(streamed), plpData(inMemory));
+    });
+
+    it('streams a `Readable` that is read as strings', async function() {
+      const value = '{"a":"ü"}';
+      const source = Readable.from([Buffer.from(value, 'utf8')]).setEncoding('utf8');
+
+      const bytes = await collect(new RpcRequestPayload('p', [resolveParameter(param({ type: TYPES.JSON, value: source }), collation, options)], txnDescriptor, options));
+      assert.deepEqual(plpData(bytes), Buffer.from(value, 'utf8'));
+    });
+
+    it('declares an async source as `json`', function() {
+      assert.strictEqual(TYPES.JSON.declaration(param({ type: TYPES.JSON, value: Readable.from([]) })), 'json');
+    });
+
+    it('surfaces a chunk that is not a string as InputError naming the parameter', async function() {
+      const resolved = resolveParameter(param({ name: 'doc', type: TYPES.JSON, value: from([Buffer.from('{}')]) }), collation, options);
+
+      let error: unknown;
+      try {
+        await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, InputError);
+      assert.strictEqual((error as InputError).message, "Input parameter 'doc' could not be validated");
+      assert.instanceOf((error as InputError).cause, TypeError);
+    });
+  });
+
   it('surfaces a failing source as InputError naming the parameter', async function() {
     async function * boom() {
       yield Buffer.from([1]);

@@ -117,14 +117,19 @@ describe('MessageIO', function() {
       await Promise.all([
         // Server side
         (async () => {
-          // Wait for data to become available
-          await once(serverConnection, 'readable');
+          const chunks: Buffer[] = [];
+          let length = 0;
 
-          let chunk: Buffer;
-          const chunks = [];
+          // The payload is sent as two packets, which are written separately
+          // and can arrive in separate reads.
+          while (length < 21) {
+            await once(serverConnection, 'readable');
 
-          while (chunk = serverConnection.read()) {
-            chunks.push(chunk);
+            let chunk: Buffer;
+            while (chunk = serverConnection.read()) {
+              chunks.push(chunk);
+              length += chunk.length;
+            }
           }
 
           const data = Buffer.concat(chunks);
