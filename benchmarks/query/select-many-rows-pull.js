@@ -39,15 +39,15 @@ function main({ n, size }) {
         (async function() {
           for (let i = 0; i < n; i++) {
             const request = new Request('SELECT * FROM #benchmark');
-            connection.execSql(request);
+            const response = connection.execSql(request);
 
-            for await (const row of request.rows()) {
+            for await (const row of response.rows()) {
               row.get(0);
               row.get(1);
               await row.read(2);
             }
 
-            await request.finish();
+            await response.finish();
           }
 
           bench.end(n);

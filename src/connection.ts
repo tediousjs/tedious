@@ -31,7 +31,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
-import { ResponseReader, type PullResponse } from './pull-response';
+import { PreparedStatement, ResponseReader, type Response } from './pull-response';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
@@ -2709,10 +2709,12 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  execSqlBatch(request: Request) {
-    request.startExecution();
+  execSqlBatch(request: Request): Response {
+    const response = request.startExecution();
 
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+
+    return response;
   }
 
   /**
@@ -2737,8 +2739,8 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  execSql(request: Request) {
-    request.startExecution();
+  execSql(request: Request): Response {
+    const response = request.startExecution();
 
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
@@ -2750,7 +2752,7 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return;
+      return response;
     }
 
     const parameters: ResolvedParameter[] = [];
@@ -2780,6 +2782,8 @@ class Connection extends EventEmitter {
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return response;
   }
 
   /**
@@ -2920,8 +2924,12 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
+   *
+   * @returns The prepared statement, once the statement was prepared. For
+   *   requests without a completion callback, the statement is executed and
+   *   unprepared via the returned [[PreparedStatement]].
    */
-  prepare(request: Request) {
+  prepare(request: Request): Promise<PreparedStatement> {
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -2954,6 +2962,7 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
+    const response = request.startExecution(false);
     request.preparing = true;
 
     // TODO: We need to clean up this event handler, otherwise this leaks memory
@@ -2966,6 +2975,12 @@ class Connection extends EventEmitter {
     });
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
+
+    const statement = response.settled().then(() => new PreparedStatement(this, request));
+    // Requests with a completion callback learn about errors via the
+    // request's `error` event instead.
+    statement.catch(() => {});
+    return statement;
   }
 
   /**
@@ -2975,7 +2990,9 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type.
    *   Parameter values are ignored.
    */
-  unprepare(request: Request) {
+  unprepare(request: Request): Response {
+    const response = request.startExecution(false);
+
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -2990,6 +3007,8 @@ class Connection extends EventEmitter {
     }));
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return response;
   }
 
   /**
@@ -3001,8 +3020,8 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }) {
-    request.startExecution();
+  execute(request: Request, parameters?: { [key: string]: unknown }): Response {
+    const response = request.startExecution();
 
     const executeParameters: ResolvedParameter[] = [];
 
@@ -3034,10 +3053,12 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return;
+      return response;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return response;
   }
 
   /**
@@ -3045,8 +3066,8 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  callProcedure(request: Request) {
-    request.startExecution();
+  callProcedure(request: Request): Response {
+    const response = request.startExecution();
 
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
@@ -3058,10 +3079,12 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return;
+      return response;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return response;
   }
 
   /**
@@ -3283,8 +3306,8 @@ class Connection extends EventEmitter {
       this.attentionSent = false;
 
       // A pulled request is in progress until its consumer finished it.
-      const response = request instanceof Request ? request.pull : undefined;
-      if (response !== undefined) {
+      const response = request instanceof Request ? request.response : undefined;
+      if (response !== undefined && response.pulled) {
         this.unfinishedRequest = request as Request;
         response.onFinished = () => {
           if (this.unfinishedRequest === request) {
@@ -3363,7 +3386,7 @@ class Connection extends EventEmitter {
    *
    * @private
    */
-  startPullResponse(message: Message, request: Request, response: PullResponse) {
+  startPullResponse(message: Message, request: Request, response: Response) {
     const reader = new ResponseReader(message, new RequestTokenHandler(this, request), this.debug, this.config.options);
 
     // Whether an attention message was sent, whose acknowledgement completes
@@ -3890,8 +3913,8 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        if (this.request instanceof Request && this.request.pull !== undefined) {
-          this.startPullResponse(message, this.request, this.request.pull);
+        if (this.request instanceof Request && this.request.response?.pulled) {
+          this.startPullResponse(message, this.request, this.request.response);
           return;
         }
 

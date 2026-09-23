@@ -1,7 +1,7 @@
 import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request from './request';
-import { type OutputParameters, type RequestSummary, type ResultSet, type Row } from './pull-response';
+import { type OutputParameters, type PreparedStatement, type RequestSummary, type Response, type ResultSet, type Row } from './pull-response';
 import { name } from './library';
 
 import { ConnectionError, InputError, RequestError } from './errors';
@@ -36,7 +36,9 @@ export type {
   ConnectionConfiguration,
   ConnectionOptions,
   OutputParameters,
+  PreparedStatement,
   RequestSummary,
+  Response,
   ResultSet,
   Row
 };

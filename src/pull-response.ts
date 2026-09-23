@@ -2,6 +2,7 @@ import { Readable } from 'stream';
 
 import type Debug from './debug';
 import type Request from './request';
+import type Connection from './connection';
 import { RequestError } from './errors';
 import { type Metadata } from './metadata-parser';
 import { decodePLPValue } from './value-parser';
@@ -275,7 +276,7 @@ function waitForToken(reader: ResponseReader): Promise<void> {
  * between.
  */
 abstract class ValueSequence {
-  declare response: PullResponse;
+  declare response: Response;
 
   declare items: Array<{ value: unknown, metadata: Metadata }>;
   declare complete: boolean;
@@ -290,7 +291,7 @@ abstract class ValueSequence {
   declare activeStream: Readable | undefined;
   declare pumping: Promise<void> | undefined;
 
-  constructor(response: PullResponse, items: Array<{ value: unknown, metadata: Metadata }>, complete: boolean) {
+  constructor(response: Response, items: Array<{ value: unknown, metadata: Metadata }>, complete: boolean) {
     this.response = response;
     this.items = items;
     this.complete = complete;
@@ -705,7 +706,7 @@ export class Row extends ValueSequence {
  * A result set, which is an async iterator of its rows.
  */
 export class ResultSet implements AsyncIterableIterator<Row> {
-  declare response: PullResponse;
+  declare response: Response;
   declare columns: ColumnMetadata[];
 
   /**
@@ -717,7 +718,7 @@ export class ResultSet implements AsyncIterableIterator<Row> {
   declare current: Row | undefined;
   declare columnIndexes: Map<string, number> | undefined;
 
-  constructor(response: PullResponse, columns: ColumnMetadata[]) {
+  constructor(response: Response, columns: ColumnMetadata[]) {
     this.response = response;
     this.columns = columns;
     this.rowCount = undefined;
@@ -864,7 +865,7 @@ export class OutputParameters extends ValueSequence {
   // The positions of the parameters read so far, by name.
   declare positions: Map<string, number>;
 
-  constructor(response: PullResponse, returnStatus: number | undefined) {
+  constructor(response: Response, returnStatus: number | undefined) {
     super(response, [], false);
 
     this.returnStatus = returnStatus;
@@ -964,11 +965,11 @@ export class OutputParameters extends ValueSequence {
  * Iterates the rows of a request that returns (at most) one result set.
  */
 export class RowIterator implements AsyncIterableIterator<Row> {
-  declare response: PullResponse;
+  declare response: Response;
   declare resultSet: ResultSet | undefined;
   declare finished: boolean;
 
-  constructor(response: PullResponse) {
+  constructor(response: Response) {
     this.response = response;
     this.resultSet = undefined;
     this.finished = false;
@@ -1039,10 +1040,10 @@ export class RowIterator implements AsyncIterableIterator<Row> {
  * Iterates the result sets of a request.
  */
 export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
-  declare response: PullResponse;
+  declare response: Response;
   declare finished: boolean;
 
-  constructor(response: PullResponse) {
+  constructor(response: Response) {
     this.response = response;
     this.finished = false;
   }
@@ -1082,11 +1083,30 @@ export interface RequestSummary {
 }
 
 /**
- * The response to one execution of a request that is consumed by pulling
- * (i.e. a request created without a completion callback).
+ * The response to one execution of a request.
+ *
+ * The response of a request without a completion callback is consumed by
+ * pulling: via [[rows]], [[results]] or [[outputParameters]]. It must be
+ * finished via [[finish]] before the next request can be made on the
+ * connection - most conveniently by declaring it with `await using`:
+ *
+ * ```js
+ * const request = new Request('SELECT id, name FROM users');
+ *
+ * await using response = connection.execSql(request);
+ * for await (const row of response.rows()) {
+ *   console.log(row.get('id'), row.get('name'));
+ * }
+ * ```
+ *
+ * The response of a request with a completion callback is delivered via the
+ * request's events instead.
  */
-export class PullResponse {
+export class Response {
   declare request: Request;
+
+  // Whether the response is consumed by pulling.
+  declare pulled: boolean;
 
   declare reader: ResponseReader | undefined;
   declare readerPromise: Promise<ResponseReader>;
@@ -1115,8 +1135,9 @@ export class PullResponse {
   // Called once `finish` completed.
   declare onFinished: () => void;
 
-  constructor(request: Request) {
+  constructor(request: Request, pulled: boolean) {
     this.request = request;
+    this.pulled = pulled;
 
     this.reader = undefined;
     this.readerPromise = new Promise((resolve, reject) => {
@@ -1267,7 +1288,61 @@ export class PullResponse {
     await this.completion;
   }
 
+  /**
+   * Iterate the rows of the response's result set.
+   *
+   * The loop ending means the request has completed. Errors of the request
+   * are thrown by the loop. Stopping the loop early cancels the request.
+   *
+   * Throws if the request returns more than one result set, use [[results]]
+   * for those.
+   */
+  rows(): RowIterator {
+    this.consume();
+    return new RowIterator(this);
+  }
+
+  /**
+   * Iterate the result sets of the response, each of which is an async
+   * iterator of its rows.
+   */
+  results(): ResultSetIterator {
+    this.consume();
+    return new ResultSetIterator(this);
+  }
+
+  /**
+   * Read the request's return status and output parameters, skipping any
+   * result sets that were not read yet.
+   *
+   * Output parameters are read one after the other: parameters before the
+   * first `max` type parameter can be accessed right away via `get`, the
+   * ones after via `stream` or `await read`.
+   */
   outputParameters(): Promise<OutputParameters> {
+    this.consume();
+    return this.readOutputParametersOnce();
+  }
+
+  /**
+   * Finish the response when it goes out of scope, via `await using`. See
+   * [[finish]].
+   */
+  async [Symbol.asyncDispose](): Promise<void> {
+    if (this.pulled) {
+      await this.finish();
+    }
+  }
+
+  consume() {
+    if (!this.pulled) {
+      throw new Error('The response of a request with a completion callback is delivered via events, and can not be pulled. Create the request without a callback instead.');
+    }
+
+    this.consumed = true;
+  }
+
+  readOutputParametersOnce(): Promise<OutputParameters> {
     return this.outputParametersPromise ??= this.readOutputParameters();
   }
 
@@ -1290,10 +1365,19 @@ export class PullResponse {
   }
 
   /**
-   * Read the rest of the response and wait for the request to complete.
-   * Can be called any number of times.
+   * Read the rest of the response, discarding any rows, wait for the request
+   * to complete, and return a summary of it.
+   *
+   * The request's error is raised by `finish` only if the response was not
+   * read via [[rows]], [[results]] or [[outputParameters]] - those raise it
+   * themselves. `finish` can be called any number of times, and raises an
+   * error at most once.
    */
   finish(): Promise<RequestSummary> {
+    if (!this.pulled) {
+      return Promise.reject(new Error('The response of a request with a completion callback is delivered via events, and can not be pulled.'));
+    }
+
     if (this.finishPromise === undefined) {
       return this.finishPromise = this.readSummary().finally(() => {
         this.onFinished();
@@ -1313,7 +1397,7 @@ export class PullResponse {
     let returnStatus;
 
     try {
-      const outputParameters = await this.outputParameters();
+      const outputParameters = await this.readOutputParametersOnce();
       returnStatus = outputParameters.returnStatus;
 
       await outputParameters.readRemaining();
@@ -1342,5 +1426,81 @@ export class PullResponse {
       returnStatus: returnStatus,
       outputParameters: values
     };
+  }
+}
+
+/**
+ * A statement prepared on the server via `connection.prepare()`, which can
+ * be executed any number of times.
+ *
+ * The statement must be unprepared once it is no longer needed - most
+ * conveniently by declaring it with `await using`:
+ *
+ * ```js
+ * const request = new Request('SELECT name FROM users WHERE id = @id');
+ * request.addParameter('id', TYPES.Int);
+ *
+ * await using statement = await connection.prepare(request);
+ * for (const id of ids) {
+ *   await using response = statement.execute({ id });
+ *   for await (const row of response.rows()) {
+ *     // ...
+ *   }
+ * }
+ * ```
+ */
+export class PreparedStatement {
+  declare connection: Connection;
+  declare request: Request;
+
+  // The response of the latest execution.
+  declare response: Response | undefined;
+  declare unpreparing: Promise<void> | undefined;
+
+  constructor(connection: Connection, request: Request) {
+    this.connection = connection;
+    this.request = request;
+    this.response = undefined;
+    this.unpreparing = undefined;
+  }
+
+  /**
+   * The statement's handle on the server.
+   */
+  get handle(): number | undefined {
+    return this.request.handle;
+  }
+
+  /**
+   * Execute the statement with the given parameter values.
+   */
+  execute(parameters?: { [key: string]: unknown }): Response {
+    if (this.unpreparing !== undefined) {
+      throw new Error('The statement was unprepared.');
+    }
+
+    return this.response = this.connection.execute(this.request, parameters);
+  }
+
+  /**
+   * Unprepare the statement on the server, finishing its latest execution
+   * first if needed. Can be called any number of times.
+   */
+  unprepare(): Promise<void> {
+    return this.unpreparing ??= (async () => {
+      const response = this.response;
+      if (response !== undefined && response.pulled) {
+        await response.finish();
+      }
+
+      await this.connection.unprepare(this.request).settled();
+    })();
+  }
+
+  /**
+   * Unprepare the statement when it goes out of scope, via `await using`.
+   */
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.unprepare();
   }
 }
