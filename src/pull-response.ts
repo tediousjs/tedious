@@ -646,11 +646,13 @@ export class Row extends ValueSequence {
   }
 
   /**
-   * All values of the row, which must have been read completely.
+   * All values of the row, which must have been read completely. That is
+   * the case for rows without `max` values - otherwise, use
+   * [[readValues]].
    */
   values(): unknown[] {
     if (!this.complete || this.pending !== undefined || this.items.length < this.resultSet.columns.length) {
-      throw new Error('The row was not read completely.');
+      throw new Error('The row was not read completely. Use `await readValues()` to read all of its values.');
     }
 
     return this.items.map((item, index) => {
@@ -660,6 +662,39 @@ export class Row extends ValueSequence {
 
       return item.value;
     });
+  }
+
+  /**
+   * Read all remaining values of the row in full (including `max` values),
+   * and return all values of the row.
+   *
+   * Values that were already streamed can not be returned anymore.
+   */
+  readValues(): Promise<unknown[]> {
+    try {
+      const reading = this.readRemaining();
+      return reading !== undefined ? reading.then(() => this.values()) : Promise.resolve(this.values());
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  }
+
+  readRemaining(): MaybePromise<void> {
+    while (true) {
+      if (this.pending !== undefined) {
+        const reading = this.readPendingValue();
+        if (reading !== undefined) {
+          return reading.then(() => this.readRemaining());
+        }
+      } else if (this.complete) {
+        return;
+      } else {
+        const readingAhead = this.readAhead();
+        if (readingAhead !== undefined) {
+          return readingAhead.then(() => this.readRemaining());
+        }
+      }
+    }
   }
 }
 

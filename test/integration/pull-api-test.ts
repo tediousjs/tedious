@@ -258,6 +258,37 @@ describe('pulling responses', function() {
       assert.deepEqual(await query('SELECT 1'), [[1]]);
     });
 
+    it('reads all values of a row in one call via `readValues`', async function() {
+      const text = 'x'.repeat(100000);
+
+      const request = new Request('SELECT 1 AS a, CAST(@text AS nvarchar(max)) AS b, 2 AS c, CAST(0x0102 AS varbinary(max)) AS d');
+      request.addParameter('text', TYPES.NVarChar, text);
+      connection.execSql(request);
+
+      for await (const row of request.rows()) {
+        assert.throws(() => row.values(), /readValues/);
+        assert.deepEqual(await row.readValues(), [1, text, 2, Buffer.from([1, 2])]);
+        assert.deepEqual(row.values(), [1, text, 2, Buffer.from([1, 2])]);
+      }
+    });
+
+    it('does not return values that were streamed via `readValues`', async function() {
+      const request = new Request('SELECT CAST(0x01 AS varbinary(max)) AS a, 1 AS b');
+      connection.execSql(request);
+
+      for await (const row of request.rows()) {
+        await collect(row.stream('a'));
+
+        let error: Error | undefined;
+        try {
+          await row.readValues();
+        } catch (err: any) {
+          error = err;
+        }
+        assert.match(error!.message, /was streamed/);
+      }
+    });
+
     it('returns `null` values of streamable columns right away', async function() {
       const request = new Request('SELECT CAST(NULL AS varbinary(max)) AS a, 1 AS b');
       connection.execSql(request);
