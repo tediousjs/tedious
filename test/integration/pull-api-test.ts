@@ -1,6 +1,7 @@
 import { assert } from 'chai';
 import { randomBytes } from 'crypto';
-import { type Readable } from 'stream';
+import { Writable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 import { TYPES } from '../../src/tedious';
 import Connection from '../../src/connection';
@@ -21,14 +22,14 @@ function getConfig() {
   };
 }
 
-async function collect(stream: Readable | null): Promise<Buffer> {
-  assert.isNotNull(stream);
+async function collect(chunks: AsyncIterable<Buffer> | null): Promise<Buffer> {
+  assert.isNotNull(chunks);
 
-  const chunks = [];
-  for await (const chunk of stream!) {
-    chunks.push(chunk);
+  const collected = [];
+  for await (const chunk of chunks!) {
+    collected.push(chunk);
   }
-  return Buffer.concat(chunks);
+  return Buffer.concat(collected);
 }
 
 describe('pulling responses', function() {
@@ -329,6 +330,60 @@ describe('pulling responses', function() {
       for await (const row of response.rows()) {
         assert.deepEqual(await collect(await row.stream('b')), second);
         assert.throws(() => row.get('a'), /was streamed/);
+      }
+    });
+
+    it('streams a value via `pipeline()`', async function() {
+      const value = randomBytes(1024 * 1024);
+
+      const request = new Request('SELECT @value AS content');
+      request.addParameter('value', TYPES.VarBinary, value);
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        const chunks: Buffer[] = [];
+        await pipeline((await row.stream('content'))!, new Writable({
+          write(chunk, encoding, callback) {
+            chunks.push(chunk);
+            callback();
+          }
+        }));
+
+        assert.deepEqual(Buffer.concat(chunks), value);
+      }
+    });
+
+    it('skips the rest of a value whose iteration was stopped early', async function() {
+      const request = new Request("SELECT CAST(REPLICATE(CAST('x' AS varchar(max)), 100000) AS varbinary(max)) AS a, 1 AS b");
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        for await (const chunk of (await row.stream('a'))!) {
+          assert.isAbove(chunk.length, 0);
+          break;
+        }
+
+        assert.strictEqual(await row.read('b'), 1);
+      }
+    });
+
+    it('fails the iteration of a value that was skipped', async function() {
+      const request = new Request("SELECT CAST(REPLICATE(CAST('x' AS varchar(max)), 100000) AS varbinary(max)) AS a, 1 AS b");
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        const iterator = (await row.stream('a'))![Symbol.asyncIterator]();
+        await iterator.next();
+
+        assert.strictEqual(await row.read('b'), 1);
+
+        let error: Error | undefined;
+        try {
+          await iterator.next();
+        } catch (err: any) {
+          error = err;
+        }
+        assert.match(error!.message, /skipped/);
       }
     });
 

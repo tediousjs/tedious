@@ -1,5 +1,3 @@
-import { Readable } from 'stream';
-
 import type Debug from './debug';
 import type Request from './request';
 import type { PulledRequest } from './request';
@@ -268,6 +266,93 @@ function waitForToken(reader: ResponseReader): Promise<void> {
 }
 
 /**
+ * Iterates the data of a streamed value, chunk by chunk.
+ */
+class ValueIterator implements AsyncIterableIterator<Buffer> {
+  declare sequence: ValueSequence;
+
+  // `reading` while the value's data is iterated, `done` once the iteration
+  // ended, and `skipped` if the value was skipped before its data was
+  // iterated completely.
+  declare state: 'reading' | 'done' | 'skipped';
+
+  constructor(sequence: ValueSequence) {
+    this.sequence = sequence;
+    this.state = 'reading';
+  }
+
+  [Symbol.asyncIterator]() {
+    return this;
+  }
+
+  next(): Promise<IteratorResult<Buffer, undefined>> {
+    const rethrow = this.sequence.response.rethrow;
+
+    if (this.state === 'done') {
+      return DONE_PROMISE;
+    }
+
+    if (this.state === 'skipped') {
+      return Promise.reject(new Error('The value was skipped before its data was read completely.')).catch(rethrow);
+    }
+
+    try {
+      const result = this.read();
+      return result instanceof Promise ? result.catch(rethrow) : Promise.resolve(result);
+    } catch (err) {
+      return Promise.reject(err).catch(rethrow);
+    }
+  }
+
+  read(): MaybePromise<IteratorResult<Buffer, undefined>> {
+    const sequence = this.sequence;
+    const reader = sequence.response.reader!;
+
+    const token = reader.nextSync();
+    if (token === undefined) {
+      return waitForToken(reader).then(() => this.read());
+    }
+
+    if (token instanceof ValueChunkToken) {
+      return { done: false, value: token.data };
+    }
+
+    if (token instanceof ValueEndToken) {
+      this.state = 'done';
+      sequence.activeIterator = undefined;
+      sequence.addPendingItem(STREAMED);
+
+      // Read the values after this one, so they are available via `get`
+      // once the iteration ended.
+      const readingAhead = sequence.readAhead();
+      return readingAhead !== undefined ? readingAhead.then(() => DONE) : DONE;
+    }
+
+    return sequence.interrupted().then((error) => {
+      throw error;
+    });
+  }
+
+  /**
+   * Stop the iteration. The rest of the value is skipped once the next value
+   * (or row) is read.
+   */
+  return(): Promise<IteratorResult<Buffer, undefined>> {
+    if (this.state === 'reading') {
+      this.state = 'done';
+    }
+
+    return DONE_PROMISE;
+  }
+
+  detach() {
+    if (this.state === 'reading') {
+      this.state = 'skipped';
+    }
+  }
+}
+
+/**
  * Values that are read one after the other: the columns of a row, or the
  * output parameters of a request.
  *
@@ -288,9 +373,8 @@ abstract class ValueSequence {
   declare pendingChunks: Buffer[];
   declare pendingLength: number;
 
-  // The stream of the value currently being streamed, and its pump.
-  declare activeStream: Readable | undefined;
-  declare pumping: Promise<void> | undefined;
+  // The iterator of the value currently being streamed.
+  declare activeIterator: ValueIterator | undefined;
 
   constructor(response: Response, items: Array<{ value: unknown, metadata: Metadata }>, complete: boolean) {
     this.response = response;
@@ -299,8 +383,7 @@ abstract class ValueSequence {
     this.pending = undefined;
     this.pendingChunks = [];
     this.pendingLength = 0;
-    this.activeStream = undefined;
-    this.pumping = undefined;
+    this.activeIterator = undefined;
   }
 
   /**
@@ -383,9 +466,13 @@ abstract class ValueSequence {
 
   /**
    * Stream the raw data of a value of a `max` type, skipping any unread
-   * values before it. Resolves to `null` if the value is `null`.
+   * values before it: resolves to an async iterable of the data's chunks, or
+   * to `null` if the value is `null`.
+   *
+   * The chunks reference the incoming data without copying it. Stopping the
+   * iteration early skips the rest of the value.
    */
-  stream(key: number | string): Promise<Readable | null> {
+  stream(key: number | string): Promise<AsyncIterable<Buffer> | null> {
     try {
       const stream = this.streamValue(key);
       return stream instanceof Promise ? stream.catch(this.response.rethrow) : Promise.resolve(stream);
@@ -394,7 +481,7 @@ abstract class ValueSequence {
     }
   }
 
-  streamValue(key: number | string): MaybePromise<Readable | null> {
+  streamValue(key: number | string): MaybePromise<ValueIterator | null> {
     const index = this.locate(key);
     if (typeof index !== 'number') {
       return index.then(() => this.streamValue(key));
@@ -418,66 +505,7 @@ abstract class ValueSequence {
       throw new Error(`The value of \`${key}\` is not available.`);
     }
 
-    const stream = new Readable({
-      read: () => {
-        if (this.pumping !== undefined) {
-          return;
-        }
-
-        this.pumping = this.pump(stream).catch((err) => {
-          this.response.deliveredErrors.add(err);
-          stream.destroy(err);
-        }).finally(() => {
-          this.pumping = undefined;
-        });
-      }
-    });
-
-    this.activeStream = stream;
-    return stream;
-  }
-
-  /**
-   * Push the data of the pending value into its stream, until the stream
-   * does not accept more data or the value ended.
-   */
-  async pump(stream: Readable) {
-    const reader = this.response.reader!;
-
-    while (true) {
-      let token = reader.nextSync();
-      if (token === undefined) {
-        token = await reader.next();
-      }
-
-      if (stream.destroyed) {
-        if (token !== null) {
-          reader.unread(token);
-        }
-        return;
-      }
-
-      if (token instanceof ValueChunkToken) {
-        if (!stream.push(token.data)) {
-          return;
-        }
-
-        continue;
-      }
-
-      if (token instanceof ValueEndToken) {
-        this.addPendingItem(STREAMED);
-        this.activeStream = undefined;
-
-        // Read the values after this one, so they are available via
-        // `get` once the stream ended.
-        await this.readAhead();
-        stream.push(null);
-        return;
-      }
-
-      throw await this.interrupted();
-    }
+    return this.activeIterator = new ValueIterator(this);
   }
 
   /**
@@ -555,12 +583,9 @@ abstract class ValueSequence {
   }
 
   skipPendingValue(): MaybePromise<void> {
-    const stream = this.activeStream;
-    if (stream !== undefined) {
-      this.activeStream = undefined;
-      stream.destroy(new Error('The value was skipped before it was read completely.'));
-      return Promise.resolve(this.pumping).then(() => this.skipPendingValue());
-    }
+    // An iteration of the value that was not completed ends here.
+    this.activeIterator?.detach();
+    this.activeIterator = undefined;
 
     const reader = this.response.reader!;
 
