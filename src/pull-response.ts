@@ -2,6 +2,7 @@ import { Readable } from 'stream';
 
 import type Debug from './debug';
 import type Request from './request';
+import type { PulledRequest } from './request';
 import type Connection from './connection';
 import { RequestError } from './errors';
 import { type Metadata } from './metadata-parser';
@@ -1451,13 +1452,13 @@ export class Response {
  */
 export class PreparedStatement {
   declare connection: Connection;
-  declare request: Request;
+  declare request: PulledRequest;
 
   // The response of the latest execution.
   declare response: Response | undefined;
   declare unpreparing: Promise<void> | undefined;
 
-  constructor(connection: Connection, request: Request) {
+  constructor(connection: Connection, request: PulledRequest) {
     this.connection = connection;
     this.request = request;
     this.response = undefined;

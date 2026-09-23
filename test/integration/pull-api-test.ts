@@ -627,14 +627,14 @@ describe('pulling responses', function() {
   });
 
   describe('misuse', function() {
-    it('does not allow pulling the response of a request that has a callback', async function() {
+    it('returns no response for a request that has a callback', async function() {
       let completed!: () => void;
       const completion = new Promise<void>((resolve) => { completed = resolve; });
 
       const request = new Request('SELECT 1', () => { completed(); });
-      const response = connection.execSql(request);
+      const response: void = connection.execSql(request);
 
-      assert.throws(() => response.rows(), /completion callback/);
+      assert.isUndefined(response);
       await completion;
     });
 

@@ -54,7 +54,7 @@ interface RequestOptions {
  * connection.execSql(request);
  * ```
  */
-class Request extends EventEmitter {
+class RequestClass extends EventEmitter {
   /**
    * @private
    */
@@ -618,6 +618,47 @@ class Request extends EventEmitter {
     this.timeout = timeout;
   }
 }
+
+// Keep reporting the class as `Request` (e.g. in `constructor.name`).
+Object.defineProperty(RequestClass, 'name', { value: 'Request' });
+
+/**
+ * A request, which is executed via a [[Connection]].
+ */
+type Request = RequestClass;
+
+/**
+ * A request without a completion callback, whose response is consumed by
+ * pulling from the [[Response]] that executing it returns.
+ */
+export type PulledRequest = Request & { readonly userCallback: undefined };
+
+/**
+ * A request with a completion callback, whose response is delivered via
+ * events.
+ */
+export type CallbackRequest = Request & { readonly userCallback: CompletionCallback };
+
+interface RequestConstructor {
+  /**
+   * Create a request whose response is consumed by pulling from the
+   * [[Response]] that executing it returns.
+   */
+  new (sqlTextOrProcedure: string | undefined, callback?: undefined, options?: RequestOptions): PulledRequest;
+
+  /**
+   * Create a request whose response is delivered via events, and whose
+   * completion is reported to `callback`.
+   */
+  new (sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions): CallbackRequest;
+
+  new (sqlTextOrProcedure: string | undefined, callback?: CompletionCallback, options?: RequestOptions): Request;
+
+  readonly prototype: Request;
+}
+
+// eslint-disable-next-line no-redeclare -- the value of the `Request` type
+const Request = RequestClass as RequestConstructor;
 
 export default Request;
 module.exports = Request;

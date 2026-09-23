@@ -26,7 +26,7 @@ import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
-import Request from './request';
+import Request, { type CallbackRequest, type PulledRequest } from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
@@ -2709,12 +2709,34 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  execSqlBatch(request: Request): Response {
+  execSqlBatch(request: PulledRequest): Response;
+  /**
+   * Execute the SQL batch represented by [[Request]].
+   * There is no param support, and unlike [[execSql]],
+   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   *
+   * In almost all cases, [[execSql]] will be a better choice.
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  execSqlBatch(request: CallbackRequest): void;
+  /**
+   * Execute the SQL batch represented by [[Request]].
+   * There is no param support, and unlike [[execSql]],
+   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   *
+   * In almost all cases, [[execSql]] will be a better choice.
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  execSqlBatch(request: Request): Response | void;
+
+  execSqlBatch(request: Request): Response | void {
     const response = request.startExecution();
 
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
 
-    return response;
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
@@ -2739,7 +2761,41 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  execSql(request: Request): Response {
+  execSql(request: PulledRequest): Response;
+  /**
+   *  Execute the SQL represented by [[Request]].
+   *
+   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
+   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+   * for the first execution. This may also result in SQL server treating the request like a stored procedure
+   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
+   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   *
+   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
+   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  execSql(request: CallbackRequest): void;
+  /**
+   *  Execute the SQL represented by [[Request]].
+   *
+   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
+   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+   * for the first execution. This may also result in SQL server treating the request like a stored procedure
+   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
+   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   *
+   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
+   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  execSql(request: Request): Response | void;
+
+  execSql(request: Request): Response | void {
     const response = request.startExecution();
 
     try {
@@ -2752,7 +2808,7 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return response;
+      return request.userCallback === undefined ? response : undefined;
     }
 
     const parameters: ResolvedParameter[] = [];
@@ -2783,7 +2839,7 @@ class Connection extends EventEmitter {
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
 
-    return response;
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
@@ -2925,11 +2981,41 @@ class Connection extends EventEmitter {
    * @param request A [[Request]] object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
    *
-   * @returns The prepared statement, once the statement was prepared. For
-   *   requests without a completion callback, the statement is executed and
+   * @returns For requests without a completion callback, the prepared
+   *   statement, once the statement was prepared - it is executed and
    *   unprepared via the returned [[PreparedStatement]].
    */
-  prepare(request: Request): Promise<PreparedStatement> {
+  prepare(request: PulledRequest): Promise<PreparedStatement>;
+  /**
+   * Prepare the SQL represented by the request.
+   *
+   * The request can then be used in subsequent calls to
+   * [[execute]] and [[unprepare]]
+   *
+   * @param request A [[Request]] object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   *
+   * @returns For requests without a completion callback, the prepared
+   *   statement, once the statement was prepared - it is executed and
+   *   unprepared via the returned [[PreparedStatement]].
+   */
+  prepare(request: CallbackRequest): void;
+  /**
+   * Prepare the SQL represented by the request.
+   *
+   * The request can then be used in subsequent calls to
+   * [[execute]] and [[unprepare]]
+   *
+   * @param request A [[Request]] object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   *
+   * @returns For requests without a completion callback, the prepared
+   *   statement, once the statement was prepared - it is executed and
+   *   unprepared via the returned [[PreparedStatement]].
+   */
+  prepare(request: Request): Promise<PreparedStatement> | void;
+
+  prepare(request: Request): Promise<PreparedStatement> | void {
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -2976,11 +3062,11 @@ class Connection extends EventEmitter {
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
 
-    const statement = response.settled().then(() => new PreparedStatement(this, request));
-    // Requests with a completion callback learn about errors via the
-    // request's `error` event instead.
-    statement.catch(() => {});
-    return statement;
+    // Requests with a completion callback learn about the outcome via the
+    // request's `prepared` and `error` events instead.
+    if (request.userCallback === undefined) {
+      return response.settled().then(() => new PreparedStatement(this, request as PulledRequest));
+    }
   }
 
   /**
@@ -3020,7 +3106,29 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }): Response {
+  execute(request: PulledRequest, parameters?: { [key: string]: unknown }): Response;
+  /**
+   * Execute previously prepared SQL, using the supplied parameters.
+   *
+   * @param request A previously prepared [[Request]].
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the [[Request]] before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   */
+  execute(request: CallbackRequest, parameters?: { [key: string]: unknown }): void;
+  /**
+   * Execute previously prepared SQL, using the supplied parameters.
+   *
+   * @param request A previously prepared [[Request]].
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the [[Request]] before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   */
+  execute(request: Request, parameters?: { [key: string]: unknown }): Response | void;
+
+  execute(request: Request, parameters?: { [key: string]: unknown }): Response | void {
     const response = request.startExecution();
 
     const executeParameters: ResolvedParameter[] = [];
@@ -3053,12 +3161,12 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return response;
+      return request.userCallback === undefined ? response : undefined;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
 
-    return response;
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
@@ -3066,7 +3174,21 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    */
-  callProcedure(request: Request): Response {
+  callProcedure(request: PulledRequest): Response;
+  /**
+   * Call a stored procedure represented by [[Request]].
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  callProcedure(request: CallbackRequest): void;
+  /**
+   * Call a stored procedure represented by [[Request]].
+   *
+   * @param request A [[Request]] object representing the request.
+   */
+  callProcedure(request: Request): Response | void;
+
+  callProcedure(request: Request): Response | void {
     const response = request.startExecution();
 
     try {
@@ -3079,12 +3201,12 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return response;
+      return request.userCallback === undefined ? response : undefined;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
 
-    return response;
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
