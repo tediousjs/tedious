@@ -3051,15 +3051,7 @@ class Connection extends EventEmitter {
     const response = request.startExecution(false);
     request.preparing = true;
 
-    // TODO: We need to clean up this event handler, otherwise this leaks memory
-    request.on('returnValue', (name: string, value: any) => {
-      if (name === 'handle') {
-        request.handle = value;
-      } else {
-        request.error = new RequestError(`Tedious > Unexpected output parameter ${name} from sp_prepare`);
-      }
-    });
-
+    // The prepared statement's handle is stored by the `RequestTokenHandler`.
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
 
     // Requests with a completion callback learn about the outcome via the

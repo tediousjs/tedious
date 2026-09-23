@@ -570,6 +570,25 @@ describe('pulling responses', function() {
       assert.deepEqual(await query('SELECT 4'), [[4]]);
     });
 
+    it('returns output parameters of executions', async function() {
+      const request = new Request('SET @out = @in * 2');
+      request.addParameter('in', TYPES.Int);
+      request.addOutputParameter('out', TYPES.Int);
+
+      const outputs = [];
+      {
+        await using statement = await connection.prepare(request);
+
+        for (const value of [10, 21]) {
+          await using response = statement.execute({ in: value });
+          outputs.push((await response.outputParameters()).get('out'));
+        }
+      }
+
+      assert.deepEqual(outputs, [20, 42]);
+      assert.strictEqual(request.listenerCount('returnValue'), 0);
+    });
+
     it('does not allow executing a statement that was unprepared', async function() {
       const request = new Request('SELECT 1');
 
