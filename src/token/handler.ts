@@ -538,6 +538,15 @@ export class RequestTokenHandler extends TokenHandler {
 
   onReturnValue(token: ReturnValueToken) {
     if (!this.request.canceled) {
+      // The response to `sp_prepare` returns the prepared statement's handle.
+      if (this.request instanceof Request && this.request.preparing) {
+        if (token.paramName === 'handle') {
+          this.request.handle = token.value as number;
+        } else {
+          this.request.error = new RequestError(`Tedious > Unexpected output parameter ${token.paramName} from sp_prepare`);
+        }
+      }
+
       this.request.emit('returnValue', token.paramName, token.value, token.metadata);
     }
   }
