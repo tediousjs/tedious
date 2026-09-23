@@ -6,7 +6,7 @@ import type { PulledRequest } from './request';
 import type Connection from './connection';
 import { RequestError } from './errors';
 import { type Metadata } from './metadata-parser';
-import { decodePLPValue } from './value-parser';
+import { decodePLPValue, isPLPStream } from './value-parser';
 import StreamParser, { type ParserOptions } from './token/stream-parser';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { type TokenHandler } from './token/handler';
@@ -381,67 +381,40 @@ abstract class ValueSequence {
   }
 
   /**
-   * Stream a (PLP) value's raw data, skipping any unread values before it.
+   * Stream the raw data of a value of a `max` type, skipping any unread
+   * values before it. Resolves to `null` if the value is `null`.
    */
-  stream(key: number | string): Readable {
-    const known = this.indexOf(key);
-    if (known >= 0 && known < this.items.length) {
-      throw new Error(`The value of \`${key}\` was already read. Use \`get()\` instead.`);
+  stream(key: number | string): Promise<Readable | null> {
+    try {
+      return Promise.resolve(this.streamValue(key));
+    } catch (err) {
+      return Promise.reject(err);
+    }
+  }
+
+  streamValue(key: number | string): MaybePromise<Readable | null> {
+    const index = this.locate(key);
+    if (typeof index !== 'number') {
+      return index.then(() => this.streamValue(key));
     }
 
-    let started = false;
+    if (index < this.items.length) {
+      const item = this.items[index];
 
-    const pump = async () => {
-      if (!started) {
-        started = true;
-
-        const index = await this.locate(key);
-        if (index < this.items.length) {
-          // Not a streamed value (e.g. `null`).
-          stream.push(null);
-          return;
-        }
-
-        this.activeStream = stream;
+      if (!isPLPStream(item.metadata)) {
+        throw new Error(`The value of \`${key}\` is not of a \`max\` type, and can not be streamed. Use \`get()\` instead.`);
       }
 
-      const reader = this.response.reader!;
-
-      while (true) {
-        let token = reader.nextSync();
-        if (token === undefined) {
-          token = await reader.next();
-        }
-
-        if (stream.destroyed) {
-          if (token !== null) {
-            reader.unread(token);
-          }
-          return;
-        }
-
-        if (token instanceof ValueChunkToken) {
-          if (!stream.push(token.data)) {
-            return;
-          }
-
-          continue;
-        }
-
-        if (token instanceof ValueEndToken) {
-          this.addPendingItem(STREAMED);
-          this.activeStream = undefined;
-
-          // Read the values after this one, so they are available via
-          // `get` once the stream ended.
-          await this.readAhead();
-          stream.push(null);
-          return;
-        }
-
-        throw await this.interrupted();
+      if (item.value === null) {
+        return null;
       }
-    };
+
+      throw this.unavailable(key, index);
+    }
+
+    if (index > this.items.length || this.pending === undefined) {
+      throw new Error(`The value of \`${key}\` is not available.`);
+    }
 
     const stream = new Readable({
       read: () => {
@@ -449,7 +422,7 @@ abstract class ValueSequence {
           return;
         }
 
-        this.pumping = pump().catch((err) => {
+        this.pumping = this.pump(stream).catch((err) => {
           stream.destroy(err);
         }).finally(() => {
           this.pumping = undefined;
@@ -457,7 +430,51 @@ abstract class ValueSequence {
       }
     });
 
+    this.activeStream = stream;
     return stream;
+  }
+
+  /**
+   * Push the data of the pending value into its stream, until the stream
+   * does not accept more data or the value ended.
+   */
+  async pump(stream: Readable) {
+    const reader = this.response.reader!;
+
+    while (true) {
+      let token = reader.nextSync();
+      if (token === undefined) {
+        token = await reader.next();
+      }
+
+      if (stream.destroyed) {
+        if (token !== null) {
+          reader.unread(token);
+        }
+        return;
+      }
+
+      if (token instanceof ValueChunkToken) {
+        if (!stream.push(token.data)) {
+          return;
+        }
+
+        continue;
+      }
+
+      if (token instanceof ValueEndToken) {
+        this.addPendingItem(STREAMED);
+        this.activeStream = undefined;
+
+        // Read the values after this one, so they are available via
+        // `get` once the stream ended.
+        await this.readAhead();
+        stream.push(null);
+        return;
+      }
+
+      throw await this.interrupted();
+    }
   }
 
   /**

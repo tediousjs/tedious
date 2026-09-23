@@ -21,9 +21,11 @@ function getConfig() {
   };
 }
 
-async function collect(stream: Readable): Promise<Buffer> {
+async function collect(stream: Readable | null): Promise<Buffer> {
+  assert.isNotNull(stream);
+
   const chunks = [];
-  for await (const chunk of stream) {
+  for await (const chunk of stream!) {
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
@@ -221,7 +223,7 @@ describe('pulling responses', function() {
 
         assert.throws(() => row.get('after'), /comes after the value of `content`/);
 
-        assert.deepEqual(await collect(row.stream('content')), value);
+        assert.deepEqual(await collect(await row.stream('content')), value);
 
         assert.strictEqual(row.get('after'), 7);
         assert.throws(() => row.get('content'), /was streamed/);
@@ -262,7 +264,7 @@ describe('pulling responses', function() {
         for await (const row of response.rows()) {
           count++;
           if (row.get('n') as number % 2 === 0) {
-            assert.strictEqual((await collect(row.stream('data'))).length, 20000);
+            assert.strictEqual((await collect(await row.stream('data'))).length, 20000);
           }
         }
 
@@ -291,7 +293,7 @@ describe('pulling responses', function() {
       await using response = connection.execSql(request);
 
       for await (const row of response.rows()) {
-        await collect(row.stream('a'));
+        await collect(await row.stream('a'));
 
         let error: Error | undefined;
         try {
@@ -300,6 +302,48 @@ describe('pulling responses', function() {
           error = err;
         }
         assert.match(error!.message, /was streamed/);
+      }
+    });
+
+    it('resolves `stream()` to `null` for `null` values', async function() {
+      const request = new Request('SELECT CAST(0x01 AS varbinary(max)) AS a, CAST(NULL AS varbinary(max)) AS b, CAST(NULL AS varbinary(max)) AS c, 1 AS d');
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        // `c` comes after the unread value of `a`, so it is read ahead to.
+        assert.isNull(await row.stream('c'));
+        assert.isNull(await row.stream('b'));
+        assert.strictEqual(row.get('d'), 1);
+      }
+    });
+
+    it('streams a value after skipping an unread one', async function() {
+      const first = randomBytes(100000);
+      const second = randomBytes(100000);
+
+      const request = new Request('SELECT @first AS a, @second AS b');
+      request.addParameter('first', TYPES.VarBinary, first);
+      request.addParameter('second', TYPES.VarBinary, second);
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        assert.deepEqual(await collect(await row.stream('b')), second);
+        assert.throws(() => row.get('a'), /was streamed/);
+      }
+    });
+
+    it('does not stream values that are not of a `max` type', async function() {
+      const request = new Request('SELECT 1 AS a, CAST(NULL AS int) AS b');
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        let error: Error | undefined;
+        try {
+          await row.stream('b');
+        } catch (err: any) {
+          error = err;
+        }
+        assert.match(error!.message, /not of a `max` type/);
       }
     });
 
@@ -352,11 +396,20 @@ describe('pulling responses', function() {
         assert.strictEqual(output.get('after'), 1);
         assert.strictEqual(output.length('content'), value.length);
 
-        assert.deepEqual(await collect(output.stream('content')), value);
+        assert.deepEqual(await collect(await output.stream('content')), value);
         assert.throws(() => output.get('content'), /was streamed/);
       }
 
       assert.deepEqual(await query('SELECT 2'), [[2]]);
+    });
+
+    it('resolves `stream()` of a `null` output parameter to `null`', async function() {
+      const request = new Request('SET @a = NULL');
+      request.addOutputParameter('a', TYPES.VarBinary, undefined, { length: Infinity });
+      await using response = connection.execSql(request);
+
+      const output = await response.outputParameters();
+      assert.isNull(await output.stream('a'));
     });
 
     it('reads `max` output parameters in any order', async function() {
