@@ -3,6 +3,7 @@ import { type InternalConnectionOptions } from '../../src/connection';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 
 import { assert } from 'chai';
+import { Readable } from 'stream';
 
 // Test options - using type assertion since tests only exercise code paths
 // that use a subset of the full InternalConnectionOptions
@@ -1819,32 +1820,69 @@ describe('JSON', function() {
       assert.isNull(TYPES.JSON.validate(undefined, undefined));
     });
 
-    it('returns the UTF-8 encoded value for strings containing valid JSON', function() {
+    it('returns strings as UTF-8 encoded JSON text', function() {
       const result = TYPES.JSON.validate('{"a":"ü"}', undefined);
       assert.deepEqual(result, Buffer.from('{"a":"ü"}', 'utf8'));
     });
 
-    it('throws for strings that do not contain valid JSON', function() {
-      assert.throws(() => {
-        TYPES.JSON.validate('{oops', undefined);
-      }, SyntaxError);
+    it('does not parse strings, leaving their validation to the server', function() {
+      assert.deepEqual(TYPES.JSON.validate('{oops', undefined), Buffer.from('{oops', 'utf8'));
     });
 
-    it('serializes objects and arrays to their UTF-8 encoded JSON representation', function() {
+    it('treats `String` objects like strings', function() {
+      assert.deepEqual(TYPES.JSON.validate(new String('[1]'), undefined), Buffer.from('[1]', 'utf8'));
+    });
+
+    it('serializes other values to their UTF-8 encoded JSON representation', function() {
       assert.deepEqual(TYPES.JSON.validate({ a: [1, 'ü'] }, undefined), Buffer.from('{"a":[1,"ü"]}', 'utf8'));
       assert.deepEqual(TYPES.JSON.validate([1, 2], undefined), Buffer.from('[1,2]', 'utf8'));
+      assert.deepEqual(TYPES.JSON.validate(42, undefined), Buffer.from('42', 'utf8'));
+      assert.deepEqual(TYPES.JSON.validate(true, undefined), Buffer.from('true', 'utf8'));
+      assert.deepEqual(TYPES.JSON.validate({ at: new Date(0) }, undefined), Buffer.from('{"at":"1970-01-01T00:00:00.000Z"}', 'utf8'));
     });
 
-    it('throws for Buffer values', function() {
+    for (const [description, value] of [
+      ['`Buffer`s', Buffer.from('{"a":1}')],
+      ['nested `Buffer`s', { a: Buffer.from([1]) }],
+      ['typed arrays', new Uint8Array([1, 2])],
+      ['`ArrayBuffer`s', new ArrayBuffer(2)],
+      ['`DataView`s', new DataView(new ArrayBuffer(2))],
+      ['`Map`s', new Map([['a', 1]])],
+      ['`Set`s', new Set([1])],
+      ['nested `Set`s', [new Set([1])]],
+      ['`WeakMap`s', new WeakMap()],
+      ['generators', (function * () { yield 1; })()],
+      ['async iterables', (async function * () { yield '{"a":1}'; })()],
+      ['streams', Readable.from(['{}'])],
+      ['`NaN`', NaN],
+      ['nested `Infinity`', { a: -Infinity }],
+      ['`Number` objects holding `NaN`', new Number(NaN)],
+      ['bigints', { a: 1n }],
+      ['functions', () => {}],
+      ['circular structures', (() => { const a: { self?: unknown } = {}; a.self = a; return a; })()]
+    ] as const) {
+      it(`throws for ${description}`, function() {
+        assert.throws(() => {
+          TYPES.JSON.validate(value, undefined);
+        }, TypeError, /^Invalid JSON value: /);
+      });
+    }
+
+    it('does not include the value in its error messages', function() {
       assert.throws(() => {
-        TYPES.JSON.validate(Buffer.from('{"a":1}'), undefined);
-      }, TypeError, 'Invalid JSON value.');
+        TYPES.JSON.validate({ secret: 'secret-token-abc', n: NaN }, undefined);
+      }, TypeError, /^(?!.*secret)/);
+    });
+  });
+
+  describe('.resolve', function() {
+    it('validates in-memory values', function() {
+      assert.deepEqual(TYPES.JSON.resolve!({ type: TYPES.JSON, name: 'p', output: false, value: { a: 1 } }, undefined, options), { value: Buffer.from('{"a":1}', 'utf8') });
     });
 
-    it('throws for values that can not be serialized to JSON', function() {
-      assert.throws(() => {
-        TYPES.JSON.validate(() => {}, undefined);
-      }, TypeError, 'Invalid JSON value.');
+    it('leaves async iterables to be read while the request is written', function() {
+      const value = Readable.from(['{}']);
+      assert.strictEqual(TYPES.JSON.resolve!({ type: TYPES.JSON, name: 'p', output: false, value }, undefined, options).value, value);
     });
   });
 });
