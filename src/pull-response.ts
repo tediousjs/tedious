@@ -1069,16 +1069,24 @@ export class RowIterator implements AsyncIterableIterator<Row> {
     this.finished = true;
 
     if (await this.response.nextResultSet() !== undefined) {
-      await this.response.abort();
+      await this.response.skipResultSets().catch(() => undefined);
       throw new Error('The request returned more than one result set. Use `results()` to read all of them.');
     }
 
     return await this.response.end();
   }
 
+  /**
+   * Called when a loop is stopped early: skips the rest of the result sets,
+   * so the request runs to completion. Any error of the request is raised by
+   * `finish()`.
+   */
   async return(): Promise<IteratorReturnResult<undefined>> {
-    this.finished = true;
-    await this.response.abort();
+    if (!this.finished) {
+      this.finished = true;
+      await this.response.skipResultSets().catch(() => undefined);
+    }
+
     return DONE;
   }
 }
@@ -1117,9 +1125,17 @@ export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
     return await this.response.end();
   }
 
+  /**
+   * Called when a loop is stopped early: skips the rest of the result sets,
+   * so the request runs to completion. Any error of the request is raised by
+   * `finish()`.
+   */
   async return(): Promise<IteratorReturnResult<undefined>> {
-    this.finished = true;
-    await this.response.abort();
+    if (!this.finished) {
+      this.finished = true;
+      await this.response.skipResultSets().catch(() => undefined);
+    }
+
     return DONE;
   }
 }
@@ -1176,10 +1192,6 @@ export class Response {
   // loop), and are not raised by `finish` again.
   declare deliveredErrors: Set<unknown>;
 
-  // Whether the consumer canceled the request, whose resulting error is not
-  // raised by `finish`.
-  declare canceledByConsumer: boolean;
-
   // Raise an error to the consumer, remembering that it was raised. Used as
   // the rejection handler of the consumer's calls.
   declare rethrow: (error: unknown) => never;
@@ -1212,7 +1224,6 @@ export class Response {
 
     this.resultSet = undefined;
     this.deliveredErrors = new Set();
-    this.canceledByConsumer = false;
     this.rethrow = (error) => {
       this.deliveredErrors.add(error);
       throw error;
@@ -1333,25 +1344,24 @@ export class Response {
   }
 
   /**
-   * Cancel the request (if it is still running), and wait for it to
-   * complete. Used when a consumer stops early.
+   * Skip the rest of the result sets, up to the output parameters, and wait
+   * for the request to complete unless output parameters follow. Used when a
+   * consumer stops reading early.
    */
-  async abort() {
-    // The consumer does not need to learn about its own cancellation.
-    this.canceledByConsumer = true;
-
-    if (!this.completed) {
-      this.request.cancel();
+  async skipResultSets() {
+    while (await this.nextResultSet() !== undefined) {
+      // skip the remaining result sets
     }
 
-    await this.completion;
+    await this.end();
   }
 
   /**
    * Iterate the rows of the response's result set.
    *
    * The loop ending means the request has completed. Errors of the request
-   * are thrown by the loop. Stopping the loop early cancels the request.
+   * are thrown by the loop. Stopping the loop early skips the remaining rows,
+   * and leaves any error of the request to be raised by `finish`.
    *
    * Throws if the request returns more than one result set, use [[results]]
    * for those.
@@ -1427,7 +1437,7 @@ export class Response {
    * to complete, and return a summary of it.
    *
    * Raises the request's error, unless it was raised already (e.g. by a
-   * `rows()` loop), or the request was canceled by stopping a loop early.
+   * `rows()` loop).
    * `finish` can be called any number of times, and raises an error at most
    * once.
    */
@@ -1470,10 +1480,8 @@ export class Response {
 
       this.summary = { rowCount: this.request.rowCount ?? 0, returnStatus: returnStatus, outputParameters: values };
 
-      // Errors the consumer received already, or that the consumer caused
-      // by canceling the request, are not raised again.
-      const canceled = this.canceledByConsumer && err === this.completionError;
-      if (!canceled && !this.deliveredErrors.has(err)) {
+      // Errors the consumer received already are not raised again.
+      if (!this.deliveredErrors.has(err)) {
         throw err;
       }
     }

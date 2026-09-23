@@ -117,7 +117,7 @@ describe('pulling responses', function() {
       assert.deepEqual(await query('SELECT 3'), [[3]]);
     });
 
-    it('cancels the request when the loop is stopped early', async function() {
+    it('drains the rest of the response when the loop is stopped early', async function() {
       {
         const request = new Request('SELECT TOP 50000 a.object_id FROM sys.all_objects a CROSS JOIN sys.all_objects b');
         await using response = connection.execSql(request);
@@ -131,9 +131,52 @@ describe('pulling responses', function() {
         }
 
         assert.strictEqual(count, 10);
+
+        const { rowCount } = await response.finish();
+        assert.strictEqual(rowCount, 50000);
       }
 
       assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('raises errors after a loop that was stopped early from `finish`', async function() {
+      const request = new Request('SELECT 1 UNION ALL SELECT 2; SELECT 1 / 0');
+      const response = connection.execSqlBatch(request);
+
+      const rows = [];
+      for await (const resultSet of response.results()) {
+        for await (const row of resultSet) {
+          rows.push(row.get(0));
+          break;
+        }
+        break;
+      }
+      assert.deepEqual(rows, [1]);
+
+      let error: Error | undefined;
+      try {
+        await response.finish();
+      } catch (err: any) {
+        error = err;
+      }
+
+      assert.instanceOf(error, RequestError);
+      assert.match(error!.message, /Divide by zero/);
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+
+    it('still provides output parameters after a loop was stopped early', async function() {
+      const request = new Request('SELECT 1 UNION ALL SELECT 2; SET @out = 42');
+      request.addOutputParameter('out', TYPES.Int);
+      await using response = connection.execSql(request);
+
+      for await (const row of response.rows()) {
+        row.get(0);
+        break;
+      }
+
+      const outputParameters = await response.outputParameters();
+      assert.strictEqual(outputParameters.get('out'), 42);
     });
 
     it('throws errors of the request from the loop, after the rows before the error', async function() {
@@ -773,7 +816,7 @@ describe('pulling responses', function() {
       assert.match(error!.message, /Could not find stored procedure/);
     });
 
-    it('can be executed again after an execution was canceled', async function() {
+    it('can be executed again after a loop over an execution was stopped early', async function() {
       const request = new Request('SELECT TOP 5000 a.object_id FROM sys.all_objects a CROSS JOIN sys.all_objects b');
 
       await using statement = await connection.prepare(request);
