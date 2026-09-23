@@ -36,6 +36,61 @@ class TestDatabaseChangeHandler extends TokenHandler {
 }
 
 describe('Token Stream Parser', () => {
+  describe('when an event listener throws', function() {
+    let uncaughtExceptionListeners: NodeJS.UncaughtExceptionListener[];
+    let unhandledRejectionListeners: NodeJS.UnhandledRejectionListener[];
+
+    // Take over mocha's handlers, to observe how the exception surfaces.
+    beforeEach(function() {
+      uncaughtExceptionListeners = process.listeners('uncaughtException');
+      unhandledRejectionListeners = process.listeners('unhandledRejection');
+      process.removeAllListeners('uncaughtException');
+      process.removeAllListeners('unhandledRejection');
+    });
+
+    afterEach(function() {
+      process.removeAllListeners('uncaughtException');
+      process.removeAllListeners('unhandledRejection');
+      uncaughtExceptionListeners.forEach((listener) => process.on('uncaughtException', listener));
+      unhandledRejectionListeners.forEach((listener) => process.on('unhandledRejection', listener));
+    });
+
+    function expectUncaughtException(expected: Error, done: Mocha.Done) {
+      process.once('uncaughtException', (err) => {
+        try {
+          assert.strictEqual(err, expected);
+          done();
+        } catch (assertionError) {
+          done(assertionError);
+        }
+      });
+
+      process.once('unhandledRejection', () => {
+        done(new Error('Expected an uncaught exception, not an unhandled rejection'));
+      });
+    }
+
+    it('raises an exception of an `end` listener as an uncaught exception', function(done) {
+      const error = new Error('end listener failed');
+      expectUncaughtException(error, done);
+
+      const parser = new Parser([createDbChangeBuffer()] as unknown as Message, new Debug(), new TestDatabaseChangeHandler(), options);
+      parser.on('end', () => {
+        throw error;
+      });
+    });
+
+    it('raises an exception of an `error` listener as an uncaught exception', function(done) {
+      const error = new Error('error listener failed');
+      expectUncaughtException(error, done);
+
+      const parser = new Parser([Buffer.from([0xFF])] as unknown as Message, new Debug(), new TestDatabaseChangeHandler(), options);
+      parser.on('error', () => {
+        throw error;
+      });
+    });
+  });
+
   it('should parse envChange token', function(done) {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
