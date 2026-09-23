@@ -351,6 +351,9 @@ export class Login7TokenHandler extends TokenHandler {
         // this client can not safely parse - fail the login instead of
         // continuing on a connection whose data can not be trusted.
         this.loginError = new ConnectionError('Received invalid JSON support acknowledgement');
+        // FEATUREEXTACK follows LOGINACK, and the login is only failed with
+        // `loginError` if no LOGINACK was received.
+        this.loginAckReceived = false;
       }
     }
 
