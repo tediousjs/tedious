@@ -550,6 +550,40 @@ describe('pulling responses', function() {
       assert.deepEqual(await query('SELECT 3'), [[3]]);
     });
 
+    it('raises errors of a response whose rows were never iterated when it goes out of scope', async function() {
+      let error: Error | undefined;
+      try {
+        const request = new Request('SELECT 1 / 0');
+        await using response = connection.execSql(request);
+        response.rows();
+      } catch (err: any) {
+        error = err;
+      }
+
+      assert.instanceOf(error, RequestError);
+      assert.match(error!.message, /Divide by zero/);
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+
+    it('raises both errors if the scope is left via an exception while the request failed', async function() {
+      let error: any;
+      try {
+        const request = new Request('SELECT 1 / 0');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- only disposed
+        await using response = connection.execSql(request);
+        throw new Error('boom');
+      } catch (err: any) {
+        error = err;
+      }
+
+      // Node.js 22 does not provide `SuppressedError` itself, so check the
+      // error's shape rather than its class.
+      assert.strictEqual(error.name, 'SuppressedError');
+      assert.match(error.error.message, /Divide by zero/);
+      assert.strictEqual(error.suppressed.message, 'boom');
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+
     it('does not raise errors again that a loop already raised', async function() {
       const request = new Request('SELECT 1 / 0');
       await using response = connection.execSql(request);

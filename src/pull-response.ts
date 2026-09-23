@@ -353,9 +353,10 @@ abstract class ValueSequence {
    */
   read(key: number | string): Promise<unknown> {
     try {
-      return Promise.resolve(this.readValue(key));
+      const value = this.readValue(key);
+      return value instanceof Promise ? value.catch(this.response.rethrow) : Promise.resolve(value);
     } catch (err) {
-      return Promise.reject(err);
+      return Promise.reject(err).catch(this.response.rethrow);
     }
   }
 
@@ -386,9 +387,10 @@ abstract class ValueSequence {
    */
   stream(key: number | string): Promise<Readable | null> {
     try {
-      return Promise.resolve(this.streamValue(key));
+      const stream = this.streamValue(key);
+      return stream instanceof Promise ? stream.catch(this.response.rethrow) : Promise.resolve(stream);
     } catch (err) {
-      return Promise.reject(err);
+      return Promise.reject(err).catch(this.response.rethrow);
     }
   }
 
@@ -423,6 +425,7 @@ abstract class ValueSequence {
         }
 
         this.pumping = this.pump(stream).catch((err) => {
+          this.response.deliveredErrors.add(err);
           stream.destroy(err);
         }).finally(() => {
           this.pumping = undefined;
@@ -712,9 +715,9 @@ export class Row extends ValueSequence {
   readValues(): Promise<unknown[]> {
     try {
       const reading = this.readRemaining();
-      return reading !== undefined ? reading.then(() => this.values()) : Promise.resolve(this.values());
+      return reading !== undefined ? reading.then(() => this.values()).catch(this.response.rethrow) : Promise.resolve(this.values());
     } catch (err) {
-      return Promise.reject(err);
+      return Promise.reject(err).catch(this.response.rethrow);
     }
   }
 
@@ -774,9 +777,10 @@ export class ResultSet implements AsyncIterableIterator<Row> {
 
   next(): Promise<IteratorResult<Row, undefined>> {
     try {
-      return Promise.resolve(this.nextRow());
+      const result = this.nextRow();
+      return result instanceof Promise ? result.catch(this.response.rethrow) : Promise.resolve(result);
     } catch (err) {
-      return Promise.reject(err);
+      return Promise.reject(err).catch(this.response.rethrow);
     }
   }
 
@@ -1000,23 +1004,23 @@ export class RowIterator implements AsyncIterableIterator<Row> {
   next(): Promise<IteratorResult<Row, undefined>> {
     const resultSet = this.resultSet;
     if (resultSet === undefined || this.finished) {
-      return this.nextAsync();
+      return this.nextAsync().catch(this.response.rethrow);
     }
 
     let result;
     try {
       result = resultSet.nextRow();
     } catch (err) {
-      return Promise.reject(err);
+      return Promise.reject(err).catch(this.response.rethrow);
     }
 
     if (result instanceof Promise) {
       return result.then((result): MaybePromise<IteratorResult<Row, undefined>> => {
         return result.done ? this.end() : result;
-      });
+      }).catch(this.response.rethrow);
     }
 
-    return result.done ? this.end() : Promise.resolve(result);
+    return result.done ? this.end().catch(this.response.rethrow) : Promise.resolve(result);
   }
 
   async nextAsync(): Promise<IteratorResult<Row, undefined>> {
@@ -1070,7 +1074,11 @@ export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
     return this;
   }
 
-  async next(): Promise<IteratorResult<ResultSet, undefined>> {
+  next(): Promise<IteratorResult<ResultSet, undefined>> {
+    return this.nextResultSet().catch(this.response.rethrow);
+  }
+
+  async nextResultSet(): Promise<IteratorResult<ResultSet, undefined>> {
     if (this.finished) {
       return DONE;
     }
@@ -1139,12 +1147,17 @@ export class Response {
   // The result set currently being read.
   declare resultSet: ResultSet | undefined;
 
-  // Whether a consumer (`rows()` or `results()`) was used.
-  declare consumed: boolean;
+  // Errors that were raised to the consumer already (e.g. by a `rows()`
+  // loop), and are not raised by `finish` again.
+  declare deliveredErrors: Set<unknown>;
 
-  // Whether the request's error was already raised to the consumer (or the
-  // consumer canceled the request), so `finish` does not raise it again.
-  declare errorDelivered: boolean;
+  // Whether the consumer canceled the request, whose resulting error is not
+  // raised by `finish`.
+  declare canceledByConsumer: boolean;
+
+  // Raise an error to the consumer, remembering that it was raised. Used as
+  // the rejection handler of the consumer's calls.
+  declare rethrow: (error: unknown) => never;
 
   declare outputParametersPromise: Promise<OutputParameters> | undefined;
   declare finishPromise: Promise<RequestSummary> | undefined;
@@ -1173,8 +1186,12 @@ export class Response {
     });
 
     this.resultSet = undefined;
-    this.consumed = false;
-    this.errorDelivered = false;
+    this.deliveredErrors = new Set();
+    this.canceledByConsumer = false;
+    this.rethrow = (error) => {
+      this.deliveredErrors.add(error);
+      throw error;
+    };
     this.outputParametersPromise = undefined;
     this.finishPromise = undefined;
     this.summary = undefined;
@@ -1216,7 +1233,6 @@ export class Response {
     await this.completion;
 
     if (this.completionError !== undefined) {
-      this.errorDelivered = true;
       throw this.completionError;
     }
   }
@@ -1297,7 +1313,7 @@ export class Response {
    */
   async abort() {
     // The consumer does not need to learn about its own cancellation.
-    this.errorDelivered = true;
+    this.canceledByConsumer = true;
 
     if (!this.completed) {
       this.request.cancel();
@@ -1316,7 +1332,7 @@ export class Response {
    * for those.
    */
   rows(): RowIterator {
-    this.consume();
+    this.assertPulled();
     return new RowIterator(this);
   }
 
@@ -1325,7 +1341,7 @@ export class Response {
    * iterator of its rows.
    */
   results(): ResultSetIterator {
-    this.consume();
+    this.assertPulled();
     return new ResultSetIterator(this);
   }
 
@@ -1338,8 +1354,8 @@ export class Response {
    * ones after via `stream` or `await read`.
    */
   outputParameters(): Promise<OutputParameters> {
-    this.consume();
-    return this.readOutputParametersOnce();
+    this.assertPulled();
+    return this.readOutputParametersOnce().catch(this.rethrow);
   }
 
   /**
@@ -1352,13 +1368,12 @@ export class Response {
     }
   }
 
-  consume() {
+  assertPulled() {
     if (!this.pulled) {
       throw new Error('The response of a request with a completion callback is delivered via events, and can not be pulled. Create the request without a callback instead.');
     }
-
-    this.consumed = true;
   }
+
 
   readOutputParametersOnce(): Promise<OutputParameters> {
     return this.outputParametersPromise ??= this.readOutputParameters();
@@ -1386,10 +1401,10 @@ export class Response {
    * Read the rest of the response, discarding any rows, wait for the request
    * to complete, and return a summary of it.
    *
-   * The request's error is raised by `finish` only if the response was not
-   * read via [[rows]], [[results]] or [[outputParameters]] - those raise it
-   * themselves. `finish` can be called any number of times, and raises an
-   * error at most once.
+   * Raises the request's error, unless it was raised already (e.g. by a
+   * `rows()` loop), or the request was canceled by stopping a loop early.
+   * `finish` can be called any number of times, and raises an error at most
+   * once.
    */
   finish(): Promise<RequestSummary> {
     if (!this.pulled) {
@@ -1407,10 +1422,6 @@ export class Response {
   }
 
   async readSummary(): Promise<RequestSummary> {
-    // Consumers that pulled the response (e.g. via a `rows()` loop) received
-    // the request's error from there, so it is not raised again.
-    const errorDelivered = this.consumed || this.errorDelivered;
-
     const values: { [name: string]: unknown } = {};
     let returnStatus;
 
@@ -1434,7 +1445,10 @@ export class Response {
 
       this.summary = { rowCount: this.request.rowCount ?? 0, returnStatus: returnStatus, outputParameters: values };
 
-      if (!(errorDelivered && err === this.completionError)) {
+      // Errors the consumer received already, or that the consumer caused
+      // by canceling the request, are not raised again.
+      const canceled = this.canceledByConsumer && err === this.completionError;
+      if (!canceled && !this.deliveredErrors.has(err)) {
         throw err;
       }
     }
