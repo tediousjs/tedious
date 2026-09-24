@@ -584,49 +584,81 @@ function readNChars(buf: Buffer, offset: number, dataLength: number): Result<str
   return new Result(buf.toString('ucs2', offset, offset + dataLength), offset + dataLength);
 }
 
-async function readPLPStream(parser: Parser): Promise<null | Buffer[]> {
-  while (parser.buffer.length < parser.position + 8) {
-    await parser.waitForChunk();
-  }
+/**
+ * The progress of reading a PLP value.
+ */
+export interface PLPState {
+  chunks: Buffer[];
+  expectedLength: bigint;
+  currentLength: number;
+}
 
-  const expectedLength = parser.buffer.readBigUInt64LE(parser.position);
-  parser.position += 8;
+/**
+ * Reads a partially length-prefixed value from the parser.
+ *
+ * The read is resumable: progress is kept in `holder.plp`, and the parser's
+ * position is committed after the header and after each chunk. When the
+ * buffered data runs out, a `NotEnoughDataError` is thrown, the parser
+ * rewinds to the last commit, and calling this function again once more
+ * data is available continues where it left off.
+ */
+function readPLPStream(parser: Parser, holder: { plp: PLPState | undefined }): null | Buffer[] {
+  const buffer = parser.buffer;
+  let position = parser.position;
 
-  if (expectedLength === PLP_NULL) {
-    return null;
-  }
-
-  const chunks: Buffer[] = [];
-  let currentLength = 0;
-
-  while (true) {
-    while (parser.buffer.length < parser.position + 4) {
-      await parser.waitForChunk();
+  let state = holder.plp;
+  if (state === undefined) {
+    if (buffer.length < position + 8) {
+      throw new NotEnoughDataError(position + 8);
     }
 
-    const chunkLength = parser.buffer.readUInt32LE(parser.position);
-    parser.position += 4;
+    const expectedLength = buffer.readBigUInt64LE(position);
+    position += 8;
+
+    if (expectedLength === PLP_NULL) {
+      parser.position = position;
+      return null;
+    }
+
+    state = holder.plp = { chunks: [], expectedLength, currentLength: 0 };
+    parser.position = position;
+    parser.commit();
+  }
+
+  while (true) {
+    if (buffer.length < position + 4) {
+      throw new NotEnoughDataError(position + 4);
+    }
+
+    const chunkLength = buffer.readUInt32LE(position);
 
     if (!chunkLength) {
+      position += 4;
       break;
     }
 
-    while (parser.buffer.length < parser.position + chunkLength) {
-      await parser.waitForChunk();
+    if (buffer.length < position + 4 + chunkLength) {
+      throw new NotEnoughDataError(position + 4 + chunkLength);
     }
 
-    chunks.push(parser.buffer.slice(parser.position, parser.position + chunkLength));
-    parser.position += chunkLength;
-    currentLength += chunkLength;
+    state.chunks.push(buffer.slice(position + 4, position + 4 + chunkLength));
+    position += 4 + chunkLength;
+    state.currentLength += chunkLength;
+
+    parser.position = position;
+    parser.commit();
   }
 
-  if (expectedLength !== UNKNOWN_PLP_LEN) {
-    if (currentLength !== Number(expectedLength)) {
-      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + expectedLength + ', but got ' + currentLength + ' bytes');
+  parser.position = position;
+  holder.plp = undefined;
+
+  if (state.expectedLength !== UNKNOWN_PLP_LEN) {
+    if (state.currentLength !== Number(state.expectedLength)) {
+      throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + state.expectedLength + ', but got ' + state.currentLength + ' bytes');
     }
   }
 
-  return chunks;
+  return state.chunks;
 }
 
 // Epoch offsets for building UTC `Date` values via plain arithmetic, which
@@ -784,8 +816,38 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
   return new Result(date, offset);
 }
 
+/**
+ * Reads a partially length-prefixed value (see `readPLPStream`) and
+ * converts it into the JavaScript value for `metadata`'s type.
+ */
+function readPLPValue(parser: Parser, holder: { plp: PLPState | undefined }, metadata: Metadata): unknown {
+  const chunks = readPLPStream(parser, holder);
+
+  if (chunks === null) {
+    return null;
+  }
+
+  switch (metadata.type.name) {
+    case 'NVarChar':
+    case 'Xml':
+      return Buffer.concat(chunks).toString('ucs2');
+
+    case 'VarChar':
+      return iconv.decode(Buffer.concat(chunks), metadata.collation?.codepage ?? 'utf8');
+
+    case 'VarBinary':
+    case 'UDT':
+      return Buffer.concat(chunks);
+
+    default:
+      throw new Error(sprintf('Unsupported PLP type %s', metadata.type.name));
+  }
+}
+
 module.exports.readValue = readValue;
+module.exports.readPLPValue = readPLPValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.readPLPStream = readPLPStream;
 
-export { readValue, isPLPStream, readPLPStream };
+
+export { readValue, isPLPStream, readPLPStream, readPLPValue };

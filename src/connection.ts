@@ -37,6 +37,7 @@ import { connectInParallel, connectInSequence } from './connector';
 import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
+import IncomingMessage from './incoming-message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
@@ -2215,7 +2216,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message, handler: TokenHandler) {
+  createTokenStreamParser(message: IncomingMessage, handler: TokenHandler) {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 

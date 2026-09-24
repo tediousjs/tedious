@@ -2,18 +2,22 @@ import BufferList from 'bl';
 import { Transform } from 'stream';
 
 import Debug from './debug';
-import Message from './message';
+import IncomingMessage from './incoming-message';
 import { Packet, HEADER_LENGTH } from './packet';
 import { ConnectionError } from './errors';
 
 /**
   IncomingMessageStream
-  Transform received TDS data into individual IncomingMessage streams.
+  Transform received TDS data into individual IncomingMessage objects.
+
+  The data of each message is written to the message as its packets arrive.
+  Processing of further packets is held back while a message's consumer
+  cannot accept more data, which propagates as backpressure to the socket.
 */
 class IncomingMessageStream extends Transform {
   declare debug: Debug;
   declare bl: any;
-  declare currentMessage: Message | undefined;
+  declare currentMessage: IncomingMessage | undefined;
 
   constructor(debug: Debug) {
     super({ readableObjectMode: true });
@@ -22,26 +26,6 @@ class IncomingMessageStream extends Transform {
 
     this.currentMessage = undefined;
     this.bl = new BufferList();
-  }
-
-  pause() {
-    super.pause();
-
-    if (this.currentMessage) {
-      this.currentMessage.pause();
-    }
-
-    return this;
-  }
-
-  resume() {
-    super.resume();
-
-    if (this.currentMessage) {
-      this.currentMessage.resume();
-    }
-
-    return this;
   }
 
   processBufferedData(callback: (err?: ConnectionError) => void) {
@@ -53,40 +37,38 @@ class IncomingMessageStream extends Transform {
         return callback(new ConnectionError('Unable to process incoming packet'));
       }
 
-      if (this.bl.length >= length) {
-        const data = this.bl.slice(0, length);
-        this.bl.consume(length);
-
-        // TODO: Get rid of creating `Packet` instances here.
-        const packet = new Packet(data);
-        this.debug.packet('Received', packet);
-        this.debug.data(packet);
-
-        let message = this.currentMessage;
-        if (message === undefined) {
-          this.currentMessage = message = new Message({ type: packet.type(), resetConnection: false });
-          this.push(message);
-        }
-
-        if (packet.isLast()) {
-          // Wait until the current message was fully processed before we
-          // continue processing any remaining messages.
-          message.once('end', () => {
-            this.currentMessage = undefined;
-            this.processBufferedData(callback);
-          });
-          message.end(packet.data());
-          return;
-        } else if (!message.write(packet.data())) {
-          // If too much data is buffering up in the
-          // current message, wait for it to drain.
-          message.once('drain', () => {
-            this.processBufferedData(callback);
-          });
-          return;
-        }
-      } else {
+      if (this.bl.length < length) {
         break;
+      }
+
+      const data = this.bl.slice(0, length);
+      this.bl.consume(length);
+
+      // TODO: Get rid of creating `Packet` instances here.
+      const packet = new Packet(data);
+      this.debug.packet('Received', packet);
+      this.debug.data(packet);
+
+      let message = this.currentMessage;
+      if (message === undefined) {
+        this.currentMessage = message = new IncomingMessage({ type: packet.type() });
+        this.push(message);
+      }
+
+      const accepted = message.write(packet.data());
+
+      if (packet.isLast()) {
+        this.currentMessage = undefined;
+        message.end();
+      }
+
+      if (!accepted) {
+        // The message's consumer cannot accept more data right now. Wait
+        // until it can before processing any further packets.
+        message.onDrain = () => {
+          this.processBufferedData(callback);
+        };
+        return;
       }
     }
 

@@ -3,7 +3,7 @@ import { Parser } from '../../../src/token/token-stream-parser';
 import { TYPE, DatabaseEnvChangeToken } from '../../../src/token/token';
 import { type ParserOptions } from '../../../src/token/stream-parser';
 import { TokenHandler } from '../../../src/token/handler';
-import type Message from '../../../src/message';
+import type IncomingMessage from '../../../src/incoming-message';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { assert } from 'chai';
 
@@ -40,8 +40,8 @@ describe('Token Stream Parser', () => {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
-    // Cast to Message since tests use a simplified input instead of full Message
-    const parser = new Parser([buffer] as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
+    // Cast to IncomingMessage since tests use a simplified input instead of full Message
+    const parser = new Parser([buffer] as unknown as IncomingMessage, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
@@ -50,8 +50,8 @@ describe('Token Stream Parser', () => {
     const debug = new Debug({ token: true });
     const buffer = createDbChangeBuffer();
 
-    // Cast to Message since tests use a simplified input instead of full Message
-    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
+    // Cast to IncomingMessage since tests use a simplified input instead of full Message
+    const parser = new Parser([buffer.slice(0, 6), buffer.slice(6)] as unknown as IncomingMessage, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
@@ -62,8 +62,8 @@ describe('Token Stream Parser', () => {
 
     const chunks = Array.from(buffer, (byte) => Buffer.from([byte]));
 
-    // Cast to Message since tests use a simplified input instead of full Message
-    const parser = new Parser(chunks as unknown as Message, debug, new TestDatabaseChangeHandler(), options);
+    // Cast to IncomingMessage since tests use a simplified input instead of full Message
+    const parser = new Parser(chunks as unknown as IncomingMessage, debug, new TestDatabaseChangeHandler(), options);
 
     parser.on('end', done);
   });
