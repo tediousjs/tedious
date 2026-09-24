@@ -13,7 +13,7 @@ import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import Debug from '../../../src/debug';
-import { Collation } from '../../../src/collation';
+import { Collation, Flags } from '../../../src/collation';
 
 const options = {
   useUTC: false,
@@ -482,6 +482,46 @@ describe('Row Token Parser', function() {
     assert.instanceOf(token, RowToken);
     assert.strictEqual(token.columns.length, 1);
     assert.deepEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse a varchar(max) value in a UTF-8 collation', async function() {
+    const debug = new Debug();
+    const colMetadata: ColumnMetadata[] = [
+      {
+        colName: 'col0',
+        userType: 0,
+        flags: 0,
+        precision: undefined,
+        scale: undefined,
+        dataLength: 65535,
+        schema: undefined,
+        udtInfo: undefined,
+        type: dataTypeByName.VarChar,
+        collation: new Collation(1033, Flags.UTF8, 0, 0)
+      }
+    ];
+
+    // A value starting with a byte order mark - it is part of the data and
+    // must be preserved.
+    const value = Buffer.concat([Buffer.from([0xEF, 0xBB, 0xBF]), Buffer.from('h\u00e9llo \u6771\u4eac')]);
+
+    const buffer = new WritableTrackingBuffer(0, 'ascii');
+    buffer.writeUInt8(0xd1);
+    buffer.writeUInt64LE(value.length);
+    buffer.writeUInt32LE(value.length);
+    buffer.writeBuffer(value);
+    buffer.writeUInt32LE(0);
+
+    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, '\uFEFFh\u00e9llo \u6771\u4eac');
     assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
     assert.isTrue((await parser.next()).done);
   });
