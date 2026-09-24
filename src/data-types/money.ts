@@ -19,18 +19,20 @@ const Money: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as number | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = Money.validate(raw, undefined) as number | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    // The value in ten-thousandths, as a high and a low 32-bit half.
-    const scaled = value * 10000;
-    buffer.writeUInt8(0x08);
-    buffer.writeInt32LE(Math.floor(scaled * SHIFT_RIGHT_32));
-    buffer.writeInt32LE(scaled & -1);
+      // The value in ten-thousandths, as a high and a low 32-bit half.
+      const scaled = value * 10000;
+      buffer.writeUInt8(0x08);
+      buffer.writeInt32LE(Math.floor(scaled * SHIFT_RIGHT_32));
+      buffer.writeInt32LE(scaled & -1);
+    };
   },
 
   validate: function(value): number | null {

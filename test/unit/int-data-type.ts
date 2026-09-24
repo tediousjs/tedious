@@ -9,10 +9,10 @@ const { Int, SmallInt, TinyInt, BigInt } = typeByName;
 // that use a subset of the full InternalConnectionOptions
 const options: InternalConnectionOptions = {} as InternalConnectionOptions;
 
-// The data `writeValue` writes for a parameter, after the length byte.
+// The data the compiled writer writes for a parameter, after the length byte.
 function data(type: DataType, parameter: ParameterData) {
   const buffer = new WritableTrackingBuffer();
-  type.writeValue(buffer, parameter, options);
+  type.compileWriter(parameter, options)(buffer, parameter.value);
   return buffer.data.subarray(1);
 }
 

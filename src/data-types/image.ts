@@ -26,15 +26,17 @@ const Image: DataType = {
     buffer.writeInt32LE(parameter.length!);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as Buffer | null;
-    if (value == null) {
-      buffer.writeBuffer(NULL_LENGTH);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = Image.validate(raw, undefined) as Buffer | null;
+      if (value == null) {
+        buffer.writeBuffer(NULL_LENGTH);
+        return;
+      }
 
-    buffer.writeInt32LE(value.length);
-    buffer.writeBuffer(value);
+      buffer.writeInt32LE(value.length);
+      buffer.writeBuffer(value);
+    };
   },
 
   validate: function(value): null | Buffer {

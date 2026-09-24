@@ -71,7 +71,7 @@ async function * referencePayload(procedure: string | number, parameters: Parame
 
     const bytes = new WritableTrackingBuffer();
     type.writeTypeInfo(bytes, param, options);
-    const rest = type.writeValue(bytes, param, options);
+    const rest = type.compileWriter(param, options)(bytes, param.value);
     if (rest !== undefined) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _ of rest) { }
@@ -186,8 +186,10 @@ describe('RpcRequestPayload', function() {
     // A type whose value write fails.
     const type: DataType = {
       ...TYPES.Int,
-      writeValue() {
-        throw new RangeError('boom');
+      compileWriter() {
+        return () => {
+          throw new RangeError('boom');
+        };
       }
     };
     const resolved = resolveParameter({ type, name: 'broken', value: 1, output: false }, undefined, options);

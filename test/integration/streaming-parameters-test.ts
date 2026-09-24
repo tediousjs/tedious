@@ -168,6 +168,85 @@ describe('streaming parameters', function() {
     });
   });
 
+  describe('a TVP row with a cell read from a source', function() {
+    beforeEach(function() {
+      if (config.options.tdsVersion! < '7_3_A') {
+        this.skip();
+      }
+    });
+
+    let procedureName: string;
+    let typeName: string;
+
+    beforeEach(function(done) {
+      const suffix = Math.floor(Math.random() * 1000000);
+      procedureName = `__tediousStreamedCellTest${suffix}`;
+      typeName = `__tediousStreamedCellType${suffix}`;
+
+      connection.execSqlBatch(new Request(`
+        CREATE TYPE [${typeName}] AS TABLE (a int, b varbinary(max), c nvarchar(max));
+      `, done));
+    });
+
+    beforeEach(function(done) {
+      connection.execSqlBatch(new Request(`
+        CREATE PROCEDURE [${procedureName}] @tvp ${typeName} readonly AS BEGIN
+          select a, b, c from @tvp order by a
+        END
+      `, done));
+    });
+
+    afterEach(function(done) {
+      connection.execSqlBatch(new Request(`
+        DROP PROCEDURE IF EXISTS [${procedureName}];
+        DROP TYPE IF EXISTS [${typeName}];
+      `, done));
+    });
+
+    it('round-trips the cell unchanged, alongside in-memory and null cells', function(done) {
+      const blob = randomBytes(100_000);
+      const text = 'streamed cell '.repeat(5_000);
+
+      const received: Array<[number, Buffer | null, string | null]> = [];
+
+      const request = new Request(procedureName, (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.lengthOf(received, 3);
+        assert.strictEqual(received[0][0], 1);
+        assert.isTrue(received[0][1]!.equals(blob));
+        assert.strictEqual(received[0][2], text);
+        assert.strictEqual(received[1][0], 2);
+        assert.isTrue(received[1][1]!.equals(blob));
+        assert.strictEqual(received[1][2], text);
+        assert.deepEqual(received[2], [3, null, null]);
+        done();
+      });
+
+      request.on('row', (columns) => {
+        received.push([columns[0].value, columns[1].value, columns[2].value]);
+      });
+
+      request.addParameter('tvp', TYPES.TVP, {
+        columns: [
+          { name: 'a', type: TYPES.Int },
+          { name: 'b', type: TYPES.VarBinary, length: Infinity },
+          { name: 'c', type: TYPES.NVarChar, length: Infinity }
+        ],
+        rows: [
+          // Uneven chunks, empty ones included, crossing packet and flush boundaries.
+          [1, chunked(blob, [1, 0, 4_097, 20_000, 3]), chunked(text, [5, 0, 3_000, 12_000])],
+          [2, blob, text],
+          [3, null, null]
+        ]
+      });
+
+      connection.callProcedure(request);
+    });
+  });
+
   describe('table-valued parameters', function() {
     beforeEach(function() {
       if (config.options.tdsVersion! < '7_3_A') {

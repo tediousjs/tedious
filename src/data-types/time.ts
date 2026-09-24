@@ -25,15 +25,19 @@ const Time: DataType = {
     buffer.writeUInt8(parameter.scale!);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as TemporalValue | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter(column, options) {
+    const scale = column.scale;
+    const useUTC = options.useUTC;
+    return (buffer, raw) => {
+      const value = Time.validate(raw, undefined) as TemporalValue | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(timeLength(parameter.scale));
-    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
+      buffer.writeUInt8(timeLength(scale));
+      writeTimeOfDay(buffer, value, scale!, useUTC);
+    };
   },
 
   validate: function(value): null | number | Date {

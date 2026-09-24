@@ -40,15 +40,18 @@ const Binary: { maximumLength: number } & DataType = {
     buffer.writeUInt16LE(parameter.length!);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as Buffer | null;
-    if (value == null) {
-      buffer.writeBuffer(NULL_LENGTH);
-      return;
-    }
+  compileWriter(column) {
+    const length = column.length;
+    return (buffer, raw) => {
+      const value = Binary.validate(raw, undefined) as Buffer | null;
+      if (value == null) {
+        buffer.writeBuffer(NULL_LENGTH);
+        return;
+      }
 
-    buffer.writeUInt16LE(parameter.length!);
-    buffer.writeBuffer(value.subarray(0, parameter.length !== undefined ? Math.min(parameter.length, Binary.maximumLength) : Binary.maximumLength));
+      buffer.writeUInt16LE(length!);
+      buffer.writeBuffer(value.subarray(0, length !== undefined ? Math.min(length, Binary.maximumLength) : Binary.maximumLength));
+    };
   },
 
   validate: function(value): Buffer | null {

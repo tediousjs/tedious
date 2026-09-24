@@ -20,17 +20,19 @@ const UniqueIdentifier: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as string | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = UniqueIdentifier.validate(raw, undefined) as string | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(0x10);
-    for (const byte of guidToArray(value)) {
-      buffer.writeUInt8(byte);
-    }
+      buffer.writeUInt8(0x10);
+      for (const byte of guidToArray(value)) {
+        buffer.writeUInt8(byte);
+      }
+    };
   },
 
   validate: function(value): string | null {

@@ -34,15 +34,17 @@ const NText: DataType = {
     }
   },
 
-  writeValue(buffer, parameter) {
-    if (parameter.value == null) {
-      buffer.writeBuffer(NULL_LENGTH);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = NText.validate(raw, undefined);
+      if (value == null) {
+        buffer.writeBuffer(NULL_LENGTH);
+        return;
+      }
 
-    const value = String(parameter.value);
-    buffer.writeInt32LE(value.length * 2);
-    buffer.writeString(value, 'ucs2');
+      buffer.writeInt32LE(value.length * 2);
+      buffer.writeString(value, 'ucs2');
+    };
   },
 
   validate: function(value): string | null {

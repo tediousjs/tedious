@@ -13,7 +13,7 @@ const IntN: DataType = {
     throw new Error('not implemented');
   },
 
-  writeValue() {
+  compileWriter() {
     throw new Error('not implemented');
   },
 

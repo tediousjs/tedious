@@ -38,7 +38,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
    * after every parameter, and at the end. A large value written by
    * reference stays by reference, so this costs no extra copy. A parameter
    * whose value is read from a source while the request is written has the
-   * rest of that write returned by `writeValue`, and is driven here so that
+   * rest of that write returned by its writer, and is driven here so that
    * the buffer is handed on whenever the type says it is worth it.
    *
    * Chunks are yielded one by one rather than through `yield*`: an array
@@ -57,7 +57,7 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
       let rest: void | AsyncIterable<void>;
       try {
         parameter.type.writeTypeInfo(buffer, parameter.data, this.options);
-        rest = parameter.type.writeValue(buffer, parameter.data, this.options);
+        rest = parameter.type.compileWriter(parameter.data, this.options)(buffer, parameter.data.value);
       } catch (error) {
         throw new InputError(`Input parameter '${parameter.name}' could not be validated`, { cause: error });
       }

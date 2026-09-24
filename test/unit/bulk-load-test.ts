@@ -29,7 +29,9 @@ describe('BulkLoad', function() {
           buffer.writeUInt8(0x00);
         },
 
-        writeValue() { },
+        compileWriter() {
+          return () => {};
+        },
 
         validate(value) {
           return value;
@@ -70,8 +72,10 @@ describe('BulkLoad', function() {
     it('wraps errors thrown while writing row values', async function() {
       const cause = new RangeError('out of range');
       const error = await writeRow(buildType({
-        writeValue() {
-          throw cause;
+        compileWriter() {
+          return () => {
+            throw cause;
+          };
         }
       }));
 
@@ -113,8 +117,10 @@ describe('BulkLoad', function() {
       })();
 
       const error = await writeRow(buildType({
-        writeValue() {
-          throw new RangeError('out of range');
+        compileWriter() {
+          return () => {
+            throw new RangeError('out of range');
+          };
         }
       }), rows);
 
@@ -209,7 +215,7 @@ describe('BulkLoad', function() {
         request.columns.forEach((column, i) => {
           const value = column.type.validate(row[i], column.collation);
           const parameter = { length: column.length, scale: column.scale, precision: column.precision, value };
-          column.type.writeValue(buffer, parameter, connectionOptions);
+          column.type.compileWriter(parameter, connectionOptions)(buffer, parameter.value);
         });
         expected.push(buffer.slice());
       }
@@ -475,9 +481,12 @@ describe('BulkLoad', function() {
       const serialized: string[] = [];
       const tracking = (name: string): DataType => ({
         ...TYPES.VarBinary,
-        writeValue(buffer, parameter, options) {
-          serialized.push(name);
-          TYPES.VarBinary.writeValue!(buffer, parameter, options);
+        compileWriter(column, options) {
+          const write = TYPES.VarBinary.compileWriter(column, options);
+          return (buffer, value) => {
+            serialized.push(name);
+            return write(buffer, value);
+          };
         }
       });
       request.addColumn('a', tracking('a'), { length: 6000, nullable: false });

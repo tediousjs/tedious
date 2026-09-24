@@ -18,33 +18,36 @@ const DateTime: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as Date | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter(column, options) {
+    const useUTC = options.useUTC;
+    return (buffer, raw) => {
+      const value = DateTime.validate(raw, undefined) as Date | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    let days: number, milliseconds: number;
-    if (options.useUTC) {
-      days = EPOCH_DATE.until(LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()), ChronoUnit.DAYS);
-      milliseconds = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
-    } else {
-      days = EPOCH_DATE.until(LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate()), ChronoUnit.DAYS);
-      milliseconds = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
-    }
+      let days: number, milliseconds: number;
+      if (useUTC) {
+        days = EPOCH_DATE.until(LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()), ChronoUnit.DAYS);
+        milliseconds = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
+      } else {
+        days = EPOCH_DATE.until(LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate()), ChronoUnit.DAYS);
+        milliseconds = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
+      }
 
-    let threeHundredthsOfSecond = Math.round(milliseconds / (3 + (1 / 3)));
+      let threeHundredthsOfSecond = Math.round(milliseconds / (3 + (1 / 3)));
 
-    // 25920000 equals one day
-    if (threeHundredthsOfSecond === 25920000) {
-      days += 1;
-      threeHundredthsOfSecond = 0;
-    }
+      // 25920000 equals one day
+      if (threeHundredthsOfSecond === 25920000) {
+        days += 1;
+        threeHundredthsOfSecond = 0;
+      }
 
-    buffer.writeUInt8(0x08);
-    buffer.writeInt32LE(days);
-    buffer.writeUInt32LE(threeHundredthsOfSecond);
+      buffer.writeUInt8(0x08);
+      buffer.writeInt32LE(days);
+      buffer.writeUInt32LE(threeHundredthsOfSecond);
+    };
   },
 
   // TODO: type 'any' needs to be revisited.
