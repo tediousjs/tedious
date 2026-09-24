@@ -12,7 +12,6 @@ import { RowToken } from '../../../src/token/token';
 import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { Collation } from '../../../src/collation';
 
 const options = {
@@ -23,7 +22,6 @@ const options = {
 describe('Row Token Parser', function() {
   describe('parsing a row with many columns', function() {
     it('should parse them correctly', async function() {
-      const debug = new Debug();
       const buffer = new WritableTrackingBuffer();
       buffer.writeUInt8(0xd1);
 
@@ -44,7 +42,7 @@ describe('Row Token Parser', function() {
         buffer.writeUsVarchar(i.toString(), 'ascii');
       }
 
-      const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+      const parser = Parser.parseTokens([buffer.data], options, colMetadata);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
@@ -63,7 +61,6 @@ describe('Row Token Parser', function() {
 
   describe('parsing a row delivered one byte at a time', function() {
     it('should parse it correctly', async function() {
-      const debug = new Debug();
       const colMetadata: ColumnMetadata[] = [
         {
           colName: 'col0',
@@ -98,7 +95,7 @@ describe('Row Token Parser', function() {
 
       const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
 
-      const parser = Parser.parseTokens(chunks, debug, options, colMetadata);
+      const parser = Parser.parseTokens(chunks, options, colMetadata);
       const result = await parser.next();
       assert.isFalse(result.done);
       const token = result.value;
@@ -113,7 +110,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse int', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -132,7 +128,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt8(0xd1);
     buffer.writeUInt32LE(value);
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -145,7 +141,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse bigint', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -179,7 +174,7 @@ describe('Row Token Parser', function() {
       Buffer.from([1, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 127])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -192,7 +187,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse real', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -211,7 +205,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt8(0xd1);
     buffer.writeBuffer(Buffer.from([0x00, 0x00, 0x18, 0x41]));
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -225,7 +219,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse float', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -246,7 +239,7 @@ describe('Row Token Parser', function() {
       Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x40])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -259,7 +252,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse Money', async function() {
-    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -296,7 +288,7 @@ describe('Row Token Parser', function() {
       Buffer.from([0x08, 0xf4, 0x10, 0x22, 0x11, 0xdc, 0x6a, 0xe9, 0x7d])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -313,7 +305,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varchar without code page', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -336,7 +327,7 @@ describe('Row Token Parser', function() {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -349,7 +340,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varchar with code page', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -372,7 +362,7 @@ describe('Row Token Parser', function() {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -385,7 +375,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse nvarchar', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -406,7 +395,7 @@ describe('Row Token Parser', function() {
     buffer.writeString(value, 'ucs2');
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -419,7 +408,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varBinary', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -440,7 +428,7 @@ describe('Row Token Parser', function() {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -453,7 +441,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse binary', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -474,7 +461,7 @@ describe('Row Token Parser', function() {
     buffer.writeBuffer(Buffer.from(value));
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -487,7 +474,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varcharMaxNull', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -510,7 +496,7 @@ describe('Row Token Parser', function() {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -523,7 +509,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varcharMaxUnknownLength', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -552,7 +537,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -565,7 +550,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varcharMaxKnownLength', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -593,7 +577,7 @@ describe('Row Token Parser', function() {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -606,7 +590,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varcharmaxWithCodePage', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -633,7 +616,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -646,7 +629,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should error on varcharMaxKnownLength mismatch', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -673,7 +655,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
 
     let error;
     try {
@@ -688,7 +670,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varBinaryMaxNull', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -711,7 +692,7 @@ describe('Row Token Parser', function() {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -724,7 +705,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse varBinaryMaxUnknownLength', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -752,7 +732,7 @@ describe('Row Token Parser', function() {
     buffer.writeBuffer(Buffer.from(value.slice(2, 4)));
     buffer.writeUInt32LE(0);
     // console.log(buffer.data)
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -765,7 +745,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse intN', async function() {
-    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -899,7 +878,7 @@ describe('Row Token Parser', function() {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -922,7 +901,6 @@ describe('Row Token Parser', function() {
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `false`', async function() {
-    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -965,7 +943,7 @@ describe('Row Token Parser', function() {
     // console.log(buffer.data)
 
 
-    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: false }, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], { ...options, lowerCaseGuids: false }, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -982,7 +960,6 @@ describe('Row Token Parser', function() {
   });
 
   it('parsing a UniqueIdentifier value when `lowerCaseGuids` option is `true`', async function() {
-    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -1023,7 +1000,7 @@ describe('Row Token Parser', function() {
       ])
     );
 
-    const parser = Parser.parseTokens([buffer.data], debug, { ...options, lowerCaseGuids: true }, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], { ...options, lowerCaseGuids: true }, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1039,7 +1016,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse floatN', async function() {
-    const debug = new Debug();
     const baseMetadata = {
       userType: 0,
       flags: 0,
@@ -1079,7 +1055,7 @@ describe('Row Token Parser', function() {
     );
     // console.log(buffer.data)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1093,7 +1069,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse datetime', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -1118,7 +1093,7 @@ describe('Row Token Parser', function() {
     // console.log(buffer)
 
     {
-      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: false }, colMetadata);
+      const parser = Parser.parseTokens([buffer.data], { ...options, useUTC: false }, colMetadata);
 
       let result = await parser.next();
       assert.isFalse(result.done);
@@ -1137,7 +1112,7 @@ describe('Row Token Parser', function() {
     }
 
     {
-      const parser = Parser.parseTokens([buffer.data], debug, { ...options, useUTC: true }, colMetadata);
+      const parser = Parser.parseTokens([buffer.data], { ...options, useUTC: true }, colMetadata);
 
       let result = await parser.next();
       assert.isFalse(result.done);
@@ -1157,7 +1132,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse datetimeN', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [{
       colName: 'col0',
       userType: 0,
@@ -1177,7 +1151,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1190,7 +1164,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse numeric4Bytes', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1216,7 +1189,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1229,7 +1202,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse numeric4BytesNegative', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1255,7 +1227,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(93);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1267,7 +1239,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse numeric8Bytes', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1294,7 +1265,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
@@ -1307,7 +1278,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse numeric12Bytes', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1335,7 +1305,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
@@ -1348,7 +1318,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse numeric16Bytes', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1382,7 +1351,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt32LE(1);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);
@@ -1395,7 +1364,6 @@ describe('Row Token Parser', function() {
   });
 
   it('should parse numericNull', async function() {
-    const debug = new Debug();
     const colMetadata: ColumnMetadata[] = [
       {
         colName: 'col0',
@@ -1416,7 +1384,7 @@ describe('Row Token Parser', function() {
     buffer.writeUInt8(0);
     // console.log(buffer)
 
-    const parser = Parser.parseTokens([buffer.data], debug, options, colMetadata);
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
     const result = await parser.next();
     // console.log(token)
     assert.isFalse(result.done);

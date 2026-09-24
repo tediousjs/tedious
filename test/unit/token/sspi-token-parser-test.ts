@@ -1,14 +1,12 @@
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { SSPIToken } from '../../../src/token/token';
 import WriteBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
-import Debug from '../../../src/debug';
 import { assert } from 'chai';
 
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('sspi token parser', function() {
   it('should parse challenge', async function() {
-    const debug = new Debug();
     const source = new WriteBuffer();
     source.writeUInt8(0xed);
     source.writeUInt16LE(0);
@@ -29,7 +27,7 @@ describe('sspi token parser', function() {
 
     const data = source.data;
     data.writeUInt16LE(data.length - 3, 1);
-    const parser = StreamParser.parseTokens([data], debug, options);
+    const parser = StreamParser.parseTokens([data], options);
 
 
     const expected = {
