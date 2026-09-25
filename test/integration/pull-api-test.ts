@@ -22,6 +22,14 @@ function getConfig() {
   };
 }
 
+// `max` types, and with them streamed values, exist from TDS 7.2 on.
+function skipWithoutMaxTypes(context: Mocha.Context) {
+  const tdsVersion = process.env.TEDIOUS_TDS_VERSION;
+  if (tdsVersion !== undefined && tdsVersion < '7_2') {
+    context.skip();
+  }
+}
+
 async function collect(chunks: AsyncIterable<Buffer> | null): Promise<Buffer> {
   assert.isNotNull(chunks);
 
@@ -254,6 +262,10 @@ describe('pulling responses', function() {
   });
 
   describe('streaming values', function() {
+    beforeEach(function() {
+      skipWithoutMaxTypes(this);
+    });
+
     it('streams a `varbinary(max)` value, with the values before it available right away', async function() {
       const value = randomBytes(3 * 1024 * 1024);
 
@@ -476,6 +488,8 @@ describe('pulling responses', function() {
     });
 
     it('streams `max` output parameters', async function() {
+      skipWithoutMaxTypes(this);
+
       const value = randomBytes(2 * 1024 * 1024);
 
       {
@@ -502,6 +516,8 @@ describe('pulling responses', function() {
     });
 
     it('resolves `stream()` of a `null` output parameter to `null`', async function() {
+      skipWithoutMaxTypes(this);
+
       const request = new Request('SET @a = NULL');
       request.addOutputParameter('a', TYPES.VarBinary, undefined, { length: Infinity });
       await using response = connection.execSql(request);
@@ -511,6 +527,8 @@ describe('pulling responses', function() {
     });
 
     it('reads `max` output parameters in any order', async function() {
+      skipWithoutMaxTypes(this);
+
       {
         const request = new Request("SET @a = REPLICATE(CAST('a' AS varchar(max)), 9000); SET @b = REPLICATE(CAST('b' AS varchar(max)), 9000)");
         request.addOutputParameter('a', TYPES.VarChar, undefined, { length: Infinity });
@@ -552,6 +570,8 @@ describe('pulling responses', function() {
     });
 
     it('returns output parameters, discarding rows', async function() {
+      skipWithoutMaxTypes(this);
+
       const request = new Request("SELECT 1; SET @a = 'x'; SET @b = REPLICATE(CAST('y' AS varchar(max)), 10000)");
       request.addOutputParameter('a', TYPES.VarChar);
       request.addOutputParameter('b', TYPES.VarChar, undefined, { length: Infinity });
