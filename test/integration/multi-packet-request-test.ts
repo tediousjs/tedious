@@ -43,7 +43,7 @@ describe('a request whose message spans several packets', function() {
       const request = new Request('select len(@value)', (err) => {
         err ? reject(err) : resolve();
       });
-      request.addParameter('value', TYPES.NVarChar, value, { length: Infinity });
+      request.addParameter('value', TYPES.NVarChar, value);
       connection.execSql(request);
     });
   }
@@ -71,6 +71,7 @@ describe('a request whose message spans several packets', function() {
     // held back until the server acknowledged the ones before it - which the
     // server delays by ~40ms (delayed acknowledgements).
     const onePacket = await averageTime('x');
+    // 6,000 bytes - an `nvarchar(3000)` value, supported by all TDS versions.
     const twoPackets = await averageTime('x'.repeat(3000));
 
     assert.isBelow(twoPackets - onePacket, 20, `one packet: ${onePacket.toFixed(1)}ms, two packets: ${twoPackets.toFixed(1)}ms`);
