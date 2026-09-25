@@ -27,6 +27,7 @@ import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
+import { abortOnSignal, type ExecutionOptions } from './execution-options';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
@@ -2706,8 +2707,10 @@ class Connection extends EventEmitter {
    * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
-  execSqlBatch(request: Request) {
+  execSqlBatch(request: Request, options?: ExecutionOptions) {
+    abortOnSignal(request, options?.signal);
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
   }
 
@@ -2732,8 +2735,11 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
-  execSql(request: Request) {
+  execSql(request: Request, options?: ExecutionOptions) {
+    abortOnSignal(request, options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -2863,10 +2869,11 @@ class Connection extends EventEmitter {
    *
    * @param bulkLoad A previously created [[BulkLoad]].
    * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
+   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
-  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>, options?: ExecutionOptions): void
 
-  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>) {
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>, options?: ExecutionOptions) {
     bulkLoad.executionStarted = true;
 
     // Owns the row source from here on: the first row is requested now,
@@ -2903,6 +2910,10 @@ class Connection extends EventEmitter {
 
     bulkLoad.once('cancel', onCancel);
 
+    // Registered after `onCancel`, so a signal that is aborted already also
+    // cancels the `INSERT BULK` statement, which is then not sent at all.
+    abortOnSignal(bulkLoad, options?.signal);
+
     this.execSqlBatch(request);
   }
 
@@ -2914,8 +2925,11 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
+   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
-  prepare(request: Request) {
+  prepare(request: Request, options?: ExecutionOptions) {
+    abortOnSignal(request, options?.signal);
+
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -2986,8 +3000,11 @@ class Connection extends EventEmitter {
    *   parameters that were added to the [[Request]] before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
+   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions) {
+    abortOnSignal(request, options?.signal);
+
     const executeParameters: ResolvedParameter[] = [];
 
     executeParameters.push(this.resolveRequestParameter({
@@ -3028,8 +3045,11 @@ class Connection extends EventEmitter {
    * Call a stored procedure represented by [[Request]].
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
-  callProcedure(request: Request) {
+  callProcedure(request: Request, options?: ExecutionOptions) {
+    abortOnSignal(request, options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
