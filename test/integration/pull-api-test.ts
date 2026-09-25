@@ -7,6 +7,7 @@ import { TYPES } from '../../src/tedious';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { RequestError } from '../../src/errors';
+import { type Response } from '../../src/pull-response';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
@@ -237,8 +238,109 @@ describe('pulling responses', function() {
 
       assert.deepEqual(resultSets, [
         { columns: ['a'], rows: [[1]], rowCount: 1 },
-        { columns: ['b', 'c'], rows: [['x', 'y'], ['z', 'w']], rowCount: 2 }
+        { columns: ['b', 'c'], rows: [['x', 'y'], ['z', 'w']], rowCount: 2 },
+        // A `DECLARE` with a value reports a row count, like an assignment.
+        { columns: [], rows: [], rowCount: 1 }
       ]);
+    });
+
+    // Collect the column names, rows, row count, info messages and errors of
+    // all results.
+    async function collectResults(response: Response) {
+      const results = [];
+      for await (const result of response.results()) {
+        const rows = [];
+        for await (const row of result) {
+          rows.push(row.values());
+        }
+        results.push({
+          columns: result.columns.map((c) => c.colName),
+          rows,
+          rowCount: result.rowCount,
+          messages: result.messages.map((m) => m.message),
+          errors: result.errors.map((e) => e.message)
+        });
+      }
+      return results;
+    }
+
+    const STATEMENTS = "CREATE TABLE #r (id int); INSERT INTO #r VALUES (1), (2); UPDATE #r SET id = id WHERE id = 1; PRINT 'updated'; SELECT id FROM #r ORDER BY id; DELETE FROM #r WHERE id = 99; DROP TABLE #r";
+
+    const EXPECTED_RESULTS = [
+      { columns: [], rows: [], rowCount: 2, messages: [], errors: [] },
+      { columns: [], rows: [], rowCount: 1, messages: [], errors: [] },
+      // The message of the `PRINT` statement, which has no result.
+      { columns: ['id'], rows: [[1], [2]], rowCount: 2, messages: ['updated'], errors: [] },
+      { columns: [], rows: [], rowCount: 0, messages: [], errors: [] }
+    ];
+
+    it('returns a result for each statement that returns rows or reports a row count', async function() {
+      await using response = connection.execSqlBatch(new Request(STATEMENTS));
+      assert.deepEqual(await collectResults(response), EXPECTED_RESULTS);
+    });
+
+    it('returns the same results for statements executed via `sp_executesql`', async function() {
+      await using response = connection.execSql(new Request(STATEMENTS));
+      assert.deepEqual(await collectResults(response), EXPECTED_RESULTS);
+    });
+
+    it('only returns result sets with `SET NOCOUNT ON`', async function() {
+      for (const method of ['execSqlBatch', 'execSql'] as const) {
+        await using response = connection[method](new Request('SET NOCOUNT ON; ' + STATEMENTS));
+
+        assert.deepEqual(await collectResults(response), [
+          { columns: ['id'], rows: [[1], [2]], rowCount: undefined, messages: ['updated'], errors: [] }
+        ], method);
+      }
+    });
+
+    it('collects all info messages of the response', async function() {
+      await using response = connection.execSqlBatch(new Request("PRINT 'first'; SELECT 1; PRINT 'second'"));
+
+      for await (const result of response.results()) {
+        for await (const row of result) {
+          row.get(0);
+        }
+      }
+
+      // The last message has no result it belongs to.
+      assert.deepEqual(response.messages.map((m) => m.message), ['first', 'second']);
+    });
+
+    it('attaches errors to the result of their statement, and raises them at the end', async function() {
+      {
+        await using response = connection.execSqlBatch(new Request('SELECT 1 / 0 AS a; SELECT 2 AS b'));
+
+        const results = [];
+        let error: Error | undefined;
+        try {
+          for await (const result of response.results()) {
+            const rows = [];
+            for await (const row of result) {
+              rows.push(row.values());
+            }
+            results.push({ columns: result.columns.map((c) => c.colName), rows, errors: result.errors });
+          }
+        } catch (err: any) {
+          error = err;
+        }
+
+        assert.lengthOf(results, 2);
+        assert.deepEqual(results.map(({ columns, rows }) => ({ columns, rows })), [
+          { columns: ['a'], rows: [] },
+          { columns: ['b'], rows: [[2]] }
+        ]);
+        assert.lengthOf(results[0].errors, 1);
+        assert.lengthOf(results[1].errors, 0);
+        assert.strictEqual(error, results[0].errors[0]);
+        assert.match(error!.message, /Divide by zero/);
+      }
+
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+
+    it('skips results without rows when reading the rows of a single result set via `rows()`', async function() {
+      assert.deepEqual(await query('CREATE TABLE #s (id int); INSERT INTO #s VALUES (1), (2); SELECT id FROM #s ORDER BY id; DELETE FROM #s'), [[1], [2]]);
     });
 
     it('skips the rows of result sets that are not read', async function() {
@@ -543,6 +645,18 @@ describe('pulling responses', function() {
       assert.deepEqual(await query('SELECT 2'), [[2]]);
     });
 
+    it('reads output parameters via `outputParameters()` before finishing', async function() {
+      const request = new Request('SET @out = 42');
+      request.addOutputParameter('out', TYPES.Int);
+      await using response = connection.execSql(request);
+
+      const outputParameters = await response.outputParameters();
+      assert.strictEqual(outputParameters.get('out'), 42);
+
+      const summary = await response.finish();
+      assert.notProperty(summary, 'outputParameters');
+    });
+
     it('discards output parameters nobody asked for when finished', async function() {
       {
         const request = new Request('SELECT 1; SET @out = 42');
@@ -569,16 +683,15 @@ describe('pulling responses', function() {
       assert.strictEqual(rowCount, 3);
     });
 
-    it('returns output parameters, discarding rows', async function() {
-      skipWithoutMaxTypes(this);
+    it('returns the row count and info messages of each result, discarding rows', async function() {
+      const request = new Request("CREATE TABLE #pull (id int); INSERT INTO #pull VALUES (1), (2); PRINT 'inserted'; SELECT id FROM #pull; DELETE FROM #pull");
+      await using response = connection.execSqlBatch(request);
 
-      const request = new Request("SELECT 1; SET @a = 'x'; SET @b = REPLICATE(CAST('y' AS varchar(max)), 10000)");
-      request.addOutputParameter('a', TYPES.VarChar);
-      request.addOutputParameter('b', TYPES.VarChar, undefined, { length: Infinity });
-      await using response = connection.execSql(request);
-
-      const { outputParameters } = await response.finish();
-      assert.deepEqual(outputParameters, { a: 'x', b: 'y'.repeat(10000) });
+      const { rowCount, results, messages } = await response.finish();
+      assert.strictEqual(rowCount, 6);
+      assert.deepEqual(results.map((result) => result.rowCount), [2, 2, 2]);
+      assert.deepEqual(results.map((result) => result.messages.map((m) => m.message)), [[], ['inserted'], []]);
+      assert.deepEqual(messages.map((m) => m.message), ['inserted']);
     });
 
     it('throws errors of the request', async function() {
@@ -728,8 +841,10 @@ describe('pulling responses', function() {
         row.get(0);
       }
 
-      assert.deepEqual(await response.finish(), { rowCount: 2, returnStatus: 0, outputParameters: {} });
-      assert.deepEqual(await response.finish(), { rowCount: 2, returnStatus: 0, outputParameters: {} });
+      const summary = await response.finish();
+      assert.strictEqual(summary.rowCount, 2);
+      assert.strictEqual(summary.returnStatus, 0);
+      assert.strictEqual(await response.finish(), summary);
     });
   });
 

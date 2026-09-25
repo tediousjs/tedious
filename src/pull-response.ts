@@ -7,13 +7,15 @@ import { type Metadata } from './metadata-parser';
 import { decodePLPValue, isPLPStream } from './value-parser';
 import StreamParser, { type ParserOptions } from './token/stream-parser';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
-import { type TokenHandler } from './token/handler';
+import { type RequestTokenHandler } from './token/handler';
 import {
   ColMetadataToken,
   ColumnValueToken,
   DoneInProcToken,
   DoneProcToken,
   DoneToken,
+  type ErrorMessageToken,
+  type InfoMessageToken,
   ReturnStatusToken,
   ReturnValueStartToken,
   ReturnValueToken,
@@ -28,6 +30,20 @@ import {
 
 const DONE: IteratorReturnResult<undefined> = Object.freeze({ done: true, value: undefined });
 const DONE_PROMISE = Promise.resolve(DONE);
+
+/**
+ * An informational message from the server, e.g. from `PRINT`, `RAISERROR`
+ * with a severity of 10 or lower, or a warning.
+ */
+export interface InfoMessage {
+  message: string;
+  number: number;
+  state: number;
+  class: number;
+  serverName: string;
+  procName: string;
+  lineNumber: number;
+}
 
 // Marks a value that was streamed (or skipped) instead of read.
 const STREAMED = Symbol('streamed');
@@ -44,7 +60,7 @@ const STREAMED = Symbol('streamed');
 export class ResponseReader {
   declare parser: StreamParser;
   declare iterator: AsyncIterator<Buffer>;
-  declare handler: TokenHandler;
+  declare handler: RequestTokenHandler;
   declare debug: Debug;
 
   // A token that was pushed back via `unread`.
@@ -62,7 +78,12 @@ export class ResponseReader {
   // Called once the whole message was read, or reading it failed.
   declare onEnd: (error?: Error) => void;
 
-  constructor(message: AsyncIterable<Buffer>, handler: TokenHandler, debug: Debug, options: ParserOptions) {
+  // Called with each info message, and each error of the request, as they
+  // are read.
+  declare onInfoMessage: (message: InfoMessage) => void;
+  declare onRequestError: (error: RequestError) => void;
+
+  constructor(message: AsyncIterable<Buffer>, handler: RequestTokenHandler, debug: Debug, options: ParserOptions) {
     // Streamed rows are always read as arrays of their values (regardless of
     // `useColumnNames`), and their values are accessed by column index.
     this.parser = new StreamParser(options);
@@ -77,6 +98,8 @@ export class ResponseReader {
     this.error = undefined;
     this.returnStatus = undefined;
     this.onEnd = () => {};
+    this.onInfoMessage = () => {};
+    this.onRequestError = () => {};
   }
 
   /**
@@ -236,6 +259,23 @@ export class ResponseReader {
           this.returnStatus = (token as ReturnStatusToken).value;
           handler.onReturnStatus(token as ReturnStatusToken);
           break;
+
+        case 'onInfoMessage': {
+          const { message, number, state, class: severity, serverName, procName, lineNumber } = token as InfoMessageToken;
+          handler.onInfoMessage(token as InfoMessageToken);
+          this.onInfoMessage({ message, number, state, class: severity, serverName, procName, lineNumber });
+          break;
+        }
+
+        case 'onErrorMessage': {
+          // The handler records the error (unless the request was canceled).
+          const errorCount = handler.errors.length;
+          handler.onErrorMessage(token as ErrorMessageToken);
+          if (handler.errors.length > errorCount) {
+            this.onRequestError(handler.errors[errorCount]);
+          }
+          break;
+        }
 
         default:
           handler[token.handlerName](token as any);
@@ -677,19 +717,19 @@ abstract class ValueSequence {
  * values that were not read yet.
  */
 export class Row extends ValueSequence {
-  declare resultSet: ResultSet;
+  declare result: Result;
 
-  constructor(resultSet: ResultSet, values: unknown[], complete: boolean) {
-    super(resultSet.response, values, complete);
-    this.resultSet = resultSet;
+  constructor(result: Result, values: unknown[], complete: boolean) {
+    super(result.response, values, complete);
+    this.result = result;
   }
 
   indexOf(key: number | string): number {
-    return this.resultSet.indexOf(key);
+    return this.result.indexOf(key);
   }
 
   metadataAt(index: number): Metadata {
-    return this.resultSet.columns[index];
+    return this.result.columns[index];
   }
 
   locate(key: number | string): MaybePromise<number> {
@@ -714,7 +754,7 @@ export class Row extends ValueSequence {
     if (token instanceof ColumnValueToken) {
       this.items.push(token.value);
     } else if (token instanceof ValueStartToken) {
-      this.pending = { name: this.resultSet.columns[token.index].colName, metadata: token.metadata, length: token.length };
+      this.pending = { name: this.result.columns[token.index].colName, metadata: token.metadata, length: token.length };
     } else if (token instanceof RowEndToken) {
       this.complete = true;
     } else {
@@ -731,7 +771,7 @@ export class Row extends ValueSequence {
    * after moving on to the next row.
    */
   values(): unknown[] {
-    if (!this.complete || this.pending !== undefined || this.items.length < this.resultSet.columns.length) {
+    if (!this.complete || this.pending !== undefined || this.items.length < this.result.columns.length) {
       throw new Error('The row was not read completely. Use `await readValues()` to read all of its values.');
     }
 
@@ -761,16 +801,42 @@ export class Row extends ValueSequence {
 }
 
 /**
- * A result set, which is an async iterator of its rows.
+ * A result of a request: a result set, or the row count of a statement
+ * without a result set (e.g. of an `INSERT`, `UPDATE` or `DELETE`).
+ *
+ * A result is an async iterator of its rows - there are none if it has no
+ * result set.
  */
-export class ResultSet implements AsyncIterableIterator<Row> {
+export class Result implements AsyncIterableIterator<Row> {
   declare response: Response;
+
+  /**
+   * The columns of the result set, or an empty array if the result has no
+   * result set.
+   */
   declare columns: ColumnMetadata[];
 
   /**
-   * The number of rows, once all rows were read.
+   * The number of rows returned (for a result set) or affected, once all
+   * rows were read. `undefined` if the server did not report it (e.g. with
+   * `SET NOCOUNT ON`).
    */
   declare rowCount: number | undefined;
+
+  /**
+   * The info messages of the result's statement (and of statements before
+   * it that have no result of their own, like `PRINT`). Complete once all
+   * rows were read.
+   */
+  declare messages: InfoMessage[];
+
+  /**
+   * The errors of the result's statement. Complete once all rows were read.
+   *
+   * The errors are raised when the response ends, like all other errors of
+   * the request.
+   */
+  declare errors: RequestError[];
 
   declare done: boolean;
   declare current: Row | undefined;
@@ -780,6 +846,8 @@ export class ResultSet implements AsyncIterableIterator<Row> {
     this.response = response;
     this.columns = columns;
     this.rowCount = undefined;
+    this.messages = [];
+    this.errors = [];
     this.done = false;
     this.current = undefined;
     this.columnIndexes = undefined;
@@ -880,6 +948,7 @@ export class ResultSet implements AsyncIterableIterator<Row> {
 
     this.done = true;
     this.current = undefined;
+    this.response.endResult(this);
     return DONE;
   }
 
@@ -1035,7 +1104,7 @@ export class OutputParameters extends ValueSequence {
  */
 export class RowIterator implements AsyncIterableIterator<Row> {
   declare response: Response;
-  declare resultSet: ResultSet | undefined;
+  declare resultSet: Result | undefined;
   declare finished: boolean;
 
   constructor(response: Response) {
@@ -1111,7 +1180,7 @@ export class RowIterator implements AsyncIterableIterator<Row> {
 /**
  * Iterates the result sets of a request.
  */
-export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
+export class ResultIterator implements AsyncIterableIterator<Result> {
   declare response: Response;
   declare finished: boolean;
 
@@ -1124,18 +1193,18 @@ export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
     return this;
   }
 
-  next(): Promise<IteratorResult<ResultSet, undefined>> {
+  next(): Promise<IteratorResult<Result, undefined>> {
     return this.nextResultSet().catch(this.response.rethrow);
   }
 
-  async nextResultSet(): Promise<IteratorResult<ResultSet, undefined>> {
+  async nextResultSet(): Promise<IteratorResult<Result, undefined>> {
     if (this.finished) {
       return DONE;
     }
 
-    const resultSet = await this.response.nextResultSet();
-    if (resultSet !== undefined) {
-      return { done: false, value: resultSet };
+    const result = await this.response.nextResult();
+    if (result !== undefined) {
+      return { done: false, value: result };
     }
 
     this.finished = true;
@@ -1157,9 +1226,22 @@ export class ResultSetIterator implements AsyncIterableIterator<ResultSet> {
  * The outcome of a request that was consumed completely via `finish`.
  */
 export interface RequestSummary {
+  /**
+   * The total number of rows returned or affected.
+   */
   rowCount: number;
+
   returnStatus: number | undefined;
-  outputParameters: { [name: string]: unknown };
+
+  /**
+   * The row count, info messages and errors of each result.
+   */
+  results: Array<Pick<Result, 'rowCount' | 'messages' | 'errors'>>;
+
+  /**
+   * All info messages of the request.
+   */
+  messages: InfoMessage[];
 }
 
 /**
@@ -1198,8 +1280,24 @@ export class Response {
   declare completion: Promise<void>;
   declare resolveCompletion: () => void;
 
-  // The result set currently being read.
-  declare resultSet: ResultSet | undefined;
+  // The result currently being read.
+  declare currentResult: Result | undefined;
+
+  /**
+   * The info messages read so far.
+   */
+  declare messages: InfoMessage[];
+
+  // All results read so far (for the summary).
+  declare readResults: Result[];
+
+  // The result whose statement's messages and errors are being read, until
+  // its `DONE` token.
+  declare collectingResult: Result | undefined;
+
+  // Messages and errors that were read, but belong to the next result.
+  declare pendingMessages: InfoMessage[];
+  declare pendingErrors: RequestError[];
 
   // Errors that were raised to the consumer already (e.g. by a `rows()`
   // loop), and are not raised by `finish` again.
@@ -1241,7 +1339,12 @@ export class Response {
       this.resolveCompletion = resolve;
     });
 
-    this.resultSet = undefined;
+    this.currentResult = undefined;
+    this.messages = [];
+    this.readResults = [];
+    this.collectingResult = undefined;
+    this.pendingMessages = [];
+    this.pendingErrors = [];
     this.deliveredErrors = new Set();
     this.rethrow = (error) => {
       this.deliveredErrors.add(error);
@@ -1291,7 +1394,41 @@ export class Response {
    */
   setReader(reader: ResponseReader) {
     this.reader = reader;
+
+    reader.onInfoMessage = (message) => {
+      this.messages.push(message);
+      (this.collectingResult?.messages ?? this.pendingMessages).push(message);
+    };
+
+    reader.onRequestError = (error) => {
+      (this.collectingResult?.errors ?? this.pendingErrors).push(error);
+    };
+
     this.resolveReader(reader);
+  }
+
+  /**
+   * Start a result, which gets the messages and errors read since the
+   * previous one.
+   */
+  startResult(result: Result) {
+    result.messages = this.pendingMessages;
+    result.errors = this.pendingErrors;
+    this.pendingMessages = [];
+    this.pendingErrors = [];
+
+    this.readResults.push(result);
+    this.collectingResult = result.done ? undefined : result;
+    return result;
+  }
+
+  /**
+   * Called once all rows of a result were read.
+   */
+  endResult(result: Result) {
+    if (this.collectingResult === result) {
+      this.collectingResult = undefined;
+    }
   }
 
   /**
@@ -1339,14 +1476,21 @@ export class Response {
    * Returns `undefined` once there are no more result sets - at the end of
    * the response, or at the output parameters.
    */
-  async nextResultSet(): Promise<ResultSet | undefined> {
+  /**
+   * Advance to the next result, skipping the rest of the current one.
+   *
+   * A result is a result set, or a `DONE` token that reports a row count or
+   * an error. Other `DONE` tokens (e.g. of `DECLARE` or `PRINT` statements,
+   * or of all statements with `SET NOCOUNT ON`) are skipped.
+   */
+  async nextResult(): Promise<Result | undefined> {
     const reader = await this.getReader();
 
-    const current = this.resultSet;
+    const current = this.currentResult;
     if (current !== undefined && !current.done) {
       await current.skipRest();
     }
-    this.resultSet = undefined;
+    this.currentResult = undefined;
 
     while (true) {
       const token = await reader.next();
@@ -1356,7 +1500,7 @@ export class Response {
       }
 
       if (token instanceof ColMetadataToken) {
-        return this.resultSet = new ResultSet(this, token.columns);
+        return this.currentResult = this.startResult(new Result(this, token.columns));
       }
 
       if (token instanceof ReturnValueToken || token instanceof ReturnValueStartToken) {
@@ -1364,8 +1508,26 @@ export class Response {
         return undefined;
       }
 
-      // `DONE` tokens of statements without a result set: the token handler
-      // already took care of them.
+      // A `DONEPROC` token ends a procedure (e.g. `sp_executesql`) rather
+      // than a statement.
+      if ((token instanceof DoneToken || token instanceof DoneInProcToken) && !token.attention && (token.rowCount !== undefined || token.sqlError)) {
+        const result = new Result(this, []);
+        result.rowCount = token.rowCount;
+        result.done = true;
+        return this.currentResult = this.startResult(result);
+      }
+    }
+  }
+
+  /**
+   * Advance to the next result that has a result set.
+   */
+  async nextResultSet(): Promise<Result | undefined> {
+    while (true) {
+      const result = await this.nextResult();
+      if (result === undefined || result.columns.length > 0) {
+        return result;
+      }
     }
   }
 
@@ -1410,8 +1572,9 @@ export class Response {
    * are thrown by the loop. Stopping the loop early skips the remaining rows,
    * and leaves any error of the request to be raised by `finish`.
    *
-   * Throws if the request returns more than one result set, use [[results]]
-   * for those.
+   * Results without a result set (e.g. the row count of an `INSERT` before
+   * a `SELECT`) are skipped. Throws if the request returns more than one
+   * result set, use [[results]] for those.
    */
   rows(): RowIterator {
     this.assertPulled();
@@ -1419,12 +1582,17 @@ export class Response {
   }
 
   /**
-   * Iterate the result sets of the response, each of which is an async
-   * iterator of its rows.
+   * Iterate the results of the response, in order: one for each result set,
+   * and one for each statement without a result set that reports a row count
+   * (e.g. an `INSERT`, `UPDATE` or `DELETE`, unless `SET NOCOUNT ON` is in
+   * effect) or an error. Each result is an async iterator of its rows.
+   *
+   * Each result has the info messages and errors of its statement. All info
+   * messages are also available via [[messages]].
    */
-  results(): ResultSetIterator {
+  results(): ResultIterator {
     this.assertPulled();
-    return new ResultSetIterator(this);
+    return new ResultIterator(this);
   }
 
   /**
@@ -1473,8 +1641,8 @@ export class Response {
   }
 
   async readOutputParameters(): Promise<OutputParameters> {
-    while (await this.nextResultSet() !== undefined) {
-      // skip the remaining result sets
+    while (await this.nextResult() !== undefined) {
+      // skip the remaining results
     }
 
     const reader = await this.getReader();
@@ -1491,8 +1659,10 @@ export class Response {
   }
 
   /**
-   * Read the rest of the response, discarding any rows, wait for the request
-   * to complete, and return a summary of it.
+   * Read the rest of the response, discarding any rows and output
+   * parameters (use [[outputParameters]] to read those), wait for the
+   * request to complete, and return a summary of it: the row count, info
+   * messages and errors of each result.
    *
    * Raises the request's error, unless it was raised already (e.g. by a
    * `rows()` loop).
@@ -1515,28 +1685,20 @@ export class Response {
   }
 
   async readSummary(): Promise<RequestSummary> {
-    const values: { [name: string]: unknown } = {};
-    let returnStatus;
-
     try {
-      const outputParameters = await this.readOutputParametersOnce();
-      returnStatus = outputParameters.returnStatus;
-
-      await outputParameters.readRemaining();
-      await outputParameters.finish();
-
-      for (const [name, index] of outputParameters.positions) {
-        const value = outputParameters.items[index];
-        if (value !== STREAMED) {
-          values[name] = value;
-        }
+      while (await this.nextResult() !== undefined) {
+        // read the remaining results
       }
+
+      // Output parameters nobody asked for are discarded.
+      await this.discard();
+      await this.settled();
     } catch (err) {
       // Wait for the request to complete even if reading failed, so the
       // connection can be used again once `finish` returned.
       await this.discard();
 
-      this.summary = { rowCount: this.request.rowCount ?? 0, returnStatus: returnStatus, outputParameters: values };
+      this.summary = this.makeSummary();
 
       // Errors the consumer received already are not raised again.
       if (!this.deliveredErrors.has(err)) {
@@ -1544,12 +1706,18 @@ export class Response {
       }
     }
 
-    return this.summary = {
+    return this.summary = this.makeSummary();
+  }
+
+  makeSummary(): RequestSummary {
+    return {
       rowCount: this.request.rowCount ?? 0,
-      returnStatus: returnStatus,
-      outputParameters: values
+      returnStatus: this.reader?.returnStatus,
+      results: this.readResults,
+      messages: this.messages
     };
   }
+
 }
 
 /**
