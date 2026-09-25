@@ -3,7 +3,7 @@
 import Parser, { type TokenReader } from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
-import { ColumnValueToken, NBCRowToken, RowEndToken, RowStartToken, RowToken, Token, ValueChunkToken, ValueEndToken, ValueStartToken } from './token';
+import { ColumnValueToken, RowEndToken, RowStartToken, RowToken, RowValuesToken, Token, ValueChunkToken, ValueEndToken, ValueStartToken } from './token';
 import { NotEnoughDataError } from './helpers';
 
 import { isPLPStream, PLPReader, readValue } from '../value-parser';
@@ -68,11 +68,11 @@ export class RowTokenReader extends ColumnValuesReader implements TokenReader {
 }
 
 /**
- * Reads a `ROW` or `NBCROW` token, streaming PLP values piece by piece instead
- * of reading them as a whole.
+ * Reads a `ROW` or `NBCROW` token as an array of its values, streaming PLP
+ * values piece by piece instead of reading them as a whole.
  *
- * A row without any (non-`null`) PLP values is returned as a single `ROW` or
- * `NBCROW` token. Otherwise, the row is returned as a sequence of tokens,
+ * A row without any (non-`null`) PLP values is returned as a single
+ * `RowValuesToken`. Otherwise, the row is returned as a sequence of tokens,
  * starting with a `RowStartToken` (see there).
  */
 export class StreamedRowReader implements TokenReader {
@@ -82,7 +82,7 @@ export class StreamedRowReader implements TokenReader {
   declare nullBitmap: Buffer | undefined;
 
   // The values read before the first streamed value.
-  declare columns: Column[];
+  declare values: unknown[];
   // The index of the next column to read.
   declare index: number;
   // Whether the `RowStartToken` was returned.
@@ -101,7 +101,7 @@ export class StreamedRowReader implements TokenReader {
     this.hasNullBitmap = hasNullBitmap;
     this.nullBitmap = undefined;
 
-    this.columns = [];
+    this.values = [];
     this.index = 0;
     this.started = false;
 
@@ -139,7 +139,7 @@ export class StreamedRowReader implements TokenReader {
 
           if (!this.started) {
             this.started = true;
-            return new RowStartToken(this.columns);
+            return new RowStartToken(this.values);
           }
 
           return this.readPLPValue(parser, plpReader);
@@ -155,10 +155,10 @@ export class StreamedRowReader implements TokenReader {
       this.index += 1;
 
       if (this.started) {
-        return new ColumnValueToken(index, metadata, value);
+        return new ColumnValueToken(index, value);
       }
 
-      this.columns.push({ value, metadata });
+      this.values.push(value);
     }
 
     this.hasMore = false;
@@ -167,8 +167,7 @@ export class StreamedRowReader implements TokenReader {
       return new RowEndToken();
     }
 
-    const columns = parser.options.useColumnNames ? toColumnsMap(this.columns) : this.columns;
-    return this.hasNullBitmap ? new NBCRowToken(columns) : new RowToken(columns);
+    return new RowValuesToken(this.values);
   }
 
   readPLPValue(parser: Parser, plpReader: PLPReader): Token {

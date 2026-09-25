@@ -577,9 +577,10 @@ export class SSPIToken extends Token {
   }
 }
 
-// When values are streamed, a row without any (non-`null`) PLP values is
-// still delivered as a single `ROW` or `NBCROW` token. A row with PLP values
-// is delivered as a sequence of tokens instead:
+// When values are streamed, rows are read as plain arrays of their values
+// (their metadata is that of the result set's columns). A row without any
+// (non-`null`) PLP values is delivered as a single `RowValuesToken`. A row
+// with PLP values is delivered as a sequence of tokens instead:
 //
 //   RowStartToken                                       (the values before the first PLP value)
 //   ValueStartToken, ValueChunkToken*, ValueEndToken    (the first PLP value)
@@ -592,6 +593,22 @@ export class SSPIToken extends Token {
 //
 //   ReturnValueStartToken, ValueChunkToken*, ValueEndToken
 
+export class RowValuesToken extends Token {
+  declare name: 'ROW_VALUES';
+  declare handlerName: 'onRowValues';
+
+  /**
+   * The values of all columns of the row.
+   */
+  declare values: unknown[];
+
+  constructor(values: unknown[]) {
+    super('ROW_VALUES', 'onRowValues');
+
+    this.values = values;
+  }
+}
+
 export class RowStartToken extends Token {
   declare name: 'ROW_START';
   declare handlerName: 'onRowStart';
@@ -599,12 +616,12 @@ export class RowStartToken extends Token {
   /**
    * The values of the columns before the first streamed value.
    */
-  declare columns: Array<{ value: unknown, metadata: ColumnMetadata }>;
+  declare values: unknown[];
 
-  constructor(columns: Array<{ value: unknown, metadata: ColumnMetadata }>) {
+  constructor(values: unknown[]) {
     super('ROW_START', 'onRowStart');
 
-    this.columns = columns;
+    this.values = values;
   }
 }
 
@@ -613,14 +630,12 @@ export class ColumnValueToken extends Token {
   declare handlerName: 'onColumnValue';
 
   declare index: number;
-  declare metadata: ColumnMetadata;
   declare value: unknown;
 
-  constructor(index: number, metadata: ColumnMetadata, value: unknown) {
+  constructor(index: number, value: unknown) {
     super('COLUMN_VALUE', 'onColumnValue');
 
     this.index = index;
-    this.metadata = metadata;
     this.value = value;
   }
 }

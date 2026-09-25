@@ -32,6 +32,7 @@ import {
   RoutingEnvChangeToken,
   RowEndToken,
   RowStartToken,
+  RowValuesToken,
   RowToken,
   SSPIToken,
   TabNameToken,
@@ -152,6 +153,10 @@ export class TokenHandler {
   }
 
   onRow(token: RowToken | NBCRowToken) {
+    throw new UnexpectedTokenError(this, token);
+  }
+
+  onRowValues(token: RowValuesToken) {
     throw new UnexpectedTokenError(this, token);
   }
 

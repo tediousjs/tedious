@@ -19,6 +19,7 @@ import {
   ReturnValueToken,
   RowEndToken,
   RowStartToken,
+  RowValuesToken,
   type Token,
   ValueChunkToken,
   ValueEndToken,
@@ -62,12 +63,9 @@ export class ResponseReader {
   declare onEnd: (error?: Error) => void;
 
   constructor(message: AsyncIterable<Buffer>, handler: TokenHandler, debug: Debug, options: ParserOptions) {
-    // Rows are accessed by column index, so they are always read as arrays.
-    // The options are inherited (rather than copied), so later changes to
-    // the connection's options still apply.
-    const parserOptions: ParserOptions = Object.create(options, { useColumnNames: { value: false } });
-
-    this.parser = new StreamParser(parserOptions);
+    // Streamed rows are always read as arrays of their values (regardless of
+    // `useColumnNames`), and their values are accessed by column index.
+    this.parser = new StreamParser(options);
     this.parser.streamValues = true;
     this.iterator = message[Symbol.asyncIterator]();
     this.handler = handler;
@@ -214,7 +212,7 @@ export class ResponseReader {
 
       switch (token.handlerName) {
         // Tokens that are only consumed by the response's consumer.
-        case 'onRow':
+        case 'onRowValues':
         case 'onRowStart':
         case 'onColumnValue':
         case 'onValueStart':
@@ -320,7 +318,7 @@ class ValueIterator implements AsyncIterableIterator<Buffer> {
     if (token instanceof ValueEndToken) {
       this.state = 'done';
       sequence.activeIterator = undefined;
-      sequence.addPendingItem(STREAMED);
+      sequence.addPendingValue(STREAMED);
 
       // Read the values after this one, so they are available via `get`
       // once the iteration ended.
@@ -364,7 +362,10 @@ class ValueIterator implements AsyncIterableIterator<Buffer> {
 abstract class ValueSequence {
   declare response: Response;
 
-  declare items: Array<{ value: unknown, metadata: Metadata }>;
+  // The values read so far. A value that was streamed (or skipped) instead
+  // of read is `STREAMED`.
+  declare items: unknown[];
+  declare hasStreamedValues: boolean;
   declare complete: boolean;
 
   // The streamed value that is up next, once its start has been read.
@@ -376,9 +377,10 @@ abstract class ValueSequence {
   // The iterator of the value currently being streamed.
   declare activeIterator: ValueIterator | undefined;
 
-  constructor(response: Response, items: Array<{ value: unknown, metadata: Metadata }>, complete: boolean) {
+  constructor(response: Response, items: unknown[], complete: boolean) {
     this.response = response;
     this.items = items;
+    this.hasStreamedValues = false;
     this.complete = complete;
     this.pending = undefined;
     this.pendingChunks = [];
@@ -399,12 +401,16 @@ abstract class ValueSequence {
    */
   abstract locate(key: number | string): MaybePromise<number>;
 
+  // The metadata of the value at the given position.
+  abstract metadataAt(index: number): Metadata;
+
   // Apply a token that was read.
   abstract accept(token: Token): void;
 
   // Called when the pending value was read, streamed or skipped.
-  addPendingItem(value: unknown) {
-    this.items.push({ value, metadata: this.pending!.metadata });
+  addPendingValue(value: unknown) {
+    this.items.push(value);
+    this.hasStreamedValues ||= value === STREAMED;
     this.pending = undefined;
   }
 
@@ -413,10 +419,12 @@ abstract class ValueSequence {
    */
   get(key: number | string): unknown {
     const index = this.indexOf(key);
-    const item = index >= 0 ? this.items[index] : undefined;
 
-    if (item !== undefined && item.value !== STREAMED) {
-      return item.value;
+    if (index >= 0 && index < this.items.length) {
+      const value = this.items[index];
+      if (value !== STREAMED) {
+        return value;
+      }
     }
 
     throw this.unavailable(key, index);
@@ -488,13 +496,11 @@ abstract class ValueSequence {
     }
 
     if (index < this.items.length) {
-      const item = this.items[index];
-
-      if (!isPLPStream(item.metadata)) {
+      if (!isPLPStream(this.metadataAt(index))) {
         throw new Error(`The value of \`${key}\` is not of a \`max\` type, and can not be streamed. Use \`get()\` instead.`);
       }
 
-      if (item.value === null) {
+      if (this.items[index] === null) {
         return null;
       }
 
@@ -596,7 +602,7 @@ abstract class ValueSequence {
       }
 
       if (token instanceof ValueEndToken) {
-        this.addPendingItem(STREAMED);
+        this.addPendingValue(STREAMED);
         return;
       }
 
@@ -627,7 +633,7 @@ abstract class ValueSequence {
         const value = decodePLPValue(this.pendingChunks, this.pendingLength, this.pending!.metadata);
         this.pendingChunks = [];
         this.pendingLength = 0;
-        this.addPendingItem(value);
+        this.addPendingValue(value);
         return;
       }
 
@@ -673,13 +679,17 @@ abstract class ValueSequence {
 export class Row extends ValueSequence {
   declare resultSet: ResultSet;
 
-  constructor(resultSet: ResultSet, columns: Array<{ value: unknown, metadata: Metadata }>, complete: boolean) {
-    super(resultSet.response, columns, complete);
+  constructor(resultSet: ResultSet, values: unknown[], complete: boolean) {
+    super(resultSet.response, values, complete);
     this.resultSet = resultSet;
   }
 
   indexOf(key: number | string): number {
     return this.resultSet.indexOf(key);
+  }
+
+  metadataAt(index: number): Metadata {
+    return this.resultSet.columns[index];
   }
 
   locate(key: number | string): MaybePromise<number> {
@@ -702,7 +712,7 @@ export class Row extends ValueSequence {
 
   accept(token: Token) {
     if (token instanceof ColumnValueToken) {
-      this.items.push({ value: token.value, metadata: token.metadata });
+      this.items.push(token.value);
     } else if (token instanceof ValueStartToken) {
       this.pending = { name: this.resultSet.columns[token.index].colName, metadata: token.metadata, length: token.length };
     } else if (token instanceof RowEndToken) {
@@ -716,19 +726,21 @@ export class Row extends ValueSequence {
    * All values of the row, which must have been read completely. That is
    * the case for rows without `max` values - otherwise, use
    * [[readValues]].
+   *
+   * The returned array is the row's own (it is not copied), and stays valid
+   * after moving on to the next row.
    */
   values(): unknown[] {
     if (!this.complete || this.pending !== undefined || this.items.length < this.resultSet.columns.length) {
       throw new Error('The row was not read completely. Use `await readValues()` to read all of its values.');
     }
 
-    return this.items.map((item, index) => {
-      if (item.value === STREAMED) {
-        throw this.unavailable(index, index);
-      }
+    if (this.hasStreamedValues) {
+      const index = this.items.indexOf(STREAMED);
+      throw this.unavailable(index, index);
+    }
 
-      return item.value;
-    });
+    return this.items;
   }
 
   /**
@@ -848,11 +860,11 @@ export class ResultSet implements AsyncIterableIterator<Row> {
   handle(token: Token | null): IteratorResult<Row, undefined> {
     if (token !== null) {
       switch (token.handlerName) {
-        case 'onRow':
-          return { done: false, value: this.current = new Row(this, (token as any).columns, true) };
+        case 'onRowValues':
+          return { done: false, value: this.current = new Row(this, (token as RowValuesToken).values, true) };
 
         case 'onRowStart':
-          return { done: false, value: this.current = new Row(this, (token as RowStartToken).columns, false) };
+          return { done: false, value: this.current = new Row(this, (token as RowStartToken).values, false) };
 
         case 'onDone':
         case 'onDoneInProc':
@@ -912,12 +924,16 @@ export class OutputParameters extends ValueSequence {
   // The positions of the parameters read so far, by name.
   declare positions: Map<string, number>;
 
+  // The metadata of the parameters read so far, by position.
+  declare metadata: Metadata[];
+
   constructor(response: Response, returnStatus: number | undefined) {
     super(response, [], false);
 
     this.returnStatus = returnStatus;
     this.names = response.request.parameters.filter((parameter) => parameter.output).map((parameter) => parameter.name);
     this.positions = new Map();
+    this.metadata = [];
   }
 
   nameOf(key: number | string): string {
@@ -962,15 +978,21 @@ export class OutputParameters extends ValueSequence {
     }
   }
 
-  addPendingItem(value: unknown) {
+  metadataAt(index: number): Metadata {
+    return this.metadata[index];
+  }
+
+  addPendingValue(value: unknown) {
     this.positions.set(this.pending!.name, this.items.length);
-    super.addPendingItem(value);
+    this.metadata.push(this.pending!.metadata);
+    super.addPendingValue(value);
   }
 
   accept(token: Token) {
     if (token instanceof ReturnValueToken) {
       this.positions.set(token.paramName, this.items.length);
-      this.items.push({ value: token.value, metadata: token.metadata });
+      this.metadata.push(token.metadata);
+      this.items.push(token.value);
     } else if (token instanceof ReturnValueStartToken) {
       this.pending = { name: token.paramName, metadata: token.metadata, length: token.length };
     } else {
@@ -1504,7 +1526,7 @@ export class Response {
       await outputParameters.finish();
 
       for (const [name, index] of outputParameters.positions) {
-        const value = outputParameters.items[index].value;
+        const value = outputParameters.items[index];
         if (value !== STREAMED) {
           values[name] = value;
         }

@@ -3,7 +3,7 @@ import { assert } from 'chai';
 import Parser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { Readable } from 'stream';
 
-import { ColumnValueToken, DoneToken, NBCRowToken, ReturnValueStartToken, ReturnValueToken, RowStartToken, RowToken, type Token, ValueChunkToken, ValueStartToken } from '../../../src/token/token';
+import { ColumnValueToken, DoneToken, NBCRowToken, ReturnValueStartToken, ReturnValueToken, RowStartToken, RowToken, RowValuesToken, type Token, ValueChunkToken, ValueStartToken } from '../../../src/token/token';
 import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
@@ -248,7 +248,9 @@ describe('Stream Parser', function() {
 
       for (const token of tokens) {
         if (token instanceof RowStartToken) {
-          summary.push(['ROW_START', token.columns.map((c) => c.value)]);
+          summary.push(['ROW_START', token.values]);
+        } else if (token instanceof RowValuesToken) {
+          summary.push(['ROW_VALUES', token.values]);
         } else if (token instanceof ReturnValueStartToken) {
           summary.push(['RETURNVALUE_START', token.paramName, token.length]);
         } else if (token instanceof RowToken || token instanceof NBCRowToken) {
@@ -307,7 +309,7 @@ describe('Stream Parser', function() {
       ]);
     });
 
-    it('returns rows without streamed values as single tokens', function() {
+    it('returns rows without streamed values as single tokens of their values', function() {
       const colMetadata = [
         column('a', dataTypeByName.Int),
         column('b', dataTypeByName.VarBinary, 0xFFFF)
@@ -324,8 +326,8 @@ describe('Stream Parser', function() {
       const tokens = parseByteByByte(buffer.data, colMetadata, true);
 
       assert.deepEqual(summarize(tokens), [
-        ['ROW', [1, null]],
-        ['NBCROW', [2, null]]
+        ['ROW_VALUES', [1, null]],
+        ['ROW_VALUES', [2, null]]
       ]);
     });
 
@@ -420,7 +422,7 @@ describe('Stream Parser', function() {
       assert.instanceOf(parser.read(), RowToken);
 
       parser.streamValues = true;
-      assert.deepEqual(summarize(readAll(parser)), [['ROW', [1]]]);
+      assert.deepEqual(summarize(readAll(parser)), [['ROW_VALUES', [1]]]);
 
       parser.end();
     });
