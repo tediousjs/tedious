@@ -651,6 +651,7 @@ describe('BulkLoad', function() {
       const connection = new Connection({ server: 'localhost', options: {} });
       connection.execSqlBatch = (request: Request) => {
         process.nextTick(() => { request.callback(undefined); });
+        return request.startExecution();
       };
 
       const source = Readable.from([[1]], { objectMode: true });

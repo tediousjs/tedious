@@ -8,6 +8,7 @@ import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/ty
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { type ColumnInfo } from './token/token';
 import { Collation } from './collation';
+import { Response } from './pull-response';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -40,6 +41,17 @@ export interface ParameterOptions {
   scale?: number;
 }
 
+/**
+ * Options of a single execution of a [[Request]].
+ */
+export interface ExecutionOptions {
+  /**
+   * Cancels the execution when aborted. The execution then fails with the
+   * signal's reason.
+   */
+  signal?: AbortSignal | undefined;
+}
+
 interface RequestOptions {
   statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
 }
@@ -53,7 +65,7 @@ interface RequestOptions {
  * connection.execSql(request);
  * ```
  */
-class Request extends EventEmitter {
+class RequestClass extends EventEmitter {
   /**
    * @private
    */
@@ -87,7 +99,14 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare userCallback: CompletionCallback;
+  declare userCallback: CompletionCallback | undefined;
+
+  /**
+   * The response of the request's current execution.
+   *
+   * @private
+   */
+  declare response: Response | undefined;
   /**
    * @private
    */
@@ -108,7 +127,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare rows?: Array<any>;
+  declare collectedRows?: Array<any>;
   /**
    * @private
    */
@@ -397,8 +416,11 @@ class Request extends EventEmitter {
    *
    * @param callback
    *   The callback to execute once the request has been fully completed.
+   *
+   *   Without a callback, the request's response is consumed by pulling:
+   *   executing the request returns a [[Response]] to pull it from.
    */
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
+  constructor(sqlTextOrProcedure: string | undefined, callback?: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -412,6 +434,7 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
+    this.response = undefined;
     this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
     this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
@@ -422,13 +445,19 @@ class Request extends EventEmitter {
 
       if (this.preparing) {
         this.preparing = false;
+        this.response?.complete(err);
+
         if (err) {
-          this.emit('error', err);
+          // Without a callback, the error is raised via `connection.prepare()`.
+          if (this.userCallback !== undefined || this.listenerCount('error') > 0) {
+            this.emit('error', err);
+          }
         } else {
           this.emit('prepared');
         }
       } else {
-        this.userCallback(err, rowCount, rows);
+        this.userCallback?.(err, rowCount, rows);
+        this.response?.complete(err);
         this.emit('requestCompleted');
       }
     };
@@ -579,6 +608,21 @@ class Request extends EventEmitter {
   }
 
   /**
+   * Called by the connection when the request is executed. Returns the
+   * response of this execution, which is consumed by pulling if the request
+   * has no completion callback.
+   *
+   * @private
+   */
+  startExecution(pulled = this.userCallback === undefined, signal?: AbortSignal): Response {
+    const response = this.response = new Response(this, pulled);
+    if (signal !== undefined) {
+      response.listenForAbort(signal);
+    }
+    return response;
+  }
+
+  /**
    * Sets a timeout for this request.
    *
    * @param timeout
@@ -590,6 +634,47 @@ class Request extends EventEmitter {
     this.timeout = timeout;
   }
 }
+
+// Keep reporting the class as `Request` (e.g. in `constructor.name`).
+Object.defineProperty(RequestClass, 'name', { value: 'Request' });
+
+/**
+ * A request, which is executed via a [[Connection]].
+ */
+type Request = RequestClass;
+
+/**
+ * A request without a completion callback, whose response is consumed by
+ * pulling from the [[Response]] that executing it returns.
+ */
+export type PulledRequest = Request & { readonly userCallback: undefined };
+
+/**
+ * A request with a completion callback, whose response is delivered via
+ * events.
+ */
+export type CallbackRequest = Request & { readonly userCallback: CompletionCallback };
+
+interface RequestConstructor {
+  /**
+   * Create a request whose response is consumed by pulling from the
+   * [[Response]] that executing it returns.
+   */
+  new (sqlTextOrProcedure: string | undefined, callback?: undefined, options?: RequestOptions): PulledRequest;
+
+  /**
+   * Create a request whose response is delivered via events, and whose
+   * completion is reported to `callback`.
+   */
+  new (sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions): CallbackRequest;
+
+  new (sqlTextOrProcedure: string | undefined, callback?: CompletionCallback, options?: RequestOptions): Request;
+
+  readonly prototype: Request;
+}
+
+// eslint-disable-next-line no-redeclare -- the value of the `Request` type
+const Request = RequestClass as RequestConstructor;
 
 export default Request;
 module.exports = Request;
