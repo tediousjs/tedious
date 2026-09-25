@@ -213,6 +213,126 @@ describe('pulling responses', function() {
     });
   });
 
+  describe('rowBatches()', function() {
+    // Collect the values of all rows, per batch.
+    async function collectBatches(batches: AsyncIterable<Array<{ values(): unknown[] }>>) {
+      const collected = [];
+      for await (const batch of batches) {
+        collected.push(batch.map((row) => row.values()));
+      }
+      return collected;
+    }
+
+    it('returns batches of the given size', async function() {
+      const request = new Request('SELECT n FROM (VALUES (1), (2), (3), (4), (5)) AS v(n) ORDER BY n');
+      await using response = connection.execSql(request);
+
+      assert.deepEqual(await collectBatches(response.rowBatches(2)), [[[1], [2]], [[3], [4]], [[5]]]);
+    });
+
+    it('returns the rows received so far per batch if no size is given', async function() {
+      const request = new Request('SELECT TOP 20000 CAST(ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS int) AS n, REPLICATE(\'x\', 100) AS s FROM sys.all_objects a CROSS JOIN sys.all_objects b');
+      await using response = connection.execSql(request);
+
+      const batches = await collectBatches(response.rowBatches());
+
+      assert.isAbove(batches.length, 1);
+      assert.isBelow(batches.length, 20000 / 10);
+      for (const batch of batches) {
+        assert.isNotEmpty(batch);
+      }
+
+      const numbers = batches.flat().map((values) => values[0]);
+      assert.deepEqual(numbers, Array.from({ length: 20000 }, (_, i) => i + 1));
+    });
+
+    it('reads values of `max` types in full, so all rows of a batch stay valid', async function() {
+      const request = new Request("SELECT n, REPLICATE(CAST('x' AS varchar(max)), 20000 + n) AS s FROM (VALUES (1), (2), (3)) AS v(n) ORDER BY n");
+      await using response = connection.execSql(request);
+
+      const batches = [];
+      for await (const batch of response.rowBatches(2)) {
+        batches.push(batch);
+      }
+
+      const rows = batches.flat();
+      assert.deepEqual(rows.map((row) => row.get('n')), [1, 2, 3]);
+      assert.deepEqual(rows.map((row) => (row.get('s') as string).length), [20001, 20002, 20003]);
+    });
+
+    it('iterates nothing for statements without a result set', async function() {
+      const request = new Request('DECLARE @a int');
+      await using response = connection.execSql(request);
+
+      assert.deepEqual(await collectBatches(response.rowBatches()), []);
+    });
+
+    it('rejects batch sizes that are not positive integers', async function() {
+      const request = new Request('SELECT 1');
+      await using response = connection.execSql(request);
+
+      for (const size of [0, -1, 1.5, NaN]) {
+        assert.throws(() => response.rowBatches(size), TypeError, 'The batch size must be a positive integer.');
+      }
+    });
+
+    it('drains the rest of the response when the loop is stopped early', async function() {
+      {
+        const request = new Request('SELECT TOP 50000 a.object_id FROM sys.all_objects a CROSS JOIN sys.all_objects b');
+        await using response = connection.execSql(request);
+
+        let batches = 0;
+        for await (const batch of response.rowBatches(10)) {
+          assert.lengthOf(batch, 10);
+          batches += 1;
+          break;
+        }
+
+        assert.strictEqual(batches, 1);
+
+        const { rowCount } = await response.finish();
+        assert.strictEqual(rowCount, 50000);
+      }
+
+      assert.deepEqual(await query('SELECT 1'), [[1]]);
+    });
+
+    it('throws errors of the request from the loop, after the rows before the error', async function() {
+      {
+        const request = new Request('SELECT 10 / n FROM (VALUES (1), (2), (0)) AS v(n)');
+        await using response = connection.execSql(request);
+
+        const rows = [];
+        let error: Error | undefined;
+        try {
+          for await (const batch of response.rowBatches(100)) {
+            rows.push(...batch.map((row) => row.get(0)));
+          }
+        } catch (err: any) {
+          error = err;
+        }
+
+        assert.deepEqual(rows, [10, 5]);
+        assert.instanceOf(error, RequestError);
+        assert.match(error!.message, /Divide by zero/);
+      }
+
+      assert.deepEqual(await query('SELECT 2'), [[2]]);
+    });
+
+    it('returns the rows of each result set in batches via `batches()`', async function() {
+      const request = new Request("SELECT n FROM (VALUES (1), (2), (3)) AS v(n) ORDER BY n; SELECT 'a'");
+      await using response = connection.execSqlBatch(request);
+
+      const results = [];
+      for await (const resultSet of response.results()) {
+        results.push(await collectBatches(resultSet.batches(2)));
+      }
+
+      assert.deepEqual(results, [[[[1], [2]], [[3]]], [[['a']]]]);
+    });
+  });
+
   describe('results()', function() {
     it('iterates multiple result sets', async function() {
       const request = new Request("SELECT 1 AS a; SELECT 'x' AS b, 'y' AS c UNION ALL SELECT 'z', 'w'; DECLARE @x int = 1");

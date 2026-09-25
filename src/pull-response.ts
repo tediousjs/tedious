@@ -140,6 +140,22 @@ export class ResponseReader {
   }
 
   /**
+   * Whether the next token (or the end of the message) can be read from the
+   * data received so far, without waiting for more.
+   */
+  canReadSync(): boolean {
+    const token = this.nextSync();
+    if (token === undefined) {
+      return false;
+    }
+
+    if (token !== null) {
+      this.unread(token);
+    }
+    return true;
+  }
+
+  /**
    * Read (and discard) the rest of the message.
    */
   async drain() {
@@ -250,6 +266,28 @@ export class ResponseReader {
 // was already received, and only return a promise once they need to wait for
 // more data. This avoids the cost of a promise per step, e.g. per row.
 type MaybePromise<T> = T | Promise<T>;
+
+function readCompletely(result: IteratorResult<Row, undefined>): MaybePromise<Row | undefined> {
+  if (result.done) {
+    return undefined;
+  }
+
+  const row = result.value;
+  const reading = row.readRemaining();
+  return reading !== undefined ? reading.then(() => row) : row;
+}
+
+function batch(rows: Row[]): IteratorResult<Row[], undefined> {
+  return rows.length > 0 ? { done: false, value: rows } : DONE;
+}
+
+function validateBatchSize(size: number | undefined): number | undefined {
+  if (size !== undefined && !(Number.isInteger(size) && size > 0)) {
+    throw new TypeError('The batch size must be a positive integer.');
+  }
+
+  return size;
+}
 
 /**
  * Wait until the next token was received, and make it available via
@@ -761,6 +799,41 @@ export class Row extends ValueSequence {
 }
 
 /**
+ * Iterates the rows of a result set in batches.
+ */
+class RowBatchesOfResultSet implements AsyncIterableIterator<Row[]> {
+  declare resultSet: ResultSet;
+  declare size: number | undefined;
+
+  constructor(resultSet: ResultSet, size: number | undefined) {
+    this.resultSet = resultSet;
+    this.size = size;
+  }
+
+  [Symbol.asyncIterator]() {
+    return this;
+  }
+
+  next(): Promise<IteratorResult<Row[], undefined>> {
+    const response = this.resultSet.response;
+    try {
+      const result = this.resultSet.nextBatch(this.size);
+      return result instanceof Promise ? result.catch(response.rethrow) : Promise.resolve(result);
+    } catch (err) {
+      return Promise.reject(err).catch(response.rethrow);
+    }
+  }
+
+  /**
+   * Stop iterating the result set. Its remaining rows are skipped once the
+   * response is read further.
+   */
+  return(): Promise<IteratorResult<Row[], undefined>> {
+    return DONE_PROMISE;
+  }
+}
+
+/**
  * A result set, which is an async iterator of its rows.
  */
 export class ResultSet implements AsyncIterableIterator<Row> {
@@ -855,6 +928,61 @@ export class ResultSet implements AsyncIterableIterator<Row> {
     }
 
     return result;
+  }
+
+  /**
+   * Iterate the rows in batches of completely read rows (see [[nextBatch]]).
+   */
+  batches(size?: number): AsyncIterableIterator<Row[]> {
+    return new RowBatchesOfResultSet(this, validateBatchSize(size));
+  }
+
+  /**
+   * Read the next batch of rows. All values of the rows are read in full
+   * (including values of `max` types), so the rows of a batch stay valid.
+   *
+   * A batch has `size` rows (only the last batch of a result set can have
+   * fewer). Without a `size`, a batch has all rows that can be read from the
+   * data received so far, but at least one.
+   */
+  nextBatch(size: number | undefined): MaybePromise<IteratorResult<Row[], undefined>> {
+    const rows: Row[] = [];
+    const reader = this.response.reader!;
+
+    const fill = (): MaybePromise<IteratorResult<Row[], undefined>> => {
+      while (size !== undefined ? rows.length < size : rows.length === 0 || reader.canReadSync()) {
+        const row = this.nextCompleteRow();
+        if (row instanceof Promise) {
+          return row.then((row) => {
+            if (row === undefined) {
+              return batch(rows);
+            }
+
+            rows.push(row);
+            return fill();
+          });
+        }
+
+        if (row === undefined) {
+          break;
+        }
+
+        rows.push(row);
+      }
+
+      return batch(rows);
+    };
+
+    return fill();
+  }
+
+  /**
+   * Advance to the next row, and read all of its values in full. Resolves
+   * to `undefined` at the end of the result set.
+   */
+  nextCompleteRow(): MaybePromise<Row | undefined> {
+    const result = this.nextRow();
+    return result instanceof Promise ? result.then(readCompletely) : readCompletely(result);
   }
 
   handle(token: Token | null): IteratorResult<Row, undefined> {
@@ -1031,9 +1159,10 @@ export class OutputParameters extends ValueSequence {
 }
 
 /**
- * Iterates the rows of a request that returns (at most) one result set.
+ * Iterates the rows of a request that returns (at most) one result set, one
+ * by one or in batches.
  */
-export class RowIterator implements AsyncIterableIterator<Row> {
+abstract class SingleResultSetIterator<T> implements AsyncIterableIterator<T> {
   declare response: Response;
   declare resultSet: ResultSet | undefined;
   declare finished: boolean;
@@ -1048,7 +1177,10 @@ export class RowIterator implements AsyncIterableIterator<Row> {
     return this;
   }
 
-  next(): Promise<IteratorResult<Row, undefined>> {
+  // Read the next item of the result set.
+  abstract step(resultSet: ResultSet): MaybePromise<IteratorResult<T, undefined>>;
+
+  next(): Promise<IteratorResult<T, undefined>> {
     const resultSet = this.resultSet;
     if (resultSet === undefined || this.finished) {
       return this.nextAsync().catch(this.response.rethrow);
@@ -1056,13 +1188,13 @@ export class RowIterator implements AsyncIterableIterator<Row> {
 
     let result;
     try {
-      result = resultSet.nextRow();
+      result = this.step(resultSet);
     } catch (err) {
       return Promise.reject(err).catch(this.response.rethrow);
     }
 
     if (result instanceof Promise) {
-      return result.then((result): MaybePromise<IteratorResult<Row, undefined>> => {
+      return result.then((result): MaybePromise<IteratorResult<T, undefined>> => {
         return result.done ? this.end() : result;
       }).catch(this.response.rethrow);
     }
@@ -1070,7 +1202,7 @@ export class RowIterator implements AsyncIterableIterator<Row> {
     return result.done ? this.end().catch(this.response.rethrow) : Promise.resolve(result);
   }
 
-  async nextAsync(): Promise<IteratorResult<Row, undefined>> {
+  async nextAsync(): Promise<IteratorResult<T, undefined>> {
     if (this.finished) {
       return DONE;
     }
@@ -1083,7 +1215,7 @@ export class RowIterator implements AsyncIterableIterator<Row> {
       }
     }
 
-    const result = await this.resultSet.nextRow();
+    const result = await this.step(this.resultSet);
     return result.done ? await this.end() : result;
   }
 
@@ -1105,6 +1237,32 @@ export class RowIterator implements AsyncIterableIterator<Row> {
   async return(): Promise<IteratorReturnResult<undefined>> {
     this.finished = true;
     return DONE;
+  }
+}
+
+/**
+ * Iterates the rows of a request that returns (at most) one result set.
+ */
+export class RowIterator extends SingleResultSetIterator<Row> {
+  step(resultSet: ResultSet): MaybePromise<IteratorResult<Row, undefined>> {
+    return resultSet.nextRow();
+  }
+}
+
+/**
+ * Iterates the rows of a request that returns (at most) one result set, in
+ * batches of completely read rows (see `ResultSet#nextBatch`).
+ */
+export class RowBatchIterator extends SingleResultSetIterator<Row[]> {
+  declare size: number | undefined;
+
+  constructor(response: Response, size: number | undefined) {
+    super(response);
+    this.size = size;
+  }
+
+  step(resultSet: ResultSet): MaybePromise<IteratorResult<Row[], undefined>> {
+    return resultSet.nextBatch(this.size);
   }
 }
 
@@ -1416,6 +1574,17 @@ export class Response {
   rows(): RowIterator {
     this.assertPulled();
     return new RowIterator(this);
+  }
+
+  /**
+   * Like [[rows]], but returns the rows in batches, with all of their values
+   * read in full (see `ResultSet#nextBatch`). A batch has `size` rows or, if
+   * no `size` is given, all rows that can be read from the data received so
+   * far. This costs one `await` per batch instead of one per row.
+   */
+  rowBatches(size?: number): RowBatchIterator {
+    this.assertPulled();
+    return new RowBatchIterator(this, validateBatchSize(size));
   }
 
   /**
