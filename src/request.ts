@@ -438,6 +438,11 @@ class RequestClass extends EventEmitter {
     this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
     this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
+      // A cancellation only applies to the execution it was made for, so it
+      // must not fail later executions of the request - including ones that
+      // are started from the callback or event listeners below.
+      this.canceled = false;
+
       if (this.preparing) {
         this.preparing = false;
         this.response?.complete(err);
@@ -455,10 +460,6 @@ class RequestClass extends EventEmitter {
         this.response?.complete(err);
         this.emit('requestCompleted');
       }
-
-      // A cancellation only applies to the execution it was made for, so it
-      // does not fail later executions (or the unpreparing) of the request.
-      this.canceled = false;
     };
   }
 

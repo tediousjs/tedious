@@ -26,10 +26,12 @@ export class Parser extends EventEmitter {
     this.paused = false;
     this.onResume = undefined;
 
+    // Emit outside of the promise chain, so an exception thrown by a listener
+    // is an uncaught exception (like on master), not an unhandled rejection.
     this.run(message, handler).then(() => {
-      this.emit('end');
+      process.nextTick(() => this.emit('end'));
     }, (error: Error) => {
-      this.emit('error', error);
+      process.nextTick(() => this.emit('error', error));
     });
   }
 

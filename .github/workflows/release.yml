@@ -30,6 +30,9 @@ jobs:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: |
         info=$(npm info tedious --json)
+        # npm 12+ always wraps `npm info --json` output in an array, older
+        # versions return a bare object. Normalize to the object form.
+        info=$(jq 'if type == "array" then .[0] else . end' <<< "$info")
         next=$(jq -r '."dist-tags".next' <<< "$info")
         latest=$(jq -r '."dist-tags".latest' <<< "$info")
 

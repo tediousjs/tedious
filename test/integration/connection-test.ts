@@ -1350,6 +1350,45 @@ update #tab1 set name = 'a3' where name like 'a%'\
     }
   });
 
+  it('allows executing a request again after it was canceled', function(done) {
+    const config = getConfig();
+
+    let executions = 0;
+    const request = new Request('select 1', (err, rowCount) => {
+      executions += 1;
+
+      if (executions === 1) {
+        assert.instanceOf(err, RequestError);
+        assert.strictEqual((err as RequestError).code, 'ECANCEL');
+
+        connection.execSql(request);
+        return;
+      }
+
+      assert.ifError(err);
+      assert.strictEqual(rowCount, 1);
+
+      connection.close();
+    });
+
+    const connection = new Connection(config);
+
+    connection.connect((err) => {
+      assert.ifError(err);
+
+      connection.execSql(request);
+      request.cancel();
+    });
+
+    connection.on('end', () => {
+      done();
+    });
+
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+  });
+
   it('should support cancelling a request while it is processed on the server', function(done) {
     const config = getConfig();
 

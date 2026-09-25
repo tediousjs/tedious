@@ -347,7 +347,7 @@ function main({ n }) {
     '1100C10064000000000000007900000000FE0000E0000000000000000000'
   ].join(''), 'hex');
 
-  const parser = new Parser(repeat(data, n), {}, {
+  const parser = new Parser(repeat(data, n), { token: function() { } }, {
     onColMetadata: () => { },
     onRow: () => { },
     onDoneInProc: () => { },

@@ -2304,6 +2304,13 @@ class Connection extends EventEmitter {
 
     let socket = await connect(connectOpts, dns.lookup, signal);
 
+    // Disable Nagle's algorithm. Messages are written as complete packets,
+    // so there is nothing for it to batch up - it only holds back the last
+    // packet of a message that spans several packets until the previous ones
+    // were acknowledged, which the server's delayed acknowledgements stall
+    // for ~40ms.
+    socket.setNoDelay(true);
+
     if (this.config.options.encrypt === 'strict') {
       try {
         // Wrap the socket with TLS for TDS 8.0
