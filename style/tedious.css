@@ -116,7 +116,7 @@ code li {
 }
 
 #navigation .heading {
-  font-family: 'The Girl Next Door';
+  font-family: 'The Girl Next Door', sans-serif;
   font-size: 250%;
 }
 
@@ -162,7 +162,7 @@ code li {
 }
 
 h1 {
-  font-family: 'The Girl Next Door';
+  font-family: 'The Girl Next Door', sans-serif;
   font-size: 250%;
   font-weight: bold;
   margin-bottom: 0.5em;
