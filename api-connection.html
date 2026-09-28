@@ -66,7 +66,7 @@ var config = {
 };
 var connection = new Connection(config);
 
-// Setup event handler when the connection is established. 
+// Setup event handler when the connection is established.
 connection.on('connect', function(err) {
   if(err) {
     console.log('Error: ', err)
@@ -85,7 +85,7 @@ connection.connect();
 
     <p>Note: be aware of the different options field: <br>
         <dd>1) config.authentication.options</dd>
-        <dd>2) config.options</dd> 
+        <dd>2) config.options</dd>
     </p>
 
     <dl>
@@ -100,15 +100,15 @@ connection.connect();
         <code>authentication.type</code>
       </dt>
       <dd>
-        Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>,
-        <code>azure-active-directory-default</code>, <code>azure-active-directory-password</code>, 
-        <code>azure-active-directory-access-token</code>, <code>azure-active-directory-msi-vm</code>, 
+        Type of the authentication method, valid types are <code>default</code>, <code>ntlm</code>, <code>token-credential</code>,
+        <code>azure-active-directory-default</code>, <code>azure-active-directory-password</code>,
+        <code>azure-active-directory-access-token</code>, <code>azure-active-directory-msi-vm</code>,
         <code>azure-active-directory-msi-app-service</code>, or <code>azure-active-directory-service-principal-secret</code>
         <ul>
           <li><code>azure-active-directory-default</code></li>
           <p>
-            This uses <code>DefaultAzureCredential</code> to try multiple methods of authentication. You can find 
-            more information on what values to provide and how to provide them from 
+            This uses <code>DefaultAzureCredential</code> to try multiple methods of authentication. You can find
+            more information on what values to provide and how to provide them from
             <a href="https://docs.microsoft.com/en-us/javascript/api/overview/azure/identity-readme?view=azure-node-latest#defaultazurecredential">this Microsoft document.</a>
           </p>
 {% highlight javascript %}
@@ -118,7 +118,7 @@ connection.connect();
   "options": {
     "clientId": value (Optional)
   }
-}           
+}
 {% endhighlight %}
           <ul>
             <li>clientId (string): The (`client`) ID of the user you want to log in with.</li>
@@ -134,23 +134,46 @@ connection.connect();
     "clientId": value,
     "tenantId": value (Optional)
   }
-}           
+}
 {% endhighlight %}
           <ul>
             <li>username (string): A user needs to provide the `userName` associated to their account.</li>
             <li>password (string): A user needs to provide the `password` associated to their account.</li>
-            <li>clientId (string): Application (`client`) ID from your registered Azure application. 
-              The application has to have public client flows enabled and has to have `user_impersonation` 
+            <li>clientId (string): Application (`client`) ID from your registered Azure application.
+              The application has to have public client flows enabled and has to have `user_impersonation`
               permissions for Azure SQL Database. The user account that is being used also has to be assigned
               to the application, and has to grant consent (either explicitly or via admin consent).
               Note: the previously provided default client ID will expire in the near future and stop working.
             </li>
             <li>tenantId (string): Optional parameter for specific Azure tenant ID. (default: <code>common</code>).
               If your server does not support the <code>/common</code> endpoint, please provide a tenantId.
-              Note: this used to be called <code>domain</code>. 
+              Note: this used to be called <code>domain</code>.
               <code>domain</code> will proceed to work but will be removed in the near future.
             </li>
           </ul>
+          <li><code>token-credential</code></li>
+          <p>
+              Log in with a credential from Azure instead of a password. Pass any credential from e.g
+              <a href="https://www.npmjs.com/package/@azure/identity"><code>@azure/identity</code></a>
+              and tedious will ask it for a new token on each connect.
+          </p>
+          {% highlight javascript %}
+          const { DefaultAzureCredential } = require('@azure/identity');
+
+          "authentication": {
+            "type": 'token-credential',
+            "options": {
+              "credential": new DefaultAzureCredential()
+            }
+          }
+          {% endhighlight %}
+            <ul>
+                <li>
+                    credential (TokenCredential): Instance of a token credential from a package like <a href="https://www.npmjs.com/package/@azure/identity"><code>@azure/identity</code></a>.
+                    This could be any of the built-in credential types such as <code>DefaultAzureCredential</code>, <code>EnvironmentCredential</code>, <code>ChainedTokenCredential</code>, <code>VisualStudioCodeCredential</code> and so on.
+                    See the <a href="https://www.npmjs.com/package/@azure/identity"><code>@azure/identity</code></a> package's documentation for more ways to customize your authentication experience for your environment's specifics.
+                </li>
+            </ul>
           <li><code>azure-active-directory-access-token</code></li>
 {% highlight javascript %}
 "authentication": {
@@ -159,14 +182,14 @@ connection.connect();
   "options": {
     "token": value
   }
-}         
+}
 {% endhighlight %}
           <ul>
             <li>token (string): A user needs to provide the `token` which they retrieved elsewhere to forming the connection.</li>
             <p>
               <h4>Best Practices</h4>
-              Tedious supports an authentication type: <code>azure-active-directory-password</code>. 
-              This is the recommended method because Tedious will handle the process of retrieving the Azure token 
+              Tedious supports an authentication type: <code>azure-active-directory-password</code>.
+              This is the recommended method because Tedious will handle the process of retrieving the Azure token
               internally instead of requiring the user to manually retrieve the token as shown below.
             </p>
             <p>
@@ -177,7 +200,7 @@ connection.connect();
                 <li> Retrieving the token within an msi-app-service using a PowerShell script: <a href="https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=dotnet" target="_blank"><i><b>here</b></i></a>.</li>
                 <li> Retrieving the token within an msi-vm using a PowerShell script: <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>here</b></i></a>.</li>
                 <li> Retrieving the token within a JavaScript script: <a href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/how-to-use-vm-token#get-a-token-using-powershell" target="_blank"><i><b>here</b></i></a>.</li>
-              </ul>   
+              </ul>
             </p>
           </ul>
           </ul>
@@ -190,14 +213,14 @@ connection.connect();
     "clientId": value,
     "msiEndpoint": value
   }
-    
-}           
+
+}
 {% endhighlight %}
           <ul>
             <li>clientId (string): If a user wants to connect to an Azure app service using a specific client account, the user must provide a `clientId` that is associated with their created identity. This is optional for retrieving the token from the Azure web app service.
             </li>
             <li>msiEndpoint (string):  A user needs to provide the `msiEndpoint` for retriving the access token.</li>
-          </ul>          
+          </ul>
 <li><code>azure-active-directory-msi-app-service</code></li>
 {% highlight javascript %}
 "authentication": {
@@ -208,8 +231,8 @@ connection.connect();
     "msiEndpoint": value,
     "msiSecret": value
   }
-}           
-{% endhighlight %}   
+}
+{% endhighlight %}
           <ul>
             <li>clientId (string): If a user wants to connect to an Azure app service using a specific client account, the user must provide a `clientId` that is associated with their created identity. This is optional for retrieving the token from the Azure web app service.
             </li>
@@ -217,7 +240,7 @@ connection.connect();
               msiEndpoint (string):  An msi app service environment needs to provide the `msiEndpoint` to retrieve the access token.
             </li>
             <li>msiSecret (string):  An msi app service environment needs to provide the `msiSecret` to retrieve the access token.</li>
-          </ul>          
+          </ul>
 <li><code>azure-active-directory-service-principal-secret</code></li>
 {% highlight javascript %}
 "authentication": {
@@ -228,13 +251,13 @@ connection.connect();
     "clientSecret": value,
     "tenantId": (Optional)
   }
-}           
-{% endhighlight %}   
+}
+{% endhighlight %}
           <ul>
             <li>clientId (string): Application (`client`) ID from your registered Azure application.</li>
             <li>clientSecret (string): The created `client secret` for this registered Azure application.</li>
             <li>tenantId (string): Directory (`tenant`) ID from your registered Azure application.</li>
-          </ul>                  
+          </ul>
         </ul>
         <li><code>NTLM</code></li>
         <ul>
@@ -275,8 +298,8 @@ connection.connect();
         <code>authentication.options.clientId</code>
       </dt>
       <dd>
-        When using azure-active-directory-msi-app-service (optional), azure-active-directory-msi-vm (optional), 
-        or azure-active-directory-service-principal-secret authentication type, this is the Application (client) 
+        When using azure-active-directory-msi-app-service (optional), azure-active-directory-msi-vm (optional),
+        or azure-active-directory-service-principal-secret authentication type, this is the Application (client)
         ID of the identity to use for authentication.
       </dd>
 
@@ -284,7 +307,7 @@ connection.connect();
         <code>authentication.options.clientSecret</code>
       </dt>
       <dd>
-        When using azure-active-directory-service-principal-secret authentication type, this is a secret 
+        When using azure-active-directory-service-principal-secret authentication type, this is a secret
         associated with the clientId to use for authentication.
       </dd>
 
@@ -322,7 +345,7 @@ connection.connect();
         The number of milliseconds before the cancel (abort) of a request is considered failed
         (default: <code>5000</code>).
       </dd>
-      
+
       <dt>
         <code>options.columnNameReplacer</code>
       </dt>
@@ -340,7 +363,7 @@ connection.connect();
         Number of milliseconds before retrying to establish connection, in case of transient failure. (default:
         <code>500</code>)
       </dd>
-      
+
       <dt>
         <code>options.connectTimeout</code>
       </dt>
@@ -449,7 +472,7 @@ connection.connect();
         (Default: <code>true</code>).
       </dd>
 
-      
+
       <dt>
         <code>options.enableAnsiPadding</code>
       </dt>
@@ -471,7 +494,7 @@ connection.connect();
         <code>options.enableArithAbort</code>
       </dt>
       <dd>
-        Ends a query when an overflow or divide-by-zero error occurs during query execution. 
+        Ends a query when an overflow or divide-by-zero error occurs during query execution.
         See <a href="https://docs.microsoft.com/en-us/sql/t-sql/statements/set-arithabort-transact-sql?view=sql-server-2017">documentation</a>
         for more details.
         (default: <code>true</code>)
@@ -501,7 +524,7 @@ connection.connect();
         A boolean, sets the connection to either implicit or autocommit transaction mode. (default: <code>false</code>)
       </dd>
 
-      
+
       <dt>
         <code>options.enableNumericRoundabort</code>
       </dt>
@@ -509,7 +532,7 @@ connection.connect();
         If false, error is not generated during loss of precession. (default: <code>false</code>)
       </dd>
 
-      
+
       <dt>
         <code>options.enableQuotedIdentifier </code>
       </dt>
@@ -518,14 +541,14 @@ connection.connect();
         treated as identifiers. (default: <code>true</code>)
       </dd>
 
-      
+
       <dt>
         <code>options.encrypt</code>
       </dt>
       <dd>
-        A string value set to <code>strict</code> enables the TDS 8.0 protocol. 
-        Otherwise, encrypt can be set to a boolean value which determines 
-        whether or not the connection will be encrypted under the TDS 7.x protocol. 
+        A string value set to <code>strict</code> enables the TDS 8.0 protocol.
+        Otherwise, encrypt can be set to a boolean value which determines
+        whether or not the connection will be encrypted under the TDS 7.x protocol.
         (default: <code>true</code>)
       </dd>
 
@@ -551,7 +574,7 @@ connection.connect();
         <br />
         Mutually exclusive with <code>options.port</code>.
       </dd>
-      
+
       <dt>
         <code>options.isolationLevel</code>
       </dt>
@@ -567,7 +590,7 @@ connection.connect();
         </ul>
         (default: <code>READ_COMMITED</code>).
       </dd>
-         
+
       <dt>
         <code>options.language</code>
       </dt>
@@ -582,12 +605,12 @@ connection.connect();
       <dd>
         A string indicating which network interface (ip address) to use when connecting to SQL Server.
       </dd>
-      
+
       <dt>
         <code>options.maxRetriesOnTransientErrors</code>
       </dt>
       <dd>
-        The maximum number of connection retries for transient errors. 
+        The maximum number of connection retries for transient errors.
         (default: <code>3</code>).
       </dd>
 
@@ -606,8 +629,8 @@ connection.connect();
         The size of TDS packets (subject to negotiation with the server).
         Should be a power of 2.
         (default: <code>4096</code>).
-      </dd>  
-      
+      </dd>
+
       <dt>
         <code>options.port</code>
       </dt>
@@ -695,9 +718,9 @@ connection.connect();
       <dd>
         If "true", the SQL Server SSL certificate is automatically trusted when the communication layer is encrypted using SSL.
 
-        If "false", the SQL Server validates the server SSL certificate. If the server certificate validation fails, 
-        the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly 
-        matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed. 
+        If "false", the SQL Server validates the server SSL certificate. If the server certificate validation fails,
+        the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly
+        matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed.
         (default: <code>false</code>).
       </dd>
 
@@ -930,7 +953,7 @@ connection.connect();
 
 <h2 id="function_connect">connection.connect(callback)</h2>
 <p>
-  Initialize a connection. 
+  Initialize a connection.
 </p>
 <div class="argument">
   <div class="name">callback</div>
@@ -941,9 +964,9 @@ connection.connect();
       If an error occurs, then <code>err</code> will describe the error.
       <p>
       </p>
-      This parameter is optional, if a user choose to not include this parameter, 
+      This parameter is optional, if a user choose to not include this parameter,
       then they have to call the <code>connection.on('connect', (err) => {});</code>
-      to check the connection status. 
+      to check the connection status.
     </p>
     <div class="argument">
       <div class="name">err</div>
@@ -955,7 +978,7 @@ connection.connect();
               If a connection error is returned, then it can be directly logged.
 {% highlight javascript %}
 console.log('Error: ', err)
-{% endhighlight %}   
+{% endhighlight %}
             </li>
             <li>
               If an aggregate error object is returned, then it needs to be logged as an array of messages.
@@ -1145,22 +1168,22 @@ err.errors.map(error=>console.log('Error: ', err))
   <div class="description">
     <p>
       The row data. Accepts objects that implements the <code>Iterable</code> or <code>AsyncIterable</code> interface
-      (e.g. a <code>Readable</code> stream or an <code>AsyncGenerator</code>). Each row can either be an array or object.    
+      (e.g. a <code>Readable</code> stream or an <code>AsyncGenerator</code>). Each row can either be an array or object.
 
       <ul>
           <li> Using an Iterable object
 {% highlight javascript %}
-const rows = [{col1name: col1data, col2name: col2data, col3name: col3data, ... }, 
-              [col1data, col2data, col3data, ...], 
+const rows = [{col1name: col1data, col2name: col2data, col3name: col3data, ... },
+              [col1data, col2data, col3data, ...],
               {col2name: col2data}]
-{% endhighlight %}   
+{% endhighlight %}
         </li>
         <li> Using an AsyncIterable object
 {% highlight javascript %}
-const rows = Readable.from([{col1name: col1data, col2name: col2data, col3name: col3data, ... }, 
-              [col1data, col2data, col3data, ...], 
+const rows = Readable.from([{col1name: col1data, col2name: col2data, col3name: col3data, ... },
+              [col1data, col2data, col3data, ...],
               {col2name: col2data}])
-{% endhighlight %}             
+{% endhighlight %}
 
         </li>
       </ul>
