@@ -210,8 +210,7 @@ connection.connect();
   "type":'azure-active-directory-msi-vm',
   ...,
   "options": {
-    "clientId": value,
-    "msiEndpoint": value
+    "clientId": value
   }
 
 }
@@ -219,7 +218,6 @@ connection.connect();
           <ul>
             <li>clientId (string): If a user wants to connect to an Azure app service using a specific client account, the user must provide a `clientId` that is associated with their created identity. This is optional for retrieving the token from the Azure web app service.
             </li>
-            <li>msiEndpoint (string):  A user needs to provide the `msiEndpoint` for retriving the access token.</li>
           </ul>
 <li><code>azure-active-directory-msi-app-service</code></li>
 {% highlight javascript %}
@@ -227,19 +225,13 @@ connection.connect();
   "type":'azure-active-directory-msi-app-service',
   ...,
   "options": {
-    "clientId": value,
-    "msiEndpoint": value,
-    "msiSecret": value
+    "clientId": value
   }
 }
 {% endhighlight %}
           <ul>
             <li>clientId (string): If a user wants to connect to an Azure app service using a specific client account, the user must provide a `clientId` that is associated with their created identity. This is optional for retrieving the token from the Azure web app service.
             </li>
-            <li>
-              msiEndpoint (string):  An msi app service environment needs to provide the `msiEndpoint` to retrieve the access token.
-            </li>
-            <li>msiSecret (string):  An msi app service environment needs to provide the `msiSecret` to retrieve the access token.</li>
           </ul>
 <li><code>azure-active-directory-service-principal-secret</code></li>
 {% highlight javascript %}
