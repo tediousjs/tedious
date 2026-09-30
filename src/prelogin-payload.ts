@@ -1,3 +1,4 @@
+import { ConnectionError } from './errors';
 import { formatHex } from './format-hex';
 
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
@@ -53,7 +54,7 @@ interface Options {
 }
 
 /*
-  s2.2.6.4
+  s2.2.6.5
  */
 class PreloginPayload {
   declare data: Buffer;
@@ -66,8 +67,8 @@ class PreloginPayload {
     subbuild: number;
   };
 
-  declare encryption: number;
-  declare encryptionString: string;
+  declare encryption: number | undefined;
+  declare encryptionString: string | undefined;
 
   declare instance: number;
 
@@ -197,6 +198,7 @@ class PreloginPayload {
 
   extractOptions() {
     let offset = 0;
+    let encryptionOffset: number | undefined;
     while (this.data[offset] !== TOKEN.TERMINATOR) {
       let dataOffset = this.data.readUInt16BE(offset + 1);
       const dataLength = this.data.readUInt16BE(offset + 3);
@@ -205,6 +207,13 @@ class PreloginPayload {
           this.extractVersion(dataOffset);
           break;
         case TOKEN.ENCRYPTION:
+          if (encryptionOffset !== undefined) {
+            throw new ConnectionError('Duplicate ENCRYPTION option in PRELOGIN response', 'EENCRYPT');
+          }
+          if (dataLength !== 1 || dataOffset >= this.data.length) {
+            throw new ConnectionError('Malformed ENCRYPTION option in PRELOGIN response', 'EENCRYPT');
+          }
+          encryptionOffset = dataOffset;
           this.extractEncryption(dataOffset);
           break;
         case TOKEN.INSTOPT:
@@ -227,6 +236,9 @@ class PreloginPayload {
       }
       offset += 5;
       dataOffset += dataLength;
+    }
+    if (encryptionOffset !== undefined && encryptionOffset <= offset) {
+      throw new ConnectionError('Malformed ENCRYPTION option in PRELOGIN response', 'EENCRYPT');
     }
   }
 
