@@ -2,42 +2,89 @@
 [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Code Coverage](https://codecov.io/gh/tediousjs/tedious/badge.svg)](https://codecov.io/gh/tediousjs/tedious)
 
 
-Tedious is a pure-Javascript implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
+Tedious is a pure-JavaScript implementation of the [TDS protocol](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
-
-**NOTE: New columns are nullable by default as of version 1.11.0**
-
-Previous behavior can be restored using `config.options.enableAnsiNullDefault = false`. See [pull request 230](https://github.com/tediousjs/tedious/pull/230).
-
-**NOTE: Default login behavior has changed slightly as of version 1.2**
-
-See the [changelog](https://github.com/tediousjs/tedious/releases) for version history.
-
 
 ### Supported TDS versions
 
+- TDS 8.0 (SQL Server 2022 and later; requires `encrypt: 'strict'`)
 - TDS 7.4 (SQL Server 2012/2014/2016/2017/2019/2022)
 - TDS 7.3.B (SQL Server 2008 R2)
 - TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
-- TDS 7.1 (SQL Server 2000) - *deprecated, support will be removed in a future version*
+- TDS 7.1 (SQL Server 2000) - deprecated
 
 ## Installation
 
-Node.js is a prerequisite for installing tedious. Once you have installed [Node.js](https://nodejs.org/), installing tedious is simple:
+Tedious requires [Node.js 22 or later](https://nodejs.org/). Install the package with:
 
-    npm install tedious
+```sh
+npm install tedious
+```
 
-## Getting Started
-- [Node.js + macOS](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/mac/)
-- [Node.js + Red Hat Enterprise Linux](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/rhel/)
-- [Node.js + SUSE Linux Enterprise Server](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/sles/)
-- [Node.js + Ubuntu](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/ubuntu/)
-- [Node.js + Windows](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/windows/)
+## Getting started
+
+Platform-specific guides are available for:
+
+- [macOS](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/mac/)
+- [Red Hat Enterprise Linux](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/rhel/)
+- [SUSE Linux Enterprise Server](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/sles/)
+- [Ubuntu](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/ubuntu/)
+- [Windows](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/windows/)
+
+Create a connection using your SQL Server host and credentials, then execute a
+request. This example reads credentials from environment variables; set them
+before running the script.
+
+```js
+const { Connection, Request } = require('tedious');
+
+const connection = new Connection({
+  server: process.env.DB_SERVER,
+  authentication: {
+    type: 'default',
+    options: {
+      userName: process.env.DB_USER,
+      password: process.env.DB_PASSWORD
+    }
+  },
+  options: {
+    database: process.env.DB_DATABASE,
+    encrypt: true
+  }
+});
+
+connection.connect((error) => {
+  if (error) {
+    console.error('Connection failed:', error);
+    return;
+  }
+
+  const request = new Request('SELECT 1 AS value', (error) => {
+    if (error) {
+      console.error('Query failed:', error);
+    }
+    connection.close();
+  });
+
+  request.on('row', (columns) => {
+    console.log(columns[0].value);
+  });
+
+  connection.execSql(request);
+});
+```
+
+For SQL Server 2022 or later when using TDS 8.0, set both
+`tdsVersion: '8_0'` and `encrypt: 'strict'`. Strict encryption requires a
+valid server certificate; `trustServerCertificate` does not bypass certificate
+validation in this mode. See the
+[API documentation](https://tediousjs.github.io/tedious/) and
+[examples](examples/) for more options and usage patterns.
 
 <a name="documentation"></a>
 ## Documentation
-More documentation and code samples are available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
+More documentation and code samples are available at [tediousjs.github.io/tedious/](https://tediousjs.github.io/tedious/)
 
 <a name="name"></a>
 ## Name
@@ -51,7 +98,7 @@ We'd like to learn more about how you use tedious:
 
 <a name="contributing"></a>
 ## Contributing
-We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
+We welcome contributions from the community. Feel free to check out the code and submit pull requests.
 
 ## Security
 Please report security vulnerabilities privately. See our [security policy](SECURITY.md) for reporting instructions.
