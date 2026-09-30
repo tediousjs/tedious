@@ -48,7 +48,7 @@ import Procedures from './special-stored-procedure';
 
 import { version } from '../package.json';
 import { URL } from 'url';
-import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
+import { AttentionTokenHandler, azureActiveDirectoryPasswordDeprecationWarning, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 type BeginTransactionCallback =
   /**
@@ -248,7 +248,11 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   };
 }
 
+/**
+ * @deprecated Use `token-credential` authentication with a suitable credential instead.
+ */
 interface AzureActiveDirectoryPasswordAuthentication {
+  /** @deprecated Use `token-credential` authentication with a suitable credential instead. */
   type: 'azure-active-directory-password';
   options: {
     /**
@@ -481,7 +485,7 @@ interface DebugOptions {
 interface AuthenticationOptions {
   /**
    * Type of the authentication method, valid types are `default`, `ntlm`,
-   * `azure-active-directory-password`, `azure-active-directory-access-token`,
+   * `azure-active-directory-password` (deprecated), `azure-active-directory-access-token`,
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
    * `azure-active-directory-default`
    * or `azure-active-directory-service-principal-secret`
@@ -493,7 +497,7 @@ interface AuthenticationOptions {
    * * `default`: [[DefaultAuthentication.options]]
    * * `ntlm` :[[NtlmAuthentication]]
    * * `token-credential`: [[CredentialChainAuthentication.options]]
-   * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
+   * * `azure-active-directory-password` (deprecated): [[AzureActiveDirectoryPasswordAuthentication.options]]
    * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
    * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
@@ -1187,6 +1191,8 @@ class Connection extends EventEmitter {
         if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
           throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
         }
+
+        azureActiveDirectoryPasswordDeprecationWarning.emit();
 
         authentication = {
           type: 'azure-active-directory-password',
