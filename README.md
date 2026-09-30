@@ -43,12 +43,6 @@ More documentation and code samples are available at [tediousjs.github.io/tediou
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.
 
-## Developer Survey
-
-We'd like to learn more about how you use tedious:
-
-<a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://sqlchoice.blob.core.windows.net/sqlchoice/static/images/survey.png"></a>
-
 <a name="contributing"></a>
 ## Contributing
 We welcome contributions from the community. Feel free to checkout the code and submit pull requests.
