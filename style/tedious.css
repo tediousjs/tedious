@@ -116,7 +116,7 @@ code li {
 }
 
 #navigation .heading {
-  font-family: 'The Girl Next Door';
+  font-family: 'The Girl Next Door', sans-serif;
   font-size: 250%;
 }
 
@@ -162,7 +162,7 @@ code li {
 }
 
 h1 {
-  font-family: 'The Girl Next Door';
+  font-family: 'The Girl Next Door', sans-serif;
   font-size: 250%;
   font-weight: bold;
   margin-bottom: 0.5em;
@@ -274,4 +274,47 @@ em {
 
 strong {
     font-weight: bold;
+}
+
+.highlight,
+pre {
+    overflow-x: auto;
+}
+
+@media screen and (max-width: 48em) {
+    #navigation {
+        top: 1em;
+        left: 1em;
+        width: 7em;
+    }
+
+    #navigation .heading {
+        font-size: 180%;
+    }
+
+    #search input[type=text] {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    #content {
+        margin: 1em 1em 3em 8.5em;
+        overflow-wrap: anywhere;
+    }
+
+    #footer {
+        box-sizing: border-box;
+        height: auto;
+    }
+
+    table {
+        display: block;
+        overflow-x: auto;
+    }
+
+    .ribbon {
+        top: auto;
+        bottom: 4em;
+        transform: rotate(45deg);
+    }
 }
