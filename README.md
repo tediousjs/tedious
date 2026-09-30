@@ -49,7 +49,7 @@ Please report security vulnerabilities privately. See our [security policy](SECU
 <a name="license"></a>
 ## License
 
-Copyright (c) 2010-2021 Mike D Pilsbury
+Copyright (c) 2010-2026 Mike D Pilsbury
 
 The MIT License
 
