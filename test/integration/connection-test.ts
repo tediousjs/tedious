@@ -249,16 +249,23 @@ describe('Initiate Connect Test', function() {
       connection.on('debug', console.log);
     }
 
+    let connectError: Error | undefined;
     connection.connect(function(err) {
-      assert.instanceOf(err, ConnectionError);
-      assert.strictEqual(err.code, 'ESOCKET');
-
-      assert.instanceOf(err.cause, Error);
-      console.log(err.cause);
-      assert.include(err.cause.message, 'no ciphers available');
+      connectError = err;
     });
 
     connection.on('end', function() {
+      try {
+        assert.instanceOf(connectError, ConnectionError);
+        assert.strictEqual((connectError as ConnectionError).code, 'ESOCKET');
+
+        const cause = (connectError as ConnectionError).cause;
+        assert.instanceOf(cause, Error);
+        assert.include((cause as Error).message, 'no ciphers available');
+      } catch (err) {
+        return done(err);
+      }
+
       done();
     });
   });
