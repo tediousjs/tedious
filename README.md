@@ -1,14 +1,15 @@
 # Tedious (node implementation of TDS)
 [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Code Coverage](https://codecov.io/gh/tediousjs/tedious/badge.svg)](https://codecov.io/gh/tediousjs/tedious)
 
-
-Tedious is a pure-JavaScript implementation of the [TDS protocol](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/),
+Tedious is a pure-Javascript implementation of the [TDS protocol](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tds),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
+
+See the [changelog](https://github.com/tediousjs/tedious/releases) for version history.
 
 ### Supported TDS versions
 
-- TDS 8.0 (SQL Server 2022 and later; requires `encrypt: 'strict'`)
-- TDS 7.4 (SQL Server 2012/2014/2016/2017/2019/2022)
+- TDS 8.0 (SQL Server 2022 and later; requires `options.encrypt: 'strict'`)
+- TDS 7.4 (SQL Server 2012/2014/2016/2017/2019/2022/2025)
 - TDS 7.3.B (SQL Server 2008 R2)
 - TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
@@ -26,11 +27,12 @@ npm install tedious
 
 Platform-specific guides are available for:
 
-- [macOS](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/mac/)
-- [Red Hat Enterprise Linux](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/rhel/)
-- [SUSE Linux Enterprise Server](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/sles/)
-- [Ubuntu](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/ubuntu/)
-- [Windows](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/windows/)
+- [Node.js SQL Server Guide](https://learn.microsoft.com/en-us/sql/connect/node-js/node-js-driver-for-sql-server)
+- [Node.js + macOS](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#macos)
+- [Node.js + Red Hat Enterprise Linux](https://learn.microsoft.com/en-us/sql/linux/install-upgrade/quickstart-install-red-hat)
+- [Node.js + SUSE Linux Enterprise Server](https://learn.microsoft.com/en-us/sql/linux/install-upgrade/quickstart-install-suse)
+- [Node.js + Ubuntu](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#ubuntu-linux)
+- [Node.js + Windows](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#windows)
 
 Create a connection using your SQL Server host and credentials, then execute a
 request. This example reads credentials from environment variables; set them
@@ -90,12 +92,6 @@ More documentation and code samples are available at [tediousjs.github.io/tediou
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.
 
-## Developer Survey
-
-We'd like to learn more about how you use tedious:
-
-<a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://sqlchoice.blob.core.windows.net/sqlchoice/static/images/survey.png"></a>
-
 <a name="contributing"></a>
 ## Contributing
 We welcome contributions from the community. Feel free to check out the code and submit pull requests.
@@ -106,7 +102,7 @@ Please report security vulnerabilities privately. See our [security policy](SECU
 <a name="license"></a>
 ## License
 
-Copyright (c) 2010-2021 Mike D Pilsbury
+Copyright (c) 2010-2026 Mike D Pilsbury
 
 The MIT License
 
