@@ -83,6 +83,71 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('reads a max column\'s cell from an async iterable while the row is written', function(done) {
+    const blob = Buffer.alloc(100_000);
+    for (let i = 0; i < blob.length; i++) {
+      blob[i] = i & 0xFF;
+    }
+    const text = 'streamed cell '.repeat(5_000);
+
+    async function * chunked<T extends Buffer | string>(value: T, sizes: number[]): AsyncIterable<T> {
+      let offset = 0;
+      for (const size of sizes) {
+        yield value.slice(offset, offset + size) as T;
+        offset += size;
+      }
+      yield value.slice(offset) as T;
+    }
+
+    const bulkLoad = connection.newBulkLoad('#tmpStreamedCells', (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 3);
+
+      const rows: Array<[number, Buffer | null, string | null]> = [];
+      const request = new Request('SELECT id, blob, text FROM #tmpStreamedCells ORDER BY id', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.lengthOf(rows, 3);
+        assert.strictEqual(rows[0][0], 1);
+        assert.isTrue(rows[0][1]!.equals(blob));
+        assert.strictEqual(rows[0][2], text);
+        assert.strictEqual(rows[1][0], 2);
+        assert.isTrue(rows[1][1]!.equals(blob));
+        assert.strictEqual(rows[1][2], text);
+        assert.deepEqual(rows[2], [3, null, null]);
+        done();
+      });
+      request.on('row', (columns) => {
+        rows.push([columns[0].value, columns[1].value, columns[2].value]);
+      });
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+    bulkLoad.addColumn('blob', TYPES.VarBinary, { length: Infinity, nullable: true });
+    bulkLoad.addColumn('text', TYPES.NVarChar, { length: Infinity, nullable: true });
+
+    const request = new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, [
+        // Uneven chunks, empty ones included, crossing packet and flush boundaries.
+        [1, chunked(blob, [1, 0, 4_097, 20_000, 3]), chunked(text, [5, 0, 3_000, 12_000])],
+        [2, blob, text],
+        [3, null, null]
+      ]);
+    });
+
+    connection.execSqlBatch(request);
+  });
+
   describe('.addColumn', function() {
     it('throws an error if called after streaming bulk load has started', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
@@ -1648,8 +1713,13 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        // A cell is validated and written in one step, so a bad value
+        // surfaces as the column's InputError, with the validation error
+        // as its cause, like a parameter's does.
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err.message, "Column 'value' could not be serialized");
+        assert.instanceOf((err as InputError).cause, TypeError);
+        assert.strictEqual(((err as InputError).cause as TypeError).message, 'Invalid date.');
 
         done();
       }
@@ -1664,8 +1734,8 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(((err as InputError).cause as TypeError).message, 'Invalid date.');
 
         assert.strictEqual(rowCount, 0);
 

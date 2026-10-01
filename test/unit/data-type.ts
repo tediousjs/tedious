@@ -16,29 +16,30 @@ function typeInfo(type: DataType, parameter: ParameterData, options: InternalCon
   return buffer.data;
 }
 
-// What `writeValue` writes for a parameter, split into the length field and
+// What the compiled writer writes for a parameter, split into the length field and
 // the data. A null is signalled in the length field, so writing a null gives
 // the field's width.
 function serialize(type: DataType, parameter: ParameterData, options: InternalConnectionOptions) {
+  const write = type.compileWriter(parameter, options);
   const buffer = new WritableTrackingBuffer();
-  assert.isUndefined(type.writeValue(buffer, parameter, options));
+  assert.isUndefined(write(buffer, parameter.value));
 
   const nullBuffer = new WritableTrackingBuffer();
-  type.writeValue(nullBuffer, { ...parameter, value: null }, options);
+  write(nullBuffer, null);
 
   const bytes = buffer.data;
   return { length: bytes.subarray(0, nullBuffer.length), data: bytes.subarray(nullBuffer.length) };
 }
 
 describe('BigInt', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.BigInt, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.BigInt, { value: 123n }, options).length, Buffer.from([0x08]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 123456789;
       const expected = Buffer.from('15cd5b0700000000', 'hex');
@@ -82,7 +83,7 @@ describe('BigInt', function() {
 });
 
 describe('Binary', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Binary, { value: null, length: 10 }, options).length, Buffer.from([0xFF, 0xFF]));
       assert.deepEqual(serialize(TYPES.Binary, { value: Buffer.alloc(0), length: 0 }, options).length, Buffer.from([0x00, 0x00]));
@@ -90,7 +91,7 @@ describe('Binary', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `Buffer` values', function() {
       const value = Buffer.from([0x12, 0x34, 0x00, 0x00]);
       const expected = Buffer.from('12340000', 'hex');
@@ -124,7 +125,7 @@ describe('Binary', function() {
 });
 
 describe('Bit', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Bit, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Bit, { value: true }, options).length, Buffer.from([0x01]));
@@ -132,7 +133,7 @@ describe('Bit', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 1;
       const expected = Buffer.from([0x01]);
@@ -172,14 +173,14 @@ describe('Bit', function() {
 });
 
 describe('Char', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Char, { value: null }, options).length, Buffer.from([0xFF, 0xFF]));
       assert.deepEqual(serialize(TYPES.Char, { value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]) }, options).length, Buffer.from([0x04, 0x00]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `Buffer` values', function() {
       const value = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
       const parameterValue = { value };
@@ -209,14 +210,14 @@ describe('Char', function() {
 });
 
 describe('Date', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Date, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Date, { value: new Date() }, options).length, Buffer.from([0x03]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts dates during daylight savings period', function() {
       for (const [value, expectedBuffer] of [
         [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('163a0b', 'hex')],
@@ -256,14 +257,14 @@ describe('Date', function() {
 });
 
 describe('DateTime', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.DateTime, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.DateTime, { value: new Date() }, options).length, Buffer.from([0x08]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts dates during daylight savings period', function() {
       for (const testSet of [
         [new Date(2015, 5, 18, 23, 59, 59), 42171],
@@ -303,7 +304,7 @@ describe('DateTime', function() {
 });
 
 describe('DateTime2', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 0 }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 1 }, options).length, Buffer.from([0x00]));
@@ -325,7 +326,7 @@ describe('DateTime2', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts dates during daylight savings period', function() {
       for (const [value, expectedBuffer] of [
         [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('7f5101163a0b', 'hex')],
@@ -363,7 +364,7 @@ describe('DateTime2', function() {
 });
 
 describe('DateTimeOffset', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 0 }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 1 }, options).length, Buffer.from([0x00]));
@@ -385,7 +386,7 @@ describe('DateTimeOffset', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `Date` values', function() {
       const value = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
       const expected = Buffer.from('20fd002d380b', 'hex');
@@ -430,7 +431,7 @@ describe('DateTimeOffset', function() {
 });
 
 describe('Decimal', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       for (let i = 1; i <= 38; i++) {
         assert.deepEqual(serialize(TYPES.Decimal, { value: null, precision: i }, options).length, Buffer.from([0x00]));
@@ -454,7 +455,7 @@ describe('Decimal', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values (Precision <= 9)', function() {
       const value = 1.23;
       const expected = Buffer.from('0101000000', 'hex');
@@ -586,14 +587,14 @@ describe('Decimal', function() {
 });
 
 describe('Float', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Float, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Float, { value: 1.2345 }, options).length, Buffer.from([0x08]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 1.2345;
       const expected = Buffer.from('8d976e1283c0f33f', 'hex');
@@ -657,14 +658,14 @@ describe('Float', function() {
 });
 
 describe('Image', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Image, { value: null, length: -1 }, options).length, Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]));
       assert.deepEqual(serialize(TYPES.Image, { value: Buffer.alloc(10), length: 10 }, options).length, Buffer.from([0x0A, 0x00, 0x00, 0x00]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `Buffer` values', function() {
       const value = Buffer.from('010101', 'hex');
 
@@ -699,14 +700,14 @@ describe('Image', function() {
 });
 
 describe('Int', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Int, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Int, { value: 123 }, options).length, Buffer.from([0x04]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 1234;
       const expected = Buffer.from('d2040000', 'hex');
@@ -760,14 +761,14 @@ describe('Int', function() {
 });
 
 describe('Money', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Money, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Money, { value: 123 }, options).length, Buffer.from([0x08]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 1234;
       const expected = Buffer.from('00000000204bbc00', 'hex');
@@ -822,22 +823,23 @@ describe('Money', function() {
 });
 
 describe('NChar', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.NChar, { value: null }, options).length, Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(serialize(TYPES.NChar, { value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]) }, options).length, Buffer.from([0x04, 0x00]));
+      assert.deepEqual(serialize(TYPES.NChar, { value: '\uffff\uffff' }, options).length, Buffer.from([0x04, 0x00]));
     });
   });
 
-  describe('.writeValue data', function() {
-    it('correctly converts `Buffer` values', function() {
-      const value = Buffer.from([0xff, 0xff, 0xff, 0xff]);
+  describe('.compileWriter data', function() {
+    it('correctly converts `string` values', function() {
+      const value = '\uffff\uffff';
+      const expected = Buffer.from([0xff, 0xff, 0xff, 0xff]);
 
       const type = TYPES.NChar;
       const parameterValue = { value };
 
       const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
-      assert.deepEqual(buffer, value);
+      assert.deepEqual(buffer, expected);
     });
 
     it('correctly converts `null` values', function() {
@@ -864,7 +866,7 @@ describe('NChar', function() {
 });
 
 describe('Numeric', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       for (let i = 1; i <= 38; i++) {
         assert.deepEqual(serialize(TYPES.Numeric, { value: null, precision: i }, options).length, Buffer.from([0x00]));
@@ -888,7 +890,7 @@ describe('Numeric', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values (Precision <= 9)', function() {
       const value = 1.23;
       const expected = Buffer.from('0101000000', 'hex');
@@ -991,19 +993,19 @@ describe('Numeric', function() {
 });
 
 describe('NVarChar', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.NVarChar, { value: null, length: 10 }, options).length, Buffer.from([0xFF, 0xFF]));
-      assert.deepEqual(serialize(TYPES.NVarChar, { value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, options).length, Buffer.from([0x04, 0x00]));
+      assert.deepEqual(serialize(TYPES.NVarChar, { value: '\uffff\uffff', length: 10 }, options).length, Buffer.from([0x04, 0x00]));
 
       assert.deepEqual(serialize(TYPES.NVarChar, { value: null, length: 10000 }, options).length, Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
-      assert.deepEqual(serialize(TYPES.NVarChar, { value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10000 }, options).length, Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
+      assert.deepEqual(serialize(TYPES.NVarChar, { value: '\uffff\uffff', length: 10000 }, options).length, Buffer.from([0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]));
     });
   });
 
-  describe('.writeValue data', function() {
-    it('correctly converts `Buffer` values (Length <= Maximum Length)', function() {
-      const value = Buffer.from([0xff, 0xff]);
+  describe('.compileWriter data', function() {
+    it('correctly converts `string` values (Length <= Maximum Length)', function() {
+      const value = '\uffff';
       const expected = Buffer.from('ffff', 'hex');
       const length = 1;
 
@@ -1014,8 +1016,8 @@ describe('NVarChar', function() {
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `Buffer` values (Length > Maximum Length)', function() {
-      const value = Buffer.from([0xff, 0xff]);
+    it('correctly converts `string` values (Length > Maximum Length)', function() {
+      const value = '\uffff';
       const expected = Buffer.from('02000000ffff00000000', 'hex');
       const length = 4100;
 
@@ -1070,14 +1072,14 @@ describe('NVarChar', function() {
 });
 
 describe('Real', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Real, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Real, { value: 123.123 }, options).length, Buffer.from([0x04]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 123.123;
       const expected = Buffer.from('fa3ef642', 'hex');
@@ -1113,14 +1115,14 @@ describe('Real', function() {
 });
 
 describe('SmallDateTime', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.SmallDateTime, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.SmallDateTime, { value: new Date() }, options).length, Buffer.from([0x04]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts dates during daylight savings period', function() {
       for (const [value, expectedNoOfDays] of [
         [new Date(2015, 5, 18, 23, 59, 59), 42171],
@@ -1162,14 +1164,14 @@ describe('SmallDateTime', function() {
 });
 
 describe('SmallInt', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.SmallInt, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.SmallInt, { value: 123 }, options).length, Buffer.from([0x02]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 2;
       const expected = Buffer.from('0200', 'hex');
@@ -1223,14 +1225,14 @@ describe('SmallInt', function() {
 });
 
 describe('SmallMoney', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.SmallMoney, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.SmallMoney, { value: 123 }, options).length, Buffer.from([0x04]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 2;
       const expected = Buffer.from('204e0000', 'hex');
@@ -1284,14 +1286,14 @@ describe('SmallMoney', function() {
 });
 
 describe('Text', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Text, { value: null, length: -1 }, options).length, Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]));
       assert.deepEqual(serialize(TYPES.Text, { value: Buffer.from('Hello World', 'ascii'), length: 11 }, options).length, Buffer.from([0x0B, 0x00, 0x00, 0x00]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `Buffer` values', function() {
       const value = Buffer.from('Hello World', 'ascii');
       const expected = Buffer.from('48656c6c6f20576f726c64', 'hex');
@@ -1327,7 +1329,7 @@ describe('Text', function() {
 });
 
 describe('Time', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 0 }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 1 }, options).length, Buffer.from([0x00]));
@@ -1348,7 +1350,7 @@ describe('Time', function() {
       assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 7 }, options).length, Buffer.from([0x05]));
     });
   });
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     // Test rounding of nanosecondDelta
     it('correctly converts `Date` values with a `nanosecondDelta` property', function() {
       const type = TYPES.Time;
@@ -1394,14 +1396,14 @@ describe('Time', function() {
 });
 
 describe('TinyInt', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.TinyInt, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.TinyInt, { value: 4 }, options).length, Buffer.from([0x01]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `number` values', function() {
       const value = 1;
       const expected = Buffer.from('01', 'hex');
@@ -1486,11 +1488,14 @@ describe('TVP', function() {
   });
 
   describe('.writeValue', function() {
-    // A TVP's `writeValue` returns the rest of the write, whatever its rows.
+    // A TVP's rows are written as the rest of the write.
     async function write(parameter: ParameterData, options: InternalConnectionOptions) {
       const buffer = new WritableTrackingBuffer();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for await (const _ of TYPES.TVP.writeValue(buffer, parameter, options)!) { }
+      const rest = TYPES.TVP.compileWriter(parameter, options)(buffer, parameter.value);
+      if (rest !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of rest) { }
+      }
       return buffer.data;
     }
 
@@ -1522,14 +1527,14 @@ describe('TVP', function() {
 });
 
 describe('UniqueIdentifier', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.UniqueIdentifier, { value: null }, options).length, Buffer.from([0x00]));
       assert.deepEqual(serialize(TYPES.UniqueIdentifier, { value: 'e062ae34-6de5-47f3-8ba3-29d25f77e71a' }, options).length, Buffer.from([0x10]));
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `string` values', function() {
       const value = 'e062ae34-6de5-47f3-8ba3-29d25f77e71a';
 
@@ -1576,7 +1581,7 @@ describe('UniqueIdentifier', function() {
 });
 
 describe('VarBinary', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.VarBinary, { value: null, length: 10 }, options).length, Buffer.from([0xFF, 0xFF]));
       assert.deepEqual(serialize(TYPES.VarBinary, { value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, options).length, Buffer.from([0x04, 0x00]));
@@ -1586,7 +1591,7 @@ describe('VarBinary', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `null` values', function() {
       const testCases: Array<{ value: null, length: number, expected: Buffer }> = [
         { value: null, length: 1, expected: Buffer.from([]) },
@@ -1599,9 +1604,9 @@ describe('VarBinary', function() {
       }
     });
 
-    it('correctly converts `number` values', function() {
-      const testCases: Array<{ value: number, length: number, expected: Buffer }> = [
-        { value: 1, length: 1, expected: Buffer.from('3100', 'hex') },
+    it('correctly converts `Buffer` values', function() {
+      const testCases: Array<{ value: Buffer, length: number, expected: Buffer }> = [
+        { value: Buffer.from('3100', 'hex'), length: 2, expected: Buffer.from('3100', 'hex') },
       ];
       for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
@@ -1610,9 +1615,9 @@ describe('VarBinary', function() {
       }
     });
 
-    it('correctly converts `number` values (Length <= Maximum Length)', function() {
-      const value = 1;
-      const length = 1;
+    it('correctly converts `Buffer` values (Length <= Maximum Length)', function() {
+      const value = Buffer.from('3100', 'hex');
+      const length = 2;
       const expected = Buffer.from('3100', 'hex');
       const parameterValue = { value, length };
 
@@ -1620,8 +1625,8 @@ describe('VarBinary', function() {
       assert.deepEqual(buffer, expected);
     });
 
-    it('correctly converts `number` values (Length > Maximum Length)', function() {
-      const value = 1;
+    it('correctly converts `Buffer` values (Length > Maximum Length)', function() {
+      const value = Buffer.from('3100', 'hex');
       const length = 9000;
       const expected = Buffer.from('02000000310000000000', 'hex');
       const parameterValue = { value, length };
@@ -1669,7 +1674,7 @@ describe('VarBinary', function() {
 });
 
 describe('VarChar', function() {
-  describe('.writeValue length field', function() {
+  describe('.compileWriter length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.VarChar, { value: null, length: 10 }, options).length, Buffer.from([0xFF, 0xFF]));
       assert.deepEqual(serialize(TYPES.VarChar, { value: Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]), length: 10 }, options).length, Buffer.from([0x04, 0x00]));
@@ -1679,7 +1684,7 @@ describe('VarChar', function() {
     });
   });
 
-  describe('.writeValue data', function() {
+  describe('.compileWriter data', function() {
     it('correctly converts `Buffer` values (Length <= Maximum Length)', function() {
       const value = Buffer.from('hello world');
       const length = 1;

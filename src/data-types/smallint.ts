@@ -16,15 +16,17 @@ const SmallInt: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as number | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = SmallInt.validate(raw, undefined) as number | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(0x02);
-    buffer.writeInt16LE(value);
+      buffer.writeUInt8(0x02);
+      buffer.writeInt16LE(value);
+    };
   },
 
   validate: function(value): null | number {

@@ -18,15 +18,17 @@ const BigInt: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as bigint | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = BigInt.validate(raw, undefined) as bigint | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(0x08);
-    buffer.writeBigInt64LE(value);
+      buffer.writeUInt8(0x08);
+      buffer.writeBigInt64LE(value);
+    };
   },
 
   validate: function(value): null | bigint {

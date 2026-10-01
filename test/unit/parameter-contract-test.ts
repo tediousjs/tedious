@@ -77,7 +77,7 @@ describe('Parameter serialization contract', function() {
       const resolved = resolveParameter({ type: TYPES.VarBinary, name: 'p', value, output: false }, undefined, options);
 
       const buffer = new WritableTrackingBuffer();
-      TYPES.VarBinary.writeValue(buffer, resolved.data, options);
+      TYPES.VarBinary.compileWriter(resolved.data, options)(buffer, value);
       assert.include(buffer.getBuffers(), value);
     });
   });

@@ -16,16 +16,6 @@ const Int: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    if (parameter.value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
-
-    buffer.writeUInt8(0x04);
-    buffer.writeInt32LE(Number(parameter.value));
-  },
-
   validate: function(value): number | null {
     if (value == null) {
       return null;
@@ -44,6 +34,19 @@ const Int: DataType = {
     }
 
     return value | 0;
+  },
+
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = Int.validate(raw, undefined);
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
+
+      buffer.writeUInt8(0x04);
+      buffer.writeInt32LE(value);
+    };
   }
 };
 

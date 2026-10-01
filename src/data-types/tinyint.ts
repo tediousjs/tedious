@@ -16,15 +16,17 @@ const TinyInt: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as number | null;
-    if (value == null) {
-      buffer.writeUInt8(0x00);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = TinyInt.validate(raw, undefined) as number | null;
+      if (value == null) {
+        buffer.writeUInt8(0x00);
+        return;
+      }
 
-    buffer.writeUInt8(0x01);
-    buffer.writeUInt8(value);
+      buffer.writeUInt8(0x01);
+      buffer.writeUInt8(value);
+    };
   },
 
   validate: function(value): number | null {

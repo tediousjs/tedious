@@ -36,15 +36,18 @@ const Text: DataType = {
     }
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value as Buffer | null;
-    if (value == null) {
-      buffer.writeBuffer(NULL_LENGTH);
-      return;
-    }
+  compileWriter(column) {
+    const collation = column.collation;
+    return (buffer, raw) => {
+      const value = Buffer.isBuffer(raw) ? raw : Text.validate(raw, collation) as Buffer | null;
+      if (value == null) {
+        buffer.writeBuffer(NULL_LENGTH);
+        return;
+      }
 
-    buffer.writeInt32LE(value.length);
-    buffer.writeBuffer(value);
+      buffer.writeInt32LE(value.length);
+      buffer.writeBuffer(value);
+    };
   },
 
   validate: function(value, collation): Buffer | null {

@@ -33,8 +33,13 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
     writeDecimalTypeInfo(buffer, NumericN.id, parameter.precision, parameter.scale);
   },
 
-  writeValue(buffer, parameter) {
-    writeDecimal(buffer, parameter.value as number | null, parameter.precision, parameter.scale, 'NUMERIC');
+  compileWriter(column) {
+    const precision = column.precision;
+    const scale = column.scale;
+    return (buffer, raw) => {
+      const value = Numeric.validate(raw, undefined) as number | null;
+      writeDecimal(buffer, value, precision, scale, 'NUMERIC');
+    };
   },
 
   validate: function(value): null | number {

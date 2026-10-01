@@ -58,21 +58,17 @@ const NChar: DataType & { maximumLength: number } = {
     }
   },
 
-  writeValue(buffer, parameter) {
-    const value = parameter.value;
-    if (value == null) {
-      buffer.writeBuffer(NULL_LENGTH);
-      return;
-    }
+  compileWriter() {
+    return (buffer, raw) => {
+      const value = NChar.validate(raw, undefined);
+      if (value == null) {
+        buffer.writeBuffer(NULL_LENGTH);
+        return;
+      }
 
-    if (Buffer.isBuffer(value)) {
-      buffer.writeUInt16LE(value.length);
-      buffer.writeBuffer(value);
-    } else {
-      const string = String(value);
-      buffer.writeUInt16LE(string.length * 2);
-      buffer.writeString(string, 'ucs2');
-    }
+      buffer.writeUInt16LE(value.length * 2);
+      buffer.writeString(value, 'ucs2');
+    };
   },
 
   validate: function(value): string | null {
