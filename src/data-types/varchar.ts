@@ -1,7 +1,7 @@
 import iconv from 'iconv-lite';
 
 import { type DataType, type ParameterData } from '../data-type';
-import { isAsyncIterable, stringChunks, writePlpStream, writePlpValue } from './plp-stream';
+import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
 
 const MAX = (1 << 16) - 1;
 
@@ -125,7 +125,19 @@ const VarChar: { maximumLength: number } & DataType = {
     // it as `varchar(max)` and checked the collation.
     if (isAsyncIterable(parameter.value)) {
       const codepage = parameter.collation!.codepage!;
-      return writePlpStream(buffer, stringChunks(parameter.value), (chunk) => iconv.encode(chunk, codepage));
+      const encoder = iconv.getEncoder(codepage);
+      return writePlpStream(
+        buffer,
+        parameter.value,
+        (chunk) => {
+          if (typeof chunk !== 'string') {
+            throw new TypeError('Invalid string.');
+          }
+
+          return encoder.write(chunk);
+        },
+        () => encoder.end()
+      );
     }
 
     // `validate` encoded the value.
