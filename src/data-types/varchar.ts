@@ -1,13 +1,27 @@
 import iconv from 'iconv-lite';
 
 import { type DataType, type ParameterData } from '../data-type';
-import { isAsyncIterable, stringChunks, writePlpStream, writePlpValue } from './plp-stream';
+import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
+import type WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const MAX = (1 << 16) - 1;
 
 const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
+
+// One stateful encoder per value: it holds a high surrogate that ends a chunk
+// until the next chunk (or the end of the value) completes or orphans it, so
+// a surrogate pair split across chunks is encoded as one character.
+function encodeStream(buffer: WritableTrackingBuffer, source: AsyncIterable<unknown>, codepage: string) {
+  const encoder = iconv.getEncoder(codepage);
+  return writePlpStream(buffer, source, (chunk) => {
+    if (typeof chunk !== 'string') {
+      throw new TypeError('Invalid string.');
+    }
+    return encoder.write(chunk);
+  }, () => encoder.end());
+}
 
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
@@ -124,8 +138,7 @@ const VarChar: { maximumLength: number } & DataType = {
     // Read from its source while the request is written; `resolve` declared
     // it as `varchar(max)` and checked the collation.
     if (isAsyncIterable(parameter.value)) {
-      const codepage = parameter.collation!.codepage!;
-      return writePlpStream(buffer, stringChunks(parameter.value), (chunk) => iconv.encode(chunk, codepage));
+      return encodeStream(buffer, parameter.value, parameter.collation!.codepage!);
     }
 
     // `validate` encoded the value.
