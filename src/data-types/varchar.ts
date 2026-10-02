@@ -13,9 +13,9 @@ const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 // One stateful encoder per value: it holds a high surrogate that ends a chunk
 // until the next chunk (or the end of the value) completes or orphans it, so
 // a surrogate pair split across chunks is encoded as one character.
-function encodeStream(buffer: WritableTrackingBuffer, source: AsyncIterable<unknown>, codepage: string) {
+async function * encodeStream(buffer: WritableTrackingBuffer, source: AsyncIterable<unknown>, codepage: string): AsyncGenerator<void, void> {
   const encoder = iconv.getEncoder(codepage);
-  return writePlpStream(buffer, source, (chunk) => {
+  yield * writePlpStream(buffer, source, (chunk) => {
     if (typeof chunk !== 'string') {
       throw new TypeError('Invalid string.');
     }
