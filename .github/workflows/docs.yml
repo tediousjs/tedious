@@ -2,7 +2,7 @@ name: Docs
 
 on:
   push:
-    branches: [master]
+    branches: [master, robin/typedoc-pages]
   workflow_dispatch:
 
 permissions:
