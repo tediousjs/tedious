@@ -681,8 +681,8 @@ export interface ConnectionOptions {
   enableQuotedIdentifier?: boolean;
 
   /**
-   * A string value that can be only set to 'strict', which indicates the usage TDS 8.0 protocol. Otherwise,
-   * a boolean determining whether or not the connection will be encrypted.
+   * A string value that can only be set to 'strict', which enables strict TLS encryption required by TDS 8.0.
+   * Set [[tdsVersion]] to `'8_0'` to use TDS 8.0. Otherwise, a boolean determining whether the connection will be encrypted.
    *
    * (default: `true`)
    */
@@ -819,6 +819,7 @@ export interface ConnectionOptions {
    * * `7_3_A`
    * * `7_3_B`
    * * `7_4`
+   * * `8_0` (requires `encrypt: 'strict'`)
    *
    * (default: `7_4`)
    */

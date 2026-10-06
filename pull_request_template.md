@@ -1,9 +1,8 @@
-**Before submitting a PR :**
-1. Ensure your fork is created from `master` branch of [the repository](https://github.com/tediousjs/tedious).
-2. Run `npm install` in the root folder.
-3. After bug fix/code change, ensure all the existing tests and new tests (if any) pass (`npm run-script test-all`). During development, to run individual test use `node_modules/nodeunit test/<test_file.js> -t <test_name>`.
-4. Build the driver (`npm run build`).
-5. Run eslint and flow typechecker (`npm run lint`).
-6. Run commitlint (`node_modules/.bin/commitlint --from origin/master --to HEAD`). Refer [commit conventions](https://commitlint.js.org/#/concepts-commit-conventions) and [commit rules](https://commitlint.js.org/#/reference-rules).
+**Before submitting a PR:**
+1. Ensure your fork is created from the repository's `master` branch, and that your pull request is based on the latest `master`.
+2. Install dependencies with `npm ci`.
+3. Run the unit tests with `npm test`. Run the integration tests with `npm run test-integration` when a test SQL Server is available; `npm run test-all` runs both suites.
+4. Build the driver with `npm run build`.
+5. Run ESLint and TypeScript checks with `npm run lint`.
 
 **Thank you for Contributing!**
