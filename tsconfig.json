@@ -27,6 +27,8 @@
   "typedocOptions": {
     "name": "Tedious",
     "out": "./docs",
-    "entryPoints": ["./src/tedious.ts"]
+    "entryPoints": ["./src/tedious.ts"],
+    "plugin": ["typedoc-theme-oxide"],
+    "theme": "oxide",
   }
 }
