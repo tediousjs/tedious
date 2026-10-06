@@ -2,10 +2,9 @@ import { type AddressInfo, createConnection, createServer, Server, Socket } from
 import { once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';
-import DuplexPair from 'native-duplexpair';
 import { checkServerIdentity, type PeerCertificate, TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
-import { Duplex } from 'stream';
+import { Duplex, duplexPair } from 'stream';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
@@ -343,10 +342,10 @@ describe('MessageIO', function() {
     let securePair: { encrypted: Duplex, cleartext: TLSSocket };
 
     beforeEach(function() {
-      const duplexpair = new DuplexPair();
+      const [socket1, socket2] = duplexPair();
 
       securePair = {
-        cleartext: new TLSSocket(duplexpair.socket1 as Socket, {
+        cleartext: new TLSSocket(socket1 as Socket, {
           key: readFileSync('./test/fixtures/localhost.key'),
           cert: readFileSync('./test/fixtures/localhost.crt'),
           isServer: true,
@@ -354,7 +353,7 @@ describe('MessageIO', function() {
           // TDS 7.x only supports TLS versions up to TLS v1.2
           maxVersion: 'TLSv1.2'
         }),
-        encrypted: duplexpair.socket2
+        encrypted: socket2
       };
     });
 
@@ -575,10 +574,10 @@ describe('MessageIO', function() {
         securePair.cleartext.destroy();
         securePair.encrypted.destroy();
 
-        const duplexpair = new DuplexPair();
+        const [socket1, socket2] = duplexPair();
 
         securePair = {
-          cleartext: new TLSSocket(duplexpair.socket1 as Socket, {
+          cleartext: new TLSSocket(socket1 as Socket, {
             key: readFileSync('./test/fixtures/loopback-ip.key'),
             cert: readFileSync('./test/fixtures/loopback-ip.crt'),
             isServer: true,
@@ -586,7 +585,7 @@ describe('MessageIO', function() {
             // TDS 7.x only supports TLS versions up to TLS v1.2
             maxVersion: 'TLSv1.2'
           }),
-          encrypted: duplexpair.socket2
+          encrypted: socket2
         };
       });
 

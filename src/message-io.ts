@@ -1,6 +1,3 @@
-import DuplexPair from 'native-duplexpair';
-
-import { Duplex } from 'stream';
 import * as tls from 'tls';
 import { isIP, Socket } from 'net';
 import { EventEmitter } from 'events';
@@ -12,6 +9,7 @@ import { TYPE } from './packet';
 
 import IncomingMessageStream from './incoming-message-stream';
 import OutgoingMessageStream from './outgoing-message-stream';
+import { TlsBridge } from './tls-bridge';
 
 class MessageIO extends EventEmitter {
   // Node's `tls.TLSSocket#setMaxSendFragment` silently ignores values outside this range.
@@ -27,10 +25,8 @@ class MessageIO extends EventEmitter {
   declare private incomingMessageStream: IncomingMessageStream;
   declare outgoingMessageStream: OutgoingMessageStream;
 
-  declare securePair?: {
-    cleartext: tls.TLSSocket;
-    encrypted: Duplex;
-  };
+  // The TLS socket negotiated via `startTls`.
+  declare tlsSocket?: tls.TLSSocket;
 
   declare incomingMessageIterator: AsyncIterableIterator<Message>;
 
@@ -60,9 +56,9 @@ class MessageIO extends EventEmitter {
 
     const maxSendFragment = Math.min(this.outgoingMessageStream.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE);
 
-    if (this.securePair) {
-      // Classic `encrypt: true` path: TLS is layered over a `DuplexPair`.
-      this.securePair.cleartext.setMaxSendFragment(maxSendFragment);
+    if (this.tlsSocket) {
+      // Classic `encrypt: true` path: TLS is layered over a `TlsBridge`.
+      this.tlsSocket.setMaxSendFragment(maxSendFragment);
     } else if (this.socket instanceof tls.TLSSocket) {
       // `encrypt: "strict"` (TDS 8.0) path: the socket itself is the TLS socket. Without
       // this, a server-initiated packet size change (ENVCHANGE) after login would leave
@@ -82,51 +78,58 @@ class MessageIO extends EventEmitter {
     const secureContext = tls.createSecureContext(credentialsDetails);
 
     return new Promise<void>((resolve, reject) => {
-      const duplexpair = new DuplexPair();
-      const securePair = this.securePair = {
-        cleartext: tls.connect({
-          socket: duplexpair.socket1 as Socket,
-          // The `host` is used to verify the server's certificate identity.
-          // It is not used to establish a connection as a `socket` is
-          // specified.
-          host: hostname,
-          // RFC 6066 does not allow IP addresses to be used as the server
-          // name, so omit the SNI extension in that case.
-          servername: isIP(hostname) ? '' : hostname,
-          secureContext: secureContext,
-          rejectUnauthorized: !trustServerCertificate
-        }),
-        encrypted: duplexpair.socket2
-      };
+      // Each step of the handshake is sent as a `PRELOGIN` message, and the
+      // server responds with exactly one message containing its response.
+      const bridge = new TlsBridge(this.socket, async (data) => {
+        this.sendMessage(TYPE.PRELOGIN, data);
+
+        const chunks = [];
+        for await (const chunk of await this.readMessage()) {
+          chunks.push(chunk);
+        }
+        return Buffer.concat(chunks);
+      });
+
+      const tlsSocket = this.tlsSocket = tls.connect({
+        socket: bridge,
+        // The `host` is used to verify the server's certificate identity.
+        // It is not used to establish a connection as a `socket` is
+        // specified.
+        host: hostname,
+        // RFC 6066 does not allow IP addresses to be used as the server
+        // name, so omit the SNI extension in that case.
+        servername: isIP(hostname) ? '' : hostname,
+        secureContext: secureContext,
+        rejectUnauthorized: !trustServerCertificate
+      });
 
       const onSecureConnect = () => {
-        securePair.encrypted.removeListener('readable', onReadable);
-        securePair.cleartext.removeListener('error', onError);
-        securePair.cleartext.removeListener('secureConnect', onSecureConnect);
+        tlsSocket.removeListener('error', onError);
+        bridge.removeListener('error', onError);
 
         // If we encounter any errors from this point on,
         // we just forward them to the actual network socket.
-        securePair.cleartext.once('error', (err) => {
+        tlsSocket.once('error', (err) => {
           this.socket.destroy(err);
         });
 
-        const cipher = securePair.cleartext.getCipher();
+        const cipher = tlsSocket.getCipher();
         if (cipher) {
           this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
         }
 
-        this.emit('secure', securePair.cleartext);
+        this.emit('secure', tlsSocket);
 
-        securePair.cleartext.setMaxSendFragment(Math.min(this.outgoingMessageStream.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
+        tlsSocket.setMaxSendFragment(Math.min(this.outgoingMessageStream.packetSize, MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE));
 
+        // Messages are exchanged via TLS from now on.
         this.outgoingMessageStream.unpipe(this.socket);
         this.socket.unpipe(this.incomingMessageStream);
 
-        this.socket.pipe(securePair.encrypted);
-        securePair.encrypted.pipe(this.socket);
+        bridge.startPassthrough();
 
-        securePair.cleartext.pipe(this.incomingMessageStream);
-        this.outgoingMessageStream.pipe(securePair.cleartext);
+        tlsSocket.pipe(this.incomingMessageStream);
+        this.outgoingMessageStream.pipe(tlsSocket);
 
         this.tlsNegotiationComplete = true;
 
@@ -134,49 +137,19 @@ class MessageIO extends EventEmitter {
       };
 
       const onError = (err?: Error) => {
-        securePair.encrypted.removeListener('readable', onReadable);
-        securePair.cleartext.removeListener('error', onError);
-        securePair.cleartext.removeListener('secureConnect', onSecureConnect);
+        tlsSocket.removeListener('error', onError);
+        tlsSocket.removeListener('secureConnect', onSecureConnect);
+        bridge.removeListener('error', onError);
 
-        securePair.cleartext.destroy();
-        securePair.encrypted.destroy();
+        tlsSocket.destroy();
+        bridge.destroy();
 
         reject(err);
       };
 
-      const onReadable = () => {
-        // When there is handshake data on the encrypted stream of the secure pair,
-        // we wrap it into a `PRELOGIN` message and send it to the server.
-        //
-        // For each `PRELOGIN` message we sent we get back exactly one response message
-        // that contains the server's handshake response data.
-        const message = new Message({ type: TYPE.PRELOGIN, resetConnection: false });
-
-        let chunk;
-        while (chunk = securePair.encrypted.read()) {
-          message.write(chunk);
-        }
-        this.outgoingMessageStream.write(message);
-        message.end();
-
-        this.readMessage().then(async (response) => {
-          // Setup readable handler for the next round of handshaking.
-          // If we encounter a `secureConnect` on the cleartext side
-          // of the secure pair, the `readable` handler is cleared
-          // and no further handshake handling will happen.
-          securePair.encrypted.once('readable', onReadable);
-
-          for await (const data of response) {
-            // We feed the server's handshake response back into the
-            // encrypted end of the secure pair.
-            securePair.encrypted.write(data);
-          }
-        }).catch(onError);
-      };
-
-      securePair.cleartext.once('error', onError);
-      securePair.cleartext.once('secureConnect', onSecureConnect);
-      securePair.encrypted.once('readable', onReadable);
+      tlsSocket.once('error', onError);
+      tlsSocket.once('secureConnect', onSecureConnect);
+      bridge.once('error', onError);
     });
   }
 
