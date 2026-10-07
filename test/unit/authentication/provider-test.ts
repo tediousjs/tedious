@@ -3,7 +3,7 @@ import * as net from 'net';
 import sinon from 'sinon';
 
 import { Connection, ConnectionError } from '../../../src/tedious';
-import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession } from '../../../src/authentication/provider';
+import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession, type SspiExchange } from '../../../src/authentication/provider';
 import IncomingMessageStream from '../../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../../src/outgoing-message-stream';
 import Debug from '../../../src/debug';
@@ -70,6 +70,22 @@ function buildFedAuthInfoToken(stsUrl: string, spn: string): Buffer {
   header.writeUInt32LE(data.length, 1);
 
   return Buffer.concat([header, data]);
+}
+
+function buildLoginFailedErrorToken(): Buffer {
+  const data = new WritableTrackingBuffer();
+  data.writeUInt32LE(18456); // Number
+  data.writeUInt8(1); // State
+  data.writeUInt8(14); // Class
+  data.writeUsVarchar('Login failed.', 'ucs2'); // MsgText
+  data.writeBVarchar('', 'ucs2'); // ServerName
+  data.writeBVarchar('', 'ucs2'); // ProcName
+  data.writeUInt32LE(1); // LineNumber
+
+  const buffer = new WritableTrackingBuffer();
+  buffer.writeUInt8(0xAA);
+  buffer.writeUsVarbyte(data.data);
+  return buffer.data;
 }
 
 function buildFedAuthFeatureExtAckToken(): Buffer {
@@ -236,12 +252,11 @@ describe('Authentication providers', function() {
       });
 
       const contexts: AuthenticationContext[] = [];
-      const close = sinon.spy();
 
       await connect(createConnection({
         createSession(context) {
           contexts.push(context);
-          return { type: 'sql', userName: 'rotating-user', password: 'rotating-password', close: close };
+          return { type: 'sql', userName: 'rotating-user', password: 'rotating-password' };
         }
       }));
 
@@ -252,17 +267,15 @@ describe('Authentication providers', function() {
       // The PRELOGIN response sent by the test server sets FEDAUTHREQUIRED
       assert.isTrue(contexts[0].fedAuthRequired);
       assert.instanceOf(contexts[0].signal, AbortSignal);
-
-      sinon.assert.calledOnce(close);
     });
   });
 
   describe('with an `sspi` session', function() {
-    it('exchanges security tokens with the server until the login is acknowledged', async function() {
-      const initialToken = Buffer.from('initial-token');
-      const challenges = [Buffer.from('first-challenge'), Buffer.from('second-challenge')];
-      const responses = [Buffer.from('first-response'), Buffer.from('second-response')];
-
+    /**
+     * Sends the LOGIN7 response for an SSPI login. `exchanges` lists the
+     * security tokens the server sends, and the tokens it expects back.
+     */
+    function serveSspiLogin(initialToken: Buffer, exchanges: Array<[Buffer, Buffer]>, finalResponse: Buffer[], loginSucceeds: boolean) {
       onConnection(async (connection) => {
         await handlePrelogin(connection);
 
@@ -270,41 +283,169 @@ describe('Authentication providers', function() {
         assert.strictEqual(login.type, TYPE.LOGIN7);
         assert.isTrue(login.data.includes(initialToken));
 
-        for (let i = 0; i < challenges.length; i++) {
-          connection.write(TYPE.TABULAR_RESULT, buildSspiToken(challenges[i]));
+        for (const [challenge, expectedResponse] of exchanges) {
+          connection.write(TYPE.TABULAR_RESULT, buildSspiToken(challenge));
 
           const response = await connection.read();
           assert.strictEqual(response.type, TYPE.SSPI);
-          assert.deepEqual(response.data, responses[i]);
+          assert.deepEqual(response.data, expectedResponse);
         }
 
-        connection.write(TYPE.TABULAR_RESULT, buildLoginAckToken());
+        connection.write(TYPE.TABULAR_RESULT, ...finalResponse);
 
-        await handleInitialSql(connection);
+        if (loginSucceeds) {
+          await handleInitialSql(connection);
+        }
       });
+    }
 
-      const handleChallenge = sinon.stub();
-      handleChallenge.onFirstCall().resolves(responses[0]);
-      handleChallenge.onSecondCall().returns(responses[1]);
-      const close = sinon.spy();
-
-      await connect(createConnection({
-        async createSession() {
-          return { type: 'sspi', initialToken: initialToken, handleChallenge: handleChallenge, close: close };
+    function createSspiConnection(exchange: SspiExchange) {
+      return createConnection({
+        createSession() {
+          return { type: 'sspi', exchange: exchange };
         }
-      }));
+      });
+    }
 
-      sinon.assert.calledTwice(handleChallenge);
-      assert.deepEqual(handleChallenge.firstCall.args[0], challenges[0]);
-      assert.instanceOf(handleChallenge.firstCall.args[1], AbortSignal);
-      assert.deepEqual(handleChallenge.secondCall.args[0], challenges[1]);
+    it('exchanges security tokens with the server until the login is accepted', async function() {
+      serveSspiLogin(Buffer.from('initial-token'), [
+        [Buffer.from('first-challenge'), Buffer.from('first-response')],
+        [Buffer.from('second-challenge'), Buffer.from('second-response')]
+      ], [buildLoginAckToken()], true);
 
-      sinon.assert.calledOnce(close);
+      const received: Array<Buffer | undefined> = [];
+      let finished = false;
+
+      await connect(createSspiConnection((async function*() {
+        try {
+          received.push(yield Buffer.from('initial-token'));
+          received.push(yield Buffer.from('first-response'));
+          received.push(yield Buffer.from('second-response'));
+        } finally {
+          finished = true;
+        }
+      })()));
+
+      assert.deepEqual(received, [Buffer.from('first-challenge'), Buffer.from('second-challenge'), undefined]);
+      assert.isTrue(finished);
+    });
+
+    it('supports synchronous generators', async function() {
+      serveSspiLogin(Buffer.from('initial-token'), [
+        [Buffer.from('challenge'), Buffer.from('response')]
+      ], [buildLoginAckToken()], true);
+
+      await connect(createSspiConnection((function*() {
+        const challenge = yield Buffer.from('initial-token');
+        assert.deepEqual(challenge, Buffer.from('challenge'));
+        yield Buffer.from('response');
+      })()));
+    });
+
+    it('passes the security token sent along with the login acknowledgement to the session', async function() {
+      serveSspiLogin(Buffer.from('ap-req'), [], [buildSspiToken(Buffer.from('ap-rep')), buildLoginAckToken()], true);
+
+      let finalToken: Buffer | undefined;
+
+      await connect(createSspiConnection((async function*() {
+        finalToken = yield Buffer.from('ap-req');
+        // Mutual authentication completed, nothing more to send.
+        yield Buffer.alloc(0);
+      })()));
+
+      assert.deepEqual(finalToken, Buffer.from('ap-rep'));
+    });
+
+    it('fails the login if the session rejects the final security token', async function() {
+      serveSspiLogin(Buffer.from('ap-req'), [], [buildSspiToken(Buffer.from('forged-ap-rep')), buildLoginAckToken()], false);
+
+      const verificationError = new Error('mutual authentication failed');
+      let finished = false;
+
+      let error: any;
+      try {
+        await connect(createSspiConnection((async function*() {
+          try {
+            yield Buffer.from('ap-req');
+            throw verificationError;
+          } finally {
+            finished = true;
+          }
+        })()));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, ConnectionError);
+      assert.strictEqual(error.code, 'ELOGIN');
+      assert.strictEqual(error.message, 'SSPI authentication failed: mutual authentication failed');
+      assert.strictEqual(error.cause, verificationError);
+      assert.isTrue(finished);
+    });
+
+    it('fails the login if the session wants to send another token after the login was accepted', async function() {
+      serveSspiLogin(Buffer.from('initial-token'), [], [buildLoginAckToken()], false);
+
+      let error: any;
+      try {
+        await connect(createSspiConnection((function*() {
+          yield Buffer.from('initial-token');
+          yield Buffer.from('unexpected-token');
+        })()));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, ConnectionError);
+      assert.strictEqual(error.code, 'ELOGIN');
+      assert.strictEqual(error.message, 'SSPI authentication failed: The server accepted the login, but the authentication session did not complete.');
     });
 
     it('fails the login if computing the response fails', async function() {
-      const challengeError = new Error('InitializeSecurityContext failed');
+      serveSspiLogin(Buffer.from('initial-token'), [], [buildSspiToken(Buffer.from('challenge'))], false);
 
+      const challengeError = new Error('InitializeSecurityContext failed');
+      let finished = false;
+
+      let error: any;
+      try {
+        await connect(createSspiConnection((async function*() {
+          try {
+            yield Buffer.from('initial-token');
+            throw challengeError;
+          } finally {
+            finished = true;
+          }
+        })()));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, ConnectionError);
+      assert.strictEqual(error.code, 'ELOGIN');
+      assert.strictEqual(error.message, 'SSPI authentication failed: InitializeSecurityContext failed');
+      assert.strictEqual(error.cause, challengeError);
+      assert.isTrue(finished);
+    });
+
+    it('fails the login if the session finishes while the server still expects a token', async function() {
+      serveSspiLogin(Buffer.from('initial-token'), [], [buildSspiToken(Buffer.from('challenge'))], false);
+
+      let error: any;
+      try {
+        await connect(createSspiConnection((function*() {
+          yield Buffer.from('initial-token');
+        })()));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, ConnectionError);
+      assert.strictEqual(error.code, 'ELOGIN');
+      assert.strictEqual(error.message, 'SSPI authentication failed: The authentication session did not return a security token.');
+    });
+
+    it('finishes the exchange once a pending step completes if the login attempt is aborted', async function() {
       onConnection(async (connection) => {
         await handlePrelogin(connection);
 
@@ -314,30 +455,68 @@ describe('Authentication providers', function() {
         connection.write(TYPE.TABULAR_RESULT, buildSspiToken(Buffer.from('challenge')));
       });
 
-      const close = sinon.spy();
+      const { promise: finished, resolve: onFinished } = Promise.withResolvers<void>();
+      let resumedAfterAbort = false;
+
+      const { promise: stepStarted, resolve: onStepStarted } = Promise.withResolvers<void>();
+
+      const connection = createSspiConnection((async function*() {
+        try {
+          yield Buffer.from('initial-token');
+
+          // Simulate a slow native call, during which the connection is closed.
+          onStepStarted();
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          yield Buffer.from('response');
+          resumedAfterAbort = true;
+        } finally {
+          onFinished();
+        }
+      })());
+
+      stepStarted.then(() => { connection.close(); });
 
       let error: any;
       try {
-        await connect(createConnection({
-          createSession() {
-            return {
-              type: 'sspi',
-              initialToken: Buffer.from('initial-token'),
-              handleChallenge() { throw challengeError; },
-              close: close
-            };
+        await connect(connection);
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, ConnectionError);
+      assert.strictEqual(error.code, 'ECLOSE');
+
+      await finished;
+      assert.isFalse(resumedAfterAbort);
+    });
+
+    it('finishes the exchange if the server rejects the login', async function() {
+      serveSspiLogin(Buffer.from('initial-token'), [
+        [Buffer.from('challenge'), Buffer.from('response')]
+      ], [buildLoginFailedErrorToken()], false);
+
+      let finished = false;
+
+      let error: any;
+      try {
+        await connect(createSspiConnection((async function*() {
+          try {
+            yield Buffer.from('initial-token');
+            yield Buffer.from('response');
+            assert.fail('The exchange should not be resumed after the login was rejected');
+          } finally {
+            finished = true;
           }
-        }));
+        })()));
       } catch (err) {
         error = err;
       }
 
       assert.instanceOf(error, ConnectionError);
       assert.strictEqual(error.code, 'ELOGIN');
-      assert.strictEqual(error.message, 'SSPI authentication failed: InitializeSecurityContext failed');
-      assert.strictEqual(error.cause, challengeError);
-
-      sinon.assert.calledOnce(close);
+      assert.strictEqual(error.message, 'Login failed.');
+      assert.isTrue(finished);
     });
   });
 

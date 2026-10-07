@@ -11,7 +11,8 @@ import {
   type MsalFederatedAuthenticationSession,
   type SecurityTokenFederatedAuthenticationSession,
   type SqlAuthenticationSession,
-  type SspiAuthenticationSession
+  type SspiAuthenticationSession,
+  type SspiExchange
 } from './authentication/provider';
 
 import { ConnectionError, InputError, RequestError } from './errors';
@@ -53,5 +54,6 @@ export type {
   MsalFederatedAuthenticationSession,
   SecurityTokenFederatedAuthenticationSession,
   SqlAuthenticationSession,
-  SspiAuthenticationSession
+  SspiAuthenticationSession,
+  SspiExchange
 };

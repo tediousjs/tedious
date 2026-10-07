@@ -36,22 +36,11 @@ export interface AuthenticationContext {
   readonly signal: AbortSignal;
 }
 
-interface BaseAuthenticationSession {
-  /**
-   * Called once the login attempt this session was created for has
-   * finished, whether it succeeded or failed.
-   *
-   * Use this to release any resources that were allocated for the
-   * session (e.g. native security context handles).
-   */
-  close?(): void | Promise<void>;
-}
-
 /**
  * Logs into the server using SQL Server authentication, i.e. using a user
  * name and password that are sent as part of the LOGIN7 message.
  */
-export interface SqlAuthenticationSession extends BaseAuthenticationSession {
+export interface SqlAuthenticationSession {
   type: 'sql';
 
   /**
@@ -66,31 +55,67 @@ export interface SqlAuthenticationSession extends BaseAuthenticationSession {
 }
 
 /**
+ * A generator that drives an integrated authentication (SSPI) exchange.
+ *
+ * Each value it yields is a security token that is sent to the server, and
+ * each value passed back into it is a security token the server responded
+ * with:
+ *
+ * 1. The first `next()` call (without a value) must yield the token that is
+ *    sent as part of the LOGIN7 message.
+ * 2. Every time the server responds with a security token while the login is
+ *    still in progress, `next(serverToken)` is called, and must yield the
+ *    token to send back to the server.
+ * 3. Once the server accepts the login, `next(finalToken)` is called one last
+ *    time. `finalToken` is the security token the server sent along with its
+ *    acceptance (e.g. a Kerberos `AP-REP` for mutual authentication), or
+ *    `undefined` if it did not send one. The generator should verify the
+ *    token if needed, and then finish. Throwing an error fails the login,
+ *    and so does yielding another non-empty token, as the server no longer
+ *    expects one.
+ *
+ * If the login attempt ends at any point (successfully, with an error, or
+ * because it was aborted), `return()` is called on the generator. Use a
+ * `try { ... } finally { ... }` block to release any resources (e.g. native
+ * security context handles).
+ */
+export type SspiExchange =
+  Generator<Buffer, void, Buffer | undefined> |
+  AsyncGenerator<Buffer, void, Buffer | undefined>;
+
+/**
  * Logs into the server using integrated authentication (SSPI), e.g. via
  * NTLM, Kerberos or SPNEGO.
  *
- * The `initialToken` is sent to the server as part of the LOGIN7 message.
- * Every time the server responds with a security token of its own,
- * `handleChallenge` is called with that token, and the token it returns is
- * sent back to the server. This repeats until the server either accepts or
- * rejects the login.
+ * ```js
+ * {
+ *   type: 'sspi',
+ *   exchange: (async function*() {
+ *     const context = securityLibrary.createContext(`MSSQLSvc/${server}:${port}`);
+ *     try {
+ *       let serverToken = yield await context.step();
+ *       while (serverToken !== undefined) {
+ *         const token = await context.step(serverToken);
+ *         serverToken = yield token;
+ *       }
+ *     } finally {
+ *       context.free();
+ *     }
+ *   })()
+ * }
+ * ```
  */
-export interface SspiAuthenticationSession extends BaseAuthenticationSession {
+export interface SspiAuthenticationSession {
   type: 'sspi';
 
   /**
-   * The security token to send to the server as part of the LOGIN7 message.
-   */
-  initialToken: Buffer;
-
-  /**
-   * Computes the response to a security token sent by the server.
+   * The generator that drives the security token exchange. See
+   * [[SspiExchange]] for details.
    *
-   * @param token The security token received from the server.
-   * @param signal Aborted when the login attempt is cancelled.
-   * @returns The security token to send back to the server.
+   * The generator's body does not run until the exchange starts, so no
+   * resources are allocated if the login attempt is aborted before then.
    */
-  handleChallenge(token: Buffer, signal: AbortSignal): Buffer | Promise<Buffer>;
+  exchange: SspiExchange;
 }
 
 /**
@@ -100,7 +125,7 @@ export interface SspiAuthenticationSession extends BaseAuthenticationSession {
  *
  * The token is sent to the server as part of the LOGIN7 message.
  */
-export interface SecurityTokenFederatedAuthenticationSession extends BaseAuthenticationSession {
+export interface SecurityTokenFederatedAuthenticationSession {
   type: 'federated';
   library: 'security-token';
 
@@ -135,7 +160,7 @@ export interface FederatedAuthenticationInfo {
  * Microsoft Entra ID access token) that is acquired after the server
  * has told the client which token service and resource to use.
  */
-export interface MsalFederatedAuthenticationSession extends BaseAuthenticationSession {
+export interface MsalFederatedAuthenticationSession {
   type: 'federated';
   library: 'msal';
 
@@ -221,11 +246,7 @@ export function assertValidAuthenticationSession(session: unknown): asserts sess
     throw new TypeError('The authentication session must be of type object.');
   }
 
-  const { type, close } = session as AuthenticationSession;
-
-  if (close !== undefined && typeof close !== 'function') {
-    throw new TypeError('The "close" property of the authentication session must be of type function.');
-  }
+  const { type } = session as AuthenticationSession;
 
   switch (type) {
     case 'sql': {
@@ -243,14 +264,10 @@ export function assertValidAuthenticationSession(session: unknown): asserts sess
     }
 
     case 'sspi': {
-      const { initialToken, handleChallenge } = session as SspiAuthenticationSession;
+      const { exchange } = session as SspiAuthenticationSession;
 
-      if (!Buffer.isBuffer(initialToken)) {
-        throw new TypeError('The "initialToken" property of the authentication session must be of type Buffer.');
-      }
-
-      if (typeof handleChallenge !== 'function') {
-        throw new TypeError('The "handleChallenge" property of the authentication session must be of type function.');
+      if (typeof exchange !== 'object' || exchange === null || typeof exchange.next !== 'function' || typeof exchange.return !== 'function') {
+        throw new TypeError('The "exchange" property of the authentication session must be a generator.');
       }
 
       return;

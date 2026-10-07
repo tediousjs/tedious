@@ -52,6 +52,26 @@ async function loadMd4(): Promise<Md4> {
 }
 
 /**
+ * Performs the NTLM exchange: sends a `NEGOTIATE_MESSAGE`, and answers the
+ * server's `CHALLENGE_MESSAGE` with an `AUTHENTICATE_MESSAGE`.
+ */
+function* ntlmExchange(options: { domain: string, userName: string, password: string }, md4: Md4): Generator<Buffer, void, Buffer | undefined> {
+  const challenge = yield createNTLMRequest({ domain: options.domain });
+  if (challenge === undefined) {
+    return;
+  }
+
+  const payload = new NTLMResponsePayload({
+    domain: options.domain,
+    userName: options.userName,
+    password: options.password,
+    ntlmpacket: parseChallenge(challenge)
+  }, md4);
+
+  yield payload.data;
+}
+
+/**
  * Implements the deprecated `ntlm` authentication type on top of the
  * authentication provider API.
  *
@@ -61,21 +81,7 @@ export function createNtlmAuthenticationProvider(options: { domain: string, user
   return {
     async createSession() {
       const md4 = await loadMd4();
-
-      return {
-        type: 'sspi',
-        initialToken: createNTLMRequest({ domain: options.domain }),
-        handleChallenge(token) {
-          const payload = new NTLMResponsePayload({
-            domain: options.domain,
-            userName: options.userName,
-            password: options.password,
-            ntlmpacket: parseChallenge(token)
-          }, md4);
-
-          return payload.data;
-        }
-      };
+      return { type: 'sspi', exchange: ntlmExchange(options, md4) };
     }
   };
 }

@@ -30,7 +30,7 @@ import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { type ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
-import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession, type FederatedAuthenticationSession, type SspiAuthenticationSession, assertValidAuthenticationSession, isAuthenticationProvider } from './authentication/provider';
+import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession, type FederatedAuthenticationSession, type SspiExchange, assertValidAuthenticationSession, isAuthenticationProvider } from './authentication/provider';
 import { type LegacyAuthentication, createLegacyAuthenticationProvider, isTokenCredential } from './authentication/legacy';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
@@ -768,6 +768,18 @@ async function withAbortRace<T>(signal: AbortSignal, func: (signalAborted: Promi
   } finally {
     signal.removeEventListener('abort', onAbort);
   }
+}
+
+/**
+ * Races `promise` against `signalAborted`.
+ *
+ * If the abort wins, `promise` is left unobserved, so a rejection landing
+ * afterwards is observed here to keep it from becoming an unhandled
+ * rejection.
+ */
+async function raceAbort<T>(promise: Promise<T>, signalAborted: Promise<never>): Promise<T> {
+  promise.catch(() => {});
+  return await Promise.race([promise, signalAborted]);
 }
 
 /**
@@ -2353,7 +2365,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  sendLogin7Packet(session: AuthenticationSession) {
+  sendLogin7Packet(authenticate: (payload: Login7Payload) => void) {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -2364,32 +2376,7 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    switch (session.type) {
-      case 'federated':
-        if (session.library === 'security-token') {
-          payload.fedAuth = {
-            type: 'SECURITYTOKEN',
-            echo: this.fedAuthRequired,
-            fedAuthToken: session.token
-          };
-        } else {
-          payload.fedAuth = {
-            type: 'ADAL',
-            echo: this.fedAuthRequired,
-            workflow: session.workflow === 'password' ? 'default' : 'integrated'
-          };
-        }
-        break;
-
-      case 'sspi':
-        payload.sspi = session.initialToken;
-        break;
-
-      case 'sql':
-        payload.userName = session.userName;
-        payload.password = session.password;
-        break;
-    }
+    authenticate(payload);
 
     payload.hostname = this.config.options.workstationId || os.hostname();
     payload.serverName = this.routingData ?
@@ -3344,24 +3331,36 @@ class Connection extends EventEmitter {
   async performLogin(port: number, signal: AbortSignal): Promise<RoutingData | undefined> {
     const session = await this.createAuthenticationSession(port, signal);
 
-    try {
-      this.sendLogin7Packet(session);
+    switch (session.type) {
+      case 'federated':
+        this.sendLogin7Packet((payload) => {
+          if (session.library === 'security-token') {
+            payload.fedAuth = {
+              type: 'SECURITYTOKEN',
+              echo: this.fedAuthRequired,
+              fedAuthToken: session.token
+            };
+          } else {
+            payload.fedAuth = {
+              type: 'ADAL',
+              echo: this.fedAuthRequired,
+              workflow: session.workflow === 'password' ? 'default' : 'integrated'
+            };
+          }
+        });
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+        return await this.performSentLogin7WithFedAuth(session, signal);
 
-      switch (session.type) {
-        case 'federated':
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-          return await this.performSentLogin7WithFedAuth(session, signal);
+      case 'sspi':
+        return await this.performSspiLogin(session.exchange, signal);
 
-        case 'sspi':
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_SSPI);
-          return await this.performSentLogin7WithSspi(session, signal);
-
-        case 'sql':
-          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-          return await this.performSentLogin7WithStandardLogin(signal);
-      }
-    } finally {
-      this.closeAuthenticationSession(session);
+      case 'sql':
+        this.sendLogin7Packet((payload) => {
+          payload.userName = session.userName;
+          payload.password = session.password;
+        });
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+        return await this.performSentLogin7WithStandardLogin(signal);
     }
   }
 
@@ -3389,14 +3388,9 @@ class Connection extends EventEmitter {
 
       let session;
       try {
-        session = await Promise.race([sessionPromise, signalAborted]);
+        session = await raceAbort(sessionPromise, signalAborted);
       } catch (err) {
-        if (signal.aborted) {
-          // The provider might still finish creating the session after the
-          // login attempt was aborted. Make sure it gets closed in that case.
-          sessionPromise.then((session) => { this.closeAuthenticationSession(session); }, () => {});
-          signal.throwIfAborted();
-        }
+        signal.throwIfAborted();
 
         if (err instanceof ConnectionError) {
           throw err;
@@ -3407,25 +3401,6 @@ class Connection extends EventEmitter {
 
       return session;
     });
-  }
-
-  /**
-   * @private
-   */
-  closeAuthenticationSession(session: AuthenticationSession) {
-    if (session.close === undefined) {
-      return;
-    }
-
-    const onError = (err: any) => {
-      this.debug.log('Failed to close the authentication session: ' + (err?.message ?? err));
-    };
-
-    try {
-      Promise.resolve(session.close()).catch(onError);
-    } catch (err) {
-      onError(err);
-    }
   }
 
   /**
@@ -3476,22 +3451,19 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * Drives an integrated authentication (SSPI) exchange: sends the initial
+   * security token as part of the LOGIN7 message, and then answers every
+   * security token sent by the server until the login is accepted or
+   * rejected.
+   *
    * @private
    */
-  async performSentLogin7WithSspi(session: SspiAuthenticationSession, signal: AbortSignal): Promise<RoutingData | undefined> {
-    return await withAbortRace(signal, async (signalAborted) => {
-      while (true) {
-        const handler = await this.readLogin7Response(signal, signalAborted, false);
-
-        if (handler.loginAckReceived) {
-          return handler.routingData;
-        } else if (handler.sspiToken) {
-          let response: Buffer;
+  async performSspiLogin(exchange: SspiExchange, signal: AbortSignal): Promise<RoutingData | undefined> {
+    try {
+      return await withAbortRace(signal, async (signalAborted) => {
+        const step = async (serverToken: Buffer | undefined) => {
           try {
-            response = await Promise.race([
-              (async () => await session.handleChallenge(handler.sspiToken!, signal))(),
-              signalAborted
-            ]);
+            return await raceAbort((async () => await exchange.next(serverToken))(), signalAborted);
           } catch (err) {
             signal.throwIfAborted();
 
@@ -3501,22 +3473,59 @@ class Connection extends EventEmitter {
 
             throw new ConnectionError(`SSPI authentication failed: ${(err as Error)?.message ?? err}`, 'ELOGIN', { cause: err });
           }
+        };
 
-          if (!Buffer.isBuffer(response)) {
+        const nextToken = async (serverToken: Buffer | undefined) => {
+          const result = await step(serverToken);
+
+          if (result.done || !Buffer.isBuffer(result.value)) {
             throw new ConnectionError('SSPI authentication failed: The authentication session did not return a security token.', 'ELOGIN');
           }
 
-          this.messageIo.sendMessage(TYPE.SSPI, response);
-          this.debug.payload(function() {
-            return '  SSPI - ' + response.length + ' bytes';
-          });
-        } else if (handler.loginError) {
-          throw handler.loginError;
-        } else {
-          throw new ConnectionError('Login failed.', 'ELOGIN');
+          return result.value;
+        };
+
+        const initialToken = await nextToken(undefined);
+        this.sendLogin7Packet((payload) => {
+          payload.sspi = initialToken;
+        });
+        this.transitionTo(this.STATE.SENT_LOGIN7_WITH_SSPI);
+
+        while (true) {
+          const handler = await this.readLogin7Response(signal, signalAborted, false);
+
+          if (handler.loginAckReceived) {
+            // Let the session verify the final security token sent by the
+            // server (if any), e.g. for Kerberos mutual authentication.
+            const result = await step(handler.sspiToken);
+
+            if (!result.done && result.value !== undefined && result.value.length !== 0) {
+              throw new ConnectionError('SSPI authentication failed: The server accepted the login, but the authentication session did not complete.', 'ELOGIN');
+            }
+
+            return handler.routingData;
+          } else if (handler.sspiToken) {
+            const response = await nextToken(handler.sspiToken);
+
+            this.messageIo.sendMessage(TYPE.SSPI, response);
+            this.debug.payload(function() {
+              return '  SSPI - ' + response.length + ' bytes';
+            });
+          } else if (handler.loginError) {
+            throw handler.loginError;
+          } else {
+            throw new ConnectionError('Login failed.', 'ELOGIN');
+          }
         }
-      }
-    });
+      });
+    } finally {
+      // Finish the exchange, so the session can release its resources. If a
+      // step is still running (because the login attempt was aborted), this
+      // only takes effect once that step has finished.
+      (async () => await exchange.return(undefined))().catch((err) => {
+        this.debug.log('Failed to finish the SSPI exchange: ' + (err?.message ?? err));
+      });
+    }
   }
 
   /**
@@ -3537,10 +3546,10 @@ class Connection extends EventEmitter {
         let token: string;
 
         try {
-          token = await Promise.race([
+          token = await raceAbort(
             (async () => await session.getToken({ spn: fedAuthInfoToken.spn!, stsUrl: fedAuthInfoToken.stsurl! }, signal))(),
             signalAborted
-          ]);
+          );
         } catch (err) {
           signal.throwIfAborted();
 
