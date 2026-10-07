@@ -27,6 +27,8 @@
   "typedocOptions": {
     "name": "Tedious",
     "out": "./docs",
-    "entryPoints": ["./src/tedious.ts"]
+    "entryPoints": ["./src/tedious.ts"],
+    "customCss": "./typedoc-assets/theme.css",
+    "customJs": "./typedoc-assets/dark-mode.js"
   }
 }
