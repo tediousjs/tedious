@@ -1,7 +1,30 @@
+import { type AuthenticationPlugin } from '../plugin';
 import { type AuthenticationProvider } from '../provider';
+import { assertOptionalStringOption, assertStringOption } from '../options';
+import { emitLegacyAuthenticationDeprecationWarning } from './deprecation';
 import { createNTLMRequest } from './ntlm-negotiate';
 import NTLMResponsePayload, { type Md4 } from './ntlm-response';
 import { loadOptionalDependency } from './optional-dependency';
+
+export interface NtlmAuthentication {
+  type: 'ntlm';
+  options: {
+    /**
+     * User name from your windows account.
+     */
+    userName: string;
+    /**
+     * Password from your windows account.
+     */
+    password: string;
+    /**
+     * Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
+     *
+     * This is necessary for forming a connection using ntlm type
+     */
+    domain: string;
+  };
+}
 
 export interface NtlmChallenge {
   magic: string;
@@ -55,7 +78,7 @@ async function loadMd4(): Promise<Md4> {
  * Performs the NTLM exchange: sends a `NEGOTIATE_MESSAGE`, and answers the
  * server's `CHALLENGE_MESSAGE` with an `AUTHENTICATE_MESSAGE`.
  */
-function* ntlmExchange(options: { domain: string, userName: string, password: string }, md4: Md4): Generator<Buffer, void, Buffer | undefined> {
+function* ntlmExchange(options: NtlmAuthentication['options'], md4: Md4): Generator<Buffer, void, Buffer | undefined> {
   const challenge = yield createNTLMRequest({ domain: options.domain });
   if (challenge === undefined) {
     return;
@@ -77,11 +100,34 @@ function* ntlmExchange(options: { domain: string, userName: string, password: st
  *
  * @private
  */
-export function createNtlmAuthenticationProvider(options: { domain: string, userName: string, password: string }): AuthenticationProvider {
+export function createNtlmAuthenticationProvider(options: NtlmAuthentication['options']): AuthenticationProvider {
   return {
-    async createSession() {
+    async getCredentials() {
       const md4 = await loadMd4();
       return { type: 'sspi', exchange: ntlmExchange(options, md4) };
     }
   };
 }
+
+/**
+ * The deprecated `ntlm` authentication type.
+ *
+ * @private
+ */
+export const ntlmAuthenticationPlugin: AuthenticationPlugin<Record<string, unknown>> = {
+  type: 'ntlm',
+
+  createProvider(options) {
+    assertStringOption(options, 'domain');
+    assertOptionalStringOption(options, 'userName');
+    assertOptionalStringOption(options, 'password');
+
+    emitLegacyAuthenticationDeprecationWarning('ntlm');
+
+    return createNtlmAuthenticationProvider({
+      userName: options.userName as string,
+      password: options.password as string,
+      domain: (options.domain as string).toUpperCase()
+    });
+  }
+};

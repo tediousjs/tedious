@@ -30,8 +30,10 @@ import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { type ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
-import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession, type FederatedAuthenticationSession, type SspiExchange, assertValidAuthenticationSession, isAuthenticationProvider } from './authentication/provider';
-import { type LegacyAuthentication, createLegacyAuthenticationProvider, isTokenCredential } from './authentication/legacy';
+import { type AccessTokenCredentials, type AuthenticationContext, type AuthenticationProvider, type Credentials, type SspiExchange, assertValidCredentials, isAuthenticationProvider } from './authentication/provider';
+import { createAuthenticationProviderFromConfig } from './authentication/plugin';
+import { type DefaultAuthenticationOptions } from './authentication/default';
+import { type LegacyAuthentication } from './authentication/legacy';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
@@ -190,23 +192,22 @@ const DEFAULT_DATEFORMAT = 'mdy';
 
 interface DefaultAuthentication {
   type: 'default';
-  options: {
-    /**
-     * User name to use for sql server login.
-     */
-    userName?: string | undefined;
-    /**
-     * Password to use for sql server login.
-     */
-    password?: string | undefined;
-  };
+  options: DefaultAuthenticationOptions;
+}
+
+/**
+ * An authentication type provided by a registered [[AuthenticationPlugin]].
+ */
+interface PluginAuthentication {
+  type: string;
+  options: Record<string, any>;
 }
 
 interface ErrorWithCode extends Error {
   code?: string;
 }
 
-export type ConnectionAuthentication = DefaultAuthentication | LegacyAuthentication | AuthenticationProvider;
+export type ConnectionAuthentication = DefaultAuthentication | LegacyAuthentication | PluginAuthentication | AuthenticationProvider;
 
 interface InternalConnectionConfig {
   server: string;
@@ -290,7 +291,8 @@ interface State {
   };
 }
 
-type AuthenticationType = DefaultAuthentication['type'] | LegacyAuthentication['type'];
+// `string & {}` allows any string (for plugins) while keeping editor completions for the built-in types.
+type AuthenticationType = DefaultAuthentication['type'] | LegacyAuthentication['type'] | (string & {});
 
 export interface ConnectionConfiguration {
   /**
@@ -304,11 +306,13 @@ export interface ConnectionConfiguration {
   /**
    * Authentication related options for connection.
    *
-   * This is either an [[AuthenticationProvider]], or an object describing
-   * one of the built-in authentication types. Only the `default` built-in
-   * authentication type (SQL Server authentication using a user name and
-   * password) is supported going forward. All other built-in
-   * authentication types are deprecated in favor of authentication providers.
+   * This is either an [[AuthenticationProvider]], or a JSON compatible
+   * object of the form `{ type, options }` that selects a registered
+   * [[AuthenticationPlugin]] by its `type`.
+   *
+   * The `default` authentication type (SQL Server authentication using a
+   * user name and password) is built in. The other built-in authentication
+   * types are deprecated in favor of authentication providers and plugins.
    */
   authentication?: AuthenticationOptions | AuthenticationProvider;
 }
@@ -348,8 +352,11 @@ interface AuthenticationOptions {
    * `azure-active-directory-default`
    * or `azure-active-directory-service-principal-secret`
    *
-   * All types other than `default` are deprecated and will be removed in a
-   * future version. Use an [[AuthenticationProvider]] instead.
+   * All built-in types other than `default` are deprecated and will be
+   * removed in a future version. Use an [[AuthenticationProvider]] instead.
+   *
+   * Any other type selects the [[AuthenticationPlugin]] that was registered
+   * for it with [[registerAuthenticationPlugin]].
    */
   type?: AuthenticationType;
   /**
@@ -364,6 +371,9 @@ interface AuthenticationOptions {
    * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
    * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
    * * `azure-active-directory-default` : [[AzureActiveDirectoryDefaultAuthentication.options]]
+   *
+   * For authentication types provided by a plugin, these are passed to the
+   * plugin's [[AuthenticationPlugin.createProvider]].
    */
   options?: any;
 }
@@ -994,8 +1004,9 @@ class Connection extends EventEmitter {
     this.fedAuthRequired = false;
 
     let authentication: ConnectionAuthentication;
+    let authenticationProvider: AuthenticationProvider;
     if (isAuthenticationProvider(config.authentication)) {
-      authentication = config.authentication;
+      authentication = authenticationProvider = config.authentication;
     } else if (config.authentication !== undefined) {
       if (typeof config.authentication !== 'object' || config.authentication === null) {
         throw new TypeError('The "config.authentication" property must be of type Object.');
@@ -1008,153 +1019,12 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.type" property must be of type string.');
       }
 
-      if (type !== 'default' && type !== 'ntlm' && type !== 'token-credential' && type !== 'azure-active-directory-password' && type !== 'azure-active-directory-access-token' && type !== 'azure-active-directory-msi-vm' && type !== 'azure-active-directory-msi-app-service' && type !== 'azure-active-directory-service-principal-secret' && type !== 'azure-active-directory-default') {
-        throw new TypeError('The "type" property must one of "default", "ntlm", "token-credential", "azure-active-directory-password", "azure-active-directory-access-token", "azure-active-directory-default", "azure-active-directory-msi-vm" or "azure-active-directory-msi-app-service" or "azure-active-directory-service-principal-secret".');
-      }
-
       if (typeof options !== 'object' || options === null) {
         throw new TypeError('The "config.authentication.options" property must be of type object.');
       }
 
-      if (type === 'ntlm') {
-        if (typeof options.domain !== 'string') {
-          throw new TypeError('The "config.authentication.options.domain" property must be of type string.');
-        }
-
-        if (options.userName !== undefined && typeof options.userName !== 'string') {
-          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
-        }
-
-        if (options.password !== undefined && typeof options.password !== 'string') {
-          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'ntlm',
-          options: {
-            userName: options.userName,
-            password: options.password,
-            domain: options.domain && options.domain.toUpperCase()
-          }
-        };
-      } else if (type === 'token-credential') {
-        if (!isTokenCredential(options.credential)) {
-          throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');
-        }
-
-        authentication = {
-          type: 'token-credential',
-          options: {
-            credential: options.credential
-          }
-        };
-      } else if (type === 'azure-active-directory-password') {
-        if (typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        if (options.userName !== undefined && typeof options.userName !== 'string') {
-          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
-        }
-
-        if (options.password !== undefined && typeof options.password !== 'string') {
-          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
-        }
-
-        if (options.tenantId !== undefined && typeof options.tenantId !== 'string') {
-          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-password',
-          options: {
-            userName: options.userName,
-            password: options.password,
-            tenantId: options.tenantId,
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-access-token') {
-        if (typeof options.token !== 'string') {
-          throw new TypeError('The "config.authentication.options.token" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-access-token',
-          options: {
-            token: options.token
-          }
-        };
-      } else if (type === 'azure-active-directory-msi-vm') {
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-msi-vm',
-          options: {
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-default') {
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-        authentication = {
-          type: 'azure-active-directory-default',
-          options: {
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-msi-app-service') {
-        if (options.clientId !== undefined && typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-msi-app-service',
-          options: {
-            clientId: options.clientId
-          }
-        };
-      } else if (type === 'azure-active-directory-service-principal-secret') {
-        if (typeof options.clientId !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientId" property must be of type string.');
-        }
-
-        if (typeof options.clientSecret !== 'string') {
-          throw new TypeError('The "config.authentication.options.clientSecret" property must be of type string.');
-        }
-
-        if (typeof options.tenantId !== 'string') {
-          throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'azure-active-directory-service-principal-secret',
-          options: {
-            clientId: options.clientId,
-            clientSecret: options.clientSecret,
-            tenantId: options.tenantId
-          }
-        };
-      } else {
-        if (options.userName !== undefined && typeof options.userName !== 'string') {
-          throw new TypeError('The "config.authentication.options.userName" property must be of type string.');
-        }
-
-        if (options.password !== undefined && typeof options.password !== 'string') {
-          throw new TypeError('The "config.authentication.options.password" property must be of type string.');
-        }
-
-        authentication = {
-          type: 'default',
-          options: {
-            userName: options.userName,
-            password: options.password
-          }
-        };
-      }
+      authenticationProvider = createAuthenticationProviderFromConfig(type, options);
+      authentication = { type: type, options: options };
     } else {
       authentication = {
         type: 'default',
@@ -1163,6 +1033,7 @@ class Connection extends EventEmitter {
           password: undefined
         }
       };
+      authenticationProvider = createAuthenticationProviderFromConfig(authentication.type, authentication.options);
     }
 
     this.config = {
@@ -1663,7 +1534,7 @@ class Connection extends EventEmitter {
     }
 
     this.debug = this.createDebug();
-    this.authenticationProvider = createAuthenticationProvider(this.config.authentication);
+    this.authenticationProvider = authenticationProvider;
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
 
@@ -3323,41 +3194,41 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Creates the authentication session for the current login attempt, sends
-   * the LOGIN7 message and performs the authentication exchange.
+   * Gets the credentials for the current login attempt, sends the LOGIN7
+   * message and performs the authentication exchange.
    *
    * @private
    */
   async performLogin(port: number, signal: AbortSignal): Promise<RoutingData | undefined> {
-    const session = await this.createAuthenticationSession(port, signal);
+    const credentials = await this.getCredentials(port, signal);
 
-    switch (session.type) {
-      case 'federated':
+    switch (credentials.type) {
+      case 'token':
         this.sendLogin7Packet((payload) => {
-          if (session.library === 'security-token') {
+          if (credentials.token !== undefined) {
             payload.fedAuth = {
               type: 'SECURITYTOKEN',
               echo: this.fedAuthRequired,
-              fedAuthToken: session.token
+              fedAuthToken: credentials.token
             };
           } else {
             payload.fedAuth = {
               type: 'ADAL',
               echo: this.fedAuthRequired,
-              workflow: session.workflow === 'password' ? 'default' : 'integrated'
+              workflow: credentials.workflow === 'password' ? 'default' : 'integrated'
             };
           }
         });
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-        return await this.performSentLogin7WithFedAuth(session, signal);
+        return await this.performSentLogin7WithFedAuth(credentials, signal);
 
       case 'sspi':
-        return await this.performSspiLogin(session.exchange, signal);
+        return await this.performSspiLogin(credentials.exchange, signal);
 
-      case 'sql':
+      case 'password':
         this.sendLogin7Packet((payload) => {
-          payload.userName = session.userName;
-          payload.password = session.password;
+          payload.userName = credentials.userName;
+          payload.password = credentials.password;
         });
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
         return await this.performSentLogin7WithStandardLogin(signal);
@@ -3365,30 +3236,30 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Asks the authentication provider for the session to use for the
+   * Asks the authentication provider for the credentials to use for the
    * current login attempt.
    *
    * @private
    */
-  async createAuthenticationSession(port: number, signal: AbortSignal): Promise<AuthenticationSession> {
+  async getCredentials(port: number, signal: AbortSignal): Promise<Credentials> {
     const context: AuthenticationContext = {
       server: this.routingData ? this.routingData.server : this.config.server,
       port: this.routingData ? this.routingData.port : port,
       instanceName: this.routingData ? (this.routingData.instance || undefined) : this.config.options.instanceName,
-      fedAuthRequired: this.fedAuthRequired,
+      tokenRequired: this.fedAuthRequired,
       signal: signal
     };
 
     return await withAbortRace(signal, async (signalAborted) => {
-      const sessionPromise = (async () => {
-        const session: unknown = await this.authenticationProvider.createSession(context);
-        assertValidAuthenticationSession(session);
-        return session;
+      const credentialsPromise = (async () => {
+        const credentials: unknown = await this.authenticationProvider.getCredentials(context);
+        assertValidCredentials(credentials);
+        return credentials;
       })();
 
-      let session;
+      let credentials;
       try {
-        session = await raceAbort(sessionPromise, signalAborted);
+        credentials = await raceAbort(credentialsPromise, signalAborted);
       } catch (err) {
         signal.throwIfAborted();
 
@@ -3396,10 +3267,10 @@ class Connection extends EventEmitter {
           throw err;
         }
 
-        throw new ConnectionError(`Failed to create the authentication session: ${(err as Error)?.message ?? err}`, 'ELOGIN', { cause: err });
+        throw new ConnectionError(`Failed to get the credentials: ${(err as Error)?.message ?? err}`, 'ELOGIN', { cause: err });
       }
 
-      return session;
+      return credentials;
     });
   }
 
@@ -3479,7 +3350,7 @@ class Connection extends EventEmitter {
           const result = await step(serverToken);
 
           if (result.done || !Buffer.isBuffer(result.value)) {
-            throw new ConnectionError('SSPI authentication failed: The authentication session did not return a security token.', 'ELOGIN');
+            throw new ConnectionError('SSPI authentication failed: The SSPI exchange did not return a security token.', 'ELOGIN');
           }
 
           return result.value;
@@ -3495,12 +3366,12 @@ class Connection extends EventEmitter {
           const handler = await this.readLogin7Response(signal, signalAborted, false);
 
           if (handler.loginAckReceived) {
-            // Let the session verify the final security token sent by the
+            // Let the exchange verify the final security token sent by the
             // server (if any), e.g. for Kerberos mutual authentication.
             const result = await step(handler.sspiToken);
 
             if (!result.done && result.value !== undefined && result.value.length !== 0) {
-              throw new ConnectionError('SSPI authentication failed: The server accepted the login, but the authentication session did not complete.', 'ELOGIN');
+              throw new ConnectionError('SSPI authentication failed: The server accepted the login, but the SSPI exchange did not complete.', 'ELOGIN');
             }
 
             return handler.routingData;
@@ -3519,7 +3390,7 @@ class Connection extends EventEmitter {
         }
       });
     } finally {
-      // Finish the exchange, so the session can release its resources. If a
+      // Finish the exchange, so it can release its resources. If a
       // step is still running (because the login attempt was aborted), this
       // only takes effect once that step has finished.
       (async () => await exchange.return(undefined))().catch((err) => {
@@ -3531,7 +3402,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithFedAuth(session: FederatedAuthenticationSession, signal: AbortSignal): Promise<RoutingData | undefined> {
+  async performSentLogin7WithFedAuth(credentials: AccessTokenCredentials, signal: AbortSignal): Promise<RoutingData | undefined> {
     return await withAbortRace(signal, async (signalAborted) => {
       const handler = await this.readLogin7Response(signal, signalAborted, true);
 
@@ -3541,13 +3412,15 @@ class Connection extends EventEmitter {
 
       const fedAuthInfoToken = handler.fedAuthInfoToken;
 
-      if (session.library === 'msal' && fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+      if (credentials.acquireToken !== undefined && fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+        const acquireToken = credentials.acquireToken;
+
         /** Access token retrieved for the resource described by the server. */
         let token: string;
 
         try {
           token = await raceAbort(
-            (async () => await session.getToken({ spn: fedAuthInfoToken.spn!, stsUrl: fedAuthInfoToken.stsurl! }, signal))(),
+            (async () => await acquireToken({ resource: fedAuthInfoToken.spn!, authority: fedAuthInfoToken.stsurl! }, signal))(),
             signalAborted
           );
         } catch (err) {
@@ -3601,26 +3474,6 @@ class Connection extends EventEmitter {
       ]);
     });
   }
-}
-
-/**
- * Creates the [[AuthenticationProvider]] for the given authentication configuration.
- */
-function createAuthenticationProvider(authentication: ConnectionAuthentication): AuthenticationProvider {
-  if (isAuthenticationProvider(authentication)) {
-    return authentication;
-  }
-
-  if (authentication.type === 'default') {
-    const { userName, password } = authentication.options;
-    return {
-      createSession() {
-        return { type: 'sql', userName: userName, password: password };
-      }
-    };
-  }
-
-  return createLegacyAuthenticationProvider(authentication);
 }
 
 function isTransientError(error: AggregateError | ConnectionError): boolean {

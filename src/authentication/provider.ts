@@ -1,6 +1,6 @@
 /**
  * Information about the login attempt that an [[AuthenticationProvider]] is
- * asked to create an [[AuthenticationSession]] for.
+ * asked to provide [[Credentials]] for.
  */
 export interface AuthenticationContext {
   /**
@@ -25,9 +25,9 @@ export interface AuthenticationContext {
 
   /**
    * Whether the server indicated in its PRELOGIN response that it requires
-   * federated authentication.
+   * the client to log in with an access token (federated authentication).
    */
-  readonly fedAuthRequired: boolean;
+  readonly tokenRequired: boolean;
 
   /**
    * Aborted when the login attempt is cancelled, for example because the
@@ -40,8 +40,8 @@ export interface AuthenticationContext {
  * Logs into the server using SQL Server authentication, i.e. using a user
  * name and password that are sent as part of the LOGIN7 message.
  */
-export interface SqlAuthenticationSession {
-  type: 'sql';
+export interface PasswordCredentials {
+  type: 'password';
 
   /**
    * The SQL Server login name.
@@ -105,7 +105,7 @@ export type SspiExchange =
  * }
  * ```
  */
-export interface SspiAuthenticationSession {
+export interface SspiCredentials {
   type: 'sspi';
 
   /**
@@ -119,94 +119,105 @@ export interface SspiAuthenticationSession {
 }
 
 /**
- * Logs into the server using a federated authentication token (e.g. a
- * Microsoft Entra ID access token) that is already known when the
- * login starts.
+ * Information sent by the server that describes the access token it expects.
+ */
+export interface AccessTokenRequest {
+  /**
+   * The resource the access token needs to be issued for, e.g.
+   * `https://database.windows.net/`. (This is the `SPN` sent by the server.)
+   *
+   * Microsoft Entra ID tokens should be requested for the
+   * `new URL('/.default', resource)` scope.
+   */
+  resource: string;
+
+  /**
+   * The URL of the authority (security token service) the access token
+   * should be acquired from. (This is the `STSURL` sent by the server.)
+   */
+  authority: string;
+}
+
+/**
+ * Logs into the server with an access token (e.g. a Microsoft Entra ID
+ * access token) that is already known when the login starts.
  *
  * The token is sent to the server as part of the LOGIN7 message.
  */
-export interface SecurityTokenFederatedAuthenticationSession {
-  type: 'federated';
-  library: 'security-token';
+export interface StaticAccessTokenCredentials {
+  type: 'token';
 
   /**
    * The access token to log in with.
    */
   token: string;
+
+  acquireToken?: never;
+  workflow?: never;
 }
 
 /**
- * Information sent by the server that is needed to acquire a federated
- * authentication token.
+ * Logs into the server with an access token (e.g. a Microsoft Entra ID
+ * access token) that is acquired once the server has described the token
+ * it expects.
  */
-export interface FederatedAuthenticationInfo {
+export interface AcquiredAccessTokenCredentials {
+  type: 'token';
+
   /**
-   * The service principal name of the server, e.g.
-   * `https://database.windows.net/`.
+   * Acquires the access token to log in with.
    *
-   * Microsoft Entra ID tokens should be requested for the
-   * `new URL('/.default', spn)` scope.
-   */
-  spn: string;
-
-  /**
-   * The URL of the security token service the token should be acquired from.
-   */
-  stsUrl: string;
-}
-
-/**
- * Logs into the server using a federated authentication token (e.g. a
- * Microsoft Entra ID access token) that is acquired after the server
- * has told the client which token service and resource to use.
- */
-export interface MsalFederatedAuthenticationSession {
-  type: 'federated';
-  library: 'msal';
-
-  /**
-   * The authentication workflow that is used to acquire the token.
-   *
-   * * `password`: The token is acquired using a user name and password.
-   * * `integrated`: The token is acquired in any other way.
-   */
-  workflow: 'password' | 'integrated';
-
-  /**
-   * Acquires the token to log in with.
-   *
-   * @param info Information sent by the server about how to acquire the token.
+   * @param request Describes the access token the server expects.
    * @param signal Aborted when the login attempt is cancelled.
    * @returns The access token to log in with.
    */
-  getToken(info: FederatedAuthenticationInfo, signal: AbortSignal): string | Promise<string>;
+  acquireToken(request: AccessTokenRequest, signal: AbortSignal): string | Promise<string>;
+
+  /**
+   * How the access token is acquired. This is only informational for the
+   * server.
+   *
+   * * `password`: The token is acquired using a user name and password.
+   * * `integrated`: The token is acquired in any other way.
+   *
+   * (default: `integrated`)
+   */
+  workflow?: 'password' | 'integrated' | undefined;
+
+  token?: never;
 }
 
-export type FederatedAuthenticationSession = SecurityTokenFederatedAuthenticationSession | MsalFederatedAuthenticationSession;
+/**
+ * Logs into the server with an access token (federated authentication).
+ *
+ * Either pass the `token` itself, or an `acquireToken` function that is
+ * called once the server has described the token it expects.
+ */
+export type AccessTokenCredentials = StaticAccessTokenCredentials | AcquiredAccessTokenCredentials;
 
 /**
  * Describes how a single login attempt authenticates against the server.
  */
-export type AuthenticationSession = SqlAuthenticationSession | SspiAuthenticationSession | FederatedAuthenticationSession;
+export type Credentials = PasswordCredentials | SspiCredentials | AccessTokenCredentials;
 
 /**
- * An authentication provider is a plugin that tells `tedious` how to
- * authenticate against the server.
+ * An authentication provider tells `tedious` how to authenticate against
+ * the server.
  *
  * Pass an authentication provider as the `authentication` property of the
- * [[ConnectionConfiguration]] to use it.
+ * [[ConnectionConfiguration]] to use it, or register an
+ * [[AuthenticationPlugin]] that creates it to use it from JSON based
+ * configurations.
  *
  * ```js
  * const connection = new Connection({
  *   server: 'localhost',
  *   authentication: {
- *     async createSession(context) {
+ *     getCredentials(context) {
  *       return {
- *         type: 'federated',
- *         library: 'msal',
- *         workflow: 'integrated',
- *         async getToken({ spn }, signal) {
- *           return await fetchAccessToken(new URL('/.default', spn).toString(), signal);
+ *         type: 'token',
+ *         async acquireToken({ resource }, signal) {
+ *           return await fetchAccessToken(new URL('/.default', resource).toString(), signal);
  *         }
  *       };
  *     }
@@ -216,14 +227,14 @@ export type AuthenticationSession = SqlAuthenticationSession | SspiAuthenticatio
  */
 export interface AuthenticationProvider {
   /**
-   * Creates the [[AuthenticationSession]] for a single login attempt.
+   * Returns the [[Credentials]] to use for a single login attempt.
    *
    * This is called once for every login attempt, including attempts made
    * after a transient error or after the server re-routed the connection.
    *
    * @param context Information about the login attempt.
    */
-  createSession(context: AuthenticationContext): AuthenticationSession | Promise<AuthenticationSession>;
+  getCredentials(context: AuthenticationContext): Credentials | Promise<Credentials>;
 }
 
 /**
@@ -232,76 +243,78 @@ export interface AuthenticationProvider {
  * @private
  */
 export function isAuthenticationProvider(value: unknown): value is AuthenticationProvider {
-  return typeof value === 'object' && value !== null && typeof (value as AuthenticationProvider).createSession === 'function';
+  return typeof value === 'object' && value !== null && typeof (value as AuthenticationProvider).getCredentials === 'function';
 }
 
 /**
- * Checks that the given value is a valid [[AuthenticationSession]], throwing
- * a `TypeError` if it is not.
+ * Checks that the given value is valid [[Credentials]], throwing a
+ * `TypeError` if it is not.
  *
  * @private
  */
-export function assertValidAuthenticationSession(session: unknown): asserts session is AuthenticationSession {
-  if (typeof session !== 'object' || session === null) {
-    throw new TypeError('The authentication session must be of type object.');
+export function assertValidCredentials(credentials: unknown): asserts credentials is Credentials {
+  if (typeof credentials !== 'object' || credentials === null) {
+    throw new TypeError('The credentials must be of type object.');
   }
 
-  const { type } = session as AuthenticationSession;
+  const { type } = credentials as Credentials;
 
   switch (type) {
-    case 'sql': {
-      const { userName, password } = session as SqlAuthenticationSession;
+    case 'password': {
+      const { userName, password } = credentials as PasswordCredentials;
 
       if (userName !== undefined && typeof userName !== 'string') {
-        throw new TypeError('The "userName" property of the authentication session must be of type string.');
+        throw new TypeError('The "userName" property of the credentials must be of type string.');
       }
 
       if (password !== undefined && typeof password !== 'string') {
-        throw new TypeError('The "password" property of the authentication session must be of type string.');
+        throw new TypeError('The "password" property of the credentials must be of type string.');
       }
 
       return;
     }
 
     case 'sspi': {
-      const { exchange } = session as SspiAuthenticationSession;
+      const { exchange } = credentials as SspiCredentials;
 
       if (typeof exchange !== 'object' || exchange === null || typeof exchange.next !== 'function' || typeof exchange.return !== 'function') {
-        throw new TypeError('The "exchange" property of the authentication session must be a generator.');
+        throw new TypeError('The "exchange" property of the credentials must be a generator.');
       }
 
       return;
     }
 
-    case 'federated': {
-      const { library } = session as FederatedAuthenticationSession;
+    case 'token': {
+      const { token, acquireToken, workflow } = credentials as { token?: unknown, acquireToken?: unknown, workflow?: unknown };
 
-      if (library === 'security-token') {
-        if (typeof (session as SecurityTokenFederatedAuthenticationSession).token !== 'string') {
-          throw new TypeError('The "token" property of the authentication session must be of type string.');
+      if ((token === undefined) === (acquireToken === undefined)) {
+        throw new TypeError('The credentials must have either a "token" or an "acquireToken" property.');
+      }
+
+      if (token !== undefined) {
+        if (typeof token !== 'string') {
+          throw new TypeError('The "token" property of the credentials must be of type string.');
+        }
+
+        if (workflow !== undefined) {
+          throw new TypeError('The "workflow" property of the credentials can only be used together with "acquireToken".');
         }
 
         return;
       }
 
-      if (library === 'msal') {
-        const { workflow, getToken } = session as MsalFederatedAuthenticationSession;
-
-        if (workflow !== 'password' && workflow !== 'integrated') {
-          throw new TypeError('The "workflow" property of the authentication session must be one of "password" or "integrated".');
-        }
-
-        if (typeof getToken !== 'function') {
-          throw new TypeError('The "getToken" property of the authentication session must be of type function.');
-        }
-
-        return;
+      if (typeof acquireToken !== 'function') {
+        throw new TypeError('The "acquireToken" property of the credentials must be of type function.');
       }
 
-      throw new TypeError('The "library" property of the authentication session must be one of "security-token" or "msal".');
+      if (workflow !== undefined && workflow !== 'password' && workflow !== 'integrated') {
+        throw new TypeError('The "workflow" property of the credentials must be one of "password" or "integrated".');
+      }
+
+      return;
     }
 
     default:
-      throw new TypeError('The "type" property of the authentication session must be one of "sql", "sspi" or "federated".');
+      throw new TypeError('The "type" property of the credentials must be one of "password", "sspi" or "token".');
   }
 }

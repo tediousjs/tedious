@@ -9,7 +9,7 @@ const context: AuthenticationContext = {
   server: 'localhost',
   port: 1433,
   instanceName: undefined,
-  fedAuthRequired: true,
+  tokenRequired: true,
   signal: new AbortController().signal
 };
 
@@ -45,10 +45,10 @@ describe('deprecated built-in authentication types', function() {
         options: { userName: 'user', password: 'password', clientId: 'client', tenantId: 'tenant' }
       });
 
-      const session = await provider.createSession(context);
-      assert.strictEqual(session.type, 'federated');
-      assert.propertyVal(session, 'library', 'msal');
-      assert.propertyVal(session, 'workflow', 'password');
+      const credentials = await provider.getCredentials(context);
+      assert.strictEqual(credentials.type, 'token');
+      assert.isFunction((credentials as any).acquireToken);
+      assert.propertyVal(credentials, 'workflow', 'password');
     });
 
     it('uses the `integrated` workflow for `azure-active-directory-service-principal-secret`', async function() {
@@ -57,10 +57,10 @@ describe('deprecated built-in authentication types', function() {
         options: { clientId: 'client', clientSecret: 'secret', tenantId: 'tenant' }
       });
 
-      const session = await provider.createSession(context);
-      assert.strictEqual(session.type, 'federated');
-      assert.propertyVal(session, 'library', 'msal');
-      assert.propertyVal(session, 'workflow', 'integrated');
+      const credentials = await provider.getCredentials(context);
+      assert.strictEqual(credentials.type, 'token');
+      assert.isFunction((credentials as any).acquireToken);
+      assert.propertyVal(credentials, 'workflow', 'integrated');
     });
 
     it('fails to acquire a token if the credential returns no token', async function() {
@@ -69,12 +69,12 @@ describe('deprecated built-in authentication types', function() {
         options: { credential: { async getToken() { return null; } } }
       });
 
-      const session = await provider.createSession(context);
-      assert(session.type === 'federated' && session.library === 'msal');
+      const credentials = await provider.getCredentials(context);
+      assert(credentials.type === 'token' && credentials.acquireToken !== undefined);
 
       let error: any;
       try {
-        await session.getToken({ spn: 'https://database.windows.net/', stsUrl: 'https://login.windows.net/' }, context.signal);
+        await credentials.acquireToken({ resource: 'https://database.windows.net/', authority: 'https://login.windows.net/' }, context.signal);
       } catch (err) {
         error = err;
       }

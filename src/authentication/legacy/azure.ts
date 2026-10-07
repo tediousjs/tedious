@@ -1,4 +1,7 @@
-import { type AuthenticationProvider, type MsalFederatedAuthenticationSession } from '../provider';
+import { type AuthenticationPlugin } from '../plugin';
+import { type AcquiredAccessTokenCredentials, type AuthenticationProvider } from '../provider';
+import { assertOptionalStringOption, assertStringOption } from '../options';
+import { emitLegacyAuthenticationDeprecationWarning } from './deprecation';
 import { loadOptionalDependency } from './optional-dependency';
 
 type AzureIdentity = typeof import('@azure/identity');
@@ -136,9 +139,9 @@ export type AzureAuthentication =
   AzureActiveDirectoryServicePrincipalSecret |
   AzureActiveDirectoryDefaultAuthentication;
 
-async function getAccessToken(credential: TokenCredential, spn: string, signal: AbortSignal): Promise<string> {
+async function getAccessToken(credential: TokenCredential, resource: string, signal: AbortSignal): Promise<string> {
   /** Permission scope to pass to Entra ID when requesting an authentication token. */
-  const tokenScope = new URL('/.default', spn).toString();
+  const tokenScope = new URL('/.default', resource).toString();
   const accessToken = await credential.getToken(tokenScope, { abortSignal: signal });
 
   if (accessToken === null) {
@@ -148,22 +151,21 @@ async function getAccessToken(credential: TokenCredential, spn: string, signal: 
   return accessToken.token;
 }
 
-function createCredentialSession(credential: TokenCredential, workflow: MsalFederatedAuthenticationSession['workflow']): MsalFederatedAuthenticationSession {
+function createAcquiredTokenCredentials(credential: TokenCredential, workflow: AcquiredAccessTokenCredentials['workflow']): AcquiredAccessTokenCredentials {
   return {
-    type: 'federated',
-    library: 'msal',
+    type: 'token',
     workflow: workflow,
-    getToken({ spn }, signal) {
-      return getAccessToken(credential, spn, signal);
+    acquireToken({ resource }, signal) {
+      return getAccessToken(credential, resource, signal);
     }
   };
 }
 
-function createAzureIdentityProvider(authentication: AzureAuthentication, workflow: MsalFederatedAuthenticationSession['workflow'], createCredential: (identity: AzureIdentity) => TokenCredential): AuthenticationProvider {
+function createAzureIdentityProvider(authentication: AzureAuthentication, workflow: AcquiredAccessTokenCredentials['workflow'], createCredential: (identity: AzureIdentity) => TokenCredential): AuthenticationProvider {
   return {
-    async createSession() {
+    async getCredentials() {
       const identity = await loadOptionalDependency('@azure/identity', authentication.type, () => import('@azure/identity'));
-      return createCredentialSession(createCredential(identity), workflow);
+      return createAcquiredTokenCredentials(createCredential(identity), workflow);
     }
   };
 }
@@ -179,8 +181,8 @@ export function createAzureAuthenticationProvider(authentication: AzureAuthentic
     case 'azure-active-directory-access-token': {
       const { token } = authentication.options;
       return {
-        createSession() {
-          return { type: 'federated', library: 'security-token', token: token };
+        getCredentials() {
+          return { type: 'token', token: token };
         }
       };
     }
@@ -188,8 +190,8 @@ export function createAzureAuthenticationProvider(authentication: AzureAuthentic
     case 'token-credential': {
       const { credential } = authentication.options;
       return {
-        createSession() {
-          return createCredentialSession(credential, 'integrated');
+        getCredentials() {
+          return createAcquiredTokenCredentials(credential, 'integrated');
         }
       };
     }
@@ -224,3 +226,64 @@ export function createAzureAuthenticationProvider(authentication: AzureAuthentic
     }
   }
 }
+
+/**
+ * Creates the plugin for one of the deprecated Microsoft Entra ID
+ * authentication types.
+ */
+function createAzurePlugin<Type extends AzureAuthentication['type']>(type: Type, validate: (options: Record<string, unknown>) => void): AuthenticationPlugin<Record<string, unknown>> {
+  return {
+    type: type,
+
+    createProvider(options) {
+      validate(options);
+
+      emitLegacyAuthenticationDeprecationWarning(type);
+
+      return createAzureAuthenticationProvider({ type: type, options: options } as AzureAuthentication);
+    }
+  };
+}
+
+/**
+ * The plugins implementing the deprecated Microsoft Entra ID authentication
+ * types.
+ *
+ * @private
+ */
+export const azureAuthenticationPlugins: AuthenticationPlugin[] = [
+  createAzurePlugin('token-credential', (options) => {
+    if (!isTokenCredential(options.credential)) {
+      throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');
+    }
+  }),
+
+  createAzurePlugin('azure-active-directory-password', (options) => {
+    assertStringOption(options, 'clientId');
+    assertOptionalStringOption(options, 'userName');
+    assertOptionalStringOption(options, 'password');
+    assertOptionalStringOption(options, 'tenantId');
+  }),
+
+  createAzurePlugin('azure-active-directory-access-token', (options) => {
+    assertStringOption(options, 'token');
+  }),
+
+  createAzurePlugin('azure-active-directory-msi-vm', (options) => {
+    assertOptionalStringOption(options, 'clientId');
+  }),
+
+  createAzurePlugin('azure-active-directory-default', (options) => {
+    assertOptionalStringOption(options, 'clientId');
+  }),
+
+  createAzurePlugin('azure-active-directory-msi-app-service', (options) => {
+    assertOptionalStringOption(options, 'clientId');
+  }),
+
+  createAzurePlugin('azure-active-directory-service-principal-secret', (options) => {
+    assertStringOption(options, 'clientId');
+    assertStringOption(options, 'clientSecret');
+    assertStringOption(options, 'tenantId');
+  })
+];

@@ -3,17 +3,18 @@ import Connection, { type ConnectionAuthentication, type ConnectionConfiguration
 import Request from './request';
 import { name } from './library';
 import {
+  type AccessTokenCredentials,
+  type AccessTokenRequest,
+  type AcquiredAccessTokenCredentials,
   type AuthenticationContext,
   type AuthenticationProvider,
-  type AuthenticationSession,
-  type FederatedAuthenticationInfo,
-  type FederatedAuthenticationSession,
-  type MsalFederatedAuthenticationSession,
-  type SecurityTokenFederatedAuthenticationSession,
-  type SqlAuthenticationSession,
-  type SspiAuthenticationSession,
-  type SspiExchange
+  type Credentials,
+  type PasswordCredentials,
+  type SspiCredentials,
+  type SspiExchange,
+  type StaticAccessTokenCredentials
 } from './authentication/provider';
+import { type AuthenticationPlugin, registerAuthenticationPlugin } from './authentication/plugin';
 
 import { ConnectionError, InputError, RequestError } from './errors';
 
@@ -37,23 +38,25 @@ export {
   ConnectionError,
   InputError,
   RequestError,
+  registerAuthenticationPlugin,
   TYPES,
   ISOLATION_LEVEL,
   TDS_VERSION
 };
 
 export type {
+  AccessTokenCredentials,
+  AccessTokenRequest,
+  AcquiredAccessTokenCredentials,
   AuthenticationContext,
+  AuthenticationPlugin,
   AuthenticationProvider,
-  AuthenticationSession,
   ConnectionAuthentication,
   ConnectionConfiguration,
   ConnectionOptions,
-  FederatedAuthenticationInfo,
-  FederatedAuthenticationSession,
-  MsalFederatedAuthenticationSession,
-  SecurityTokenFederatedAuthenticationSession,
-  SqlAuthenticationSession,
-  SspiAuthenticationSession,
-  SspiExchange
+  Credentials,
+  PasswordCredentials,
+  SspiCredentials,
+  SspiExchange,
+  StaticAccessTokenCredentials
 };

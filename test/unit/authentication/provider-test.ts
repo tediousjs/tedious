@@ -3,7 +3,7 @@ import * as net from 'net';
 import sinon from 'sinon';
 
 import { Connection, ConnectionError } from '../../../src/tedious';
-import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession, type SspiExchange } from '../../../src/authentication/provider';
+import { type AuthenticationContext, type AuthenticationProvider, type Credentials, type SspiExchange } from '../../../src/authentication/provider';
 import IncomingMessageStream from '../../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../../src/outgoing-message-stream';
 import Debug from '../../../src/debug';
@@ -227,8 +227,8 @@ describe('Authentication providers', function() {
 
   it('accepts an authentication provider as `config.authentication`', function() {
     const provider: AuthenticationProvider = {
-      createSession() {
-        return { type: 'sql', userName: 'user', password: 'password' };
+      getCredentials() {
+        return { type: 'password', userName: 'user', password: 'password' };
       }
     };
 
@@ -237,8 +237,8 @@ describe('Authentication providers', function() {
     assert.strictEqual(connection.authenticationProvider, provider);
   });
 
-  describe('with a `sql` session', function() {
-    it('logs in with the user name and password returned by the session', async function() {
+  describe('with `password` credentials', function() {
+    it('logs in with the user name and password returned by the provider', async function() {
       onConnection(async (connection) => {
         await handlePrelogin(connection);
 
@@ -254,9 +254,9 @@ describe('Authentication providers', function() {
       const contexts: AuthenticationContext[] = [];
 
       await connect(createConnection({
-        createSession(context) {
+        getCredentials(context) {
           contexts.push(context);
-          return { type: 'sql', userName: 'rotating-user', password: 'rotating-password' };
+          return { type: 'password', userName: 'rotating-user', password: 'rotating-password' };
         }
       }));
 
@@ -265,12 +265,12 @@ describe('Authentication providers', function() {
       assert.strictEqual(contexts[0].port, (server.address() as net.AddressInfo).port);
       assert.isUndefined(contexts[0].instanceName);
       // The PRELOGIN response sent by the test server sets FEDAUTHREQUIRED
-      assert.isTrue(contexts[0].fedAuthRequired);
+      assert.isTrue(contexts[0].tokenRequired);
       assert.instanceOf(contexts[0].signal, AbortSignal);
     });
   });
 
-  describe('with an `sspi` session', function() {
+  describe('with `sspi` credentials', function() {
     /**
      * Sends the LOGIN7 response for an SSPI login. `exchanges` lists the
      * security tokens the server sends, and the tokens it expects back.
@@ -301,7 +301,7 @@ describe('Authentication providers', function() {
 
     function createSspiConnection(exchange: SspiExchange) {
       return createConnection({
-        createSession() {
+        getCredentials() {
           return { type: 'sspi', exchange: exchange };
         }
       });
@@ -342,7 +342,7 @@ describe('Authentication providers', function() {
       })()));
     });
 
-    it('passes the security token sent along with the login acknowledgement to the session', async function() {
+    it('passes the security token sent along with the login acknowledgement to the exchange', async function() {
       serveSspiLogin(Buffer.from('ap-req'), [], [buildSspiToken(Buffer.from('ap-rep')), buildLoginAckToken()], true);
 
       let finalToken: Buffer | undefined;
@@ -356,7 +356,7 @@ describe('Authentication providers', function() {
       assert.deepEqual(finalToken, Buffer.from('ap-rep'));
     });
 
-    it('fails the login if the session rejects the final security token', async function() {
+    it('fails the login if the exchange rejects the final security token', async function() {
       serveSspiLogin(Buffer.from('ap-req'), [], [buildSspiToken(Buffer.from('forged-ap-rep')), buildLoginAckToken()], false);
 
       const verificationError = new Error('mutual authentication failed');
@@ -383,7 +383,7 @@ describe('Authentication providers', function() {
       assert.isTrue(finished);
     });
 
-    it('fails the login if the session wants to send another token after the login was accepted', async function() {
+    it('fails the login if the exchange wants to send another token after the login was accepted', async function() {
       serveSspiLogin(Buffer.from('initial-token'), [], [buildLoginAckToken()], false);
 
       let error: any;
@@ -398,7 +398,7 @@ describe('Authentication providers', function() {
 
       assert.instanceOf(error, ConnectionError);
       assert.strictEqual(error.code, 'ELOGIN');
-      assert.strictEqual(error.message, 'SSPI authentication failed: The server accepted the login, but the authentication session did not complete.');
+      assert.strictEqual(error.message, 'SSPI authentication failed: The server accepted the login, but the SSPI exchange did not complete.');
     });
 
     it('fails the login if computing the response fails', async function() {
@@ -428,7 +428,7 @@ describe('Authentication providers', function() {
       assert.isTrue(finished);
     });
 
-    it('fails the login if the session finishes while the server still expects a token', async function() {
+    it('fails the login if the exchange finishes while the server still expects a token', async function() {
       serveSspiLogin(Buffer.from('initial-token'), [], [buildSspiToken(Buffer.from('challenge'))], false);
 
       let error: any;
@@ -442,7 +442,7 @@ describe('Authentication providers', function() {
 
       assert.instanceOf(error, ConnectionError);
       assert.strictEqual(error.code, 'ELOGIN');
-      assert.strictEqual(error.message, 'SSPI authentication failed: The authentication session did not return a security token.');
+      assert.strictEqual(error.message, 'SSPI authentication failed: The SSPI exchange did not return a security token.');
     });
 
     it('finishes the exchange once a pending step completes if the login attempt is aborted', async function() {
@@ -520,8 +520,8 @@ describe('Authentication providers', function() {
     });
   });
 
-  describe('with a `federated` session', function() {
-    it('sends a `security-token` session token as part of the LOGIN7 message', async function() {
+  describe('with `token` credentials', function() {
+    it('sends a static `token` as part of the LOGIN7 message', async function() {
       onConnection(async (connection) => {
         await handlePrelogin(connection);
 
@@ -535,19 +535,19 @@ describe('Authentication providers', function() {
       });
 
       await connect(createConnection({
-        createSession() {
-          return { type: 'federated', library: 'security-token', token: 'access-token' };
+        getCredentials() {
+          return { type: 'token', token: 'access-token' };
         }
       }));
     });
 
-    it('acquires an `msal` session token using the information sent by the server', async function() {
+    it('acquires the token using the information sent by the server', async function() {
       onConnection(async (connection) => {
         await handlePrelogin(connection);
 
         const login = await connection.read();
         assert.strictEqual(login.type, TYPE.LOGIN7);
-        // FEDAUTH feature extension: MSAL library, echo (FEDAUTHREQUIRED was set in PRELOGIN), integrated workflow
+        // FEDAUTH feature extension: MSAL library, echo (FEDAUTHREQUIRED was set in PRELOGIN), integrated workflow (the default)
         assert.isTrue(login.data.includes(Buffer.from([0x02, 0x02, 0x00, 0x00, 0x00, 0x05, 0x02])));
 
         connection.write(TYPE.TABULAR_RESULT, buildFedAuthInfoToken('https://login.example.com/tenant', 'https://database.example.com/'));
@@ -561,17 +561,17 @@ describe('Authentication providers', function() {
         await handleInitialSql(connection);
       });
 
-      const getToken = sinon.stub().resolves('msal-token');
+      const acquireToken = sinon.stub().resolves('msal-token');
 
       await connect(createConnection({
-        createSession() {
-          return { type: 'federated', library: 'msal', workflow: 'integrated', getToken: getToken };
+        getCredentials() {
+          return { type: 'token', acquireToken: acquireToken };
         }
       }));
 
-      sinon.assert.calledOnce(getToken);
-      assert.deepEqual(getToken.firstCall.args[0], { spn: 'https://database.example.com/', stsUrl: 'https://login.example.com/tenant' });
-      assert.instanceOf(getToken.firstCall.args[1], AbortSignal);
+      sinon.assert.calledOnce(acquireToken);
+      assert.deepEqual(acquireToken.firstCall.args[0], { resource: 'https://database.example.com/', authority: 'https://login.example.com/tenant' });
+      assert.instanceOf(acquireToken.firstCall.args[1], AbortSignal);
     });
 
     it('fails the login with an `EFEDAUTH` error if acquiring the token fails', async function() {
@@ -589,8 +589,8 @@ describe('Authentication providers', function() {
       let error: any;
       try {
         await connect(createConnection({
-          createSession() {
-            return { type: 'federated', library: 'msal', workflow: 'password', getToken() { throw tokenError; } };
+          getCredentials() {
+            return { type: 'token', workflow: 'password', acquireToken() { throw tokenError; } };
           }
         }));
       } catch (err) {
@@ -604,7 +604,7 @@ describe('Authentication providers', function() {
     });
   });
 
-  describe('when creating the session fails', function() {
+  describe('when getting the credentials fails', function() {
     beforeEach(function() {
       onConnection(async (connection) => {
         await handlePrelogin(connection);
@@ -617,7 +617,7 @@ describe('Authentication providers', function() {
       let error: any;
       try {
         await connect(createConnection({
-          async createSession(): Promise<AuthenticationSession> {
+          async getCredentials(): Promise<Credentials> {
             throw providerError;
           }
         }));
@@ -627,15 +627,15 @@ describe('Authentication providers', function() {
 
       assert.instanceOf(error, ConnectionError);
       assert.strictEqual(error.code, 'ELOGIN');
-      assert.strictEqual(error.message, 'Failed to create the authentication session: could not reach the credential store');
+      assert.strictEqual(error.message, 'Failed to get the credentials: could not reach the credential store');
       assert.strictEqual(error.cause, providerError);
     });
 
-    it('fails the login if the provider returns an invalid session', async function() {
+    it('fails the login if the provider returns invalid credentials', async function() {
       let error: any;
       try {
         await connect(createConnection({
-          createSession() {
+          getCredentials() {
             return { type: 'kerberos' } as any;
           }
         }));
@@ -646,7 +646,7 @@ describe('Authentication providers', function() {
       assert.instanceOf(error, ConnectionError);
       assert.strictEqual(error.code, 'ELOGIN');
       assert.instanceOf(error.cause, TypeError);
-      assert.strictEqual(error.cause.message, 'The "type" property of the authentication session must be one of "sql", "sspi" or "federated".');
+      assert.strictEqual(error.cause.message, 'The "type" property of the credentials must be one of "password", "sspi" or "token".');
     });
   });
 
