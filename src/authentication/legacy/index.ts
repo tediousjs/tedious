@@ -1,4 +1,4 @@
-import { type AuthenticationPlugin } from '../plugin';
+import { type BuiltInAuthenticationPlugin } from '../plugin';
 import { type AzureAuthentication, azureAuthenticationPlugins } from './azure';
 import { type NtlmAuthentication, ntlmAuthenticationPlugin } from './ntlm';
 
@@ -15,7 +15,7 @@ export type LegacyAuthentication = NtlmAuthentication | AzureAuthentication;
  *
  * @private
  */
-export const legacyAuthenticationPlugins: AuthenticationPlugin[] = [
+export const legacyAuthenticationPlugins: BuiltInAuthenticationPlugin[] = [
   ntlmAuthenticationPlugin,
   ...azureAuthenticationPlugins
 ];

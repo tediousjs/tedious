@@ -1,5 +1,5 @@
 import BulkLoad from './bulk-load';
-import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionExtensions, type ConnectionOptions } from './connection';
+import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request from './request';
 import { name } from './library';
 import {
@@ -52,7 +52,6 @@ export type {
   AuthenticationProvider,
   ConnectionAuthentication,
   ConnectionConfiguration,
-  ConnectionExtensions,
   ConnectionOptions,
   Credentials,
   PasswordCredentials,

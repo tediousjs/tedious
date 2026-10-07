@@ -31,7 +31,7 @@ import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { type ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 import { type AccessTokenCredentials, type AuthenticationContext, type AuthenticationProvider, type Credentials, type SspiExchange, assertValidCredentials, isAuthenticationProvider } from './authentication/provider';
-import { type AuthenticationPlugin, createAuthenticationProviderFromConfig, resolveAuthenticationPlugins } from './authentication/plugin';
+import { createAuthenticationProviderFromConfig } from './authentication/plugin';
 import { type DefaultAuthenticationOptions } from './authentication/default';
 import { type LegacyAuthentication } from './authentication/legacy';
 
@@ -196,7 +196,7 @@ interface DefaultAuthentication {
 }
 
 /**
- * An authentication type provided by an [[AuthenticationPlugin]] passed to the connection.
+ * An authentication type provided by an [[AuthenticationPlugin]] package.
  */
 interface PluginAuthentication {
   type: string;
@@ -308,29 +308,14 @@ export interface ConnectionConfiguration {
    *
    * This is either an [[AuthenticationProvider]], or a JSON compatible
    * object of the form `{ type, options }` that selects one of the built-in
-   * authentication types, or an [[AuthenticationPlugin]] passed via
-   * [[ConnectionExtensions.authenticationPlugins]], by its `type`.
+   * authentication types, or an [[AuthenticationPlugin]] package, by its
+   * `type`.
    *
    * The `default` authentication type (SQL Server authentication using a
    * user name and password) is built in. The other built-in authentication
    * types are deprecated in favor of authentication providers and plugins.
    */
   authentication?: AuthenticationOptions | AuthenticationProvider;
-}
-
-/**
- * Code that extends a [[Connection]]. Unlike the [[ConnectionConfiguration]],
- * which can be loaded from JSON, these are passed separately.
- */
-export interface ConnectionExtensions {
-  /**
-   * Authentication plugins that make additional authentication types
-   * available to `config.authentication.type`.
-   *
-   * A plugin for one of the built-in authentication types is used instead of
-   * the built-in implementation.
-   */
-  authenticationPlugins?: AuthenticationPlugin[] | undefined;
 }
 
 interface DebugOptions {
@@ -371,8 +356,8 @@ interface AuthenticationOptions {
    * All built-in types other than `default` are deprecated and will be
    * removed in a future version. Use an [[AuthenticationProvider]] instead.
    *
-   * Any other type selects the [[AuthenticationPlugin]] with that type
-   * that was passed via [[ConnectionExtensions.authenticationPlugins]].
+   * Any other type loads the [[AuthenticationPlugin]] package for that type
+   * (e.g. `kerberos` loads the `tedious-auth-kerberos` package).
    */
   type?: AuthenticationType;
   /**
@@ -1005,27 +990,20 @@ class Connection extends EventEmitter {
    * ```
    *
    * @param config The connection configuration. This can be loaded from JSON.
-   * @param extensions Code that extends the connection, such as
-   *   authentication plugins.
    */
-  constructor(config: ConnectionConfiguration, extensions: ConnectionExtensions = {}) {
+  constructor(config: ConnectionConfiguration) {
     super();
 
     if (typeof config !== 'object' || config === null) {
       throw new TypeError('The "config" argument is required and must be of type Object.');
     }
 
-    if (typeof extensions !== 'object' || extensions === null) {
-      throw new TypeError('The "extensions" argument must be of type Object.');
-    }
 
     if (typeof config.server !== 'string') {
       throw new TypeError('The "config.server" property is required and must be of type string.');
     }
 
     this.fedAuthRequired = false;
-
-    const authenticationPlugins = resolveAuthenticationPlugins(extensions.authenticationPlugins);
 
     let authentication: ConnectionAuthentication;
     let authenticationProvider: AuthenticationProvider;
@@ -1047,7 +1025,7 @@ class Connection extends EventEmitter {
         throw new TypeError('The "config.authentication.options" property must be of type object.');
       }
 
-      authenticationProvider = createAuthenticationProviderFromConfig(authenticationPlugins, type, options);
+      authenticationProvider = createAuthenticationProviderFromConfig(type, options);
       authentication = { type: type, options: options };
     } else {
       authentication = {
@@ -1057,7 +1035,7 @@ class Connection extends EventEmitter {
           password: undefined
         }
       };
-      authenticationProvider = createAuthenticationProviderFromConfig(authenticationPlugins, authentication.type, authentication.options);
+      authenticationProvider = createAuthenticationProviderFromConfig(authentication.type, authentication.options);
     }
 
     this.config = {

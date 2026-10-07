@@ -1,4 +1,4 @@
-import { type AuthenticationPlugin } from '../plugin';
+import { type BuiltInAuthenticationPlugin } from '../plugin';
 import { type AuthenticationProvider } from '../provider';
 import { assertOptionalStringOption, assertStringOption } from '../options';
 import { emitLegacyAuthenticationDeprecationWarning } from './deprecation';
@@ -114,7 +114,7 @@ export function createNtlmAuthenticationProvider(options: NtlmAuthentication['op
  *
  * @private
  */
-export const ntlmAuthenticationPlugin: AuthenticationPlugin<Record<string, unknown>> = {
+export const ntlmAuthenticationPlugin: BuiltInAuthenticationPlugin<Record<string, unknown>> = {
   type: 'ntlm',
 
   createProvider(options) {

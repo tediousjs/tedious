@@ -1,4 +1,4 @@
-import { type AuthenticationPlugin } from '../plugin';
+import { type BuiltInAuthenticationPlugin } from '../plugin';
 import { type AcquiredAccessTokenCredentials, type AuthenticationProvider } from '../provider';
 import { assertOptionalStringOption, assertStringOption } from '../options';
 import { emitLegacyAuthenticationDeprecationWarning } from './deprecation';
@@ -231,7 +231,7 @@ export function createAzureAuthenticationProvider(authentication: AzureAuthentic
  * Creates the plugin for one of the deprecated Microsoft Entra ID
  * authentication types.
  */
-function createAzurePlugin<Type extends AzureAuthentication['type']>(type: Type, validate: (options: Record<string, unknown>) => void): AuthenticationPlugin<Record<string, unknown>> {
+function createAzurePlugin<Type extends AzureAuthentication['type']>(type: Type, validate: (options: Record<string, unknown>) => void): BuiltInAuthenticationPlugin<Record<string, unknown>> {
   return {
     type: type,
 
@@ -251,7 +251,7 @@ function createAzurePlugin<Type extends AzureAuthentication['type']>(type: Type,
  *
  * @private
  */
-export const azureAuthenticationPlugins: AuthenticationPlugin[] = [
+export const azureAuthenticationPlugins: BuiltInAuthenticationPlugin[] = [
   createAzurePlugin('token-credential', (options) => {
     if (!isTokenCredential(options.credential)) {
       throw new TypeError('The "config.authentication.options.credential" property must be an instance of the token credential class.');

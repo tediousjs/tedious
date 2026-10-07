@@ -1,4 +1,4 @@
-import { type AuthenticationPlugin } from './plugin';
+import { type BuiltInAuthenticationPlugin } from './plugin';
 import { assertOptionalStringOption } from './options';
 
 export interface DefaultAuthenticationOptions {
@@ -18,7 +18,7 @@ export interface DefaultAuthenticationOptions {
  *
  * @private
  */
-export const defaultAuthenticationPlugin: AuthenticationPlugin<DefaultAuthenticationOptions> = {
+export const defaultAuthenticationPlugin: BuiltInAuthenticationPlugin<DefaultAuthenticationOptions> = {
   type: 'default',
 
   createProvider(options) {

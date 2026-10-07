@@ -1,152 +1,197 @@
 import { assert } from 'chai';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import sinon from 'sinon';
 
-import { Connection, type AuthenticationPlugin, type AuthenticationProvider } from '../../../src/tedious';
+import { Connection } from '../../../src/tedious';
+import { getAuthenticationPluginPackageName } from '../../../src/authentication/plugin';
 
-function createProvider(): AuthenticationProvider {
-  return {
-    getCredentials() {
-      return { type: 'password', userName: 'user', password: 'password' };
-    }
-  };
+/**
+ * Writes the given files into `<appDir>/node_modules/<packageName>/`.
+ */
+function installPackage(appDir: string, packageName: string, files: Record<string, string>) {
+  const packageDir = path.join(appDir, 'node_modules', ...packageName.split('/'));
+  fs.mkdirSync(packageDir, { recursive: true });
+
+  for (const [name, contents] of Object.entries(files)) {
+    fs.writeFileSync(path.join(packageDir, name), contents);
+  }
 }
 
 describe('Authentication plugins', function() {
-  it('selects the plugin by the type in a JSON based configuration and passes it the options', function() {
-    const provider = createProvider();
-    const receivedOptions: unknown[] = [];
-
-    const kerberos: AuthenticationPlugin = {
-      type: 'kerberos',
-      createProvider(options) {
-        receivedOptions.push(options);
-        return provider;
-      }
-    };
-
-    const config = JSON.parse(JSON.stringify({
-      server: 'localhost',
-      authentication: { type: 'kerberos', options: { realm: 'EXAMPLE.COM', mutual: true } },
-      options: { encrypt: false }
-    }));
-
-    const connection = new Connection(config, { authenticationPlugins: [kerberos] });
-
-    assert.deepEqual(receivedOptions, [{ realm: 'EXAMPLE.COM', mutual: true }]);
-    assert.strictEqual(connection.authenticationProvider, provider);
-    assert.deepEqual(connection.config.authentication, { type: 'kerberos', options: { realm: 'EXAMPLE.COM', mutual: true } });
-  });
-
-  it('passes an empty object if no options are given', function() {
-    const receivedOptions: unknown[] = [];
-
-    new Connection({ server: 'localhost', authentication: { type: 'kerberos' } }, {
-      authenticationPlugins: [{
-        type: 'kerberos',
-        createProvider(options) {
-          receivedOptions.push(options);
-          return createProvider();
-        }
-      }]
+  describe('getAuthenticationPluginPackageName', function() {
+    it('maps authentication types to plugin package names', function() {
+      assert.strictEqual(getAuthenticationPluginPackageName('kerberos'), 'tedious-auth-kerberos');
+      assert.strictEqual(getAuthenticationPluginPackageName('tedious-auth-kerberos'), 'tedious-auth-kerberos');
+      assert.strictEqual(getAuthenticationPluginPackageName('@acme/kerberos'), '@acme/tedious-auth-kerberos');
+      assert.strictEqual(getAuthenticationPluginPackageName('@acme/tedious-auth-kerberos'), '@acme/tedious-auth-kerberos');
+      assert.strictEqual(getAuthenticationPluginPackageName('@acme'), '@acme/tedious-auth');
+      assert.strictEqual(getAuthenticationPluginPackageName('@acme/tedious-auth'), '@acme/tedious-auth');
     });
 
-    assert.deepEqual(receivedOptions, [{}]);
-  });
-
-  it('only makes plugins available to the connection they were passed to', function() {
-    const kerberos: AuthenticationPlugin = { type: 'kerberos', createProvider: createProvider };
-    new Connection({ server: 'localhost', authentication: { type: 'kerberos' } }, { authenticationPlugins: [kerberos] });
-
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'kerberos' } });
-    }, TypeError, /If "kerberos" is provided by a plugin/);
-  });
-
-  it('throws if the authentication type is not available', function() {
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'kerberos', options: {} } });
-    }, TypeError, /^The "config.authentication.type" property must be one of the available authentication types \("default", "ntlm", .*\)\. If "kerberos" is provided by a plugin, pass the plugin to the connection via `extensions.authenticationPlugins`\.$/);
-  });
-
-  it('uses a plugin for a built-in authentication type instead of the built-in implementation', function() {
-    const provider = createProvider();
-    const ntlm: AuthenticationPlugin = { type: 'ntlm', createProvider: () => provider };
-
-    // The built-in `ntlm` type would reject these options.
-    const connection = new Connection({ server: 'localhost', authentication: { type: 'ntlm', options: {} } }, { authenticationPlugins: [ntlm] });
-
-    assert.strictEqual(connection.authenticationProvider, provider);
-  });
-
-  it('throws the errors thrown by the plugin when validating the options', function() {
-    const kerberos: AuthenticationPlugin = {
-      type: 'kerberos',
-      createProvider(options: { realm?: unknown }) {
-        if (typeof options.realm !== 'string') {
-          throw new TypeError('The "config.authentication.options.realm" property must be of type string.');
-        }
-
-        return createProvider();
+    it('rejects anything that is not a package name', function() {
+      for (const type of ['', 'Kerberos', '../kerberos', './kerberos', '/kerberos', 'kerberos/index.js', '@acme/../kerberos', '@acme/kerberos/index.js', 'node:fs', 'C:\\kerberos']) {
+        assert.throws(() => {
+          getAuthenticationPluginPackageName(type);
+        }, TypeError, `The "config.authentication.type" property must be the name of a built-in authentication type or of an authentication plugin, but "${type}" is neither.`);
       }
-    };
-
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'kerberos', options: { realm: 42 } } }, { authenticationPlugins: [kerberos] });
-    }, TypeError, 'The "config.authentication.options.realm" property must be of type string.');
+    });
   });
 
-  it('throws if the plugin does not return an authentication provider', function() {
-    const kerberos: AuthenticationPlugin = { type: 'kerberos', createProvider: () => ({}) as AuthenticationProvider };
+  describe('in a JSON based configuration', function() {
+    let appDir: string;
 
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'kerberos', options: {} } }, { authenticationPlugins: [kerberos] });
-    }, TypeError, 'The authentication plugin for the "kerberos" authentication type did not return an authentication provider.');
-  });
+    before(function() {
+      appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tedious-auth-plugin-test-'));
 
-  it('validates the options of the built-in authentication types', function() {
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'default', options: { userName: 42 } } });
-    }, TypeError, 'The "config.authentication.options.userName" property must be of type string.');
+      installPackage(appDir, 'tedious-auth-commonjs', {
+        'package.json': JSON.stringify({ name: 'tedious-auth-commonjs', version: '1.0.0', main: 'index.js' }),
+        'index.js': `
+          exports.createProvider = function(options) {
+            if (options.realm !== undefined && typeof options.realm !== 'string') {
+              throw new TypeError('The "config.authentication.options.realm" property must be of type string.');
+            }
 
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'ntlm', options: {} } });
-    }, TypeError, 'The "config.authentication.options.domain" property must be of type string.');
+            return {
+              options: options,
+              getCredentials() {
+                return { type: 'password', userName: 'commonjs' };
+              }
+            };
+          };
+        `
+      });
 
-    assert.throws(() => {
-      new Connection({ server: 'localhost', authentication: { type: 'azure-active-directory-service-principal-secret', options: { clientId: 'client' } } });
-    }, TypeError, 'The "config.authentication.options.clientSecret" property must be of type string.');
-  });
+      installPackage(appDir, '@acme/tedious-auth-esm', {
+        'package.json': JSON.stringify({ name: '@acme/tedious-auth-esm', version: '1.0.0', type: 'module', exports: './index.js' }),
+        'index.js': `
+          export default {
+            createProvider(options) {
+              return {
+                options: options,
+                getCredentials() {
+                  return { type: 'password', userName: 'esm' };
+                }
+              };
+            }
+          };
+        `
+      });
 
-  describe('validation of `extensions.authenticationPlugins`', function() {
-    function createConnection(extensions: any) {
-      return new Connection({ server: 'localhost' }, extensions);
+      installPackage(appDir, 'tedious-auth-throws', {
+        'package.json': JSON.stringify({ name: 'tedious-auth-throws', version: '1.0.0', main: 'index.js' }),
+        'index.js': 'throw new Error(\'native module failed to load\');'
+      });
+
+      installPackage(appDir, 'tedious-auth-not-a-plugin', {
+        'package.json': JSON.stringify({ name: 'tedious-auth-not-a-plugin', version: '1.0.0', main: 'index.js' }),
+        'index.js': 'exports.somethingElse = true;'
+      });
+
+      installPackage(appDir, 'tedious-auth-no-provider', {
+        'package.json': JSON.stringify({ name: 'tedious-auth-no-provider', version: '1.0.0', main: 'index.js' }),
+        'index.js': 'exports.createProvider = function() { return {}; };'
+      });
+
+      installPackage(appDir, 'tedious-auth-ntlm', {
+        'package.json': JSON.stringify({ name: 'tedious-auth-ntlm', version: '1.0.0', main: 'index.js' }),
+        'index.js': 'throw new Error(\'should not be loaded\');'
+      });
+    });
+
+    after(function() {
+      fs.rmSync(appDir, { recursive: true, force: true });
+    });
+
+    beforeEach(function() {
+      // Plugins that tedious itself cannot see are looked up from the
+      // current working directory.
+      sinon.stub(process, 'cwd').returns(appDir);
+    });
+
+    afterEach(function() {
+      sinon.restore();
+    });
+
+    function createConnection(authentication: object) {
+      // Round-trip through JSON, to make sure the configuration is plain data.
+      return new Connection(JSON.parse(JSON.stringify({ server: 'localhost', authentication: authentication })));
     }
 
-    it('throws if `extensions` is not an object', function() {
-      assert.throws(() => createConnection(null), TypeError, 'The "extensions" argument must be of type Object.');
+    it('loads a CommonJS plugin package and passes it the options', async function() {
+      const connection = createConnection({ type: 'commonjs', options: { realm: 'EXAMPLE.COM' } });
+
+      assert.deepEqual((connection.authenticationProvider as any).options, { realm: 'EXAMPLE.COM' });
+      assert.deepEqual(await connection.authenticationProvider.getCredentials({} as any), { type: 'password', userName: 'commonjs' });
+      assert.deepEqual(connection.config.authentication, { type: 'commonjs', options: { realm: 'EXAMPLE.COM' } });
     });
 
-    it('throws if `authenticationPlugins` is not an array', function() {
-      assert.throws(() => createConnection({ authenticationPlugins: {} }), TypeError, 'The "extensions.authenticationPlugins" property must be an array.');
+    it('loads an ESM plugin package from a scope via its default export', async function() {
+      const connection = createConnection({ type: '@acme/esm' });
+
+      assert.deepEqual((connection.authenticationProvider as any).options, {});
+      assert.deepEqual(await connection.authenticationProvider.getCredentials({} as any), { type: 'password', userName: 'esm' });
     });
 
-    it('throws if a plugin is invalid', function() {
-      assert.throws(() => {
-        createConnection({ authenticationPlugins: [null] });
-      }, TypeError, 'The "extensions.authenticationPlugins[0]" property must be of type object.');
+    it('accepts the full package name as the type', function() {
+      const connection = createConnection({ type: 'tedious-auth-commonjs' });
 
-      assert.throws(() => {
-        createConnection({ authenticationPlugins: [{ type: '', createProvider: createProvider }] });
-      }, TypeError, 'The "extensions.authenticationPlugins[0].type" property must be a non-empty string.');
-
-      assert.throws(() => {
-        createConnection({ authenticationPlugins: [{ type: 'kerberos', createProvider: createProvider }, { type: 'other' }] });
-      }, TypeError, 'The "extensions.authenticationPlugins[1].createProvider" property must be of type function.');
+      assert.isFunction(connection.authenticationProvider.getCredentials);
     });
 
-    it('throws if two plugins have the same type', function() {
+    it('throws the errors thrown by the plugin when validating the options', function() {
       assert.throws(() => {
-        createConnection({ authenticationPlugins: [{ type: 'kerberos', createProvider: createProvider }, { type: 'kerberos', createProvider: createProvider }] });
-      }, TypeError, 'The "extensions.authenticationPlugins" property contains more than one plugin for the "kerberos" authentication type.');
+        createConnection({ type: 'commonjs', options: { realm: 42 } });
+      }, TypeError, 'The "config.authentication.options.realm" property must be of type string.');
+    });
+
+    it('throws if the plugin package is not installed', function() {
+      assert.throws(() => {
+        createConnection({ type: 'kerberos' });
+      }, Error, 'The "kerberos" authentication type is provided by the "tedious-auth-kerberos" package, which could not be found. Install it with `npm install tedious-auth-kerberos`.');
+    });
+
+    it('throws if the plugin package fails to load', function() {
+      let error: any;
+      try {
+        createConnection({ type: 'throws' });
+      } catch (err: any) {
+        error = err;
+      }
+
+      assert.instanceOf(error, Error);
+      assert.strictEqual(error.message, 'Failed to load the "tedious-auth-throws" authentication plugin: native module failed to load');
+      assert.strictEqual((error.cause as Error).message, 'native module failed to load');
+    });
+
+    it('throws if the package does not export `createProvider`', function() {
+      assert.throws(() => {
+        createConnection({ type: 'not-a-plugin' });
+      }, TypeError, 'The "tedious-auth-not-a-plugin" package is not an authentication plugin, as it does not export a `createProvider` function.');
+    });
+
+    it('throws if the plugin does not return an authentication provider', function() {
+      assert.throws(() => {
+        createConnection({ type: 'no-provider' });
+      }, TypeError, 'The authentication plugin for the "no-provider" authentication type did not return an authentication provider.');
+    });
+
+    it('prefers the built-in authentication types over plugin packages', function() {
+      // `tedious-auth-ntlm` throws when loaded, so this would fail if it was used.
+      assert.throws(() => {
+        createConnection({ type: 'ntlm', options: {} });
+      }, TypeError, 'The "config.authentication.options.domain" property must be of type string.');
+    });
+
+    it('validates the options of the built-in authentication types', function() {
+      assert.throws(() => {
+        createConnection({ type: 'default', options: { userName: 42 } });
+      }, TypeError, 'The "config.authentication.options.userName" property must be of type string.');
+
+      assert.throws(() => {
+        createConnection({ type: 'azure-active-directory-service-principal-secret', options: { clientId: 'client' } });
+      }, TypeError, 'The "config.authentication.options.clientSecret" property must be of type string.');
     });
   });
 });
