@@ -6,14 +6,13 @@ import { legacyAuthenticationPlugins } from './legacy';
  * An authentication plugin makes an [[AuthenticationProvider]] usable from
  * JSON based configurations.
  *
- * Once registered via [[registerAuthenticationPlugin]], the plugin is
- * selected by setting `authentication.type` to the plugin's `type`, and
- * `authentication.options` is passed to `createProvider`:
+ * Plugins are passed to a [[Connection]] via the `authenticationPlugins`
+ * extension. A plugin is selected by setting `authentication.type` in the
+ * configuration to the plugin's `type`, and `authentication.options` is
+ * passed to `createProvider`:
  *
  * ```js
- * const { registerAuthenticationPlugin, Connection } = require('tedious');
- *
- * registerAuthenticationPlugin({
+ * const kerberos = {
  *   type: 'kerberos',
  *   createProvider(options) {
  *     if (typeof options.realm !== 'string') {
@@ -22,17 +21,19 @@ import { legacyAuthenticationPlugins } from './legacy';
  *
  *     return new KerberosAuthenticationProvider(options);
  *   }
- * });
+ * };
  *
- * const connection = new Connection({
- *   server: 'localhost',
- *   authentication: { type: 'kerberos', options: { realm: 'EXAMPLE.COM' } }
- * });
+ * // `config` can come from a JSON file, e.g.
+ * // { "server": "localhost", "authentication": { "type": "kerberos", "options": { "realm": "EXAMPLE.COM" } } }
+ * const connection = new Connection(config, { authenticationPlugins: [kerberos] });
  * ```
  */
 export interface AuthenticationPlugin<Options extends object = any> {
   /**
    * The `authentication.type` value that selects this plugin.
+   *
+   * This can be the name of one of the built-in authentication types, in
+   * which case the plugin is used instead of the built-in implementation.
    */
   readonly type: string;
 
@@ -49,57 +50,71 @@ export interface AuthenticationPlugin<Options extends object = any> {
   createProvider(options: Options): AuthenticationProvider;
 }
 
-const plugins = new Map<string, AuthenticationPlugin>();
+/**
+ * The built-in authentication types.
+ */
+const builtInAuthenticationPlugins: ReadonlyMap<string, AuthenticationPlugin> = new Map(
+  [defaultAuthenticationPlugin, ...legacyAuthenticationPlugins].map((plugin) => [plugin.type, plugin])
+);
 
 /**
- * Registers an [[AuthenticationPlugin]], so that its authentication type can
- * be used in connection configurations.
+ * Validates the `authenticationPlugins` passed to a connection, and returns
+ * all authentication plugins available to it, keyed by their type.
  *
- * Registering the same plugin more than once has no effect. Registering a
- * different plugin for an authentication type that is already registered
- * throws an error.
- *
- * @param plugin The plugin to register.
+ * @private
  */
-export function registerAuthenticationPlugin(plugin: AuthenticationPlugin) {
-  if (typeof plugin !== 'object' || plugin === null) {
-    throw new TypeError('The "plugin" argument must be of type object.');
+export function resolveAuthenticationPlugins(plugins: unknown): ReadonlyMap<string, AuthenticationPlugin> {
+  if (plugins === undefined) {
+    return builtInAuthenticationPlugins;
   }
 
-  if (typeof plugin.type !== 'string' || plugin.type === '') {
-    throw new TypeError('The "plugin.type" property must be a non-empty string.');
+  if (!Array.isArray(plugins)) {
+    throw new TypeError('The "extensions.authenticationPlugins" property must be an array.');
   }
 
-  if (typeof plugin.createProvider !== 'function') {
-    throw new TypeError('The "plugin.createProvider" property must be of type function.');
-  }
+  const resolved = new Map(builtInAuthenticationPlugins);
+  const seen = new Set<string>();
 
-  const existing = plugins.get(plugin.type);
-  if (existing === plugin) {
-    return;
-  }
+  plugins.forEach((plugin: AuthenticationPlugin, index) => {
+    const name = `extensions.authenticationPlugins[${index}]`;
 
-  if (existing !== undefined) {
-    throw new Error(`An authentication plugin for the "${plugin.type}" authentication type is already registered.`);
-  }
+    if (typeof plugin !== 'object' || plugin === null) {
+      throw new TypeError(`The "${name}" property must be of type object.`);
+    }
 
-  plugins.set(plugin.type, plugin);
+    if (typeof plugin.type !== 'string' || plugin.type === '') {
+      throw new TypeError(`The "${name}.type" property must be a non-empty string.`);
+    }
+
+    if (typeof plugin.createProvider !== 'function') {
+      throw new TypeError(`The "${name}.createProvider" property must be of type function.`);
+    }
+
+    if (seen.has(plugin.type)) {
+      throw new TypeError(`The "extensions.authenticationPlugins" property contains more than one plugin for the "${plugin.type}" authentication type.`);
+    }
+    seen.add(plugin.type);
+
+    resolved.set(plugin.type, plugin);
+  });
+
+  return resolved;
 }
 
 /**
  * Creates the [[AuthenticationProvider]] for the given authentication type
- * and options, using the registered [[AuthenticationPlugin]].
+ * and options, using the matching [[AuthenticationPlugin]].
  *
  * @private
  */
-export function createAuthenticationProviderFromConfig(type: string, options: object): AuthenticationProvider {
+export function createAuthenticationProviderFromConfig(plugins: ReadonlyMap<string, AuthenticationPlugin>, type: string, options: object): AuthenticationProvider {
   const plugin = plugins.get(type);
 
   if (plugin === undefined) {
     const types = Array.from(plugins.keys(), (type) => `"${type}"`).join(', ');
     throw new TypeError(
-      `The "config.authentication.type" property must be one of the registered authentication types (${types}). ` +
-      `If "${type}" is provided by a plugin, register the plugin with \`registerAuthenticationPlugin()\` before creating the connection.`
+      `The "config.authentication.type" property must be one of the available authentication types (${types}). ` +
+      `If "${type}" is provided by a plugin, pass the plugin to the connection via \`extensions.authenticationPlugins\`.`
     );
   }
 
@@ -110,9 +125,4 @@ export function createAuthenticationProviderFromConfig(type: string, options: ob
   }
 
   return provider;
-}
-
-registerAuthenticationPlugin(defaultAuthenticationPlugin);
-for (const plugin of legacyAuthenticationPlugins) {
-  registerAuthenticationPlugin(plugin);
 }

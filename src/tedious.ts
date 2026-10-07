@@ -1,5 +1,5 @@
 import BulkLoad from './bulk-load';
-import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
+import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionExtensions, type ConnectionOptions } from './connection';
 import Request from './request';
 import { name } from './library';
 import {
@@ -14,7 +14,7 @@ import {
   type SspiExchange,
   type StaticAccessTokenCredentials
 } from './authentication/provider';
-import { type AuthenticationPlugin, registerAuthenticationPlugin } from './authentication/plugin';
+import { type AuthenticationPlugin } from './authentication/plugin';
 
 import { ConnectionError, InputError, RequestError } from './errors';
 
@@ -38,7 +38,6 @@ export {
   ConnectionError,
   InputError,
   RequestError,
-  registerAuthenticationPlugin,
   TYPES,
   ISOLATION_LEVEL,
   TDS_VERSION
@@ -53,6 +52,7 @@ export type {
   AuthenticationProvider,
   ConnectionAuthentication,
   ConnectionConfiguration,
+  ConnectionExtensions,
   ConnectionOptions,
   Credentials,
   PasswordCredentials,

@@ -205,9 +205,8 @@ export type Credentials = PasswordCredentials | SspiCredentials | AccessTokenCre
  * the server.
  *
  * Pass an authentication provider as the `authentication` property of the
- * [[ConnectionConfiguration]] to use it, or register an
- * [[AuthenticationPlugin]] that creates it to use it from JSON based
- * configurations.
+ * [[ConnectionConfiguration]] to use it, or wrap it in an
+ * [[AuthenticationPlugin]] to use it from JSON based configurations.
  *
  * ```js
  * const connection = new Connection({
