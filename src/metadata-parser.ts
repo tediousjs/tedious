@@ -3,7 +3,7 @@ import { type ParserOptions } from './token/stream-parser';
 import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 
-import { sprintf } from 'sprintf-js';
+import { formatHex } from './format-hex';
 
 import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
 
@@ -125,7 +125,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
 
   const type: DataType = TYPE[typeNumber];
   if (!type) {
-    throw new Error(sprintf('Unrecognised data type 0x%02X', typeNumber));
+    throw new Error(`Unrecognised data type 0x${formatHex(typeNumber, 2)}`);
   }
 
   switch (type.name) {
@@ -350,7 +350,7 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
     }
 
     default:
-      throw new Error(sprintf('Unrecognised type %s', type.name));
+      throw new Error(`Unrecognised type ${type.name}`);
   }
 }
 

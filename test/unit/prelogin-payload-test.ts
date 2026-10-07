@@ -37,4 +37,22 @@ describe('PreloginPayload', function() {
     new PreloginPayload(payload.data);
     assertPayload(payload, 'NOT_SUP', { major: 0, minor: 0, build: 0, subbuild: 0 });
   });
+
+  describe('#toString', function() {
+    it('formats the payload as zero-padded upper-case hex', function() {
+      const payload = new PreloginPayload({ encrypt: true, version: { major: 11, minor: 3, build: 2, subbuild: 0 } });
+      payload.traceId = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex');
+
+      assert.strictEqual(payload.toString('--'),
+                         '--PreLogin - version:11.3.2.0, encryption:0x01(ON), instopt:0x00, threadId:0x00000000, mars:0x00(OFF), traceId:000102030405060708090a0b0c0d0e0f');
+    });
+
+    it('formats an unencrypted payload', function() {
+      const payload = new PreloginPayload();
+      payload.traceId = Buffer.from('ff', 'hex');
+
+      assert.strictEqual(payload.toString(),
+                         'PreLogin - version:0.0.0.0, encryption:0x02(NOT_SUP), instopt:0x00, threadId:0x00000000, mars:0x00(OFF), traceId:ff');
+    });
+  });
 });

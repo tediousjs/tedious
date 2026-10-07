@@ -1,4 +1,4 @@
-import { sprintf } from 'sprintf-js';
+import { formatHex } from './format-hex';
 
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
 import { randomBytes } from 'crypto';
@@ -266,17 +266,14 @@ class PreloginPayload {
   }
 
   toString(indent = '') {
-    return indent + 'PreLogin - ' + sprintf(
-      'version:%d.%d.%d.%d, encryption:0x%02X(%s), instopt:0x%02X, threadId:0x%08X, mars:0x%02X(%s), traceId:%s',
-      this.version.major, this.version.minor, this.version.build, this.version.subbuild,
-      this.encryption ? this.encryption : 0,
-      this.encryptionString ? this.encryptionString : '',
-      this.instance ? this.instance : 0,
-      this.threadId ? this.threadId : 0,
-      this.mars ? this.mars : 0,
-      this.marsString ? this.marsString : '',
-      this.traceId ? this.traceId.toString('hex') : '',
-    );
+    const { major, minor, build, subbuild } = this.version;
+    return indent + 'PreLogin - ' +
+      `version:${major}.${minor}.${build}.${subbuild}, ` +
+      `encryption:0x${formatHex(this.encryption ? this.encryption : 0, 2)}(${this.encryptionString ? this.encryptionString : ''}), ` +
+      `instopt:0x${formatHex(this.instance ? this.instance : 0, 2)}, ` +
+      `threadId:0x${formatHex(this.threadId ? this.threadId : 0, 8)}, ` +
+      `mars:0x${formatHex(this.mars ? this.mars : 0, 2)}(${this.marsString ? this.marsString : ''}), ` +
+      `traceId:${this.traceId ? this.traceId.toString('hex') : ''}`;
   }
 }
 

@@ -1,4 +1,4 @@
-import { sprintf } from 'sprintf-js';
+import { formatHex } from './format-hex';
 import { versions } from './tds-versions';
 
 const FLAGS_1 = {
@@ -487,18 +487,13 @@ class Login7Payload {
 
   toString(indent = '') {
     return indent + 'Login7 - ' +
-      sprintf('TDS:0x%08X, PacketSize:0x%08X, ClientProgVer:0x%08X, ClientPID:0x%08X, ConnectionID:0x%08X',
-              this.tdsVersion, this.packetSize, this.clientProgVer, this.clientPid, this.connectionId
-      ) + '\n' + indent + '         ' +
-      sprintf('Flags1:0x%02X, Flags2:0x%02X, TypeFlags:0x%02X, Flags3:0x%02X, ClientTimezone:%d, ClientLCID:0x%08X',
-              this.buildOptionFlags1(), this.buildOptionFlags2(), this.buildTypeFlags(), this.buildOptionFlags3(), this.clientTimeZone, this.clientLcid
-      ) + '\n' + indent + '         ' +
-      sprintf("Hostname:'%s', Username:'%s', Password:'%s', AppName:'%s', ServerName:'%s', LibraryName:'%s'",
-              this.hostname, this.userName, this.password, this.appName, this.serverName, this.libraryName
-      ) + '\n' + indent + '         ' +
-      sprintf("Language:'%s', Database:'%s', SSPI:'%s', AttachDbFile:'%s', ChangePassword:'%s'",
-              this.language, this.database, this.sspi, this.attachDbFile, this.changePassword
-      );
+      `TDS:0x${formatHex(this.tdsVersion, 8)}, PacketSize:0x${formatHex(this.packetSize, 8)}, ClientProgVer:0x${formatHex(this.clientProgVer, 8)}, ClientPID:0x${formatHex(this.clientPid, 8)}, ConnectionID:0x${formatHex(this.connectionId, 8)}` +
+      '\n' + indent + '         ' +
+      `Flags1:0x${formatHex(this.buildOptionFlags1(), 2)}, Flags2:0x${formatHex(this.buildOptionFlags2(), 2)}, TypeFlags:0x${formatHex(this.buildTypeFlags(), 2)}, Flags3:0x${formatHex(this.buildOptionFlags3(), 2)}, ClientTimezone:${this.clientTimeZone}, ClientLCID:0x${formatHex(this.clientLcid, 8)}` +
+      '\n' + indent + '         ' +
+      `Hostname:'${this.hostname}', Username:'${this.userName}', Password:'${this.password}', AppName:'${this.appName}', ServerName:'${this.serverName}', LibraryName:'${this.libraryName}'` +
+      '\n' + indent + '         ' +
+      `Language:'${this.language}', Database:'${this.database}', SSPI:'${this.sspi}', AttachDbFile:'${this.attachDbFile}', ChangePassword:'${this.changePassword}'`;
   }
 }
 

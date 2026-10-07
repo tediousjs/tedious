@@ -2,6 +2,55 @@ import { assert } from 'chai';
 import Login7Payload from '../../src/login7-payload';
 
 describe('Login7Payload', function() {
+  describe('#toString', function() {
+    it('formats the header fields as zero-padded upper-case hex', function() {
+      const payload = new Login7Payload({
+        tdsVersion: 0x74000004,
+        packetSize: 4096,
+        clientProgVer: 0x07000000,
+        clientPid: 12345,
+        connectionId: 0xDEADBEEF,
+        clientTimeZone: -60,
+        clientLcid: 0x00000409
+      });
+
+      payload.hostname = 'host';
+      payload.userName = 'user';
+      payload.password = 'pw';
+      payload.appName = 'app';
+      payload.serverName = 'srv';
+      payload.libraryName = 'Tedious';
+      payload.language = 'lang';
+      payload.database = 'db';
+      payload.attachDbFile = 'file.mdf';
+      payload.changePassword = 'npw';
+
+      assert.strictEqual(payload.toString('--'),
+                         '--Login7 - TDS:0x74000004, PacketSize:0x00001000, ClientProgVer:0x07000000, ClientPID:0x00003039, ConnectionID:0xDEADBEEF\n' +
+                         '--         Flags1:0xB0, Flags2:0x00, TypeFlags:0x00, Flags3:0x18, ClientTimezone:-60, ClientLCID:0x00000409\n' +
+                         "--         Hostname:'host', Username:'user', Password:'pw', AppName:'app', ServerName:'srv', LibraryName:'Tedious'\n" +
+                         "--         Language:'lang', Database:'db', SSPI:'undefined', AttachDbFile:'file.mdf', ChangePassword:'npw'");
+    });
+
+    it('prints unset string fields as undefined', function() {
+      const payload = new Login7Payload({
+        tdsVersion: 0x72090002,
+        packetSize: 1024,
+        clientProgVer: 0,
+        clientPid: 1,
+        connectionId: 0,
+        clientTimeZone: 120,
+        clientLcid: 0x0809
+      });
+
+      assert.strictEqual(payload.toString(),
+                         'Login7 - TDS:0x72090002, PacketSize:0x00000400, ClientProgVer:0x00000000, ClientPID:0x00000001, ConnectionID:0x00000000\n' +
+                         '         Flags1:0xB0, Flags2:0x00, TypeFlags:0x00, Flags3:0x18, ClientTimezone:120, ClientLCID:0x00000809\n' +
+                         "         Hostname:'undefined', Username:'undefined', Password:'undefined', AppName:'undefined', ServerName:'undefined', LibraryName:'undefined'\n" +
+                         "         Language:'undefined', Database:'undefined', SSPI:'undefined', AttachDbFile:'undefined', ChangePassword:'undefined'");
+    });
+  });
+
   describe('#toBuffer', function() {
 
     describe('for a login payload with a password', function() {

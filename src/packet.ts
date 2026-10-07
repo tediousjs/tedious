@@ -1,4 +1,4 @@
-import { sprintf } from 'sprintf-js';
+import { formatHex } from './format-hex';
 
 export const HEADER_LENGTH = 8;
 
@@ -148,7 +148,8 @@ export class Packet {
   }
 
   headerToString(indent = '') {
-    const text = sprintf('type:0x%02X(%s), status:0x%02X(%s), length:0x%04X, spid:0x%04X, packetId:0x%02X, window:0x%02X', this.buffer.readUInt8(OFFSET.Type), typeByValue[this.buffer.readUInt8(OFFSET.Type)], this.buffer.readUInt8(OFFSET.Status), this.statusAsString(), this.buffer.readUInt16BE(OFFSET.Length), this.buffer.readUInt16BE(OFFSET.SPID), this.buffer.readUInt8(OFFSET.PacketID), this.buffer.readUInt8(OFFSET.Window));
+    const type = this.buffer.readUInt8(OFFSET.Type);
+    const text = `type:0x${formatHex(type, 2)}(${typeByValue[type]}), status:0x${formatHex(this.buffer.readUInt8(OFFSET.Status), 2)}(${this.statusAsString()}), length:0x${formatHex(this.buffer.readUInt16BE(OFFSET.Length), 4)}, spid:0x${formatHex(this.buffer.readUInt16BE(OFFSET.SPID), 4)}, packetId:0x${formatHex(this.buffer.readUInt8(OFFSET.PacketID), 2)}, window:0x${formatHex(this.buffer.readUInt8(OFFSET.Window), 2)}`;
     return indent + text;
   }
 
@@ -165,7 +166,7 @@ export class Packet {
     for (let offset = 0; offset < data.length; offset++) {
       if (offset % BYTES_PER_LINE === 0) {
         dataDump += indent;
-        dataDump += sprintf('%04X  ', offset);
+        dataDump += formatHex(offset, 4) + '  ';
       }
 
       if (data[offset] < 0x20 || data[offset] > 0x7E) {
@@ -178,7 +179,7 @@ export class Packet {
       }
 
       if (data[offset] != null) {
-        dataDump += sprintf('%02X', data[offset]);
+        dataDump += formatHex(data[offset], 2);
       }
 
       if (((offset + 1) % BYTES_PER_GROUP === 0) && !((offset + 1) % BYTES_PER_LINE === 0)) {
