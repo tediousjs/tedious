@@ -196,7 +196,7 @@ interface DefaultAuthentication {
 }
 
 /**
- * An authentication type provided by a registered [[AuthenticationPlugin]].
+ * An authentication type provided by an [[AuthenticationPlugin]] passed to the connection.
  */
 interface PluginAuthentication {
   type: string;
