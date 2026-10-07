@@ -29,6 +29,7 @@
     "out": "./docs",
     "entryPoints": ["./src/tedious.ts"],
     "customCss": "./typedoc-assets/theme.css",
-    "customJs": "./typedoc-assets/dark-mode.js"
+    "customJs": "./typedoc-assets/dark-mode.js",
+    "plugin": ["./typedoc-assets/theme.mjs"]
   }
 }
