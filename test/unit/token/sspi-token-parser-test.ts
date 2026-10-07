@@ -6,54 +6,21 @@ import { assert } from 'chai';
 const options = { tdsVersion: '7_2', useUTC: false } as ParserOptions;
 
 describe('sspi token parser', function() {
-  it('should parse challenge', async function() {
+  it('should parse the security token', async function() {
+    const securityToken = Buffer.from([0x60, 0x82, 0x01, 0x02, 0xa1, 0xb2, 0xc3, 0xd4]);
+
     const source = new WriteBuffer();
     source.writeUInt8(0xed);
-    source.writeUInt16LE(0);
-    source.writeString('NTLMSSP\0', 'utf8');
-    source.writeInt32LE(2); // message type
-    source.writeInt16LE(12); // domain len
-    source.writeInt16LE(12); // domain max
-    source.writeInt32LE(111); // domain offset
-    source.writeInt32LE(11256099); // flags == 'abc123'
-    source.writeBuffer(Buffer.from([0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0xa7, 0xb8])); // nonce
-    source.writeBuffer(Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])); // empty
-    source.writeInt16LE(4); // target len
-    source.writeInt16LE(4); // target max
-    source.writeInt32LE(222); // target offset
-    source.writeBuffer(Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])); // odd data
-    source.writeString('domain', 'ucs2'); // domain
-    source.writeInt32BE(11259375); // target == 'abcdef'
+    source.writeUsVarbyte(securityToken);
 
-    const data = source.data;
-    data.writeUInt16LE(data.length - 3, 1);
-    const parser = StreamParser.parseTokens([data], options);
+    const parser = StreamParser.parseTokens([source.data], options);
 
-
-    const expected = {
-      magic: 'NTLMSSP\0',
-      type: 2,
-      domainLen: 12,
-      domainMax: 12,
-      domainOffset: 111,
-      flags: 11256099,
-      nonce: Buffer.from([0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0xa7, 0xb8]),
-      zeroes: Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
-      targetLen: 4,
-      targetMax: 4,
-      targetOffset: 222,
-      oddData: Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]),
-      domain: 'domain',
-      target: Buffer.from([0x00, 0xab, 0xcd, 0xef])
-    };
     const result = await parser.next();
     assert.isFalse(result.done);
     const token = result.value;
 
     assert.instanceOf(token, SSPIToken);
-    assert.deepEqual(token.ntlmpacket, expected);
-    // Skip token (first byte) and length of VarByte (2 bytes).
-    assert.deepEqual(token.ntlmpacketBuffer, data.slice(3));
+    assert.deepEqual(token.data, securityToken);
 
     assert.isTrue((await parser.next()).done);
   });

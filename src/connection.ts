@@ -9,14 +9,6 @@ import { type SecureContextOptions } from 'tls';
 
 import { Readable } from 'stream';
 
-import {
-  ClientSecretCredential,
-  DefaultAzureCredential,
-  ManagedIdentityCredential,
-  UsernamePasswordCredential
-} from '@azure/identity';
-import { type AccessToken, type TokenCredential, isTokenCredential } from '@azure/core-auth';
-
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
@@ -25,7 +17,6 @@ import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
-import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
@@ -38,8 +29,9 @@ import { name as libraryName } from './library';
 import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
-import { createNTLMRequest } from './ntlm';
-import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { type ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { type AuthenticationContext, type AuthenticationProvider, type AuthenticationSession, type FederatedAuthenticationSession, type SspiAuthenticationSession, assertValidAuthenticationSession, isAuthenticationProvider } from './authentication/provider';
+import { type LegacyAuthentication, createLegacyAuthenticationProvider, isTokenCredential } from './authentication/legacy';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
@@ -47,7 +39,6 @@ import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
 
 import { version } from '../package.json';
-import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
 type BeginTransactionCallback =
@@ -197,131 +188,6 @@ const DEFAULT_LANGUAGE = 'us_english';
  */
 const DEFAULT_DATEFORMAT = 'mdy';
 
-interface AzureActiveDirectoryMsiAppServiceAuthentication {
-  type: 'azure-active-directory-msi-app-service';
-  options: {
-    /**
-     * If you want to connect to an Azure app service using a specific client account,
-     * you need to provide the `clientId` associated with your created identity.
-     *
-     * This is optional for retrieving a token from Azure web app service.
-     */
-    clientId?: string;
-  };
-}
-
-interface AzureActiveDirectoryMsiVmAuthentication {
-  type: 'azure-active-directory-msi-vm';
-  options: {
-    /**
-     * If you want to connect using a specific client account,
-     * you need to provide the `clientId` associated with your created identity.
-     *
-     * This is optional for retrieving a token.
-     */
-    clientId?: string;
-  };
-}
-
-interface AzureActiveDirectoryDefaultAuthentication {
-  type: 'azure-active-directory-default';
-  options: {
-    /**
-     * If you want to connect using a specific client account,
-     * you need to provide the `clientId` associated with your created identity.
-     *
-     * This is optional for retrieving a token.
-     */
-    clientId?: string;
-  };
-}
-
-
-interface AzureActiveDirectoryAccessTokenAuthentication {
-  type: 'azure-active-directory-access-token';
-  options: {
-    /**
-     * A user needs to provide a `token` which they retrieved elsewhere
-     * to form the connection.
-     */
-    token: string;
-  };
-}
-
-interface AzureActiveDirectoryPasswordAuthentication {
-  type: 'azure-active-directory-password';
-  options: {
-    /**
-     * A user needs to provide a `userName` associated with their account.
-     */
-    userName: string;
-
-    /**
-     * A user needs to provide a `password` associated with their account.
-     */
-    password: string;
-
-    /**
-     * A client id to use.
-     */
-    clientId: string;
-
-    /**
-     * Optional parameter for specific Azure tenant ID
-     */
-    tenantId: string;
-  };
-}
-
-interface AzureActiveDirectoryServicePrincipalSecret {
-  type: 'azure-active-directory-service-principal-secret';
-  options: {
-    /**
-     * Application (`client`) ID from your registered Azure application
-     */
-    clientId: string;
-    /**
-     * The created `client secret` for this registered Azure application
-     */
-    clientSecret: string;
-    /**
-     * Directory (`tenant`) ID from your registered Azure application
-     */
-    tenantId: string;
-  };
-}
-
-/** Structure that defines the options that are necessary to authenticate the Tedious.JS instance with an `@azure/identity` token credential. */
-interface TokenCredentialAuthentication {
-  /** Unique designator for the type of authentication to be used. */
-  type: 'token-credential';
-  /** Set of configurations that are required or allowed with this authentication type. */
-  options: {
-    /** Credential object used to authenticate to the resource. */
-    credential: TokenCredential;
-  };
-}
-
-interface NtlmAuthentication {
-  type: 'ntlm';
-  options: {
-    /**
-     * User name from your windows account.
-     */
-    userName: string;
-    /**
-     * Password from your windows account.
-     */
-    password: string;
-    /**
-     * Once you set domain for ntlm authentication type, driver will connect to SQL Server using domain login.
-     *
-     * This is necessary for forming a connection using ntlm type
-     */
-    domain: string;
-  };
-}
-
 interface DefaultAuthentication {
   type: 'default';
   options: {
@@ -340,7 +206,7 @@ interface ErrorWithCode extends Error {
   code?: string;
 }
 
-export type ConnectionAuthentication = DefaultAuthentication | NtlmAuthentication | TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryAccessTokenAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
+export type ConnectionAuthentication = DefaultAuthentication | LegacyAuthentication | AuthenticationProvider;
 
 interface InternalConnectionConfig {
   server: string;
@@ -424,17 +290,7 @@ interface State {
   };
 }
 
-type Authentication = DefaultAuthentication |
-  NtlmAuthentication |
-  TokenCredentialAuthentication |
-  AzureActiveDirectoryPasswordAuthentication |
-  AzureActiveDirectoryMsiAppServiceAuthentication |
-  AzureActiveDirectoryMsiVmAuthentication |
-  AzureActiveDirectoryAccessTokenAuthentication |
-  AzureActiveDirectoryServicePrincipalSecret |
-  AzureActiveDirectoryDefaultAuthentication;
-
-type AuthenticationType = Authentication['type'];
+type AuthenticationType = DefaultAuthentication['type'] | LegacyAuthentication['type'];
 
 export interface ConnectionConfiguration {
   /**
@@ -447,8 +303,14 @@ export interface ConnectionConfiguration {
   options?: ConnectionOptions;
   /**
    * Authentication related options for connection.
+   *
+   * This is either an [[AuthenticationProvider]], or an object describing
+   * one of the built-in authentication types. Only the `default` built-in
+   * authentication type (SQL Server authentication using a user name and
+   * password) is supported going forward. All other built-in
+   * authentication types are deprecated in favor of authentication providers.
    */
-  authentication?: AuthenticationOptions;
+  authentication?: AuthenticationOptions | AuthenticationProvider;
 }
 
 interface DebugOptions {
@@ -485,6 +347,9 @@ interface AuthenticationOptions {
    * `azure-active-directory-msi-vm`, `azure-active-directory-msi-app-service`,
    * `azure-active-directory-default`
    * or `azure-active-directory-service-principal-secret`
+   *
+   * All types other than `default` are deprecated and will be removed in a
+   * future version. Use an [[AuthenticationProvider]] instead.
    */
   type?: AuthenticationType;
   /**
@@ -971,13 +836,11 @@ class Connection extends EventEmitter {
    */
   declare debug: Debug;
   /**
+   * The provider used to authenticate against the server.
+   *
    * @private
    */
-  declare ntlmpacket: undefined | any;
-  /**
-   * @private
-   */
-  declare ntlmpacketBuffer: undefined | Buffer;
+  declare authenticationProvider: AuthenticationProvider;
 
   /**
    * @private
@@ -990,7 +853,7 @@ class Connection extends EventEmitter {
     TRANSIENT_FAILURE_RETRY: State;
     SENT_TLSSSLNEGOTIATION: State;
     SENT_LOGIN7_WITH_STANDARD_LOGIN: State;
-    SENT_LOGIN7_WITH_NTLM: State;
+    SENT_LOGIN7_WITH_SSPI: State;
     SENT_LOGIN7_WITH_FEDAUTH: State;
     LOGGED_IN_SENDING_INITIAL_SQL: State;
     LOGGED_IN: State;
@@ -1119,7 +982,9 @@ class Connection extends EventEmitter {
     this.fedAuthRequired = false;
 
     let authentication: ConnectionAuthentication;
-    if (config.authentication !== undefined) {
+    if (isAuthenticationProvider(config.authentication)) {
+      authentication = config.authentication;
+    } else if (config.authentication !== undefined) {
       if (typeof config.authentication !== 'object' || config.authentication === null) {
         throw new TypeError('The "config.authentication" property must be of type Object.');
       }
@@ -1786,6 +1651,7 @@ class Connection extends EventEmitter {
     }
 
     this.debug = this.createDebug();
+    this.authenticationProvider = createAuthenticationProvider(this.config.authentication);
     this.inTransaction = false;
     this.transactionDescriptors = [Buffer.from([0, 0, 0, 0, 0, 0, 0, 0])];
 
@@ -2112,29 +1978,8 @@ class Connection extends EventEmitter {
           const preloginResponse = await this.readPreloginResponse(signal);
           await this.performTlsNegotiation(preloginResponse, signal);
 
-          this.sendLogin7Packet();
-
           try {
-            const { authentication } = this.config;
-            switch (authentication.type) {
-              case 'token-credential':
-              case 'azure-active-directory-password':
-              case 'azure-active-directory-msi-vm':
-              case 'azure-active-directory-msi-app-service':
-              case 'azure-active-directory-service-principal-secret':
-              case 'azure-active-directory-default':
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
-                this.routingData = await this.performSentLogin7WithFedAuth(signal);
-                break;
-              case 'ntlm':
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_NTLM);
-                this.routingData = await this.performSentLogin7WithNTLMLogin(signal);
-                break;
-              default:
-                this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-                this.routingData = await this.performSentLogin7WithStandardLogin(signal);
-                break;
-            }
+            this.routingData = await this.performLogin(port, signal);
           } catch (err: any) {
             if (isTransientError(err)) {
               this.debug.log('Initiating retry on transient error');
@@ -2508,7 +2353,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  sendLogin7Packet() {
+  sendLogin7Packet(session: AuthenticationSession) {
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -2519,43 +2364,31 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    const { authentication } = this.config;
-    switch (authentication.type) {
-      case 'azure-active-directory-password':
-        payload.fedAuth = {
-          type: 'ADAL',
-          echo: this.fedAuthRequired,
-          workflow: 'default'
-        };
+    switch (session.type) {
+      case 'federated':
+        if (session.library === 'security-token') {
+          payload.fedAuth = {
+            type: 'SECURITYTOKEN',
+            echo: this.fedAuthRequired,
+            fedAuthToken: session.token
+          };
+        } else {
+          payload.fedAuth = {
+            type: 'ADAL',
+            echo: this.fedAuthRequired,
+            workflow: session.workflow === 'password' ? 'default' : 'integrated'
+          };
+        }
         break;
 
-      case 'azure-active-directory-access-token':
-        payload.fedAuth = {
-          type: 'SECURITYTOKEN',
-          echo: this.fedAuthRequired,
-          fedAuthToken: authentication.options.token
-        };
+      case 'sspi':
+        payload.sspi = session.initialToken;
         break;
 
-      case 'token-credential':
-      case 'azure-active-directory-msi-vm':
-      case 'azure-active-directory-default':
-      case 'azure-active-directory-msi-app-service':
-      case 'azure-active-directory-service-principal-secret':
-        payload.fedAuth = {
-          type: 'ADAL',
-          echo: this.fedAuthRequired,
-          workflow: 'integrated'
-        };
+      case 'sql':
+        payload.userName = session.userName;
+        payload.password = session.password;
         break;
-
-      case 'ntlm':
-        payload.sspi = createNTLMRequest({ domain: authentication.options.domain });
-        break;
-
-      default:
-        payload.userName = authentication.options.userName;
-        payload.password = authentication.options.password;
     }
 
     payload.hostname = this.config.options.workstationId || os.hostname();
@@ -3503,29 +3336,134 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * Creates the authentication session for the current login attempt, sends
+   * the LOGIN7 message and performs the authentication exchange.
+   *
    * @private
    */
-  async performSentLogin7WithStandardLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
-    return await withAbortRace(signal, async (signalAborted) => {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
+  async performLogin(port: number, signal: AbortSignal): Promise<RoutingData | undefined> {
+    const session = await this.createAuthenticationSession(port, signal);
 
-      const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      // If the abort wins this race, the pending `once()` is left
-      // unobserved, and a parse error landing afterwards would reject it
-      // with nobody listening. Observe it so that cannot become an
-      // unhandled rejection (same idiom as `withAbortRace`).
-      const endOfMessage = once(tokenStreamParser, 'end');
-      endOfMessage.catch(() => {});
-      await Promise.race([
-        endOfMessage,
-        signalAborted
-      ]);
+    try {
+      this.sendLogin7Packet(session);
+
+      switch (session.type) {
+        case 'federated':
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_FEDAUTH);
+          return await this.performSentLogin7WithFedAuth(session, signal);
+
+        case 'sspi':
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_SSPI);
+          return await this.performSentLogin7WithSspi(session, signal);
+
+        case 'sql':
+          this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
+          return await this.performSentLogin7WithStandardLogin(signal);
+      }
+    } finally {
+      this.closeAuthenticationSession(session);
+    }
+  }
+
+  /**
+   * Asks the authentication provider for the session to use for the
+   * current login attempt.
+   *
+   * @private
+   */
+  async createAuthenticationSession(port: number, signal: AbortSignal): Promise<AuthenticationSession> {
+    const context: AuthenticationContext = {
+      server: this.routingData ? this.routingData.server : this.config.server,
+      port: this.routingData ? this.routingData.port : port,
+      instanceName: this.routingData ? (this.routingData.instance || undefined) : this.config.options.instanceName,
+      fedAuthRequired: this.fedAuthRequired,
+      signal: signal
+    };
+
+    return await withAbortRace(signal, async (signalAborted) => {
+      const sessionPromise = (async () => {
+        const session: unknown = await this.authenticationProvider.createSession(context);
+        assertValidAuthenticationSession(session);
+        return session;
+      })();
+
+      let session;
+      try {
+        session = await Promise.race([sessionPromise, signalAborted]);
+      } catch (err) {
+        if (signal.aborted) {
+          // The provider might still finish creating the session after the
+          // login attempt was aborted. Make sure it gets closed in that case.
+          sessionPromise.then((session) => { this.closeAuthenticationSession(session); }, () => {});
+          signal.throwIfAborted();
+        }
+
+        if (err instanceof ConnectionError) {
+          throw err;
+        }
+
+        throw new ConnectionError(`Failed to create the authentication session: ${(err as Error)?.message ?? err}`, 'ELOGIN', { cause: err });
+      }
+
+      return session;
+    });
+  }
+
+  /**
+   * @private
+   */
+  closeAuthenticationSession(session: AuthenticationSession) {
+    if (session.close === undefined) {
+      return;
+    }
+
+    const onError = (err: any) => {
+      this.debug.log('Failed to close the authentication session: ' + (err?.message ?? err));
+    };
+
+    try {
+      Promise.resolve(session.close()).catch(onError);
+    } catch (err) {
+      onError(err);
+    }
+  }
+
+  /**
+   * Reads the server's response to a LOGIN7 (or follow-up authentication)
+   * message.
+   *
+   * @private
+   */
+  async readLogin7Response(signal: AbortSignal, signalAborted: Promise<never>, fedAuthRequested: boolean): Promise<Login7TokenHandler> {
+    const message = await Promise.race([
+      this.messageIo.readMessage().catch((err) => {
+        throw this.wrapSocketError(err);
+      }),
+      signalAborted
+    ]);
+
+    const handler = new Login7TokenHandler(this, fedAuthRequested);
+    const tokenStreamParser = this.createTokenStreamParser(message, handler);
+    // If the abort wins this race, the pending `once()` is left
+    // unobserved, and a parse error landing afterwards would reject it
+    // with nobody listening. Observe it so that cannot become an
+    // unhandled rejection (same idiom as `withAbortRace`).
+    const endOfMessage = once(tokenStreamParser, 'end');
+    endOfMessage.catch(() => {});
+    await Promise.race([
+      endOfMessage,
+      signalAborted
+    ]);
+
+    return handler;
+  }
+
+  /**
+   * @private
+   */
+  async performSentLogin7WithStandardLogin(signal: AbortSignal, fedAuthRequested = false): Promise<RoutingData | undefined> {
+    return await withAbortRace(signal, async (signalAborted) => {
+      const handler = await this.readLogin7Response(signal, signalAborted, fedAuthRequested);
 
       if (handler.loginAckReceived) {
         return handler.routingData;
@@ -3540,47 +3478,38 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithNTLMLogin(signal: AbortSignal): Promise<RoutingData | undefined> {
+  async performSentLogin7WithSspi(session: SspiAuthenticationSession, signal: AbortSignal): Promise<RoutingData | undefined> {
     return await withAbortRace(signal, async (signalAborted) => {
       while (true) {
-        const message = await Promise.race([
-          this.messageIo.readMessage().catch((err) => {
-            throw this.wrapSocketError(err);
-          }),
-          signalAborted
-        ]);
-
-        const handler = new Login7TokenHandler(this);
-        const tokenStreamParser = this.createTokenStreamParser(message, handler);
-        // If the abort wins this race, the pending `once()` is left
-        // unobserved, and a parse error landing afterwards would reject it
-        // with nobody listening. Observe it so that cannot become an
-        // unhandled rejection (same idiom as `withAbortRace`).
-        const endOfMessage = once(tokenStreamParser, 'end');
-        endOfMessage.catch(() => {});
-        await Promise.race([
-          endOfMessage,
-          signalAborted
-        ]);
+        const handler = await this.readLogin7Response(signal, signalAborted, false);
 
         if (handler.loginAckReceived) {
           return handler.routingData;
-        } else if (this.ntlmpacket) {
-          const authentication = this.config.authentication as NtlmAuthentication;
+        } else if (handler.sspiToken) {
+          let response: Buffer;
+          try {
+            response = await Promise.race([
+              (async () => await session.handleChallenge(handler.sspiToken!, signal))(),
+              signalAborted
+            ]);
+          } catch (err) {
+            signal.throwIfAborted();
 
-          const payload = new NTLMResponsePayload({
-            domain: authentication.options.domain,
-            userName: authentication.options.userName,
-            password: authentication.options.password,
-            ntlmpacket: this.ntlmpacket
-          });
+            if (err instanceof ConnectionError) {
+              throw err;
+            }
 
-          this.messageIo.sendMessage(TYPE.NTLMAUTH_PKT, payload.data);
+            throw new ConnectionError(`SSPI authentication failed: ${(err as Error)?.message ?? err}`, 'ELOGIN', { cause: err });
+          }
+
+          if (!Buffer.isBuffer(response)) {
+            throw new ConnectionError('SSPI authentication failed: The authentication session did not return a security token.', 'ELOGIN');
+          }
+
+          this.messageIo.sendMessage(TYPE.SSPI, response);
           this.debug.payload(function() {
-            return payload.toString('  ');
+            return '  SSPI - ' + response.length + ' bytes';
           });
-
-          this.ntlmpacket = undefined;
         } else if (handler.loginError) {
           throw handler.loginError;
         } else {
@@ -3593,27 +3522,9 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  async performSentLogin7WithFedAuth(signal: AbortSignal): Promise<RoutingData | undefined> {
+  async performSentLogin7WithFedAuth(session: FederatedAuthenticationSession, signal: AbortSignal): Promise<RoutingData | undefined> {
     return await withAbortRace(signal, async (signalAborted) => {
-      const message = await Promise.race([
-        this.messageIo.readMessage().catch((err) => {
-          throw this.wrapSocketError(err);
-        }),
-        signalAborted
-      ]);
-
-      const handler = new Login7TokenHandler(this);
-      const tokenStreamParser = this.createTokenStreamParser(message, handler);
-      // If the abort wins this race, the pending `once()` is left
-      // unobserved, and a parse error landing afterwards would reject it
-      // with nobody listening. Observe it so that cannot become an
-      // unhandled rejection (same idiom as `withAbortRace`).
-      const endOfMessage = once(tokenStreamParser, 'end');
-      endOfMessage.catch(() => {});
-      await Promise.race([
-        endOfMessage,
-        signalAborted
-      ]);
+      const handler = await this.readLogin7Response(signal, signalAborted, true);
 
       if (handler.loginAckReceived) {
         return handler.routingData;
@@ -3621,51 +3532,13 @@ class Connection extends EventEmitter {
 
       const fedAuthInfoToken = handler.fedAuthInfoToken;
 
-      if (fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
-        /** Federated authentication configuration. */
-        const authentication = this.config.authentication as TokenCredentialAuthentication | AzureActiveDirectoryPasswordAuthentication | AzureActiveDirectoryMsiVmAuthentication | AzureActiveDirectoryMsiAppServiceAuthentication | AzureActiveDirectoryServicePrincipalSecret | AzureActiveDirectoryDefaultAuthentication;
-        /** Permission scope to pass to Entra ID when requesting an authentication token. */
-        const tokenScope = new URL('/.default', fedAuthInfoToken.spn).toString();
-
-        /** Instance of the token credential to use to authenticate to the resource. */
-        let credentials: TokenCredential;
-
-        switch (authentication.type) {
-          case 'token-credential':
-            credentials = authentication.options.credential;
-            break;
-          case 'azure-active-directory-password':
-            credentials = new UsernamePasswordCredential(
-              authentication.options.tenantId ?? 'common',
-              authentication.options.clientId,
-              authentication.options.userName,
-              authentication.options.password
-            );
-            break;
-          case 'azure-active-directory-msi-vm':
-          case 'azure-active-directory-msi-app-service':
-            const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
-            credentials = new ManagedIdentityCredential(...msiArgs);
-            break;
-          case 'azure-active-directory-default':
-            const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
-            credentials = new DefaultAzureCredential(args);
-            break;
-          case 'azure-active-directory-service-principal-secret':
-            credentials = new ClientSecretCredential(
-              authentication.options.tenantId,
-              authentication.options.clientId,
-              authentication.options.clientSecret
-            );
-            break;
-        }
-
-        /** Access token retrieved from Entra ID for the configured permission scope(s). */
-        let tokenResponse: AccessToken | null;
+      if (session.library === 'msal' && fedAuthInfoToken && fedAuthInfoToken.stsurl && fedAuthInfoToken.spn) {
+        /** Access token retrieved for the resource described by the server. */
+        let token: string;
 
         try {
-          tokenResponse = await Promise.race([
-            credentials.getToken(tokenScope),
+          token = await Promise.race([
+            (async () => await session.getToken({ spn: fedAuthInfoToken.spn!, stsUrl: fedAuthInfoToken.stsurl! }, signal))(),
             signalAborted
           ]);
         } catch (err) {
@@ -3675,16 +3548,15 @@ class Connection extends EventEmitter {
             [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), err]);
         }
 
-        // Type guard the token value so that it is never null.
-        if (tokenResponse === null) {
+        if (typeof token !== 'string') {
           throw new AggregateError(
             [new ConnectionError('Security token could not be authenticated or authorized.', 'EFEDAUTH')]);
         }
 
-        this.sendFedAuthTokenMessage(tokenResponse.token);
+        this.sendFedAuthTokenMessage(token);
         // sent the fedAuth token message, the rest is similar to standard login 7
         this.transitionTo(this.STATE.SENT_LOGIN7_WITH_STANDARD_LOGIN);
-        return await this.performSentLogin7WithStandardLogin(signal);
+        return await this.performSentLogin7WithStandardLogin(signal, true);
       } else if (handler.loginError) {
         throw handler.loginError;
       } else {
@@ -3720,6 +3592,26 @@ class Connection extends EventEmitter {
       ]);
     });
   }
+}
+
+/**
+ * Creates the [[AuthenticationProvider]] for the given authentication configuration.
+ */
+function createAuthenticationProvider(authentication: ConnectionAuthentication): AuthenticationProvider {
+  if (isAuthenticationProvider(authentication)) {
+    return authentication;
+  }
+
+  if (authentication.type === 'default') {
+    const { userName, password } = authentication.options;
+    return {
+      createSession() {
+        return { type: 'sql', userName: userName, password: password };
+      }
+    };
+  }
+
+  return createLegacyAuthenticationProvider(authentication);
 }
 
 function isTransientError(error: AggregateError | ConnectionError): boolean {
@@ -3761,8 +3653,8 @@ Connection.prototype.STATE = {
     name: 'SentLogin7WithStandardLogin',
     events: {}
   },
-  SENT_LOGIN7_WITH_NTLM: {
-    name: 'SentLogin7WithNTLMLogin',
+  SENT_LOGIN7_WITH_SSPI: {
+    name: 'SentLogin7WithSSPI',
     events: {}
   },
   SENT_LOGIN7_WITH_FEDAUTH: {

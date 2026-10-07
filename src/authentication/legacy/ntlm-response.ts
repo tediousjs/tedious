@@ -1,6 +1,13 @@
-import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import WritableTrackingBuffer from '../../tracking-buffer/writable-tracking-buffer';
 import * as crypto from 'crypto';
-import md4 from 'js-md4';
+
+/**
+ * Computes the MD4 digest of the given data.
+ *
+ * MD4 is not available in Node.js' `crypto` module when using OpenSSL 3,
+ * so an implementation has to be provided (e.g. by the `js-md4` package).
+ */
+export type Md4 = (data: Buffer) => Buffer;
 
 interface Options {
   domain: string;
@@ -14,8 +21,10 @@ interface Options {
 
 class NTLMResponsePayload {
   declare data: Buffer;
+  declare md4: Md4;
 
-  constructor(loginData: Options) {
+  constructor(loginData: Options, md4: Md4) {
+    this.md4 = md4;
     this.data = this.createResponse(loginData);
   }
 
@@ -141,7 +150,7 @@ class NTLMResponsePayload {
 
   ntHash(text: string) {
     const unicodeString = Buffer.from(text, 'ucs2');
-    return Buffer.from(md4.arrayBuffer(unicodeString));
+    return this.md4(unicodeString);
   }
 
   hmacMD5(data: Buffer, key: Buffer) {

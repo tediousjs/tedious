@@ -1,5 +1,5 @@
 import { assert } from 'chai';
-import { createNTLMRequest } from '../../src/ntlm';
+import { createNTLMRequest } from '../../../src/authentication/legacy/ntlm-negotiate';
 
 describe('createNTLMRequest', function() {
   it('returns a Buffer with an NTLM request message', function() {

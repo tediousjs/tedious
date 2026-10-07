@@ -1,5 +1,8 @@
-import NTLMPayload from '../../src/ntlm-payload';
+import NTLMPayload, { type Md4 } from '../../../src/authentication/legacy/ntlm-response';
 import { assert } from 'chai';
+import md4Lib from 'js-md4';
+
+const md4: Md4 = (data) => Buffer.from(md4Lib.arrayBuffer(data));
 
 const challenge = {
   domain: 'domain',
@@ -14,7 +17,7 @@ const challenge = {
 describe('NTLMPayload', function() {
   it('should respond to challenge', function() {
 
-    const response = new NTLMPayload(challenge);
+    const response = new NTLMPayload(challenge, md4);
 
     const expectedLength =
       8 + // NTLM protocol header
@@ -45,5 +48,12 @@ describe('NTLMPayload', function() {
     assert.strictEqual(targetData, 'aaaaaaaa');
 
     assert.strictEqual(expectedLength, response.data.length);
+  });
+
+  it('computes the NT hash using the given MD4 implementation', function() {
+    const response = new NTLMPayload(challenge, md4);
+
+    // The NT hash of "password" (MD4 of its UTF-16LE encoding).
+    assert.strictEqual(response.ntHash('password').toString('hex'), '8846f7eaee8fb117ad06bdd830b7586c');
   });
 });

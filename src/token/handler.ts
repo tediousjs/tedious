@@ -280,15 +280,28 @@ export class Login7TokenHandler extends TokenHandler {
   declare fedAuthInfoToken: FedAuthInfoToken | undefined;
   declare routingData: { server: string, port: number, instance: string } | undefined;
 
+  /**
+   * The most recent security token sent by the server during
+   * integrated (SSPI) authentication.
+   */
+  declare sspiToken: Buffer | undefined;
+
+  /**
+   * Whether the LOGIN7 message requested federated authentication.
+   */
+  declare fedAuthRequested: boolean;
+
   declare loginAckReceived: boolean;
 
   declare loginError: ConnectionError | undefined;
 
-  constructor(connection: Connection) {
+  constructor(connection: Connection, fedAuthRequested = false) {
     super();
     this.loginAckReceived = false;
     this.connection = connection;
     this.loginError = undefined;
+    this.sspiToken = undefined;
+    this.fedAuthRequested = fedAuthRequested;
   }
 
   onInfoMessage(token: InfoMessageToken) {
@@ -309,10 +322,7 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onSSPI(token: SSPIToken) {
-    if (token.ntlmpacket) {
-      this.connection.ntlmpacket = token.ntlmpacket;
-      this.connection.ntlmpacketBuffer = token.ntlmpacketBuffer;
-    }
+    this.sspiToken = token.data;
   }
 
   onDatabaseChange(token: DatabaseEnvChangeToken) {
@@ -340,13 +350,11 @@ export class Login7TokenHandler extends TokenHandler {
   }
 
   onFeatureExtAck(token: FeatureExtAckToken) {
-    const { authentication } = this.connection.config;
-
-    if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
+    if (this.fedAuthRequested) {
       if (token.fedAuth === undefined) {
         this.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
       } else if (token.fedAuth.length !== 0) {
-        this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
+        this.loginError = new ConnectionError('Active Directory authentication acknowledgment includes extra data');
       }
     } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
       this.loginError = new ConnectionError('Received acknowledgement for unknown feature');

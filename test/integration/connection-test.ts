@@ -2,7 +2,8 @@ import async from 'async';
 import { assert } from 'chai';
 import os from 'os';
 
-import Connection from '../../src/connection';
+import Connection, { type ConnectionConfiguration } from '../../src/connection';
+import { type AuthenticationProvider } from '../../src/authentication/provider';
 import { ConnectionError, RequestError } from '../../src/errors';
 import Request from '../../src/request';
 import { versions } from '../../src/tds-versions';
@@ -10,9 +11,12 @@ import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
 
+type AuthenticationOptions = Exclude<ConnectionConfiguration['authentication'], AuthenticationProvider | undefined>;
+
 function getConfig() {
   const config = {
     ...defaultConfig,
+    authentication: defaultConfig.authentication as AuthenticationOptions,
     options: {
       ...defaultConfig.options,
       debug: debugOptionsFromEnv(),

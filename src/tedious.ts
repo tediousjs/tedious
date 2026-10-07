@@ -2,6 +2,17 @@ import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request from './request';
 import { name } from './library';
+import {
+  type AuthenticationContext,
+  type AuthenticationProvider,
+  type AuthenticationSession,
+  type FederatedAuthenticationInfo,
+  type FederatedAuthenticationSession,
+  type MsalFederatedAuthenticationSession,
+  type SecurityTokenFederatedAuthenticationSession,
+  type SqlAuthenticationSession,
+  type SspiAuthenticationSession
+} from './authentication/provider';
 
 import { ConnectionError, InputError, RequestError } from './errors';
 
@@ -31,7 +42,16 @@ export {
 };
 
 export type {
+  AuthenticationContext,
+  AuthenticationProvider,
+  AuthenticationSession,
   ConnectionAuthentication,
   ConnectionConfiguration,
-  ConnectionOptions
+  ConnectionOptions,
+  FederatedAuthenticationInfo,
+  FederatedAuthenticationSession,
+  MsalFederatedAuthenticationSession,
+  SecurityTokenFederatedAuthenticationSession,
+  SqlAuthenticationSession,
+  SspiAuthenticationSession
 };
