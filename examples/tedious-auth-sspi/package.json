@@ -1,0 +1,20 @@
+{
+  "name": "tedious-auth-sspi",
+  "version": "0.0.0-draft",
+  "private": true,
+  "description": "Windows integrated authentication (SSPI) for tedious, via FFI",
+  "main": "index.js",
+  "license": "MIT",
+  "os": [
+    "win32"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "koffi": "^2.16.3"
+  },
+  "peerDependencies": {
+    "tedious": "*"
+  }
+}
