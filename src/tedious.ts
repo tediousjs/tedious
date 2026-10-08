@@ -1,6 +1,7 @@
 import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request from './request';
+import { type ExecutionOptions } from './execution-options';
 import { name } from './library';
 
 import { ConnectionError, InputError, RequestError } from './errors';
@@ -33,5 +34,6 @@ export {
 export type {
   ConnectionAuthentication,
   ConnectionConfiguration,
-  ConnectionOptions
+  ConnectionOptions,
+  ExecutionOptions
 };
