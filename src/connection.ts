@@ -59,7 +59,7 @@ type BeginTransactionCallback =
    * As only one request at a time may be executed on a connection, another request should not
    * be initiated until this callback is called.
    *
-   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param err If an error occurred, an {@link Error} object with details of the error.
    * @param transactionDescriptor A Buffer that describe the transaction
    */
   (err: Error | null | undefined, transactionDescriptor?: Buffer) => void
@@ -73,7 +73,7 @@ type SaveTransactionCallback =
    * As only one request at a time may be executed on a connection, another request should not
    * be initiated until this callback is called.
    *
-   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param err If an error occurred, an {@link Error} object with details of the error.
    */
   (err: Error | null | undefined) => void;
 
@@ -86,7 +86,7 @@ type CommitTransactionCallback =
    * As only one request at a time may be executed on a connection, another request should not
    * be initiated until this callback is called.
    *
-   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param err If an error occurred, an {@link Error} object with details of the error.
    */
   (err: Error | null | undefined) => void;
 
@@ -99,7 +99,7 @@ type RollbackTransactionCallback =
    * As only one request at a time may be executed on a connection, another request should not
    * be initiated until this callback is called.
    *
-   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param err If an error occurred, an {@link Error} object with details of the error.
    */
   (err: Error | null | undefined) => void;
 
@@ -113,7 +113,7 @@ type ResetCallback =
    * As only one request at a time may be executed on a connection, another
    * request should not be initiated until this callback is called
    *
-   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param err If an error occurred, an {@link Error} object with details of the error.
    */
   (err: Error | null | undefined) => void;
 
@@ -132,7 +132,7 @@ type TransactionCallback<T extends (err: Error | null | undefined, ...args: any[
    * As only one request at a time may be executed on a connection, another request should not
    * be initiated until the completion callback is called.
    *
-   * @param err If an error occurred, an [[Error]] object with details of the error.
+   * @param err If an error occurred, an {@link Error} object with details of the error.
    * @param txDone If no error occurred, a function to be called to commit or rollback the transaction.
    */
   (err: Error | null | undefined, txDone?: TransactionDone<T>) => void;
@@ -453,25 +453,25 @@ export interface ConnectionConfiguration {
 
 interface DebugOptions {
   /**
-   * A boolean, controlling whether [[debug]] events will be emitted with text describing packet data details
+   * A boolean, controlling whether {@link Connection.on | `debug`} events will be emitted with text describing packet data details
    *
    * (default: `false`)
    */
   data: boolean;
   /**
-   * A boolean, controlling whether [[debug]] events will be emitted with text describing packet details
+   * A boolean, controlling whether {@link Connection.on | `debug`} events will be emitted with text describing packet details
    *
    * (default: `false`)
    */
   packet: boolean;
   /**
-   * A boolean, controlling whether [[debug]] events will be emitted with text describing packet payload details
+   * A boolean, controlling whether {@link Connection.on | `debug`} events will be emitted with text describing packet payload details
    *
    * (default: `false`)
    */
   payload: boolean;
   /**
-   * A boolean, controlling whether [[debug]] events will be emitted with text describing token stream tokens
+   * A boolean, controlling whether {@link Connection.on | `debug`} events will be emitted with text describing token stream tokens
    *
    * (default: `false`)
    */
@@ -490,15 +490,15 @@ interface AuthenticationOptions {
   /**
    * Different options for authentication types:
    *
-   * * `default`: [[DefaultAuthentication.options]]
-   * * `ntlm` :[[NtlmAuthentication]]
-   * * `token-credential`: [[CredentialChainAuthentication.options]]
-   * * `azure-active-directory-password` : [[AzureActiveDirectoryPasswordAuthentication.options]]
-   * * `azure-active-directory-access-token` : [[AzureActiveDirectoryAccessTokenAuthentication.options]]
-   * * `azure-active-directory-msi-vm` : [[AzureActiveDirectoryMsiVmAuthentication.options]]
-   * * `azure-active-directory-msi-app-service` : [[AzureActiveDirectoryMsiAppServiceAuthentication.options]]
-   * * `azure-active-directory-service-principal-secret` : [[AzureActiveDirectoryServicePrincipalSecret.options]]
-   * * `azure-active-directory-default` : [[AzureActiveDirectoryDefaultAuthentication.options]]
+   * * `default`: {@link DefaultAuthentication.options}
+   * * `ntlm` :{@link NtlmAuthentication}
+   * * `token-credential`: {@link TokenCredentialAuthentication.options}
+   * * `azure-active-directory-password` : {@link AzureActiveDirectoryPasswordAuthentication.options}
+   * * `azure-active-directory-access-token` : {@link AzureActiveDirectoryAccessTokenAuthentication.options}
+   * * `azure-active-directory-msi-vm` : {@link AzureActiveDirectoryMsiVmAuthentication.options}
+   * * `azure-active-directory-msi-app-service` : {@link AzureActiveDirectoryMsiAppServiceAuthentication.options}
+   * * `azure-active-directory-service-principal-secret` : {@link AzureActiveDirectoryServicePrincipalSecret.options}
+   * * `azure-active-directory-default` : {@link AzureActiveDirectoryDefaultAuthentication.options}
    */
   options?: any;
 }
@@ -520,14 +520,14 @@ export interface ConnectionOptions {
 
   /**
    * A boolean, controlling whether the column names returned will have the first letter converted to lower case
-   * (`true`) or not. This value is ignored if you provide a [[columnNameReplacer]].
+   * (`true`) or not. This value is ignored if you provide a {@link columnNameReplacer}.
    *
    * (default: `false`).
    */
   camelCaseColumns?: boolean;
 
   /**
-   * The number of milliseconds before the [[Request.cancel]] (abort) of a request is considered failed
+   * The number of milliseconds before the {@link Request.cancel} (abort) of a request is considered failed
    *
    * (default: `5000`).
    */
@@ -689,8 +689,8 @@ export interface ConnectionOptions {
   encrypt?: string | boolean;
 
   /**
-   * By default, if the database requested by [[database]] cannot be accessed,
-   * the connection will fail with an error. However, if [[fallbackToDefaultDb]] is
+   * By default, if the database requested by {@link database} cannot be accessed,
+   * the connection will fail with an error. However, if {@link fallbackToDefaultDb} is
    * set to `true`, then the user's default database will be used instead
    *
    * (default: `false`)
@@ -704,7 +704,7 @@ export interface ConnectionOptions {
    *
    * (no default)
    *
-   * Mutually exclusive with [[port]].
+   * Mutually exclusive with {@link port}.
    */
   instanceName?: string | undefined;
 
@@ -766,7 +766,7 @@ export interface ConnectionOptions {
   /**
    * Port to connect to (default: `1433`).
    *
-   * Mutually exclusive with [[instanceName]]
+   * Mutually exclusive with {@link instanceName}
    */
   port?: number | undefined;
 
@@ -789,9 +789,9 @@ export interface ConnectionOptions {
 
   /**
    * A boolean, that when true will expose received rows in Requests done related events:
-   * * [[Request.Event_doneInProc]]
-   * * [[Request.Event_doneProc]]
-   * * [[Request.Event_done]]
+   * * {@link Request.on | `doneInProc`}
+   * * {@link Request.on | `doneProc`}
+   * * {@link Request.on | `done`}
    *
    * (default: `false`)
    *
@@ -801,7 +801,7 @@ export interface ConnectionOptions {
   rowCollectionOnDone?: boolean;
 
   /**
-   * A boolean, that when true will expose received rows in Requests' completion callback.See [[Request.constructor]].
+   * A boolean, that when true will expose received rows in Requests' completion callback.See {@link Request.constructor}.
    *
    * (default: `false`)
    *
@@ -906,7 +906,7 @@ async function withAbortRace<T>(signal: AbortSignal, func: (signalAborted: Promi
 }
 
 /**
- * A [[Connection]] instance represents a single connection to a database server.
+ * A {@link Connection} instance represents a single connection to a database server.
  *
  * ```js
  * var Connection = require('tedious').Connection;
@@ -920,10 +920,10 @@ async function withAbortRace<T>(signal: AbortSignal, func: (signalAborted: Promi
  * var connection = new Connection(config);
  * ```
  *
- * Only one request at a time may be executed on a connection. Once a [[Request]]
- * has been initiated (with [[Connection.callProcedure]], [[Connection.execSql]],
- * or [[Connection.execSqlBatch]]), another should not be initiated until the
- * [[Request]]'s completion callback is called.
+ * Only one request at a time may be executed on a connection. Once a {@link Request}
+ * has been initiated (with {@link Connection.callProcedure}, {@link Connection.execSql},
+ * or {@link Connection.execSqlBatch}), another should not be initiated until the
+ * {@link Request}'s completion callback is called.
  */
 class Connection extends EventEmitter {
   /**
@@ -1885,7 +1885,7 @@ class Connection extends EventEmitter {
     event: 'connect',
     /**
      * @param err If successfully connected, will be falsy. If there was a
-     *   problem (with either connecting or validation), will be an [[Error]] object.
+     *   problem (with either connecting or validation), will be an {@link Error} object.
      */
     listener: (err: Error | undefined) => void
   ): this
@@ -1914,7 +1914,7 @@ class Connection extends EventEmitter {
   /**
    * The connection has ended.
    *
-   * This may be as a result of the client calling [[close]], the server
+   * This may be as a result of the client calling {@link close}, the server
    * closing the connection, or a network error.
    */
   on(event: 'end', listener: () => void): this
@@ -2011,7 +2011,7 @@ class Connection extends EventEmitter {
   /**
    * Closes the connection to the database.
    *
-   * The [[Event_end]] will be emitted once the connection has been closed.
+   * The {@link Connection.on | `end` event} will be emitted once the connection has been closed.
    */
   close() {
     this.closeController?.abort(new ConnectionError('Connection closed before the connection was established.', 'ECLOSE'));
@@ -2699,13 +2699,13 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Execute the SQL batch represented by [[Request]].
-   * There is no param support, and unlike [[execSql]],
+   * Execute the SQL batch represented by {@link Request}.
+   * There is no param support, and unlike {@link execSql},
    * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
    *
-   * In almost all cases, [[execSql]] will be a better choice.
+   * In almost all cases, {@link execSql} will be a better choice.
    *
-   * @param request A [[Request]] object representing the request.
+   * @param request A {@link Request} object representing the request.
    */
   execSqlBatch(request: Request) {
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
@@ -2719,19 +2719,19 @@ class Connection extends EventEmitter {
   }
 
   /**
-   *  Execute the SQL represented by [[Request]].
+   *  Execute the SQL represented by {@link Request}.
    *
    * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
    * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
    * for the first execution. This may also result in SQL server treating the request like a stored procedure
-   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
-   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   * which can result in the {@link Request.on | `doneInProc`} or {@link Request.on | `doneProc`} events being emitted instead of the
+   * {@link Request.on | `done`} event you might expect. Using {@link execSqlBatch} will prevent this from occurring but may have a negative performance impact.
    *
    * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
-   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * If you're running in to scoping issues, then {@link execSqlBatch} may be a better choice.
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
-   * @param request A [[Request]] object representing the request.
+   * @param request A {@link Request} object representing the request.
    */
   execSql(request: Request) {
     try {
@@ -2801,7 +2801,7 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Execute a [[BulkLoad]].
+   * Execute a {@link BulkLoad}.
    *
    * ```js
    * // We want to perform a bulk load into a table with the following format:
@@ -2861,8 +2861,8 @@ class Connection extends EventEmitter {
    * connection.execBulkLoad(bulkLoad, employees());
    * ```
    *
-   * @param bulkLoad A previously created [[BulkLoad]].
-   * @param rows A [[Iterable]] or [[AsyncIterable]] that contains the rows that should be bulk loaded.
+   * @param bulkLoad A previously created {@link BulkLoad}.
+   * @param rows A {@link Iterable} or {@link AsyncIterable} that contains the rows that should be bulk loaded.
    */
   execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
 
@@ -2910,9 +2910,9 @@ class Connection extends EventEmitter {
    * Prepare the SQL represented by the request.
    *
    * The request can then be used in subsequent calls to
-   * [[execute]] and [[unprepare]]
+   * {@link execute} and {@link unprepare}
    *
-   * @param request A [[Request]] object representing the request.
+   * @param request A {@link Request} object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
    */
   prepare(request: Request) {
@@ -2957,7 +2957,7 @@ class Connection extends EventEmitter {
   /**
    * Release the SQL Server resources associated with a previously prepared request.
    *
-   * @param request A [[Request]] object representing the request.
+   * @param request A {@link Request} object representing the request.
    *   Parameters only require a name and type.
    *   Parameter values are ignored.
    */
@@ -2981,9 +2981,9 @@ class Connection extends EventEmitter {
   /**
    * Execute previously prepared SQL, using the supplied parameters.
    *
-   * @param request A previously prepared [[Request]].
+   * @param request A previously prepared {@link Request}.
    * @param parameters  An object whose names correspond to the names of
-   *   parameters that were added to the [[Request]] before it was prepared.
+   *   parameters that were added to the {@link Request} before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
@@ -3025,9 +3025,9 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * Call a stored procedure represented by [[Request]].
+   * Call a stored procedure represented by {@link Request}.
    *
-   * @param request A [[Request]] object representing the request.
+   * @param request A {@link Request} object representing the request.
    */
   callProcedure(request: Request) {
     try {
@@ -3088,7 +3088,7 @@ class Connection extends EventEmitter {
   /**
    * Commit a transaction.
    *
-   * There should be an active transaction - that is, [[beginTransaction]]
+   * There should be an active transaction - that is, {@link beginTransaction}
    * should have been previously called.
    *
    * @param callback
@@ -3114,7 +3114,7 @@ class Connection extends EventEmitter {
   /**
    * Rollback a transaction.
    *
-   * There should be an active transaction - that is, [[beginTransaction]]
+   * There should be an active transaction - that is, {@link beginTransaction}
    * should have been previously called.
    *
    * @param callback
@@ -3140,7 +3140,7 @@ class Connection extends EventEmitter {
   /**
    * Set a savepoint within a transaction.
    *
-   * There should be an active transaction - that is, [[beginTransaction]]
+   * There should be an active transaction - that is, {@link beginTransaction}
    * should have been previously called.
    *
    * @param callback
@@ -3164,8 +3164,8 @@ class Connection extends EventEmitter {
    * Run the given callback after starting a transaction, and commit or
    * rollback the transaction afterwards.
    *
-   * This is a helper that employs [[beginTransaction]], [[commitTransaction]],
-   * [[rollbackTransaction]], and [[saveTransaction]] to greatly simplify the
+   * This is a helper that employs {@link beginTransaction}, {@link commitTransaction},
+   * {@link rollbackTransaction}, and {@link saveTransaction} to greatly simplify the
    * use of database transactions and automatically handle transaction nesting.
    *
    * @param cb
