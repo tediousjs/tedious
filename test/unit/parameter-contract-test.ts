@@ -48,6 +48,28 @@ describe('Parameter serialization contract', function() {
       assert.deepEqual(nullValue.data, { value: null, length: 8000 });
     });
 
+    it('declares an empty Binary value as binary(1), never a zero length', function() {
+      for (const length of [undefined, 0, NaN]) {
+        const parameter = { type: TYPES.Binary, name: 'p', value: Buffer.alloc(0), length, output: false };
+        const resolved = resolveParameter(parameter, undefined, options);
+        assert.strictEqual(TYPES.Binary.declaration(parameter), 'binary(1)');
+
+        const buffer = new WritableTrackingBuffer();
+        TYPES.Binary.writeTypeInfo(buffer, resolved.data, options);
+        TYPES.Binary.writeValue(buffer, resolved.data, options);
+        assert.deepEqual(buffer.data, Buffer.from('ad01000000', 'hex'));
+      }
+    });
+
+    it('sends the actual Binary data length when it is shorter than the declared length', function() {
+      const resolved = resolveParameter({ type: TYPES.Binary, name: 'p', value: Buffer.from('JP'), length: 4, output: false }, undefined, options);
+
+      const buffer = new WritableTrackingBuffer();
+      TYPES.Binary.writeTypeInfo(buffer, resolved.data, options);
+      TYPES.Binary.writeValue(buffer, resolved.data, options);
+      assert.deepEqual(buffer.data, Buffer.from('ad040002004a50', 'hex'));
+    });
+
     it('resolves lengths for types with ids outside the legacy variable-length id bit pattern', function() {
       const type: DataType = {
         ...TYPES.VarBinary,
