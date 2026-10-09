@@ -50,7 +50,7 @@ import { version } from '../package.json';
 import { URL } from 'url';
 import { AttentionTokenHandler, InitialSqlTokenHandler, Login7TokenHandler, RequestTokenHandler, TokenHandler } from './token/handler';
 
-type BeginTransactionCallback =
+export type BeginTransactionCallback =
   /**
    * The callback is called when the request to start the transaction has completed,
    * either successfully or with an error.
@@ -64,7 +64,7 @@ type BeginTransactionCallback =
    */
   (err: Error | null | undefined, transactionDescriptor?: Buffer) => void
 
-type SaveTransactionCallback =
+export type SaveTransactionCallback =
   /**
    * The callback is called when the request to set a savepoint within the
    * transaction has completed, either successfully or with an error.
@@ -77,7 +77,7 @@ type SaveTransactionCallback =
    */
   (err: Error | null | undefined) => void;
 
-type CommitTransactionCallback =
+export type CommitTransactionCallback =
   /**
    * The callback is called when the request to commit the transaction has completed,
    * either successfully or with an error.
@@ -90,7 +90,7 @@ type CommitTransactionCallback =
    */
   (err: Error | null | undefined) => void;
 
-type RollbackTransactionCallback =
+export type RollbackTransactionCallback =
   /**
    * The callback is called when the request to rollback the transaction has
    * completed, either successfully or with an error.
@@ -103,7 +103,7 @@ type RollbackTransactionCallback =
    */
   (err: Error | null | undefined) => void;
 
-type ResetCallback =
+export type ResetCallback =
   /**
    * The callback is called when the connection reset has completed,
    * either successfully or with an error.
@@ -197,7 +197,7 @@ const DEFAULT_LANGUAGE = 'us_english';
  */
 const DEFAULT_DATEFORMAT = 'mdy';
 
-interface AzureActiveDirectoryMsiAppServiceAuthentication {
+export interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
   options: {
     /**
@@ -210,7 +210,7 @@ interface AzureActiveDirectoryMsiAppServiceAuthentication {
   };
 }
 
-interface AzureActiveDirectoryMsiVmAuthentication {
+export interface AzureActiveDirectoryMsiVmAuthentication {
   type: 'azure-active-directory-msi-vm';
   options: {
     /**
@@ -223,7 +223,7 @@ interface AzureActiveDirectoryMsiVmAuthentication {
   };
 }
 
-interface AzureActiveDirectoryDefaultAuthentication {
+export interface AzureActiveDirectoryDefaultAuthentication {
   type: 'azure-active-directory-default';
   options: {
     /**
@@ -237,7 +237,7 @@ interface AzureActiveDirectoryDefaultAuthentication {
 }
 
 
-interface AzureActiveDirectoryAccessTokenAuthentication {
+export interface AzureActiveDirectoryAccessTokenAuthentication {
   type: 'azure-active-directory-access-token';
   options: {
     /**
@@ -248,7 +248,7 @@ interface AzureActiveDirectoryAccessTokenAuthentication {
   };
 }
 
-interface AzureActiveDirectoryPasswordAuthentication {
+export interface AzureActiveDirectoryPasswordAuthentication {
   type: 'azure-active-directory-password';
   options: {
     /**
@@ -273,7 +273,7 @@ interface AzureActiveDirectoryPasswordAuthentication {
   };
 }
 
-interface AzureActiveDirectoryServicePrincipalSecret {
+export interface AzureActiveDirectoryServicePrincipalSecret {
   type: 'azure-active-directory-service-principal-secret';
   options: {
     /**
@@ -292,7 +292,7 @@ interface AzureActiveDirectoryServicePrincipalSecret {
 }
 
 /** Structure that defines the options that are necessary to authenticate the Tedious.JS instance with an `@azure/identity` token credential. */
-interface TokenCredentialAuthentication {
+export interface TokenCredentialAuthentication {
   /** Unique designator for the type of authentication to be used. */
   type: 'token-credential';
   /** Set of configurations that are required or allowed with this authentication type. */
@@ -302,7 +302,7 @@ interface TokenCredentialAuthentication {
   };
 }
 
-interface NtlmAuthentication {
+export interface NtlmAuthentication {
   type: 'ntlm';
   options: {
     /**
@@ -322,7 +322,7 @@ interface NtlmAuthentication {
   };
 }
 
-interface DefaultAuthentication {
+export interface DefaultAuthentication {
   type: 'default';
   options: {
     /**
@@ -451,7 +451,7 @@ export interface ConnectionConfiguration {
   authentication?: AuthenticationOptions;
 }
 
-interface DebugOptions {
+export interface DebugOptions {
   /**
    * A boolean, controlling whether {@link Connection.on | `debug`} events will be emitted with text describing packet data details
    *
@@ -478,7 +478,7 @@ interface DebugOptions {
   token: boolean;
 }
 
-interface AuthenticationOptions {
+export interface AuthenticationOptions {
   /**
    * Type of the authentication method, valid types are `default`, `ntlm`,
    * `azure-active-directory-password`, `azure-active-directory-access-token`,

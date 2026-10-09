@@ -35,6 +35,14 @@
       "GitHub": "https://github.com/tediousjs/tedious",
       "Examples": "https://github.com/tediousjs/tedious/tree/master/examples",
       "Changelog": "https://github.com/tediousjs/tedious/releases"
+    },
+    "highlightLanguages": ["js", "ts", "json", "sh", "sql"],
+    "externalSymbolLinkMappings": {
+      "typescript": {
+        "Error": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error",
+        "Iterable": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterable_protocol",
+        "AsyncIterable": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_async_iterator_and_async_iterable_protocols"
+      }
     }
   }
 }
