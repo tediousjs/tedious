@@ -81,7 +81,7 @@ export interface Options {
 
 export type Callback =
   /**
-   * A function which will be called after the [[BulkLoad]] finishes executing.
+   * A function which will be called after the {@link BulkLoad} finishes executing.
    *
    * @param rowCount the number of rows inserted
    */
@@ -92,7 +92,7 @@ interface Column extends Parameter {
   collation: Collation | undefined;
 }
 
-interface ColumnOptions {
+export interface ColumnOptions {
   output?: boolean;
 
   /**
@@ -111,7 +111,7 @@ interface ColumnOptions {
   scale?: number;
 
   /**
-   * If the name of the column is different from the name of the property found on `rowObj` arguments passed to [[addRow]], then you can use this option to specify the property name.
+   * If the name of the column is different from the name of the property found on `rowObj` arguments passed to {@link Connection.execBulkLoad}, then you can use this option to specify the property name.
    */
   objName?: string;
 
@@ -124,7 +124,7 @@ interface ColumnOptions {
 /**
  * A BulkLoad instance is used to perform a bulk insert.
  *
- * Use [[Connection.newBulkLoad]] to create a new instance, and [[Connection.execBulkLoad]] to execute it.
+ * Use {@link Connection.newBulkLoad} to create a new instance, and {@link Connection.execBulkLoad} to execute it.
  *
  * Example of BulkLoad Usages:
  *
@@ -395,7 +395,7 @@ class BulkLoad extends EventEmitter {
    * ```
    *
    * A side note on bulk inserting into temporary tables: if you want to access a local temporary table after executing the bulk load,
-   * you'll need to use the same connection and execute your requests using [[Connection.execSqlBatch]] instead of [[Connection.execSql]]
+   * you'll need to use the same connection and execute your requests using {@link Connection.execSqlBatch} instead of {@link Connection.execSql}
    */
   getTableCreationSql() {
     let sql = 'CREATE TABLE ' + this.table + '(\n';
@@ -467,7 +467,7 @@ class BulkLoad extends EventEmitter {
    * ```
    *
    * @param timeout The number of milliseconds before the bulk load is considered failed, or 0 for no timeout.
-   *   When no timeout is set for the bulk load, the [[ConnectionOptions.requestTimeout]] of the Connection is used.
+   *   When no timeout is set for the bulk load, the {@link ConnectionOptions.requestTimeout} of the Connection is used.
    */
   setTimeout(timeout?: number) {
     this.timeout = timeout;

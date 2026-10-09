@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=The+Girl+Next+Door&display=swap');
+
+:root {
+  --light-color-background: #fff;
+  --light-color-background-secondary: #fff;
+  --light-color-background-active: #f3f3f3;
+  --light-color-accent: #000000;
+  --light-color-ts-class: #aa0000;
+  --light-color-link: darkblue;
+
+  --dark-color-accent: #2c3e55;
+  --dark-color-link: #79b0f0;
+  --dark-color-ts-class: #ff7b7b;
+}
+
+body {
+    font-family: Helvetica, Arial, sans-serif;
+}
+
+a {
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+header .title {
+    font-family: 'The Girl Next Door', sans-serif;
+    color: var(--color-ts-class);
+}
+
+header .title {
+    font-size: 150%;
+}
+
+table, th, td {
+    border: 1px solid gray;
+    border-collapse: collapse;
+}
+
+th {
+    border-width: 2px;
+    text-align: left;
+}
+
+.tsd-kind-icon {
+    display: none;
+}
+
+.tsd-page-toolbar {
+    box-shadow: none;
+    border-bottom: 1px solid darkgray;
+    background: var(--color-background);
+}
+
+h1 {
+    font-family: 'The Girl Next Door', sans-serif;
+    font-size: 250%;
+    color: var(--color-ts-class);
+}
+
+h2 {
+    font-size: 150%;
+}
+
+h3 {
+    font-size: 120%;
+}
+
+.tsd-navigation a {
+    padding: 0.15em 0;
+}
+
+.tsd-navigation li {
+    list-style: disc; margin-left: 1em;
+}
+
+.tsd-page-title:has(+ .tsd-panel > h1:first-child) {
+    display: none;
+}

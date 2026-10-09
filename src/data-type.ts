@@ -286,63 +286,63 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>bit</code></td>
- *     <td><code>[[TYPES.Bit]]</code></td>
+ *     <td><code>{@link TYPES.Bit}</code></td>
  *     <td><code>boolean</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>tinyint</code></td>
- *     <td><code>[[TYPES.TinyInt]]</code></td>
+ *     <td><code>{@link TYPES.TinyInt}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>smallint</code></td>
- *     <td><code>[[TYPES.SmallInt]]</code></td>
+ *     <td><code>{@link TYPES.SmallInt}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>int</code></td>
- *     <td><code>[[TYPES.Int]]</code></td>
+ *     <td><code>{@link TYPES.Int}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>bigint</code><sup>1</sup></td>
- *     <td><code>[[TYPES.BigInt]]</code></td>
+ *     <td><code>{@link TYPES.BigInt}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>numeric</code><sup>2</sup></td>
- *     <td><code>[[TYPES.Numeric]]</code></td>
+ *     <td><code>{@link TYPES.Numeric}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>decimal</code><sup>2</sup></td>
- *     <td><code>[[TYPES.Decimal]]</code></td>
+ *     <td><code>{@link TYPES.Decimal}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>smallmoney</code></td>
- *     <td><code>[[TYPES.SmallMoney]]</code></td>
+ *     <td><code>{@link TYPES.SmallMoney}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>money</code></td>
- *     <td><code>[[TYPES.Money]]</code></td>
+ *     <td><code>{@link TYPES.Money}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
@@ -355,14 +355,14 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>float</code></td>
- *     <td><code>[[TYPES.Float]]</code></td>
+ *     <td><code>{@link TYPES.Float}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>real</code></td>
- *     <td><code>[[TYPES.Real]]</code></td>
+ *     <td><code>{@link TYPES.Real}</code></td>
  *     <td><code>number</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
@@ -375,42 +375,42 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>smalldatetime</code></td>
- *     <td><code>[[TYPES.SmallDateTime]]</code></td>
+ *     <td><code>{@link TYPES.SmallDateTime}</code></td>
  *     <td><code>Date</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>datetime</code></td>
- *     <td><code>[[TYPES.DateTime]]</code></td>
+ *     <td><code>{@link TYPES.DateTime}</code></td>
  *     <td><code>Date</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>datetime2</code></td>
- *     <td><code>[[TYPES.DateTime2]]</code></td>
+ *     <td><code>{@link TYPES.DateTime2}</code></td>
  *     <td><code>Date</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>datetimeoffset</code></td>
- *     <td><code>[[TYPES.DateTimeOffset]]</code></td>
+ *     <td><code>{@link TYPES.DateTimeOffset}</code></td>
  *     <td><code>Date</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>time</code></td>
- *     <td><code>[[TYPES.Time]]</code></td>
+ *     <td><code>{@link TYPES.Time}</code></td>
  *     <td><code>Date</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>date</code></td>
- *     <td><code>[[TYPES.Date]]</code></td>
+ *     <td><code>{@link TYPES.Date}</code></td>
  *     <td><code>Date</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
@@ -423,21 +423,21 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>char</code></td>
- *     <td><code>[[TYPES.Char]]</code></td>
+ *     <td><code>{@link TYPES.Char}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>varchar</code><sup>3</sup></td>
- *     <td><code>[[TYPES.VarChar]]</code></td>
+ *     <td><code>{@link TYPES.VarChar}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>text</code></td>
- *     <td><code>[[TYPES.Text]]</code></td>
+ *     <td><code>{@link TYPES.Text}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
@@ -450,21 +450,21 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>nchar</code></td>
- *     <td><code>[[TYPES.NChar]]</code></td>
+ *     <td><code>{@link TYPES.NChar}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>nvarchar</code><sup>3</sup></td>
- *     <td><code>[[TYPES.NVarChar]]</code></td>
+ *     <td><code>{@link TYPES.NVarChar}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>ntext</code></td>
- *     <td><code>[[TYPES.NText]]</code></td>
+ *     <td><code>{@link TYPES.NText}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>-</td>
@@ -477,21 +477,21 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>binary</code></td>
- *     <td><code>[[TYPES.Binary]]</code></td>
+ *     <td><code>{@link TYPES.Binary}</code></td>
  *     <td><code>Buffer</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>varbinary</code></td>
- *     <td><code>[[TYPES.VarBinary]]</code></td>
+ *     <td><code>{@link TYPES.VarBinary}</code></td>
  *     <td><code>Buffer</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>image</code></td>
- *     <td><code>[[TYPES.Image]]</code></td>
+ *     <td><code>{@link TYPES.Image}</code></td>
  *     <td><code>Buffer</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
@@ -504,35 +504,35 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>TVP</code></td>
- *     <td><code>[[TYPES.TVP]]</code></td>
+ *     <td><code>{@link TYPES.TVP}</code></td>
  *     <td><code>Object</code></td>
  *     <td>-</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>UDT</code></td>
- *     <td><code>[[TYPES.UDT]]</code></td>
+ *     <td><code>{@link TYPES.UDT}</code></td>
  *     <td><code>Buffer</code></td>
  *     <td>✓</td>
  *     <td>-</td>
  *   </tr>
  *   <tr>
  *     <td><code>uniqueidentifier</code><sup>4</sup></td>
- *     <td><code>[[TYPES.UniqueIdentifier]]</code></td>
+ *     <td><code>{@link TYPES.UniqueIdentifier}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>variant</code></td>
- *     <td><code>[[TYPES.Variant]]</code></td>
+ *     <td><code>{@link TYPES.Variant}</code></td>
  *     <td><code>any</code></td>
  *     <td>✓</td>
  *     <td>-</td>
  *   </tr>
  *   <tr>
  *     <td><code>xml</code></td>
- *     <td><code>[[TYPES.Xml]]</code></td>
+ *     <td><code>{@link TYPES.Xml}</code></td>
  *     <td><code>string</code></td>
  *     <td>✓</td>
  *     <td>-</td>
