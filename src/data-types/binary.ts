@@ -61,6 +61,16 @@ const Binary: { maximumLength: number } & DataType = {
     }
 
     return value;
+  },
+
+  resolve(parameter) {
+    const value = this.validate(parameter.value, undefined);
+
+    // A falsy length (`0`, `NaN`) is treated as unspecified, as `declaration`
+    // does, so that the TYPE_INFO matches the declared `binary(n)`.
+    const length = parameter.length || this.resolveLength!({ ...parameter, value });
+
+    return { value, length };
   }
 };
 
