@@ -47,8 +47,11 @@ const Binary: { maximumLength: number } & DataType = {
       return;
     }
 
-    buffer.writeUInt16LE(parameter.length!);
-    buffer.writeBuffer(value.subarray(0, parameter.length !== undefined ? Math.min(parameter.length, Binary.maximumLength) : Binary.maximumLength));
+    // The data length is the number of bytes actually sent, which can be less
+    // than the declared length; the server pads the value to that length.
+    const length = Math.min(value.length, parameter.length !== undefined ? parameter.length : Binary.maximumLength, Binary.maximumLength);
+    buffer.writeUInt16LE(length);
+    buffer.writeBuffer(value.subarray(0, length));
   },
 
   validate: function(value): Buffer | null {
@@ -61,6 +64,21 @@ const Binary: { maximumLength: number } & DataType = {
     }
 
     return value;
+  },
+
+  resolve(parameter) {
+    const value = this.validate(parameter.value, undefined);
+
+    // A falsy length (`0`, `NaN`) is treated as unspecified, as `declaration`
+    // does, so that the TYPE_INFO matches the declared `binary(n)`. The
+    // server rejects a declared length of 0, so an empty value is declared
+    // as `binary(1)`.
+    let length = parameter.length;
+    if (!length) {
+      length = value != null ? value.length || 1 : this.maximumLength;
+    }
+
+    return { value, length };
   }
 };
 
