@@ -87,7 +87,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  declare userCallback: CompletionCallback;
+  declare userCallback: CompletionCallback | undefined;
   /**
    * @private
    */
@@ -398,7 +398,7 @@ class Request extends EventEmitter {
    * @param callback
    *   The callback to execute once the request has been fully completed.
    */
-  constructor(sqlTextOrProcedure: string | undefined, callback: CompletionCallback, options?: RequestOptions) {
+  constructor(sqlTextOrProcedure: string | undefined, callback?: CompletionCallback, options?: RequestOptions) {
     super();
 
     this.sqlTextOrProcedure = sqlTextOrProcedure;
@@ -428,7 +428,7 @@ class Request extends EventEmitter {
           this.emit('prepared');
         }
       } else {
-        this.userCallback(err, rowCount, rows);
+        this.userCallback?.(err, rowCount, rows);
         this.emit('requestCompleted');
       }
     };
