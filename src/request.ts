@@ -40,7 +40,7 @@ export interface ParameterOptions {
   scale?: number;
 }
 
-interface RequestOptions {
+export interface RequestOptions {
   statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
 }
 
