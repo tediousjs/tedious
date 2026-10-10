@@ -1,21 +1,998 @@
 import { type AddressInfo, createConnection, createServer, Server, Socket } from 'net';
-import { once } from 'events';
+import { getEventListeners, once } from 'events';
 import { assert } from 'chai';
 import { promisify } from 'util';
 import DuplexPair from 'native-duplexpair';
 import { checkServerIdentity, type PeerCertificate, TLSSocket } from 'tls';
 import { readFileSync } from 'fs';
-import { Duplex } from 'stream';
+import { Duplex, Readable } from 'stream';
+import BufferListStream from 'bl';
 
 import Debug from '../../src/debug';
-import MessageIO from '../../src/message-io';
+import MessageIO, { readMessage, writeMessage } from '../../src/message-io';
 import Message from '../../src/message';
 import { Packet, TYPE } from '../../src/packet';
+import { ConnectionError } from '../../src/errors';
 
 const packetType = 2;
 const packetSize = 8 + 4;
 
 const delay = promisify(setTimeout);
+
+function assertNoDanglingEventListeners(stream: Duplex) {
+  assert.strictEqual(stream.listenerCount('error'), 0);
+  assert.strictEqual(stream.listenerCount('drain'), 0);
+  assert.strictEqual(stream.listenerCount('readable'), 0);
+  assert.strictEqual(stream.listenerCount('close'), 0);
+}
+
+function splitPackets(data: Buffer): Packet[] {
+  const packets = [];
+
+  let offset = 0;
+  while (offset < data.length) {
+    const length = data.readUInt16BE(offset + 2);
+    packets.push(new Packet(data.subarray(offset, offset + length)));
+    offset += length;
+  }
+
+  return packets;
+}
+
+describe('writeMessage', function() {
+  it('wraps the given payload into a TDS packet and writes it to the given stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    await writeMessage(stream, packetSize, packetType, [payload]);
+
+    const buf = stream.read();
+    assert.instanceOf(buf, Buffer);
+
+    const packet = new Packet(buf);
+    assert.strictEqual(packet.type(), packetType);
+    assert.strictEqual(packet.length(), payload.length + 8);
+    assert.isTrue(packet.isLast());
+    assert.deepEqual(packet.data(), payload);
+
+    assert.isNull(stream.read());
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('splits payloads that are larger than the packet size across multiple packets', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    // `packetSize` allows for 4 bytes of data per packet
+    await writeMessage(stream, packetSize, packetType, [payload]);
+
+    const [firstPacket, secondPacket, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    assert.strictEqual(firstPacket.packetId(), 1);
+    assert.isFalse(firstPacket.isLast());
+    assert.deepEqual(firstPacket.data(), payload.subarray(0, 4));
+
+    assert.strictEqual(secondPacket.packetId(), 2);
+    assert.isTrue(secondPacket.isLast());
+    assert.deepEqual(secondPacket.data(), payload.subarray(4));
+  });
+
+  it('sets the reset connection status bit on every packet', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    // `packetSize` allows for 4 bytes of data per packet
+    await writeMessage(stream, packetSize, packetType, [payload], { resetConnection: true });
+
+    const packets = splitPackets(stream.read());
+    assert.lengthOf(packets, 2);
+
+    for (const packet of packets) {
+      assert.include(packet.statusAsString(), 'RESETCONNECTION');
+    }
+  });
+
+  it('writes an empty final packet for an empty payload', async function() {
+    const stream = new BufferListStream();
+
+    await writeMessage(stream, packetSize, packetType, []);
+
+    const packet = new Packet(stream.read());
+    assert.isTrue(packet.isLast());
+    assert.deepEqual(packet.data(), Buffer.alloc(0));
+
+    assert.isNull(stream.read());
+  });
+
+  it('terminates the message with the ignore flag set when iterating the payload errors', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        yield payload;
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'iteration error');
+    }
+
+    assert(hadError);
+
+    const [firstPacket, lastPacket, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    // The part of the payload that filled a whole packet was sent before the
+    // error occurred, the rest is discarded.
+    assert.isFalse(firstPacket.isLast());
+    assert.deepEqual(firstPacket.data(), payload.subarray(0, 4));
+
+    assert.isTrue(lastPacket.isLast());
+    assert.include(lastPacket.statusAsString(), 'IGNORE');
+    assert.deepEqual(lastPacket.data(), Buffer.alloc(0));
+
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors from the payload while the stream is waiting for drain', async function() {
+    const payload = Buffer.from([1, 2, 3, 4]);
+
+    const callbacks: Array<() => void> = [];
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // Collect all callbacks so that we can simulate draining the stream later
+        callbacks.push(callback);
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Simulate draining the stream after the exception was thrown
+        setTimeout(() => {
+          let cb;
+          while (cb = callbacks.shift()) {
+            cb();
+          }
+        }, 20);
+
+        throw new Error('iteration error');
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'iteration error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream during writing', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        callback(new Error('write error'));
+      },
+      read() {}
+    });
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while waiting for the stream to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [payload, payload, payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('handles errors on the stream while waiting for more payload data', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      stream.destroy(new Error('write error'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        yield payload;
+        yield payload;
+        yield payload;
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'write error');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the given stream is not writable', async function() {
+    const stream = new BufferListStream();
+    stream.end();
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, []);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the stream is closed while waiting for the final packet to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+
+      // Close the stream without an error.
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      // A single small payload: the only drain wait is the one for the
+      // final packet, after which the message would be considered sent.
+      await writeMessage(stream, packetSize, packetType, [payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the stream is closed while waiting for an intermediate packet to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+
+      // Close the stream without an error.
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [payload, payload, payload]);
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the stream is closed while waiting for more payload data', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    setTimeout(() => {
+      // Close the stream without an error.
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Stall forever, waiting for more data that never arrives.
+        await new Promise(() => {});
+      })());
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('terminates the message with the ignore flag set when the given cancel signal is aborted while writing', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort();
+    }, 20);
+
+    await writeMessage(stream, packetSize, packetType, (async function*() {
+      yield payload;
+
+      // Stall forever, waiting for more data that never arrives.
+      await new Promise(() => {});
+    })(), { cancelSignal: controller.signal });
+
+    const [firstPacket, lastPacket, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    // The part of the payload that filled a whole packet was sent before the
+    // cancellation, the rest is discarded and the message is terminated with
+    // the `IGNORE` flag set.
+    assert.isFalse(firstPacket.isLast());
+    assert.deepEqual(firstPacket.data(), payload.subarray(0, 4));
+
+    assert.isTrue(lastPacket.isLast());
+    assert.include(lastPacket.statusAsString(), 'IGNORE');
+    assert.deepEqual(lastPacket.data(), Buffer.alloc(0));
+
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('writes an ignored message without consuming the payload when the given cancel signal is already aborted', async function() {
+    const stream = new BufferListStream();
+    const cancelSignal = AbortSignal.abort();
+
+    let payloadConsumed = false;
+
+    await writeMessage(stream, packetSize, packetType, (async function*() {
+      payloadConsumed = true;
+      yield Buffer.from([1, 2, 3]);
+    })(), { cancelSignal });
+
+    assert.isFalse(payloadConsumed);
+
+    const [packet, ...rest] = splitPackets(stream.read());
+    assert.lengthOf(rest, 0);
+
+    assert.isTrue(packet.isLast());
+    assert.include(packet.statusAsString(), 'IGNORE');
+    assert.deepEqual(packet.data(), Buffer.alloc(0));
+
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('stops waiting for the stream to drain when the given cancel signal is aborted', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      controller.abort();
+    }, 20);
+
+    // Resolves normally: the remaining payload is discarded and the
+    // `IGNORE`-flagged terminator is written without further drain waits.
+    await writeMessage(stream, packetSize, packetType, [payload, payload, payload], { cancelSignal: controller.signal });
+
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('does not wait for the stream to drain when the given cancel signal is already aborted', async function() {
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    const cancelSignal = AbortSignal.abort();
+
+    // Resolves normally even though the terminator write is backpressured:
+    // nothing further will be written for this message.
+    await writeMessage(stream, packetSize, packetType, [Buffer.from([1, 2, 3])], { cancelSignal });
+
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('closes the payload iterator when the given cancel signal is aborted', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort();
+    }, 20);
+
+    let cleanedUp = false;
+
+    await writeMessage(stream, packetSize, packetType, (async function*() {
+      try {
+        yield payload;
+
+        // Stall on something that eventually settles, so the deferred
+        // `.return()` call can be processed by the generator.
+        await delay(40);
+
+        yield payload;
+      } finally {
+        cleanedUp = true;
+      }
+    })(), { cancelSignal: controller.signal });
+
+    // The message write finished at cancellation time, ...
+    assert.isFalse(cleanedUp);
+
+    // ... while the payload iterator is closed once it becomes settleable.
+    await delay(40);
+    assert.isTrue(cleanedUp);
+  });
+
+  it('closes the payload iterator when the given signal is aborted', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('teardown'));
+    }, 20);
+
+    let cleanedUp = false;
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        try {
+          yield payload;
+
+          // Stall on something that eventually settles, so the deferred
+          // `.return()` call can be processed by the generator.
+          await delay(40);
+
+          yield payload;
+        } finally {
+          cleanedUp = true;
+        }
+      })(), { signal: controller.signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'teardown');
+    }
+
+    assert(hadError);
+    assert.isFalse(cleanedUp);
+
+    await delay(40);
+    assert.isTrue(cleanedUp);
+  });
+
+  it('prefers teardown over cancellation when both signals are aborted', async function() {
+    const stream = new BufferListStream();
+    const signal = AbortSignal.abort(new Error('teardown'));
+    const cancelSignal = AbortSignal.abort();
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [Buffer.from([1, 2, 3])], { cancelSignal, signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'teardown');
+    }
+
+    assert(hadError);
+
+    // Nothing was written.
+    assert.isNull(stream.read());
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('throws when the given signal is already aborted', async function() {
+    const stream = new BufferListStream();
+    const signal = AbortSignal.abort(new Error('canceled'));
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [Buffer.from([1, 2, 3])], { signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+
+    // Nothing was written.
+    assert.isNull(stream.read());
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('stops writing when the given signal is aborted while waiting for the stream to drain', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const stream = new Duplex({
+      write(chunk, encoding, callback) {
+        // never call callback so that the stream never drains
+      },
+      read() {},
+
+      // instantly return false on write requests to indicate that the stream needs to drain
+      highWaterMark: 1
+    });
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      assert(stream.writableNeedDrain);
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, [payload, payload, payload], { signal: controller.signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('stops writing when the given signal is aborted while waiting for more payload data', async function() {
+    const payload = Buffer.from([1, 2, 3, 4, 5, 6]);
+    const stream = new BufferListStream();
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      await writeMessage(stream, packetSize, packetType, (async function*() {
+        yield payload;
+
+        // Stall forever, waiting for more data that never arrives.
+        await new Promise(() => {});
+      })(), { signal: controller.signal });
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+
+    // The part of the payload that filled a whole packet was written, but
+    // no `IGNORE` terminator: the message is intentionally left unterminated
+    // as the connection is being torn down.
+    const packets = splitPackets(stream.read());
+    assert.lengthOf(packets, 1);
+    assert.isFalse(packets[0].isLast());
+
+    assertNoDanglingEventListeners(stream);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+});
+
+describe('readMessage', function() {
+  it('reads a message consisting of a single TDS packet from the given stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+
+    const stream = new BufferListStream();
+    stream.write(packet.buffer);
+
+    const chunks = [];
+    for await (const chunk of readMessage(stream)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, [payload]);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('reads a message that spans multiple TDS packets', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+
+    const firstPacket = new Packet(packetType);
+    firstPacket.addData(payload.subarray(0, 2));
+
+    const lastPacket = new Packet(packetType);
+    lastPacket.last(true);
+    lastPacket.addData(payload.subarray(2));
+
+    const stream = new BufferListStream();
+    stream.write(firstPacket.buffer);
+    stream.write(lastPacket.buffer);
+
+    const chunks = [];
+    for await (const chunk of readMessage(stream)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(Buffer.concat(chunks), payload);
+  });
+
+  it('reads packets that arrive in chunks that do not align with packet boundaries', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+
+    const firstPacket = new Packet(packetType);
+    firstPacket.addData(payload.subarray(0, 2));
+
+    const lastPacket = new Packet(packetType);
+    lastPacket.last(true);
+    lastPacket.addData(payload.subarray(2));
+
+    const data = Buffer.concat([firstPacket.buffer, lastPacket.buffer]);
+
+    const stream = new Readable({ read() {} });
+
+    // Deliver the data byte by byte.
+    for (let i = 0; i < data.length; i++) {
+      setTimeout(() => {
+        stream.push(data.subarray(i, i + 1));
+      }, i);
+    }
+
+    const chunks = [];
+    for await (const chunk of readMessage(stream)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(Buffer.concat(chunks), payload);
+  });
+
+  it('pushes bytes that follow the last packet of a message back onto the stream', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.last(true);
+    packet.addData(payload);
+
+    const trailingBytes = Buffer.from([9, 9, 9, 9]);
+
+    const stream = new BufferListStream();
+    stream.write(Buffer.concat([packet.buffer, trailingBytes]));
+
+    const chunks = [];
+    for await (const chunk of readMessage(stream)) {
+      chunks.push(chunk);
+    }
+
+    assert.deepEqual(chunks, [payload]);
+    assert.deepEqual(stream.read(), trailingBytes);
+  });
+
+  it('handles errors while reading from the stream', async function() {
+    const stream = Readable.from((async function*(): AsyncGenerator<Buffer> {
+      throw new Error('read error');
+    })());
+
+    let hadError = false;
+    try {
+      const message = readMessage(stream);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'read error');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the stream is closed before the message was fully read', async function() {
+    const packet = new Packet(packetType);
+    packet.addData(Buffer.from([1, 2, 3]));
+
+    const stream = new Readable({ read() {} });
+    stream.push(packet.buffer);
+
+    setTimeout(() => {
+      stream.destroy();
+    }, 20);
+
+    let hadError = false;
+    try {
+      const message = readMessage(stream);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the stream is closed while a yielded chunk is being processed', async function() {
+    const payload = Buffer.from([1, 2, 3]);
+    const packet = new Packet(packetType);
+    packet.addData(payload);
+
+    const stream = new Readable({ read() {} });
+    stream.push(packet.buffer);
+
+    const message = readMessage(stream);
+
+    const { value } = await message.next();
+    assert.deepEqual(value, payload);
+
+    // The generator is now suspended at `yield`. Close the stream without
+    // an error while the consumer is processing the chunk.
+    stream.destroy();
+    await once(stream, 'close');
+
+    let hadError = false;
+    try {
+      await message.next();
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the given stream is not readable', async function() {
+    const stream = new Readable({ read() {} });
+    stream.destroy();
+
+    let hadError = false;
+    try {
+      const message = readMessage(stream);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'Premature close');
+    }
+
+    assert(hadError);
+  });
+
+  it('throws when the given signal is already aborted', async function() {
+    const stream = new BufferListStream();
+    const signal = AbortSignal.abort(new Error('canceled'));
+
+    let hadError = false;
+    try {
+      const message = readMessage(stream, { signal });
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+
+  it('stops reading when the given signal is aborted while waiting for data on a quiet stream', async function() {
+    // A stream that stays open but never produces data, like a connection
+    // to a server that accepted the connection but never responds.
+    const stream = new Readable({ read() {} });
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    let hadError = false;
+    try {
+      const message = readMessage(stream, { signal: controller.signal });
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('stops reading when the given signal is aborted after a partial message was read', async function() {
+    const firstPacket = new Packet(packetType);
+    firstPacket.addData(Buffer.from([1, 2, 3]));
+
+    const stream = new Readable({ read() {} });
+    stream.push(firstPacket.buffer);
+
+    const controller = new AbortController();
+    setTimeout(() => {
+      controller.abort(new Error('canceled'));
+    }, 20);
+
+    const chunks = [];
+    let hadError = false;
+    try {
+      for await (const chunk of readMessage(stream, { signal: controller.signal })) {
+        chunks.push(chunk);
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+    assert.deepEqual(chunks, [Buffer.from([1, 2, 3])]);
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('settles pending reads when the given signal is aborted, instead of deadlocking on `.return()`', async function() {
+    // Regression test: calling `.return()` on the generator while it is
+    // suspended waiting for stream data is queued behind the pending
+    // `.next()` call and would deadlock. Aborting the signal settles the
+    // pending read, after which `.return()` resolves normally.
+    const stream = new Readable({ read() {} });
+
+    const controller = new AbortController();
+    const message = readMessage(stream, { signal: controller.signal });
+
+    const pendingRead = message.next();
+
+    controller.abort(new Error('canceled'));
+
+    let hadError = false;
+    try {
+      await pendingRead;
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, Error);
+      assert.strictEqual(err.message, 'canceled');
+    }
+
+    assert(hadError);
+
+    // The generator has completed; `.return()` settles immediately.
+    assert.deepEqual(await message.return(), { value: undefined, done: true });
+    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+  });
+
+  it('throws when receiving a packet with an invalid length', async function() {
+    const invalidPacket = Buffer.alloc(8);
+    invalidPacket.writeUInt16BE(4, 2);
+
+    const stream = new BufferListStream();
+    stream.write(invalidPacket);
+
+    let hadError = false;
+    try {
+      const message = readMessage(stream);
+      while (!(await message.next()).done) {
+        // Discard the message contents.
+      }
+    } catch (err: any) {
+      hadError = true;
+
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual(err.message, 'Unable to process incoming packet');
+    }
+
+    assert(hadError);
+    assertNoDanglingEventListeners(stream);
+  });
+});
 
 describe('MessageIO', function() {
   let server: Server;
