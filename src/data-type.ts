@@ -37,6 +37,7 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
+import { validateLength } from './data-types/validate-length';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
@@ -76,6 +77,18 @@ export interface DataType {
   id: number;
   type: string;
   name: string;
+
+  /**
+   * For a type that is declared with a length (`binary(n)`, `nvarchar(n)`,
+   * ...), the largest length it can be declared with.
+   */
+  maximumLength?: number;
+
+  /**
+   * Whether such a type also has a `max` form (`varbinary(max)`), which a
+   * length above `maximumLength` (e.g. `Infinity`) declares.
+   */
+  hasMax?: boolean;
 
   declaration(parameter: Parameter): string;
   validate(value: any, collation: Collation | undefined, options?: InternalConnectionOptions): any; // TODO: Refactor 'any' and replace with more specific type.
@@ -137,6 +150,10 @@ export interface ResolvedParameter {
  */
 export function resolveParameter(parameter: Parameter, collation: Collation | undefined, options: InternalConnectionOptions): ResolvedParameter {
   const type = parameter.type;
+
+  if (parameter.length != null) {
+    validateLength(type, parameter.length);
+  }
 
   if (type.resolve) {
     return { name: parameter.name, output: parameter.output, type, data: type.resolve(parameter, collation, options) };

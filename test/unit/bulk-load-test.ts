@@ -641,6 +641,21 @@ describe('BulkLoad', function() {
       assert.strictEqual(bulkLoad.columns[1].length, 7);
       assert.strictEqual(bulkLoad.columns[2].length, TYPES.VarBinary.maximumLength);
     });
+
+    it('rejects a length the column type cannot be declared with', function() {
+      for (const length of [0, NaN, -1, 8001]) {
+        const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+        assert.throws(() => request.addColumn('foo', TYPES.Binary, { length }), InputError, 'Column \'foo\' has an invalid length');
+      }
+    });
+
+    it('accepts a length within the type\'s range, or none', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('a', TYPES.Binary, { length: 4 });
+      request.addColumn('b', TYPES.Binary, { });
+      request.addColumn('c', TYPES.VarBinary, { length: Infinity });
+      assert.deepEqual(request.columns.map((c) => c.length), [4, 8000, Infinity]);
+    });
   });
 
   describe('#execBulkLoad', function() {

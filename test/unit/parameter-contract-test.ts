@@ -4,6 +4,7 @@ import { typeByName as TYPES, type DataType, resolveParameter } from '../../src/
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 import { type InternalConnectionOptions } from '../../src/connection';
 import { Collation } from '../../src/collation';
+import { InputError } from '../../src/errors';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
 
@@ -68,6 +69,60 @@ describe('Parameter serialization contract', function() {
       };
       const resolved = resolveParameter({ type, name: 'p', value: 1, output: true }, undefined, options);
       assert.deepEqual(resolved, { name: 'p', output: true, type, data: { value: 7, length: 99 } });
+    });
+
+    describe('with an explicit length', function() {
+      function resolve(type: DataType, value: unknown, length: number) {
+        return resolveParameter({ type, name: 'p', value, length, output: false }, undefined, options);
+      }
+
+      it('rejects a length a type cannot be declared with', function() {
+        const cases: [DataType, unknown, number][] = [
+          [TYPES.Binary, Buffer.from('JP'), 0],
+          [TYPES.Binary, Buffer.from('JP'), NaN],
+          [TYPES.Binary, Buffer.from('JP'), -1],
+          [TYPES.Binary, Buffer.from('JP'), 1.5],
+          [TYPES.Binary, Buffer.from('JP'), 8001],
+          [TYPES.Binary, Buffer.from('JP'), Infinity],
+          [TYPES.Binary, null, 0],
+          [TYPES.VarBinary, Buffer.from('JP'), 0],
+          [TYPES.VarBinary, Buffer.from('JP'), 1.5],
+          [TYPES.Char, 'JP', 0],
+          [TYPES.Char, 'JP', NaN],
+          [TYPES.Char, 'JP', 8001],
+          [TYPES.NChar, 'JP', 4001],
+          [TYPES.VarChar, 'JP', 0],
+          [TYPES.NVarChar, 'JP', 0],
+          [TYPES.NVarChar, 'JP', -1]
+        ];
+
+        for (const [type, value, length] of cases) {
+          assert.throws(() => resolve(type, value, length), InputError, `Invalid length ${length} for ${type.name}`);
+        }
+      });
+
+      it('accepts a length within the type\'s range', function() {
+        assert.strictEqual(resolve(TYPES.Binary, Buffer.from('JP'), 1).data.length, 1);
+        assert.strictEqual(resolve(TYPES.Binary, Buffer.from('JP'), 8000).data.length, 8000);
+        assert.strictEqual(resolve(TYPES.NChar, 'JP', 4000).data.length, 4000);
+        assert.strictEqual(resolve(TYPES.NVarChar, 'JP', 1).data.length, 1);
+      });
+
+      it('accepts a length above the maximum, or NaN, for a type with a max form', function() {
+        assert.strictEqual(resolve(TYPES.VarBinary, Buffer.from('JP'), Infinity).data.length, Infinity);
+        assert.strictEqual(resolve(TYPES.VarBinary, Buffer.from('JP'), 9000).data.length, 9000);
+        assert.isNaN(resolve(TYPES.VarBinary, Buffer.from('JP'), NaN).data.length);
+        assert.isNaN(resolve(TYPES.NVarChar, 'JP', NaN).data.length);
+      });
+
+      it('leaves a length on a type that is not declared with one alone', function() {
+        assert.strictEqual(resolve(TYPES.Int, 1, 0).data.value, 1);
+      });
+
+      it('rejects an invalid length on a TVP column', function() {
+        const value = { name: 't', columns: [{ name: 'c', type: TYPES.Binary, length: 0 }], rows: [[Buffer.from('JP')]] };
+        assert.throws(() => resolveParameter({ type: TYPES.TVP, name: 'p', value, output: false }, undefined, options), InputError, 'TVP column \'c\' has an invalid length');
+      });
     });
   });
 

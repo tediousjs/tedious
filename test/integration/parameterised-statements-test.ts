@@ -1249,4 +1249,34 @@ end')\
     }
   });
 
+  it('rejects an invalid explicit length without sending the request', function(done) {
+    const connection = new Connection(getConfig());
+
+    connection.connect(function(err) {
+      assert.ifError(err);
+
+      const request = new Request('select @p as p', function(err) {
+        assert.instanceOf(err, Error);
+        assert.strictEqual((err as any).code, 'EPARAM');
+        assert.include(err!.message, 'Invalid length 0 for Binary');
+
+        // Nothing was sent, so the connection is still usable.
+        const next = new Request('select @p as p', function(err) {
+          assert.ifError(err);
+          connection.close();
+        });
+        next.addParameter('p', TYPES.Binary, Buffer.from('JP'), { length: 2 });
+        next.on('row', function(columns) {
+          assert.deepEqual(columns[0].value, Buffer.from('JP'));
+        });
+        connection.execSql(next);
+      });
+      request.addParameter('p', TYPES.Binary, Buffer.from('JP'), { length: 0 });
+      connection.execSql(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
 });

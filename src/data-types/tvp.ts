@@ -4,6 +4,7 @@ import { type Collation } from '../collation';
 import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { isAsyncIterable } from './plp-stream';
+import { validateLength } from './validate-length';
 
 const TVP_TYPE_ID = 0xF3;
 
@@ -45,6 +46,16 @@ function validateTable(value: unknown): TvpValue | null {
   const rows = (value as TvpValue).rows;
   if (!Array.isArray(rows) && !isAsyncIterable(rows)) {
     throw new TypeError('Invalid table.');
+  }
+
+  for (const column of (value as TvpValue).columns) {
+    if (column.length != null) {
+      try {
+        validateLength(column.type, column.length);
+      } catch (error) {
+        throw new InputError(`TVP column '${column.name}' has an invalid length`, { cause: error });
+      }
+    }
   }
 
   return value as TvpValue;

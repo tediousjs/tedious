@@ -6,6 +6,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
 import { InputError } from './errors';
+import { validateLength } from './data-types/validate-length';
 import { Collation } from './collation';
 
 /**
@@ -290,6 +291,14 @@ class BulkLoad extends EventEmitter {
   addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.executionStarted) {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
+    }
+
+    if (length != null) {
+      try {
+        validateLength(type, length);
+      } catch (error) {
+        throw new InputError(`Column '${name}' has an invalid length`, { cause: error });
+      }
     }
 
     const column: Column = {

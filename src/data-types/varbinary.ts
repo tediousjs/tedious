@@ -20,6 +20,7 @@ const VarBinary: { maximumLength: number } & DataType = {
   type: 'BIGVARBIN',
   name: 'VarBinary',
   maximumLength: 8000,
+  hasMax: true,
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.

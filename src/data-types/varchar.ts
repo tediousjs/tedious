@@ -14,6 +14,7 @@ const VarChar: { maximumLength: number } & DataType = {
   type: 'BIGVARCHR',
   name: 'VarChar',
   maximumLength: 8000,
+  hasMax: true,
 
   declaration: function(parameter) {
     const value = parameter.value as Buffer | null;

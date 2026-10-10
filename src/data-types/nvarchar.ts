@@ -21,6 +21,7 @@ const NVarChar: { maximumLength: number } & DataType = {
   type: 'NVARCHAR',
   name: 'NVarChar',
   maximumLength: 4000,
+  hasMax: true,
 
   declaration: function(parameter) {
     const value = parameter.value as any; // Temporary solution. Remove 'any' later.
