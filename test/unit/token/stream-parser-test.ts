@@ -1,7 +1,9 @@
 import { assert } from 'chai';
 
 import Parser, { type ParserOptions } from '../../../src/token/stream-parser';
-import { DoneToken, NBCRowToken, ReturnValueToken, RowToken } from '../../../src/token/token';
+import { Readable } from 'stream';
+
+import { ColumnValueToken, DoneToken, NBCRowToken, ReturnValueStartToken, ReturnValueToken, RowStartToken, RowToken, RowValuesToken, type Token, ValueChunkToken, ValueStartToken } from '../../../src/token/token';
 import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
 import { typeByName as dataTypeByName } from '../../../src/data-type';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
@@ -56,8 +58,9 @@ function readAll(parser: Parser) {
   return tokens;
 }
 
-function parseByteByByte(data: Buffer, colMetadata: ColumnMetadata[]) {
+function parseByteByByte(data: Buffer, colMetadata: ColumnMetadata[], streamValues = false) {
   const parser = new Parser(options, colMetadata);
+  parser.streamValues = streamValues;
 
   const tokens = [];
   for (const byte of data) {
@@ -236,5 +239,242 @@ describe('Stream Parser', function() {
     assert.throws(() => {
       parser.read();
     }, 'Partially Length-prefixed Bytes unmatched lengths : expected 10, but got 4 bytes');
+  });
+
+  describe('streaming values', function() {
+    // Summarize streamed tokens, merging consecutive value chunks.
+    function summarize(tokens: Token[]) {
+      const summary: unknown[] = [];
+
+      for (const token of tokens) {
+        if (token instanceof RowStartToken) {
+          summary.push(['ROW_START', token.values]);
+        } else if (token instanceof RowValuesToken) {
+          summary.push(['ROW_VALUES', token.values]);
+        } else if (token instanceof ReturnValueStartToken) {
+          summary.push(['RETURNVALUE_START', token.paramName, token.length]);
+        } else if (token instanceof RowToken || token instanceof NBCRowToken) {
+          summary.push([token.name, token.columns.map((c: { value: unknown }) => c.value)]);
+        } else if (token instanceof ColumnValueToken) {
+          summary.push(['COLUMN_VALUE', token.index, token.value]);
+        } else if (token instanceof ValueStartToken) {
+          summary.push(['VALUE_START', token.index, token.length]);
+        } else if (token instanceof ValueChunkToken) {
+          const last = summary[summary.length - 1];
+          if (Array.isArray(last) && last[0] === 'VALUE_DATA') {
+            last[1] = Buffer.concat([last[1], token.data]);
+          } else {
+            summary.push(['VALUE_DATA', token.data]);
+          }
+        } else if (token instanceof ReturnValueToken) {
+          summary.push(token);
+        } else {
+          summary.push(token.name);
+        }
+      }
+
+      return summary;
+    }
+
+    it('streams PLP values of rows that arrive byte by byte', function() {
+      const colMetadata = [
+        column('a', dataTypeByName.Int),
+        column('b', dataTypeByName.VarBinary, 0xFFFF),
+        column('c', dataTypeByName.NVarChar, 0xFFFF),
+        column('d', dataTypeByName.VarBinary, 0xFFFF)
+      ];
+
+      const binary = Buffer.from(Array.from({ length: 100 }, (_, i) => i));
+
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD1);
+      buffer.writeInt32LE(7);
+      writePLP(buffer, binary, 7);
+      writePLP(buffer, Buffer.alloc(0), 1);
+      buffer.writeBigUInt64LE(0xFFFFFFFFFFFFFFFFn); // null
+      writeDone(buffer, '7_2');
+
+      const tokens = parseByteByByte(buffer.data, colMetadata, true);
+
+      assert.deepEqual(summarize(tokens), [
+        ['ROW_START', [7]],
+        ['VALUE_START', 1, 100],
+        ['VALUE_DATA', binary],
+        'VALUE_END',
+        ['VALUE_START', 2, 0],
+        'VALUE_END',
+        ['COLUMN_VALUE', 3, null],
+        'ROW_END',
+        'DONE'
+      ]);
+    });
+
+    it('returns rows without streamed values as single tokens of their values', function() {
+      const colMetadata = [
+        column('a', dataTypeByName.Int),
+        column('b', dataTypeByName.VarBinary, 0xFFFF)
+      ];
+
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD1);
+      buffer.writeInt32LE(1);
+      buffer.writeBigUInt64LE(0xFFFFFFFFFFFFFFFFn); // null
+      buffer.writeUInt8(0xD2);
+      buffer.writeUInt8(0b00000010); // `b` is null
+      buffer.writeInt32LE(2);
+
+      const tokens = parseByteByByte(buffer.data, colMetadata, true);
+
+      assert.deepEqual(summarize(tokens), [
+        ['ROW_VALUES', [1, null]],
+        ['ROW_VALUES', [2, null]]
+      ]);
+    });
+
+    it('streams PLP values of return values', function() {
+      function writeReturnValue(buffer: WritableTrackingBuffer, name: string, type: number, write: () => void) {
+        buffer.writeUInt8(0xAC);
+        buffer.writeUInt16LE(1); // ordinal
+        buffer.writeBVarchar(name, 'ucs2');
+        buffer.writeUInt8(0x01); // status
+        buffer.writeUInt32LE(0); // user type
+        buffer.writeUInt16LE(0); // flags
+        buffer.writeUInt8(type);
+        write();
+      }
+
+      const buffer = new WritableTrackingBuffer();
+      writeReturnValue(buffer, '@a', 0x38, () => { // Int
+        buffer.writeInt32LE(42);
+      });
+      writeReturnValue(buffer, '@b', 0xA5, () => { // VarBinary(max)
+        buffer.writeUInt16LE(0xFFFF);
+        writePLP(buffer, Buffer.from('hello'), 2);
+      });
+      writeReturnValue(buffer, '@c', 0xA5, () => { // VarBinary(max), null
+        buffer.writeUInt16LE(0xFFFF);
+        buffer.writeBigUInt64LE(0xFFFFFFFFFFFFFFFFn);
+      });
+
+      const tokens = parseByteByByte(buffer.data, [], true);
+
+      assert.deepEqual(summarize(tokens).map((t) => (t instanceof ReturnValueToken ? [t.paramName, t.value] : t)), [
+        ['a', 42],
+        ['RETURNVALUE_START', 'b', 5],
+        ['VALUE_DATA', Buffer.from('hello')],
+        'VALUE_END',
+        ['c', null]
+      ]);
+    });
+
+    it('streams NBCROW tokens', function() {
+      const colMetadata = [
+        column('a', dataTypeByName.Int),
+        column('b', dataTypeByName.VarBinary, 0xFFFF),
+        column('c', dataTypeByName.VarBinary, 0xFFFF)
+      ];
+
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD2);
+      buffer.writeUInt8(0b00000011); // `a` and `b` are null
+      writePLP(buffer, Buffer.from('abc'), 2);
+
+      const tokens = parseByteByByte(buffer.data, colMetadata, true);
+
+      assert.deepEqual(summarize(tokens), [
+        ['ROW_START', [null, null]],
+        ['VALUE_START', 2, 3],
+        ['VALUE_DATA', Buffer.from('abc')],
+        'VALUE_END',
+        'ROW_END'
+      ]);
+    });
+
+    it('hands out value chunks without copying the incoming data', function() {
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD1);
+      writePLP(buffer, Buffer.from('hello world'), 100);
+      const data = buffer.data;
+
+      const parser = new Parser(options, [column('a', dataTypeByName.VarBinary, 0xFFFF)]);
+      parser.streamValues = true;
+      parser.write(data);
+
+      const tokens = readAll(parser);
+      const chunk = tokens.find((token) => token instanceof ValueChunkToken) as ValueChunkToken;
+
+      assert.strictEqual(chunk.data.buffer, data.buffer);
+      assert.strictEqual(chunk.data.toString(), 'hello world');
+    });
+
+    it('applies changes of `streamValues` to the following rows', function() {
+      const colMetadata = [column('a', dataTypeByName.Int)];
+
+      const buffer = new WritableTrackingBuffer();
+      for (let i = 0; i < 2; i++) {
+        buffer.writeUInt8(0xD1);
+        buffer.writeInt32LE(i);
+      }
+
+      const parser = new Parser(options, colMetadata);
+      parser.write(buffer.data);
+
+      assert.instanceOf(parser.read(), RowToken);
+
+      parser.streamValues = true;
+      assert.deepEqual(summarize(readAll(parser)), [['ROW_VALUES', [1]]]);
+
+      parser.end();
+    });
+
+    it('throws on `end` if the data ended in the middle of a streamed value', function() {
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD1);
+      writePLP(buffer, Buffer.from('hello world'), 100);
+
+      const parser = new Parser(options, [column('a', dataTypeByName.VarBinary, 0xFFFF)]);
+      parser.streamValues = true;
+      parser.write(buffer.data.subarray(0, 20));
+      readAll(parser);
+
+      assert.throws(() => {
+        parser.end();
+      }, 'unexpected end of data');
+    });
+
+    it('can pipe streamed values into a `Readable`', async function() {
+      const value = Buffer.alloc(100_000, 'x');
+
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xD1);
+      writePLP(buffer, value, 8000);
+
+      const parser = new Parser(options, [column('a', dataTypeByName.VarBinary, 0xFFFF)]);
+      parser.streamValues = true;
+
+      let stream: Readable | undefined;
+      for (let offset = 0; offset < buffer.data.length; offset += 4096) {
+        parser.write(buffer.data.subarray(offset, offset + 4096));
+
+        let token;
+        while ((token = parser.read()) !== undefined) {
+          if (token instanceof ValueStartToken) {
+            stream = new Readable({ read() {} });
+          } else if (token instanceof ValueChunkToken) {
+            stream!.push(token.data);
+          } else if (token.name === 'VALUE_END') {
+            stream!.push(null);
+          }
+        }
+      }
+      parser.end();
+
+      const chunks = [];
+      for await (const chunk of stream!) {
+        chunks.push(chunk);
+      }
+
+      assert.deepEqual(Buffer.concat(chunks), value);
+    });
   });
 });

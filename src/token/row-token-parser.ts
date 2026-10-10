@@ -3,7 +3,8 @@
 import Parser, { type TokenReader } from './stream-parser';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 
-import { RowToken } from './token';
+import { ColumnValueToken, RowEndToken, RowStartToken, RowToken, RowValuesToken, Token, ValueChunkToken, ValueEndToken, ValueStartToken } from './token';
+import { NotEnoughDataError } from './helpers';
 
 import { isPLPStream, PLPReader, readValue } from '../value-parser';
 
@@ -39,7 +40,7 @@ export class ColumnValuesReader {
       const metadata = colMetadata[index];
 
       let value;
-      if (nullBitmap !== undefined && (nullBitmap[index >> 3] & (1 << (index & 7)))) {
+      if (nullBitmap !== undefined && isNull(nullBitmap, index)) {
         value = null;
       } else if (isPLPStream(metadata)) {
         this.plpReader ??= new PLPReader(metadata);
@@ -64,6 +65,145 @@ export class RowTokenReader extends ColumnValuesReader implements TokenReader {
     this.readColumns(parser, undefined);
     return new RowToken(parser.options.useColumnNames ? toColumnsMap(this.columns) : this.columns);
   }
+}
+
+/**
+ * Reads a `ROW` or `NBCROW` token as an array of its values, streaming PLP
+ * values piece by piece instead of reading them as a whole.
+ *
+ * A row without any (non-`null`) PLP values is returned as a single
+ * `RowValuesToken`. Otherwise, the row is returned as a sequence of tokens,
+ * starting with a `RowStartToken` (see there).
+ */
+export class StreamedRowReader implements TokenReader {
+  declare hasMore: boolean;
+
+  declare hasNullBitmap: boolean;
+  declare nullBitmap: Buffer | undefined;
+
+  // The values read before the first streamed value.
+  declare values: unknown[];
+  // The index of the next column to read.
+  declare index: number;
+  // Whether the `RowStartToken` was returned.
+  declare started: boolean;
+
+  // The reader of the PLP value whose length is being read.
+  declare nextPLPReader: PLPReader | undefined;
+  // The reader of the PLP value that is currently being streamed.
+  declare plpReader: PLPReader | undefined;
+  // Whether the `ValueStartToken` of `plpReader`'s value is yet to be returned.
+  declare valueStartPending: boolean;
+
+  constructor(hasNullBitmap: boolean) {
+    this.hasMore = true;
+
+    this.hasNullBitmap = hasNullBitmap;
+    this.nullBitmap = undefined;
+
+    this.values = [];
+    this.index = 0;
+    this.started = false;
+
+    this.nextPLPReader = undefined;
+    this.plpReader = undefined;
+    this.valueStartPending = false;
+  }
+
+  read(parser: Parser): Token {
+    if (this.plpReader !== undefined) {
+      return this.readPLPValue(parser, this.plpReader);
+    }
+
+    if (this.hasNullBitmap) {
+      this.nullBitmap ??= readNullBitmap(parser);
+    }
+
+    const colMetadata = parser.colMetadata;
+
+    while (this.index < colMetadata.length) {
+      const index = this.index;
+      const metadata = colMetadata[index];
+
+      let value;
+      if (this.nullBitmap !== undefined && isNull(this.nullBitmap, index)) {
+        value = null;
+      } else if (isPLPStream(metadata)) {
+        const plpReader = this.nextPLPReader ??= new PLPReader(metadata);
+        plpReader.readLength(parser);
+        this.nextPLPReader = undefined;
+
+        if (!plpReader.isNull) {
+          this.plpReader = plpReader;
+          this.valueStartPending = true;
+
+          if (!this.started) {
+            this.started = true;
+            return new RowStartToken(this.values);
+          }
+
+          return this.readPLPValue(parser, plpReader);
+        }
+
+        value = null;
+      } else {
+        const result = readValue(parser.buffer, parser.position, metadata, parser.options);
+        parser.position = result.offset;
+        value = result.value;
+      }
+
+      this.index += 1;
+
+      if (this.started) {
+        return new ColumnValueToken(index, value);
+      }
+
+      this.values.push(value);
+    }
+
+    this.hasMore = false;
+
+    if (this.started) {
+      return new RowEndToken();
+    }
+
+    return new RowValuesToken(this.values);
+  }
+
+  readPLPValue(parser: Parser, plpReader: PLPReader): Token {
+    if (this.valueStartPending) {
+      this.valueStartPending = false;
+      return new ValueStartToken(this.index, parser.colMetadata[this.index], plpReader.totalLength);
+    }
+
+    const data = plpReader.readChunk(parser);
+    if (data !== undefined) {
+      return new ValueChunkToken(data);
+    }
+
+    this.plpReader = undefined;
+    this.index += 1;
+    return new ValueEndToken();
+  }
+}
+
+/**
+ * Read the bitmap that precedes the column values of an `NBCROW` token, and
+ * flags which columns are `null` (and have no data).
+ */
+export function readNullBitmap(parser: Parser): Buffer {
+  const start = parser.position;
+  const end = start + Math.ceil(parser.colMetadata.length / 8);
+  if (parser.buffer.length < end) {
+    throw new NotEnoughDataError(end);
+  }
+
+  parser.position = end;
+  return parser.buffer.subarray(start, end);
+}
+
+function isNull(nullBitmap: Buffer, index: number): boolean {
+  return (nullBitmap[index >> 3] & (1 << (index & 7))) !== 0;
 }
 
 /**

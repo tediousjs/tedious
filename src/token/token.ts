@@ -576,3 +576,144 @@ export class SSPIToken extends Token {
     this.ntlmpacketBuffer = ntlmpacketBuffer;
   }
 }
+
+// When values are streamed, rows are read as plain arrays of their values
+// (their metadata is that of the result set's columns). A row without any
+// (non-`null`) PLP values is delivered as a single `RowValuesToken`. A row
+// with PLP values is delivered as a sequence of tokens instead:
+//
+//   RowStartToken                                       (the values before the first PLP value)
+//   ValueStartToken, ValueChunkToken*, ValueEndToken    (the first PLP value)
+//   for each following column, either:
+//     ColumnValueToken                                  (a value read as a whole)
+//     ValueStartToken, ValueChunkToken*, ValueEndToken  (a PLP value)
+//   RowEndToken
+//
+// A `RETURNVALUE` token with a (non-`null`) PLP value is delivered as:
+//
+//   ReturnValueStartToken, ValueChunkToken*, ValueEndToken
+
+export class RowValuesToken extends Token {
+  declare name: 'ROW_VALUES';
+  declare handlerName: 'onRowValues';
+
+  /**
+   * The values of all columns of the row.
+   */
+  declare values: unknown[];
+
+  constructor(values: unknown[]) {
+    super('ROW_VALUES', 'onRowValues');
+
+    this.values = values;
+  }
+}
+
+export class RowStartToken extends Token {
+  declare name: 'ROW_START';
+  declare handlerName: 'onRowStart';
+
+  /**
+   * The values of the columns before the first streamed value.
+   */
+  declare values: unknown[];
+
+  constructor(values: unknown[]) {
+    super('ROW_START', 'onRowStart');
+
+    this.values = values;
+  }
+}
+
+export class ColumnValueToken extends Token {
+  declare name: 'COLUMN_VALUE';
+  declare handlerName: 'onColumnValue';
+
+  declare index: number;
+  declare value: unknown;
+
+  constructor(index: number, value: unknown) {
+    super('COLUMN_VALUE', 'onColumnValue');
+
+    this.index = index;
+    this.value = value;
+  }
+}
+
+export class ValueStartToken extends Token {
+  declare name: 'VALUE_START';
+  declare handlerName: 'onValueStart';
+
+  declare index: number;
+  declare metadata: ColumnMetadata;
+
+  /**
+   * The value's total length in bytes, if the server announced it.
+   */
+  declare length: number | undefined;
+
+  constructor(index: number, metadata: ColumnMetadata, length: number | undefined) {
+    super('VALUE_START', 'onValueStart');
+
+    this.index = index;
+    this.metadata = metadata;
+    this.length = length;
+  }
+}
+
+export class ReturnValueStartToken extends Token {
+  declare name: 'RETURNVALUE_START';
+  declare handlerName: 'onReturnValueStart';
+
+  declare paramOrdinal: number;
+  declare paramName: string;
+  declare metadata: Metadata;
+
+  /**
+   * The value's total length in bytes, if the server announced it.
+   */
+  declare length: number | undefined;
+
+  constructor({ paramOrdinal, paramName, metadata, length }: { paramOrdinal: number, paramName: string, metadata: Metadata, length: number | undefined }) {
+    super('RETURNVALUE_START', 'onReturnValueStart');
+
+    this.paramOrdinal = paramOrdinal;
+    this.paramName = paramName;
+    this.metadata = metadata;
+    this.length = length;
+  }
+}
+
+export class ValueChunkToken extends Token {
+  declare name: 'VALUE_CHUNK';
+  declare handlerName: 'onValueChunk';
+
+  /**
+   * A piece of the value's raw data.
+   */
+  declare data: Buffer;
+
+  constructor(data: Buffer) {
+    super('VALUE_CHUNK', 'onValueChunk');
+
+    this.data = data;
+  }
+}
+
+export class ValueEndToken extends Token {
+  declare name: 'VALUE_END';
+  declare handlerName: 'onValueEnd';
+
+  constructor() {
+    super('VALUE_END', 'onValueEnd');
+  }
+}
+
+export class RowEndToken extends Token {
+  declare name: 'ROW_END';
+  declare handlerName: 'onRowEnd';
+
+  constructor() {
+    super('ROW_END', 'onRowEnd');
+  }
+}

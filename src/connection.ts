@@ -26,11 +26,12 @@ import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
-import Request from './request';
+import Request, { type CallbackRequest, type ExecutionOptions, type PulledRequest } from './request';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
+import { PreparedStatement, ResponseReader, type Response } from './pull-response';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
@@ -954,6 +955,13 @@ class Connection extends EventEmitter {
    * @private
    */
   declare isSqlBatch: boolean;
+
+  /**
+   * A request consumed by pulling that was sent, but not finished yet.
+   *
+   * @private
+   */
+  declare unfinishedRequest: Request | undefined;
   /**
    * @private
    */
@@ -1796,6 +1804,7 @@ class Connection extends EventEmitter {
     // equivalent behavior for TDS versions before 7.2.
     this.transactionDepth = 0;
     this.isSqlBatch = false;
+    this.unfinishedRequest = undefined;
     this.closed = false;
     this.messageBuffer = Buffer.alloc(0);
 
@@ -2706,9 +2715,38 @@ class Connection extends EventEmitter {
    * In almost all cases, [[execSql]] will be a better choice.
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSqlBatch(request: Request) {
+  execSqlBatch(request: PulledRequest, options?: ExecutionOptions): Response;
+  /**
+   * Execute the SQL batch represented by [[Request]].
+   * There is no param support, and unlike [[execSql]],
+   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   *
+   * In almost all cases, [[execSql]] will be a better choice.
+   *
+   * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  execSqlBatch(request: CallbackRequest, options?: ExecutionOptions): void;
+  /**
+   * Execute the SQL batch represented by [[Request]].
+   * There is no param support, and unlike [[execSql]],
+   * it is not likely that SQL Server will reuse the execution plan it generates for the SQL.
+   *
+   * In almost all cases, [[execSql]] will be a better choice.
+   *
+   * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  execSqlBatch(request: Request, options?: ExecutionOptions): Response | void;
+
+  execSqlBatch(request: Request, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
+
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
@@ -2732,8 +2770,47 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execSql(request: Request) {
+  execSql(request: PulledRequest, options?: ExecutionOptions): Response;
+  /**
+   *  Execute the SQL represented by [[Request]].
+   *
+   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
+   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+   * for the first execution. This may also result in SQL server treating the request like a stored procedure
+   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
+   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   *
+   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
+   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
+   *
+   * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  execSql(request: CallbackRequest, options?: ExecutionOptions): void;
+  /**
+   *  Execute the SQL represented by [[Request]].
+   *
+   * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
+   * using this function, the SQL Server query optimizer is likely to reuse the execution plan it generates
+   * for the first execution. This may also result in SQL server treating the request like a stored procedure
+   * which can result in the [[Event_doneInProc]] or [[Event_doneProc]] events being emitted instead of the
+   * [[Event_done]] event you might expect. Using [[execSqlBatch]] will prevent this from occurring but may have a negative performance impact.
+   *
+   * Beware of the way that scoping rules apply, and how they may [affect local temp tables](http://weblogs.sqlteam.com/mladenp/archive/2006/11/03/17197.aspx)
+   * If you're running in to scoping issues, then [[execSqlBatch]] may be a better choice.
+   * See also [issue #24](https://github.com/pekim/tedious/issues/24)
+   *
+   * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  execSql(request: Request, options?: ExecutionOptions): Response | void;
+
+  execSql(request: Request, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -2744,7 +2821,7 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return;
+      return request.userCallback === undefined ? response : undefined;
     }
 
     const parameters: ResolvedParameter[] = [];
@@ -2774,6 +2851,8 @@ class Connection extends EventEmitter {
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
@@ -2914,8 +2993,45 @@ class Connection extends EventEmitter {
    *
    * @param request A [[Request]] object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
+   *
+   * @returns For requests without a completion callback, the prepared
+   *   statement, once the statement was prepared - it is executed and
+   *   unprepared via the returned [[PreparedStatement]].
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  prepare(request: Request) {
+  prepare(request: PulledRequest, options?: ExecutionOptions): Promise<PreparedStatement>;
+  /**
+   * Prepare the SQL represented by the request.
+   *
+   * The request can then be used in subsequent calls to
+   * [[execute]] and [[unprepare]]
+   *
+   * @param request A [[Request]] object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   *
+   * @returns For requests without a completion callback, the prepared
+   *   statement, once the statement was prepared - it is executed and
+   *   unprepared via the returned [[PreparedStatement]].
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  prepare(request: CallbackRequest, options?: ExecutionOptions): void;
+  /**
+   * Prepare the SQL represented by the request.
+   *
+   * The request can then be used in subsequent calls to
+   * [[execute]] and [[unprepare]]
+   *
+   * @param request A [[Request]] object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   *
+   * @returns For requests without a completion callback, the prepared
+   *   statement, once the statement was prepared - it is executed and
+   *   unprepared via the returned [[PreparedStatement]].
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  prepare(request: Request, options?: ExecutionOptions): Promise<PreparedStatement> | void;
+
+  prepare(request: Request, options?: ExecutionOptions): Promise<PreparedStatement> | void {
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -2948,10 +3064,17 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
+    const response = request.startExecution(false, options?.signal);
     request.preparing = true;
 
     // The prepared statement's handle is stored by the `RequestTokenHandler`.
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
+
+    // Requests with a completion callback learn about the outcome via the
+    // request's `prepared` and `error` events instead.
+    if (request.userCallback === undefined) {
+      return response.settled().then(() => new PreparedStatement(this, request as PulledRequest));
+    }
   }
 
   /**
@@ -2961,7 +3084,9 @@ class Connection extends EventEmitter {
    *   Parameters only require a name and type.
    *   Parameter values are ignored.
    */
-  unprepare(request: Request) {
+  unprepare(request: Request): Response {
+    const response = request.startExecution(false);
+
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -2976,6 +3101,8 @@ class Connection extends EventEmitter {
     }));
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Unprepare, parameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return response;
   }
 
   /**
@@ -2986,8 +3113,35 @@ class Connection extends EventEmitter {
    *   parameters that were added to the [[Request]] before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }) {
+  execute(request: PulledRequest, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response;
+  /**
+   * Execute previously prepared SQL, using the supplied parameters.
+   *
+   * @param request A previously prepared [[Request]].
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the [[Request]] before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  execute(request: CallbackRequest, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): void;
+  /**
+   * Execute previously prepared SQL, using the supplied parameters.
+   *
+   * @param request A previously prepared [[Request]].
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the [[Request]] before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response | void;
+
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
+
     const executeParameters: ResolvedParameter[] = [];
 
     executeParameters.push(this.resolveRequestParameter({
@@ -3018,18 +3172,39 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return;
+      return request.userCallback === undefined ? response : undefined;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
    * Call a stored procedure represented by [[Request]].
    *
    * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
    */
-  callProcedure(request: Request) {
+  callProcedure(request: PulledRequest, options?: ExecutionOptions): Response;
+  /**
+   * Call a stored procedure represented by [[Request]].
+   *
+   * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  callProcedure(request: CallbackRequest, options?: ExecutionOptions): void;
+  /**
+   * Call a stored procedure represented by [[Request]].
+   *
+   * @param request A [[Request]] object representing the request.
+   * @param options Options of this execution, e.g. an `AbortSignal` that cancels it.
+   */
+  callProcedure(request: Request, options?: ExecutionOptions): Response | void;
+
+  callProcedure(request: Request, options?: ExecutionOptions): Response | void {
+    const response = request.startExecution(undefined, options?.signal);
+
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -3040,10 +3215,12 @@ class Connection extends EventEmitter {
         request.callback(error);
       });
 
-      return;
+      return request.userCallback === undefined ? response : undefined;
     }
 
     this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+
+    return request.userCallback === undefined ? response : undefined;
   }
 
   /**
@@ -3242,7 +3419,11 @@ class Connection extends EventEmitter {
     // even if the request is rejected before being sent.
     request.error = undefined;
 
-    if (this.state !== this.STATE.LOGGED_IN) {
+    if (this.unfinishedRequest !== undefined) {
+      const message = 'The previous request was not finished. Call `finish()` on it, or declare it with `await using`.';
+      this.debug.log(message);
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    } else if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(new RequestError(message, 'EINVALIDSTATE'));
@@ -3259,9 +3440,21 @@ class Connection extends EventEmitter {
 
       this.request = request;
       this.attentionSent = false;
+
+      // A pulled request is in progress until its consumer finished it.
+      const response = request instanceof Request ? request.response : undefined;
+      if (response !== undefined && response.pulled) {
+        this.unfinishedRequest = request as Request;
+        response.onFinished = () => {
+          if (this.unfinishedRequest === request) {
+            this.unfinishedRequest = undefined;
+          }
+        };
+      }
+
       request.connection! = this;
       request.rowCount! = 0;
-      request.rows! = [];
+      request.collectedRows! = [];
       request.rst! = [];
 
       const onCancel = () => {
@@ -3321,6 +3514,66 @@ class Connection extends EventEmitter {
         message.end();
       });
       payloadStream.pipe(message);
+    }
+  }
+
+  /**
+   * Hand the response of a pulled request to its consumer.
+   *
+   * @private
+   */
+  startPullResponse(message: Message, request: Request, response: Response) {
+    const reader = new ResponseReader(message, new RequestTokenHandler(this, request), this.debug, this.config.options);
+
+    // Whether an attention message was sent, whose acknowledgement completes
+    // the request (in the `SENT_ATTENTION` state).
+    let attentionPending = false;
+
+    const onCancel = () => {
+      // Nobody consumes the response of a canceled request anymore, but it
+      // still needs to be read completely.
+      reader.drain();
+
+      if (this.attentionSent) {
+        attentionPending = true;
+        this.transitionTo(this.STATE.SENT_ATTENTION);
+      }
+    };
+
+    reader.onEnd = (error) => {
+      request.removeListener('cancel', onCancel);
+
+      if (error) {
+        request.removeListener('cancel', this._cancelAfterRequestSent);
+        this._onSocketError(error);
+        return;
+      }
+
+      if (attentionPending) {
+        return;
+      }
+
+      request.removeListener('cancel', this._cancelAfterRequestSent);
+
+      // If the request was canceled before its request message was fully
+      // sent, this response belongs to the ignored message and a cancel timer
+      // is running - the response's arrival completes the cancellation.
+      this.clearCancelTimer();
+
+      this.transitionTo(this.STATE.LOGGED_IN);
+      this.request = undefined;
+      if (this.config.options.tdsVersion < '7_2' && request.error && this.isSqlBatch) {
+        this.inTransaction = false;
+      }
+      request.callback(request.error, request.rowCount, request.collectedRows);
+    };
+
+    response.setReader(reader);
+
+    if (request.canceled) {
+      onCancel();
+    } else {
+      request.once('cancel', onCancel);
     }
   }
 
@@ -3796,6 +4049,11 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
+        if (this.request instanceof Request && this.request.response?.pulled) {
+          this.startPullResponse(message, this.request, this.request.response);
+          return;
+        }
+
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
         // A token parse failure leaves the connection at an undefined
@@ -3890,7 +4148,7 @@ Connection.prototype.STATE = {
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
             this.inTransaction = false;
           }
-          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.rows);
+          sqlRequest.callback(sqlRequest.error, sqlRequest.rowCount, sqlRequest.collectedRows);
         };
 
         tokenStreamParser.once('end', onEndOfMessage);

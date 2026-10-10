@@ -2,7 +2,7 @@
 
 import Parser, { type ParserOptions, type TokenReader } from './stream-parser';
 
-import { ReturnValueToken } from './token';
+import { ReturnValueStartToken, ReturnValueToken, type Token, ValueChunkToken, ValueEndToken } from './token';
 
 import { readMetadata, type Metadata } from '../metadata-parser';
 import { isPLPStream, PLPReader, readValue } from '../value-parser';
@@ -69,5 +69,68 @@ export class ReturnValueTokenReader implements TokenReader {
     }
 
     return new ReturnValueToken({ paramOrdinal, paramName, metadata, value });
+  }
+}
+
+/**
+ * Reads a `RETURNVALUE` token, streaming a PLP value piece by piece instead of
+ * reading it as a whole.
+ *
+ * A return value without a (non-`null`) PLP value is returned as a single
+ * `RETURNVALUE` token. Otherwise, it is returned as a `ReturnValueStartToken`,
+ * followed by `ValueChunkToken`s and a `ValueEndToken`.
+ */
+export class StreamedReturnValueReader implements TokenReader {
+  declare hasMore: boolean;
+
+  declare header: ReturnValueHeader | undefined;
+  declare plpReader: PLPReader | undefined;
+  declare started: boolean;
+
+  constructor() {
+    this.hasMore = true;
+
+    this.header = undefined;
+    this.plpReader = undefined;
+    this.started = false;
+  }
+
+  read(parser: Parser): Token {
+    if (this.header === undefined) {
+      const { value, offset } = readHeader(parser.buffer, parser.position, parser.options);
+      parser.position = offset;
+      this.header = value;
+    }
+
+    const { paramOrdinal, paramName, metadata } = this.header;
+
+    if (!isPLPStream(metadata)) {
+      const { value, offset } = readValue(parser.buffer, parser.position, metadata, parser.options);
+      parser.position = offset;
+
+      this.hasMore = false;
+      return new ReturnValueToken({ paramOrdinal, paramName, metadata, value });
+    }
+
+    const plpReader = this.plpReader ??= new PLPReader(metadata);
+    plpReader.readLength(parser);
+
+    if (plpReader.isNull) {
+      this.hasMore = false;
+      return new ReturnValueToken({ paramOrdinal, paramName, metadata, value: null });
+    }
+
+    if (!this.started) {
+      this.started = true;
+      return new ReturnValueStartToken({ paramOrdinal, paramName, metadata, length: plpReader.totalLength });
+    }
+
+    const data = plpReader.readChunk(parser);
+    if (data !== undefined) {
+      return new ValueChunkToken(data);
+    }
+
+    this.hasMore = false;
+    return new ValueEndToken();
   }
 }

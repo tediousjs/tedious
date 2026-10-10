@@ -203,7 +203,7 @@ class BulkLoad extends EventEmitter {
   /**
    * @private
    */
-  declare rows: Array<any> | undefined;
+  declare collectedRows: Array<any> | undefined;
   /**
    * @private
    */
