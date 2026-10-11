@@ -491,10 +491,14 @@ class Login7Payload {
       '\n' + indent + '         ' +
       `Flags1:0x${formatHex(this.buildOptionFlags1(), 2)}, Flags2:0x${formatHex(this.buildOptionFlags2(), 2)}, TypeFlags:0x${formatHex(this.buildTypeFlags(), 2)}, Flags3:0x${formatHex(this.buildOptionFlags3(), 2)}, ClientTimezone:${this.clientTimeZone}, ClientLCID:0x${formatHex(this.clientLcid, 8)}` +
       '\n' + indent + '         ' +
-      `Hostname:'${this.hostname}', Username:'${this.userName}', Password:'${this.password}', AppName:'${this.appName}', ServerName:'${this.serverName}', LibraryName:'${this.libraryName}'` +
+      `Hostname:'${this.hostname}', Username:'${this.userName}', Password:'${redact(this.password)}', AppName:'${this.appName}', ServerName:'${this.serverName}', LibraryName:'${this.libraryName}'` +
       '\n' + indent + '         ' +
-      `Language:'${this.language}', Database:'${this.database}', SSPI:'${this.sspi}', AttachDbFile:'${this.attachDbFile}', ChangePassword:'${this.changePassword}'`;
+      `Language:'${this.language}', Database:'${this.database}', SSPI:'${this.sspi}', AttachDbFile:'${this.attachDbFile}', ChangePassword:'${redact(this.changePassword)}'`;
   }
+}
+
+function redact(value: string | undefined) {
+  return value === undefined ? 'undefined' : '********';
 }
 
 export default Login7Payload;

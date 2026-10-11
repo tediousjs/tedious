@@ -28,8 +28,8 @@ describe('Login7Payload', function() {
       assert.strictEqual(payload.toString('--'),
                          '--Login7 - TDS:0x74000004, PacketSize:0x00001000, ClientProgVer:0x07000000, ClientPID:0x00003039, ConnectionID:0xDEADBEEF\n' +
                          '--         Flags1:0xB0, Flags2:0x00, TypeFlags:0x00, Flags3:0x18, ClientTimezone:-60, ClientLCID:0x00000409\n' +
-                         "--         Hostname:'host', Username:'user', Password:'pw', AppName:'app', ServerName:'srv', LibraryName:'Tedious'\n" +
-                         "--         Language:'lang', Database:'db', SSPI:'undefined', AttachDbFile:'file.mdf', ChangePassword:'npw'");
+                         "--         Hostname:'host', Username:'user', Password:'********', AppName:'app', ServerName:'srv', LibraryName:'Tedious'\n" +
+                         "--         Language:'lang', Database:'db', SSPI:'undefined', AttachDbFile:'file.mdf', ChangePassword:'********'");
     });
 
     it('prints unset string fields as undefined', function() {
