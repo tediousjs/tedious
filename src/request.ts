@@ -28,7 +28,7 @@ type CompletionCallback =
    *
    * @param rows
    *   Rows as a result of executing the SQL statement.
-   *   Will only be available if [[ConnectionOptions.rowCollectionOnRequestCompletion]] is `true`.
+   *   Will only be available if {@link ConnectionOptions.rowCollectionOnRequestCompletion} is `true`.
    */
   // TODO: Figure out how to type the `rows` parameter here.
   (error: Error | null | undefined, rowCount?: number, rows?: any) => void;
@@ -160,7 +160,7 @@ class Request extends EventEmitter {
     event: 'row',
     listener:
       /**
-       * An array or object (depends on [[ConnectionOptions.useColumnNames]]), where the columns can be accessed by index/name.
+       * An array or object (depends on {@link ConnectionOptions.useColumnNames}), where the columns can be accessed by index/name.
        * Each column has two properties, `metadata` and `value`:
        *
        * * `metadata`
@@ -183,7 +183,7 @@ class Request extends EventEmitter {
    * An `done` event is emitted for each SQL statement in the SQL batch except variable declarations.
    * For execution of SQL statements within stored procedures, `doneProc` and `doneInProc` events are used in place of `done`.
    *
-   * If you are using [[Connection.execSql]] then SQL server may treat the multiple calls with the same query as a stored procedure.
+   * If you are using {@link Connection.execSql} then SQL server may treat the multiple calls with the same query as a stored procedure.
    * When this occurs, the `doneProc` and `doneInProc` events may be emitted instead. You must handle both events to ensure complete coverage.
    */
   on(
@@ -198,7 +198,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's {@link ConnectionOptions.rowCollectionOnDone} is `true`.
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
@@ -209,7 +209,7 @@ class Request extends EventEmitter {
    * Indicates the completion status of a SQL statement within a stored procedure. All rows from a statement
    * in a stored procedure have been provided (through `row` events).
    *
-   * This event may also occur when executing multiple calls with the same query using [[execSql]].
+   * This event may also occur when executing multiple calls with the same query using {@link Connection.execSql}.
    */
   on(
     event: 'doneInProc',
@@ -223,7 +223,7 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's {@link ConnectionOptions.rowCollectionOnDone} is `true`.
        */
       (rowCount: number | undefined, more: boolean, rst?: any[]) => void
   ): this
@@ -231,7 +231,7 @@ class Request extends EventEmitter {
   /**
    * Indicates the completion status of a stored procedure. This is also generated for stored procedures
    * executed through SQL statements.\
-   * This event may also occur when executing multiple calls with the same query using [[execSql]].
+   * This event may also occur when executing multiple calls with the same query using {@link Connection.execSql}.
    */
   on(
     event: 'doneProc',
@@ -245,13 +245,13 @@ class Request extends EventEmitter {
        *
        * @param rst
        *   Rows as a result of executing the SQL statement.
-       *   Will only be available if Connection's [[ConnectionOptions.rowCollectionOnDone]] is `true`.
+       *   Will only be available if Connection's {@link ConnectionOptions.rowCollectionOnDone} is `true`.
        */
       (rowCount: number | undefined, more: boolean, procReturnStatusValue: number, rst?: any[]) => void
   ): this
 
   /**
-   * A value for an output parameter (that was added to the request with [[addOutputParameter]]).
+   * A value for an output parameter (that was added to the request with {@link addOutputParameter}).
    * See also `Using Parameters`.
    */
   on(
@@ -542,8 +542,8 @@ class Request extends EventEmitter {
   }
 
   /**
-   * Temporarily suspends the flow of data from the database. No more `row` events will be emitted until [[resume]] is called.
-   * If this request is already in a paused state, calling [[pause]] has no effect.
+   * Temporarily suspends the flow of data from the database. No more `row` events will be emitted until {@link resume} is called.
+   * If this request is already in a paused state, calling {@link pause} has no effect.
    */
   pause() {
     if (this.paused) {
@@ -555,7 +555,7 @@ class Request extends EventEmitter {
 
   /**
    * Resumes the flow of data from the database.
-   * If this request is not in a paused state, calling [[resume]] has no effect.
+   * If this request is not in a paused state, calling {@link resume} has no effect.
    */
   resume() {
     if (!this.paused) {
@@ -583,7 +583,7 @@ class Request extends EventEmitter {
    * @param timeout
    *   The number of milliseconds before the request is considered failed,
    *   or `0` for no timeout. When no timeout is set for the request,
-   *   the [[ConnectionOptions.requestTimeout]] of the [[Connection]] is used.
+   *   the {@link ConnectionOptions.requestTimeout} of the {@link Connection} is used.
    */
   setTimeout(timeout?: number) {
     this.timeout = timeout;

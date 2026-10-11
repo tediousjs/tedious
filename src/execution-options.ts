@@ -1,7 +1,7 @@
 import { RequestError } from './errors';
 
 /**
- * Options of a single execution of a [[Request]] or [[BulkLoad]].
+ * Options of a single execution of a {@link Request} or {@link BulkLoad}.
  */
 export interface ExecutionOptions {
   /**
