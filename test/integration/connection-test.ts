@@ -679,7 +679,14 @@ describe('Encrypt Test', function() {
               console.log(message);
             }
           });
-          connection.connect(done);
+          connection.connect((err) => {
+            // Some servers (e.g. Azure SQL Database) do not allow unencrypted connections.
+            if (err instanceof ConnectionError && err.code === 'EENCRYPT' && err.message.startsWith('Server requires encryption')) {
+              return this.skip();
+            }
+
+            done(err);
+          });
         });
 
         afterEach(function() {
