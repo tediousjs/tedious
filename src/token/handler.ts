@@ -63,6 +63,25 @@ export const tds71DeprecationWarning = {
   }
 };
 
+/**
+ * @private
+ */
+export const azureActiveDirectoryPasswordDeprecationWarning = {
+  emitted: false,
+
+  emit() {
+    if (this.emitted) {
+      return;
+    }
+    this.emitted = true;
+
+    process.emitWarning(
+      'Support for `azure-active-directory-password` authentication is deprecated and will be removed in a future version of `tedious`.',
+      { type: 'DeprecationWarning', code: 'TEDIOUS_DEP_AAD_PASSWORD' }
+    );
+  }
+};
+
 export class TokenHandler {
   onInfoMessage(token: InfoMessageToken) {
     throw new UnexpectedTokenError(this, token);
