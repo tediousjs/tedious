@@ -653,6 +653,66 @@ describe('Encrypt Test', function() {
       connection.execSql(request);
     });
   });
+
+  describe('with encryption disabled', function() {
+    for (const packetSize of [4096, 512]) {
+      describe(`and a packet size of ${packetSize}`, function() {
+        let connection: Connection;
+        let debugMessages: string[];
+
+        beforeEach(function(done) {
+          const config = getConfig();
+          connection = new Connection({
+            ...config,
+            options: {
+              ...config.options,
+              encrypt: false,
+              packetSize: packetSize,
+              // Make the login message span multiple packets with smaller packet sizes.
+              appName: 'a'.repeat(128)
+            }
+          });
+          debugMessages = [];
+          connection.on('debug', (message) => {
+            debugMessages.push(message);
+            if (process.env.TEDIOUS_DEBUG) {
+              console.log(message);
+            }
+          });
+          connection.connect(done);
+        });
+
+        afterEach(function() {
+          connection.close();
+        });
+
+        it('encrypts only the login packet', function(done) {
+          assert.isTrue(debugMessages.some((message) => /^TLS negotiated \(.*\) for the login packet only$/.test(message)));
+
+          const request = new Request(`
+            SELECT c.encrypt_option, c.net_packet_size
+            FROM sys.dm_exec_connections AS c
+            WHERE c.session_id = @@SPID
+          `, (err, rowCount) => {
+            if (err) {
+              return done(err);
+            }
+
+            assert.strictEqual(rowCount, 1);
+
+            done();
+          });
+
+          request.on('row', function(columns) {
+            assert.strictEqual(columns[0].value, 'FALSE');
+            assert.strictEqual(columns[1].value, packetSize);
+          });
+
+          connection.execSql(request);
+        });
+      });
+    }
+  });
 });
 
 describe('BeginTransaction Tests', function() {
