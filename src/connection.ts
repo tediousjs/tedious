@@ -684,6 +684,7 @@ export interface ConnectionOptions {
   /**
    * A string value that can be only set to 'strict', which indicates the usage TDS 8.0 protocol. Otherwise,
    * a boolean determining whether or not the connection will be encrypted.
+   * When `true`, the connection fails if the server does not negotiate full encryption.
    *
    * (default: `true`)
    */
@@ -3410,9 +3411,13 @@ class Connection extends EventEmitter {
       if (preloginPayload.fedAuthRequired === 1) {
         this.fedAuthRequired = true;
       }
+      if (this.config.options.encrypt === true && preloginPayload.encryptionString !== 'ON' && preloginPayload.encryptionString !== 'REQ') {
+        throw new ConnectionError("Server did not negotiate encryption, but the 'encrypt' config option is set to `true`. Set 'encrypt' to `false` to allow unencrypted connections.", 'EENCRYPT');
+      }
+
       if ('strict' !== this.config.options.encrypt && (preloginPayload.encryptionString === 'ON' || preloginPayload.encryptionString === 'REQ')) {
         if (!this.config.options.encrypt) {
-          throw new ConnectionError("Server requires encryption, set 'encrypt' config option to true.", 'EENCRYPT');
+          throw new ConnectionError("Server requires encryption, set 'encrypt' config option to `true`.", 'EENCRYPT');
         }
 
         this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);

@@ -9,18 +9,6 @@ const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
 const MAX_NULL_LENGTH = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 const NO_COLLATION = Buffer.from([0x00, 0x00, 0x00, 0x00, 0x00]);
 
-// Each chunk is encoded on its own, as `Writable.prototype.write` would
-// encode it: a source must not split a UTF-16 surrogate pair across two
-// chunks (see `Request.addParameter`).
-function encoderFor(codepage: string): (chunk: unknown) => Buffer {
-  return (chunk) => {
-    if (typeof chunk !== 'string') {
-      throw new TypeError('Invalid string.');
-    }
-    return iconv.encode(chunk, codepage);
-  };
-}
-
 const VarChar: { maximumLength: number } & DataType = {
   id: 0xA7,
   type: 'BIGVARCHR',
@@ -136,7 +124,20 @@ const VarChar: { maximumLength: number } & DataType = {
     // Read from its source while the request is written; `resolve` declared
     // it as `varchar(max)` and checked the collation.
     if (isAsyncIterable(parameter.value)) {
-      return writePlpStream(buffer, parameter.value, encoderFor(parameter.collation!.codepage!));
+      const codepage = parameter.collation!.codepage!;
+      const encoder = iconv.getEncoder(codepage);
+      return writePlpStream(
+        buffer,
+        parameter.value,
+        (chunk) => {
+          if (typeof chunk !== 'string') {
+            throw new TypeError('Invalid string.');
+          }
+
+          return encoder.write(chunk);
+        },
+        () => encoder.end()
+      );
     }
 
     // `validate` encoded the value.

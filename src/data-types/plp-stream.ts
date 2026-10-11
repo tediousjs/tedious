@@ -31,23 +31,32 @@ export function writePlpValue(buffer: WritableTrackingBuffer, bytes: Buffer) {
  * the terminator. Yields whenever the buffer holds a chunk's worth, as the
  * rest of a `DataType.writeValue` promises.
  */
-export async function * writePlpStream(buffer: WritableTrackingBuffer, source: AsyncIterable<unknown>, encode: (chunk: unknown) => Buffer): AsyncGenerator<void, void> {
+export async function * writePlpStream<T>(
+  buffer: WritableTrackingBuffer,
+  source: AsyncIterable<T>,
+  encode: (chunk: T) => Buffer,
+  flush?: () => Buffer | undefined
+): AsyncGenerator<void, void> {
   buffer.writeBuffer(UNKNOWN_PLP_LEN);
 
-  for await (const chunk of source) {
-    const bytes = encode(chunk);
-
-    // A zero-length PLP chunk would be read as the terminator.
-    if (bytes.length === 0) {
-      continue;
+  const writeChunk = (bytes: Buffer | undefined) => {
+    if (!bytes || bytes.length === 0) {
+      return false;
     }
 
     buffer.writeUInt32LE(bytes.length);
     buffer.writeBuffer(bytes);
+    return buffer.length >= WritableTrackingBuffer.CHUNK_SIZE;
+  };
 
-    if (buffer.length >= WritableTrackingBuffer.CHUNK_SIZE) {
+  for await (const chunk of source) {
+    if (writeChunk(encode(chunk))) {
       yield;
     }
+  }
+
+  if (writeChunk(flush?.())) {
+    yield;
   }
 
   buffer.writeBuffer(PLP_TERMINATOR);

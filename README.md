@@ -2,25 +2,20 @@
 [![NPM version](https://badge.fury.io/js/tedious.svg)](http://badge.fury.io/js/tedious) [![Build Status](https://ci.appveyor.com/api/projects/status/ike3p58hljpyffrl?svg=true)](https://ci.appveyor.com/project/tediousjs/tedious) [![Code Coverage](https://codecov.io/gh/tediousjs/tedious/badge.svg)](https://codecov.io/gh/tediousjs/tedious)
 
 
-Tedious is a pure-Javascript implementation of the [TDS protocol](http://msdn.microsoft.com/en-us/library/dd304523.aspx),
+Tedious is a pure-Javascript implementation of the [TDS protocol](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-tds/b46a581a-39de-4745-b076-ec4dbb7d13ec),
 which is used to interact with instances of Microsoft's SQL Server. It is intended to be a fairly slim implementation of the protocol, with not too much additional functionality.
-
-**NOTE: New columns are nullable by default as of version 1.11.0**
-
-Previous behavior can be restored using `config.options.enableAnsiNullDefault = false`. See [pull request 230](https://github.com/tediousjs/tedious/pull/230).
-
-**NOTE: Default login behavior has changed slightly as of version 1.2**
 
 See the [changelog](https://github.com/tediousjs/tedious/releases) for version history.
 
-
 ### Supported TDS versions
 
-- TDS 7.4 (SQL Server 2012/2014/2016/2017/2019/2022)
+- TDS 7.4 (SQL Server 2012/2014/2016/2017/2019/2022/2025)
 - TDS 7.3.B (SQL Server 2008 R2)
 - TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
 - TDS 7.1 (SQL Server 2000) - *deprecated, support will be removed in a future version*
+
+TDS 8.0 (SQL Server 2022 and later) is supported by setting `options.encrypt` to `'strict'`.
 
 ## Installation
 
@@ -29,11 +24,12 @@ Node.js is a prerequisite for installing tedious. Once you have installed [Node.
     npm install tedious
 
 ## Getting Started
-- [Node.js + macOS](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/mac/)
-- [Node.js + Red Hat Enterprise Linux](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/rhel/)
-- [Node.js + SUSE Linux Enterprise Server](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/sles/)
-- [Node.js + Ubuntu](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/ubuntu/)
-- [Node.js + Windows](https://www.microsoft.com/en-us/sql-server/developer-get-started/node/windows/)
+- [Node.js SQL Server Guide](https://learn.microsoft.com/en-us/sql/connect/node-js/node-js-driver-for-sql-server)
+- [Node.js + macOS](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#macos)
+- [Node.js + Red Hat Enterprise Linux](https://learn.microsoft.com/en-us/sql/linux/install-upgrade/quickstart-install-red-hat)
+- [Node.js + SUSE Linux Enterprise Server](https://learn.microsoft.com/en-us/sql/linux/install-upgrade/quickstart-install-suse)
+- [Node.js + Ubuntu](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#ubuntu-linux)
+- [Node.js + Windows](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#windows)
 
 <a name="documentation"></a>
 ## Documentation
@@ -42,12 +38,6 @@ More documentation and code samples are available at [tediousjs.github.io/tediou
 <a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.
-
-## Developer Survey
-
-We'd like to learn more about how you use tedious:
-
-<a href="https://aka.ms/mssqltedioussurvey"><img style="float: right;"  height="67" width="156" src="https://sqlchoice.blob.core.windows.net/sqlchoice/static/images/survey.png"></a>
 
 <a name="contributing"></a>
 ## Contributing
@@ -59,7 +49,7 @@ Please report security vulnerabilities privately. See our [security policy](SECU
 <a name="license"></a>
 ## License
 
-Copyright (c) 2010-2021 Mike D Pilsbury
+Copyright (c) 2010-2026 Mike D Pilsbury
 
 The MIT License
 

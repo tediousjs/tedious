@@ -250,11 +250,14 @@ describe('Initiate Connect Test', function() {
     }
 
     connection.connect(function(err) {
+      if (!err) {
+        connection.close();
+      }
+
       assert.instanceOf(err, ConnectionError);
       assert.strictEqual(err.code, 'ESOCKET');
 
       assert.instanceOf(err.cause, Error);
-      console.log(err.cause);
       assert.include(err.cause.message, 'no ciphers available');
     });
 

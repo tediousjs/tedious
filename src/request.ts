@@ -452,11 +452,10 @@ class Request extends EventEmitter {
    *   request is being sent, so it does not have to fit in memory, and a
    *   request that carries one can be executed only once.
    *
-   *   Each chunk of a string source is encoded on its own, as `Writable.write`
-   *   would encode it, so a chunk must not end halfway through a UTF-16
-   *   surrogate pair. Text that Node.js decoded from UTF-8 (a `Readable` with
-   *   `encoding: 'utf8'`, `readline`, `TextDecoder`) never does; a string
-   *   sliced by index can. A `Buffer` chunk of 8 KB or more is sent by
+   *   String chunks may split UTF-16 surrogate pairs; the pairs are preserved
+   *   across chunk boundaries, including empty chunks. An unpaired surrogate
+   *   is handled by the type's encoding as it is for an in-memory value.
+   *   A `Buffer` chunk of 8 KB or more is sent by
    *   reference, as `socket.write` would send it, so a source must not reuse
    *   or modify a buffer it has yielded until the request has completed.
    *

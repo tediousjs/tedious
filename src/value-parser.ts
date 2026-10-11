@@ -3,7 +3,6 @@ import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
-import { sprintf } from 'sprintf-js';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
@@ -374,7 +373,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
           return readUniqueIdentifier(buf, offset, options);
 
         default:
-          throw new Error(sprintf('Unsupported guid size %d', dataLength! - 1));
+          throw new Error(`Unsupported guid size ${dataLength! - 1}`);
       }
     }
 
@@ -436,7 +435,7 @@ function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision
   } else if (dataLength === 17) {
     ({ offset, value } = readUNumeric128LE(buf, offset));
   } else {
-    throw new Error(sprintf('Unsupported numeric dataLength %d', dataLength));
+    throw new Error(`Unsupported numeric dataLength ${dataLength}`);
   }
 
   return new Result((value * sign) / Math.pow(10, scale), offset);
