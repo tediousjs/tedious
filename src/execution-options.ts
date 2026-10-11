@@ -2,6 +2,8 @@ import { RequestError } from './errors';
 
 /**
  * Options of a single execution of a {@link Request} or {@link BulkLoad}.
+ *
+ * @experimental
  */
 export interface ExecutionOptions {
   /**

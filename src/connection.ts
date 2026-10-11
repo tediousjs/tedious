@@ -2708,8 +2708,20 @@ class Connection extends EventEmitter {
    * In almost all cases, {@link execSql} will be a better choice.
    *
    * @param request A {@link Request} object representing the request.
-   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
+  execSqlBatch(request: Request): void
+
+  /**
+   * Execute the SQL batch represented by {@link Request}, with the given
+   * options for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   * @param options Options of this execution.
+   */
+  execSqlBatch(request: Request, options?: ExecutionOptions): void
+
   execSqlBatch(request: Request, options?: ExecutionOptions) {
     abortOnSignal(request, options?.signal);
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
@@ -2736,8 +2748,20 @@ class Connection extends EventEmitter {
    * See also [issue #24](https://github.com/pekim/tedious/issues/24)
    *
    * @param request A {@link Request} object representing the request.
-   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
+  execSql(request: Request): void
+
+  /**
+   * Execute the SQL represented by {@link Request}, with the given options
+   * for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   * @param options Options of this execution.
+   */
+  execSql(request: Request, options?: ExecutionOptions): void
+
   execSql(request: Request, options?: ExecutionOptions) {
     abortOnSignal(request, options?.signal);
 
@@ -2870,7 +2894,18 @@ class Connection extends EventEmitter {
    *
    * @param bulkLoad A previously created {@link BulkLoad}.
    * @param rows A {@link Iterable} or {@link AsyncIterable} that contains the rows that should be bulk loaded.
-   * @param options Options of this execution, e.g. an abort signal to cancel it with.
+   */
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
+
+  /**
+   * Execute a {@link BulkLoad}, with the given options for this execution,
+   * e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param bulkLoad A previously created {@link BulkLoad}.
+   * @param rows A {@link Iterable} or {@link AsyncIterable} that contains the rows that should be bulk loaded.
+   * @param options Options of this execution.
    */
   execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>, options?: ExecutionOptions): void
 
@@ -2926,8 +2961,21 @@ class Connection extends EventEmitter {
    *
    * @param request A {@link Request} object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
-   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
+  prepare(request: Request): void
+
+  /**
+   * Prepare the SQL represented by the request, with the given options for
+   * this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   * @param options Options of this execution.
+   */
+  prepare(request: Request, options?: ExecutionOptions): void
+
   prepare(request: Request, options?: ExecutionOptions) {
     abortOnSignal(request, options?.signal);
 
@@ -3001,8 +3049,24 @@ class Connection extends EventEmitter {
    *   parameters that were added to the {@link Request} before it was prepared.
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
-   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
+  execute(request: Request, parameters?: { [key: string]: unknown }): void
+
+  /**
+   * Execute previously prepared SQL, using the supplied parameters, with the
+   * given options for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A previously prepared {@link Request}.
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the {@link Request} before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   * @param options Options of this execution.
+   */
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): void
+
   execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions) {
     abortOnSignal(request, options?.signal);
 
@@ -3046,8 +3110,20 @@ class Connection extends EventEmitter {
    * Call a stored procedure represented by {@link Request}.
    *
    * @param request A {@link Request} object representing the request.
-   * @param options Options of this execution, e.g. an abort signal to cancel it with.
    */
+  callProcedure(request: Request): void
+
+  /**
+   * Call a stored procedure represented by {@link Request}, with the given
+   * options for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   * @param options Options of this execution.
+   */
+  callProcedure(request: Request, options?: ExecutionOptions): void
+
   callProcedure(request: Request, options?: ExecutionOptions) {
     abortOnSignal(request, options?.signal);
 
