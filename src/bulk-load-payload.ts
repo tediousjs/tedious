@@ -33,7 +33,7 @@ function ignoreError() {}
  * stream source is observed from the moment it is handed over, and it
  * closes the source through the iterator's `return()` whenever the bulk
  * load does not run to completion, whether the rows were being read
- * ([[Symbol.asyncIterator]]) or never got to be ([[close]]).
+ * ({@link Symbol.asyncIterator}) or never got to be ({@link close}).
  *
  * Rows are written into one buffer that lives for the whole bulk load.
  * Its contents are yielded once it holds a chunk's worth
