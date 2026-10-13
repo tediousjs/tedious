@@ -144,7 +144,13 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         const isArray = Array.isArray(row);
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
-          const value = c.type.validate(isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName], c.collation);
+          const input = isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName];
+          let value;
+          try {
+            value = c.type.validate(input, c.collation);
+          } catch (error) {
+            throw new InputError(`Column '${c.name}' could not be validated`, { cause: error });
+          }
 
           const parameter = {
             length: c.length,
