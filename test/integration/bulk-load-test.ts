@@ -1648,8 +1648,10 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err.message, "Column 'value' could not be validated");
+        assert.instanceOf(err.cause, TypeError);
+        assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
 
         done();
       }
@@ -1664,8 +1666,8 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err.message, "Column 'value' could not be validated");
 
         assert.strictEqual(rowCount, 0);
 

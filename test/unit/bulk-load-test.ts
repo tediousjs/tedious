@@ -80,6 +80,38 @@ describe('BulkLoad', function() {
       assert.strictEqual(error.cause, cause);
     });
 
+    for (const { shape, rows } of [
+      { shape: 'array', rows: [['sensitive value']] },
+      { shape: 'object', rows: [{ inputName: 'sensitive value' }] }
+    ]) {
+      it(`reports the failing column for ${shape} rows without exposing the value`, async function() {
+        const cause = new TypeError('Invalid value.');
+        const type = buildType({
+          validate() {
+            throw cause;
+          }
+        });
+        const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+        request.addColumn('databaseColumn', type, { objName: 'inputName', nullable: false });
+
+        let error;
+        try {
+          for await (const chunk of new BulkLoadPayload(request, rows)) {
+            assert.instanceOf(chunk, Buffer);
+          }
+        } catch (err) {
+          error = err;
+        }
+
+        assert.instanceOf(error, InputError);
+        assert.strictEqual((error as InputError).message, "Column 'databaseColumn' could not be validated");
+        assert.notInclude((error as InputError).stack, 'sensitive value');
+        // The rejected value is not retained on the error.
+        assert.deepEqual(Object.keys(error as object), []);
+        assert.strictEqual((error as InputError).cause, cause);
+      });
+    }
+
 
     it('closes the row source when the column metadata cannot be written', async function() {
       let closed = false;
