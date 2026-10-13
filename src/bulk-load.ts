@@ -106,7 +106,11 @@ interface ColumnOptions {
   precision?: number;
 
   /**
-   * For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
+   * For Numeric and Decimal, the number of digits after the decimal point.
+   * For Time, DateTime2, and DateTimeOffset, the number of fractional-second
+   * digits, which SQL Server documentation calls the *fractional seconds
+   * precision* (the `n` in `datetime2(n)`). It defaults to 7, or 0 when the
+   * value is `null`.
    */
   scale?: number;
 
