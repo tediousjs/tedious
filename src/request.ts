@@ -17,6 +17,7 @@ import { Collation } from './collation';
  * be initiated until this callback is called.
  *
  * This callback is called before `requestCompleted` is emitted.
+ * The same arguments are also passed to `requestCompleted` listeners.
  */
 type CompletionCallback =
   /**
@@ -315,7 +316,27 @@ class Request extends EventEmitter {
       (columns: ColumnInfo[]) => void
   ): this
 
-  on(event: 'requestCompleted', listener: () => void): this
+  /**
+   * This event is emitted when the request has completed, either successfully or with an error.
+   * It is emitted after the completion callback passed to the constructor has been called,
+   * and receives the same arguments as that callback.
+   */
+  on(
+    event: 'requestCompleted',
+    listener:
+      /**
+       * @param error
+       *   If an error occurred, an error object.
+       *
+       * @param rowCount
+       *   The number of rows emitted as result of executing the SQL statement.
+       *
+       * @param rows
+       *   Rows as a result of executing the SQL statement.
+       *   Will only be available if [[ConnectionOptions.rowCollectionOnRequestCompletion]] is `true`.
+       */
+      (error: Error | null | undefined, rowCount?: number, rows?: any) => void
+  ): this
 
   on(event: 'cancel', listener: () => void): this
 
@@ -362,7 +383,7 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  emit(event: 'requestCompleted'): boolean
+  emit(event: 'requestCompleted', error: Error | null | undefined, rowCount?: number, rows?: any): boolean
   /**
    * @private
    */
@@ -429,7 +450,7 @@ class Request extends EventEmitter {
         }
       } else {
         this.userCallback?.(err, rowCount, rows);
-        this.emit('requestCompleted');
+        this.emit('requestCompleted', err, rowCount, rows);
       }
     };
   }
