@@ -1026,6 +1026,30 @@ describe('NVarChar', function() {
       assert.deepEqual(buffer, expected);
     });
 
+    it('correctly converts `string` values (Length not given)', function() {
+      // A length that is left out, as it can be for a TVP column, is sent as
+      // `max`, so the value is a PLP value and ends with its terminator.
+      const value = '\uffff';
+      const expected = Buffer.from('02000000ffff00000000', 'hex');
+
+      const type = TYPES.NVarChar;
+      const parameterValue = { value, length: undefined };
+
+      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      assert.deepEqual(buffer, expected);
+    });
+
+    it('correctly converts `string` values (Length is NaN)', function() {
+      const value = '\uffff';
+      const expected = Buffer.from('02000000ffff00000000', 'hex');
+
+      const type = TYPES.NVarChar;
+      const parameterValue = { value, length: NaN };
+
+      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      assert.deepEqual(buffer, expected);
+    });
+
     it('correctly converts `null` values (Length <= Maximum Length)', function() {
       const value = null;
       const expected = Buffer.from([]);
@@ -1065,6 +1089,10 @@ describe('NVarChar', function() {
 
       const result2 = typeInfo(type, { value: null, length: 4100 }, options);
       assert.deepEqual(result2, expected1);
+
+      // Length not given, or not a number
+      assert.deepEqual(typeInfo(type, { value: null, length: undefined }, options), expected1);
+      assert.deepEqual(typeInfo(type, { value: null, length: NaN }, options), expected1);
     });
   });
 });
@@ -1630,6 +1658,26 @@ describe('VarBinary', function() {
       assert.deepEqual(buffer, expected);
     });
 
+    it('correctly converts `Buffer` values (Length not given)', function() {
+      // A length that is left out, as it can be for a TVP column, is sent as
+      // `max`, so the value is a PLP value and ends with its terminator.
+      const value = Buffer.from([0x12, 0x34]);
+      const expected = Buffer.from('02000000123400000000', 'hex');
+      const parameterValue = { value, length: undefined };
+
+      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      assert.deepEqual(buffer, expected);
+    });
+
+    it('correctly converts `Buffer` values (Length is NaN)', function() {
+      const value = Buffer.from([0x12, 0x34]);
+      const expected = Buffer.from('02000000123400000000', 'hex');
+      const parameterValue = { value, length: NaN };
+
+      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      assert.deepEqual(buffer, expected);
+    });
+
     it('correctly converts `null` values (Length <= Maximum Length)', function() {
       const value = null;
       const length = 1;
@@ -1664,6 +1712,10 @@ describe('VarBinary', function() {
 
       const result1 = typeInfo(TYPES.VarBinary, { value: null, length: 8500 }, options);
       assert.deepEqual(result1, expected1);
+
+      // Length not given, or not a number
+      assert.deepEqual(typeInfo(TYPES.VarBinary, { value: null, length: undefined }, options), expected1);
+      assert.deepEqual(typeInfo(TYPES.VarBinary, { value: null, length: NaN }, options), expected1);
     });
   });
 });

@@ -93,7 +93,12 @@ const NVarChar: { maximumLength: number } & DataType = {
     const value = parameter.value instanceof Buffer ? parameter.value : parameter.value.toString();
     const length = typeof value === 'string' ? value.length * 2 : value.length;
 
-    if (parameter.length! <= this.maximumLength) {
+    // Sent as `max` (PLP) unless the length is within the maximum, as
+    // `writeTypeInfo` declares it, so also when it is `undefined` (a TVP
+    // column without a length) or `NaN`, which fail `>` as well as `<=`.
+    const isPlp = !(parameter.length! <= this.maximumLength);
+
+    if (!isPlp) {
       buffer.writeUInt16LE(length);
     } else {
       buffer.writeBuffer(UNKNOWN_PLP_LEN);
@@ -110,7 +115,7 @@ const NVarChar: { maximumLength: number } & DataType = {
       buffer.writeBuffer(value);
     }
 
-    if (parameter.length! > this.maximumLength) {
+    if (isPlp) {
       buffer.writeBuffer(PLP_TERMINATOR);
     }
   },
