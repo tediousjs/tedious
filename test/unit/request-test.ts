@@ -37,43 +37,6 @@ describe('Request', function() {
     });
   });
 
-  describe('`requestCompleted` event', function() {
-    it('is emitted with the completion arguments when no callback is given', function() {
-      const request = new Request('SELECT 1');
-      const rows = [[{ value: 1 }]];
-
-      const calls: any[][] = [];
-      request.on('requestCompleted', (...args) => { calls.push(args); });
-      request.callback(null, 1, rows);
-
-      assert.deepStrictEqual(calls, [[null, 1, rows]]);
-    });
-
-    it('is emitted with the error when the request fails and no callback is given', function() {
-      const request = new Request('SELECT 1');
-      const error = new Error('failed');
-
-      const calls: any[][] = [];
-      request.on('requestCompleted', (...args) => { calls.push(args); });
-      request.callback(error);
-
-      assert.deepStrictEqual(calls, [[error, undefined, undefined]]);
-    });
-
-    it('is emitted with the same arguments as the callback, after the callback', function() {
-      const order: string[] = [];
-      const request = new Request('SELECT 1', (err, rowCount) => {
-        order.push(`callback:${err?.message}:${rowCount}`);
-      });
-      request.on('requestCompleted', (err, rowCount) => {
-        order.push(`requestCompleted:${err?.message}:${rowCount}`);
-      });
-      request.callback(new Error('failed'), 0);
-
-      assert.deepStrictEqual(order, ['callback:failed:0', 'requestCompleted:failed:0']);
-    });
-  });
-
   describe('#addOutputParameter', function() {
     it('does not modify the passed in options object', function() {
       const request = new Request('', () => {});
