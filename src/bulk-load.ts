@@ -107,10 +107,13 @@ interface ColumnOptions {
 
   /**
    * For Numeric and Decimal, the number of digits after the decimal point.
+   * Defaults to 0.
+   *
    * For Time, DateTime2, and DateTimeOffset, the number of fractional-second
    * digits, which SQL Server documentation calls the *fractional seconds
-   * precision* (the `n` in `datetime2(n)`). It defaults to 7, or 0 when the
-   * value is `null`.
+   * precision* (the `n` in `datetime2(n)`). Defaults to 0 for bulk-load
+   * columns; set this explicitly (for example, to 7) to preserve fractional
+   * seconds.
    */
   scale?: number;
 
@@ -289,7 +292,7 @@ class BulkLoad extends EventEmitter {
    * @param nullable Indicates whether the column accepts NULL values.
    * @param objName If the name of the column is different from the name of the property found on `rowObj` arguments passed to {@link addRow} or {@link Connection.execBulkLoad}, then you can use this option to specify the property name.
    * @param precision For Numeric, Decimal.
-   * @param scale For Numeric, Decimal, Time, DateTime2, DateTimeOffset.
+   * @param scale For Numeric and Decimal, the number of digits after the decimal point (defaults to 0). For Time, DateTime2, and DateTimeOffset, the fractional-second precision (the `n` in `datetime2(n)`); defaults to 0 for bulk-load columns, so set it explicitly (for example, to 7) to preserve fractional seconds.
   */
   addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
     if (this.executionStarted) {
