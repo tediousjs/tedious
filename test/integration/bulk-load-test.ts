@@ -1649,7 +1649,7 @@ describe('BulkLoad', function() {
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
         assert.instanceOf(err, InputError);
-        assert.strictEqual(err.message, "Column 'value' could not be validated");
+        assert.strictEqual(err.message, "Column 'value' could not be validated at row index 0");
         assert.instanceOf(err.cause, TypeError);
         assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
 
@@ -1667,7 +1667,9 @@ describe('BulkLoad', function() {
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
         assert.instanceOf(err, InputError);
-        assert.strictEqual(err.message, "Column 'value' could not be validated");
+        assert.strictEqual(err.message, "Column 'value' could not be validated at row index 0");
+        assert.instanceOf(err.cause, TypeError);
+        assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
 
         assert.strictEqual(rowCount, 0);
 

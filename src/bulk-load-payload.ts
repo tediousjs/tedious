@@ -117,6 +117,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
 
     let done = false;
     let closed = false;
+    let rowIndex = 0;
     try {
       buffer.writeBuffer(bulkLoad.getColMetaData());
 
@@ -139,38 +140,38 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
           row = await row;
         }
 
+        if (row === null || typeof row !== 'object') {
+          throw new InputError(`Bulk load row at index ${rowIndex} is not an array or object`);
+        }
+
         buffer.writeBuffer(rowTokenBuffer);
 
         const isArray = Array.isArray(row);
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
           const input = isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName];
-          let value;
+          let step = 'validated';
           try {
-            value = c.type.validate(input, c.collation);
-          } catch (error) {
-            throw new InputError(`Column '${c.name}' could not be validated`, { cause: error });
-          }
+            const value = c.type.validate(input, c.collation);
+            const parameter = {
+              length: c.length,
+              scale: c.scale,
+              precision: c.precision,
+              value: value
+            };
 
-          const parameter = {
-            length: c.length,
-            scale: c.scale,
-            precision: c.precision,
-            value: value
-          };
+            if (isTextType[i] && value == null) {
+              buffer.writeBuffer(textPointerNullBuffer);
+            } else {
+              if (isTextType[i]) {
+                buffer.writeBuffer(textPointerAndTimestampBuffer);
+              }
 
-          if (isTextType[i] && value == null) {
-            buffer.writeBuffer(textPointerNullBuffer);
-          } else {
-            if (isTextType[i]) {
-              buffer.writeBuffer(textPointerAndTimestampBuffer);
-            }
-
-            try {
+              step = 'serialized';
               c.type.writeValue(buffer, parameter, options);
-            } catch (error) {
-              throw new InputError(`Column '${c.name}' could not be serialized`, { cause: error });
             }
+          } catch (error) {
+            throw new InputError(`Column '${c.name}' could not be ${step} at row index ${rowIndex}`, { cause: error });
           }
 
           // Checked after every cell, not only after every row, so that a
@@ -182,6 +183,8 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
             buffer.consume(buffer.length);
           }
         }
+
+        rowIndex++;
       }
     } catch (err) {
       // A failed row closes the source as a `for await` would. A close

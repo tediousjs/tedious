@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import { Readable } from 'stream';
 import BulkLoad from '../../src/bulk-load';
-import { BulkLoadPayload } from '../../src/bulk-load-payload';
+import { BulkLoadPayload, type Row } from '../../src/bulk-load-payload';
 import { InputError, RequestError } from '../../src/errors';
 import Connection, { type InternalConnectionOptions } from '../../src/connection';
 import { type Request } from '../../src/tedious';
@@ -39,14 +39,18 @@ describe('BulkLoad', function() {
       };
     }
 
-    async function writeRow(type: DataType, rows: Iterable<unknown[]> = [[null]]): Promise<Error> {
+    async function writeRow(
+      type: DataType,
+      rows: Iterable<Row> = [[null]],
+      name = 'foo',
+      options: Parameters<BulkLoad['addColumn']>[2] = { nullable: true }
+    ): Promise<Error> {
       const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
-      request.addColumn('foo', type, { nullable: true });
+      request.addColumn(name, type, options);
 
-      const chunks: Buffer[] = [];
       try {
         for await (const chunk of new BulkLoadPayload(request, rows)) {
-          chunks.push(chunk);
+          assert.instanceOf(chunk, Buffer);
         }
       } catch (err) {
         return err as Error;
@@ -76,35 +80,33 @@ describe('BulkLoad', function() {
       }));
 
       assert.instanceOf(error, InputError);
-      assert.match(error.message, /Column 'foo' could not be serialized/);
+      assert.strictEqual(error.message, "Column 'foo' could not be serialized at row index 0");
       assert.strictEqual(error.cause, cause);
     });
 
     for (const { shape, rows } of [
-      { shape: 'array', rows: [['sensitive value']] },
-      { shape: 'object', rows: [{ inputName: 'sensitive value' }] }
+      { shape: 'array', rows: [['valid value'], ['sensitive value']] },
+      { shape: 'object', rows: [{ inputName: 'valid value' }, { inputName: 'sensitive value' }] }
     ]) {
       it(`reports the failing column for ${shape} rows without exposing the value`, async function() {
         const cause = new TypeError('Invalid value.');
         const type = buildType({
-          validate() {
-            throw cause;
+          validate(value) {
+            if (value === 'sensitive value') {
+              throw cause;
+            }
+            return value;
           }
         });
-        const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
-        request.addColumn('databaseColumn', type, { objName: 'inputName', nullable: false });
-
-        let error;
-        try {
-          for await (const chunk of new BulkLoadPayload(request, rows)) {
-            assert.instanceOf(chunk, Buffer);
-          }
-        } catch (err) {
-          error = err;
-        }
+        const error = await writeRow(
+          type,
+          rows,
+          'databaseColumn',
+          { objName: 'inputName', nullable: false }
+        );
 
         assert.instanceOf(error, InputError);
-        assert.strictEqual((error as InputError).message, "Column 'databaseColumn' could not be validated");
+        assert.strictEqual(error.message, "Column 'databaseColumn' could not be validated at row index 1");
         assert.notInclude((error as InputError).stack, 'sensitive value');
         // The rejected value is not retained on the error.
         assert.deepEqual(Object.keys(error as object), []);
@@ -112,6 +114,15 @@ describe('BulkLoad', function() {
       });
     }
 
+    for (const row of [null, undefined]) {
+      it(`reports the row index when a row is ${row}`, async function() {
+        const rows = [[null], row] as unknown as Iterable<Row>;
+        const error = await writeRow(buildType({}), rows);
+
+        assert.instanceOf(error, InputError);
+        assert.strictEqual(error.message, 'Bulk load row at index 1 is not an array or object');
+      });
+    }
 
     it('closes the row source when the column metadata cannot be written', async function() {
       let closed = false;
@@ -286,7 +297,9 @@ describe('BulkLoad', function() {
         error = err;
       }
 
-      assert.instanceOf(error, TypeError);
+      assert.instanceOf(error, InputError);
+      assert.strictEqual((error as InputError).message, "Column 'id' could not be validated at row index 1");
+      assert.instanceOf((error as InputError).cause, TypeError);
       assert.lengthOf(chunks, 0);
       assert.isTrue(closed);
     });
