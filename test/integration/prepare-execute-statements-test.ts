@@ -304,12 +304,13 @@ describe('Prepare Execute Statement', function() {
     }
 
     // Prepare a statement that can cause a divide by zero error depending on the parameter
-    const request = new Request('select 1 / @divisor as result', function() {});
+    // No completion callback is given - the `requestCompleted` event is used instead
+    const request = new Request('select 1 / @divisor as result');
     request.addParameter('divisor', TYPES.Int);
 
     let executionCount = 0;
     const results: (number | null)[] = [];
-    const errors: (Error | undefined)[] = [];
+    const errors: (Error | null | undefined)[] = [];
 
     request.on('row', function(columns) {
       results.push(columns[0].value);
@@ -319,20 +320,23 @@ describe('Prepare Execute Statement', function() {
       assert.ok(request.handle);
 
       // First execution: should succeed with divisor = 1
-      request.once('requestCompleted', function() {
+      request.once('requestCompleted', function(err) {
         executionCount++;
-        errors.push(request.error);
+        assert.strictEqual(err, request.error);
+        errors.push(err);
 
         // Second execution: should fail with divisor = 0 (divide by zero)
-        request.once('requestCompleted', function() {
+        request.once('requestCompleted', function(err) {
           executionCount++;
-          errors.push(request.error);
+          assert.strictEqual(err, request.error);
+          errors.push(err);
 
           // Third execution: should succeed with divisor = 2
           // Before the fix, this would report the error from the second execution
-          request.once('requestCompleted', function() {
+          request.once('requestCompleted', function(err) {
             executionCount++;
-            errors.push(request.error);
+            assert.strictEqual(err, request.error);
+            errors.push(err);
 
             // Unprepare the statement and wait for it to complete before closing
             request.once('requestCompleted', function() {
