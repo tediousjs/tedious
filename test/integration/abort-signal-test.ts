@@ -23,6 +23,15 @@ function getConfig() {
   };
 }
 
+// Assert that an execution failed because its abort signal was aborted with
+// the given reason.
+function assertAbortError(error: unknown, reason: unknown) {
+  assert.instanceOf(error, RequestError);
+  assert.strictEqual((error as RequestError).code, 'ABORT_ERR');
+  assert.strictEqual((error as RequestError).name, 'AbortError');
+  assert.strictEqual((error as RequestError).cause, reason);
+}
+
 interface Completion {
   error: Error | null | undefined;
   rowCount: number | undefined;
@@ -87,7 +96,7 @@ describe('abort signals', function() {
 
   for (const [method, execute] of executions) {
     describe(method, function() {
-      it('cancels the request when the signal is aborted, and fails with the signal\'s reason', async function() {
+      it('cancels the request when the signal is aborted, and fails with an abort error', async function() {
         const controller = new AbortController();
         const reason = new Error('no longer needed');
 
@@ -98,7 +107,7 @@ describe('abort signals', function() {
         controller.abort(reason);
 
         const { error } = await completed;
-        assert.strictEqual(error, reason);
+        assertAbortError(error, reason);
 
         // The connection can be used right away.
         assert.strictEqual(await querySingleValue('SELECT 1'), 1);
@@ -120,20 +129,22 @@ describe('abort signals', function() {
         assert.isFalse(calledBack, 'the callback is called asynchronously');
 
         const { error } = await completed;
-        assert.strictEqual(error, reason);
+        assertAbortError(error, reason);
 
         assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #executions'), 0);
       });
     });
   }
 
-  it('fails with the reason of a timeout signal', async function() {
+  it('fails with an abort error caused by the reason of a timeout signal', async function() {
     const { request: req, completed } = request("WAITFOR DELAY '00:00:05'");
     connection.execSql(req, { signal: AbortSignal.timeout(100) });
 
     const { error } = await completed;
-    assert.instanceOf(error, DOMException);
-    assert.strictEqual(error!.name, 'TimeoutError');
+    assert.instanceOf(error, RequestError);
+    assert.strictEqual((error as RequestError).code, 'ABORT_ERR');
+    assert.instanceOf((error as RequestError).cause, DOMException);
+    assert.strictEqual(((error as RequestError).cause as DOMException).name, 'TimeoutError');
   });
 
   it('fails with a cancellation error if the request itself is canceled', async function() {
@@ -194,7 +205,7 @@ describe('abort signals', function() {
     controller.abort(reason);
 
     const { error } = await completed;
-    assert.strictEqual(error, reason);
+    assertAbortError(error, reason);
   });
 
   it('cancels an execution of a prepared statement, which can be executed again afterwards', async function() {
@@ -230,7 +241,9 @@ describe('abort signals', function() {
     connection.execute(req, { delay: '00:00:00' });
     await second;
 
-    assert.deepEqual(executions, [reason, undefined]);
+    assert.lengthOf(executions, 2);
+    assertAbortError(executions[0], reason);
+    assert.isUndefined(executions[1]);
   });
 
   describe('execBulkLoad', function() {
@@ -252,7 +265,7 @@ describe('abort signals', function() {
       return { bulkLoad, completed };
     }
 
-    it('cancels the bulk load when the signal is aborted, and fails with the signal\'s reason', async function() {
+    it('cancels the bulk load when the signal is aborted, and fails with an abort error', async function() {
       const { bulkLoad, completed } = await prepareBulkLoad();
       const controller = new AbortController();
       const reason = new Error('no longer needed');
@@ -269,7 +282,7 @@ describe('abort signals', function() {
       connection.execBulkLoad(bulkLoad, rows(), { signal: controller.signal });
 
       const { error } = await completed;
-      assert.strictEqual(error, reason);
+      assertAbortError(error, reason);
 
       assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 0);
     });
@@ -290,7 +303,7 @@ describe('abort signals', function() {
       connection.execBulkLoad(bulkLoad, rows(), { signal: AbortSignal.abort(reason) });
 
       const { error } = await completed;
-      assert.strictEqual(error, reason);
+      assertAbortError(error, reason);
       assert.isTrue(closed);
 
       assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 0);

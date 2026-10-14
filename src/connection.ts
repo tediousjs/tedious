@@ -2369,6 +2369,14 @@ class Connection extends EventEmitter {
   requestTimeout() {
     this.requestTimer = undefined;
     const request = this.request!;
+
+    // A request that was canceled already, e.g. via `cancel()` or an abort
+    // signal, completes with the error of that cancellation, once the server
+    // acknowledged it (or the cancel timer expired).
+    if (request.canceled) {
+      return;
+    }
+
     request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
@@ -2723,8 +2731,7 @@ class Connection extends EventEmitter {
   execSqlBatch(request: Request, options?: ExecutionOptions): void
 
   execSqlBatch(request: Request, options?: ExecutionOptions) {
-    abortOnSignal(request, options?.signal);
-    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -2763,8 +2770,6 @@ class Connection extends EventEmitter {
   execSql(request: Request, options?: ExecutionOptions): void
 
   execSql(request: Request, options?: ExecutionOptions) {
-    abortOnSignal(request, options?.signal);
-
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -2804,7 +2809,7 @@ class Connection extends EventEmitter {
       parameters.push(...request.resolvedParameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -2977,8 +2982,6 @@ class Connection extends EventEmitter {
   prepare(request: Request, options?: ExecutionOptions): void
 
   prepare(request: Request, options?: ExecutionOptions) {
-    abortOnSignal(request, options?.signal);
-
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -3014,7 +3017,7 @@ class Connection extends EventEmitter {
     request.preparing = true;
 
     // The prepared statement's handle is stored by the `RequestTokenHandler`.
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -3068,8 +3071,6 @@ class Connection extends EventEmitter {
   execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): void
 
   execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions) {
-    abortOnSignal(request, options?.signal);
-
     const executeParameters: ResolvedParameter[] = [];
 
     executeParameters.push(this.resolveRequestParameter({
@@ -3103,7 +3104,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -3125,8 +3126,6 @@ class Connection extends EventEmitter {
   callProcedure(request: Request, options?: ExecutionOptions): void
 
   callProcedure(request: Request, options?: ExecutionOptions) {
-    abortOnSignal(request, options?.signal);
-
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -3140,7 +3139,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -3334,7 +3333,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, signal?: AbortSignal) {
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
@@ -3343,7 +3342,16 @@ class Connection extends EventEmitter {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
       request.callback(new RequestError(message, 'EINVALIDSTATE'));
-    } else if (request.canceled) {
+      return;
+    }
+
+    // Only listen to the signal once the request is certain to be executed
+    // and to call back. If the request is rejected (above), or if preparing
+    // its payload throws, the signal must not affect the request, which might
+    // still be executing another time (or will be executed again later).
+    abortOnSignal(request, signal);
+
+    if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
