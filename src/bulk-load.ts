@@ -92,7 +92,7 @@ interface Column extends Parameter {
   collation: Collation | undefined;
 }
 
-interface ColumnOptions {
+export interface ColumnOptions {
   output?: boolean;
 
   /**
