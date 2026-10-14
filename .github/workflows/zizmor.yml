@@ -1,0 +1,32 @@
+name: zizmor
+
+on:
+  push:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  pull_request:
+    branches: [ "**" ]
+
+permissions: {}
+
+jobs:
+  zizmor:
+    name: Analyze GitHub Actions workflows
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # Findings are uploaded to the repository's code scanning alerts. The
+      # job itself only fails on internal errors, not on findings.
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          # `.gitignore` ignores all dotfiles, so collecting from `.` (the
+          # default) finds nothing. Point zizmor at `.github` directly.
+          inputs: .github
