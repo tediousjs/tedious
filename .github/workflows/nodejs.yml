@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [ "master", "alpha", "beta", "*.x" ]
 
+permissions:
+  contents: read
+
 env:
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
@@ -16,10 +19,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
     - name: Use Node.js 22
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: 22
         cache: 'npm'
@@ -38,11 +43,13 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -64,7 +71,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -73,7 +80,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -82,7 +89,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -91,7 +98,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -100,7 +107,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -109,7 +116,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -126,16 +133,18 @@ jobs:
 
     steps:
     - name: Install SQL Server ${{ matrix.mssql-version }}
-      uses: tediousjs/setup-sqlserver@v4
+      uses: tediousjs/setup-sqlserver@7b5fff37b12b3be221350caeab43f54c2072c86f # v4
       with:
         sqlserver-version: ${{ matrix.mssql-version }}
         install-updates: true
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -186,7 +195,7 @@ jobs:
     - name: run unit tests
       run: npx nyc --reporter=lcov npm run test
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -195,7 +204,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_4
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -204,7 +213,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_B
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -213,7 +222,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_3_A
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -222,7 +231,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_2
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -231,7 +240,7 @@ jobs:
         TEDIOUS_TDS_VERSION: 7_1
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -244,10 +253,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
     - name: Use Node.js 22
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: 22
         cache: 'npm'
@@ -265,7 +276,7 @@ jobs:
         AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -278,10 +289,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
     - name: Use Node.js 22
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: 22
         cache: 'npm'
@@ -301,7 +314,7 @@ jobs:
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -314,10 +327,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
     - name: Use Node.js 22
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: 22
         cache: 'npm'
@@ -337,7 +352,7 @@ jobs:
         AZURE_AD_PASSWORD: ${{ secrets.AZURE_AD_PASSWORD }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -351,10 +366,12 @@ jobs:
     if: ${{ github.event_name == 'push' || github.repository == github.event.pull_request.head.repo.full_name }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
     - name: Use Node.js 22
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: 22
         cache: 'npm'
@@ -373,7 +390,7 @@ jobs:
         AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
       run: npx nyc --reporter=lcov npm run test-integration
 
-    - uses: codecov/codecov-action@v5
+    - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -390,10 +407,12 @@ jobs:
       id-token: write # to enable use of OIDC for npm provenance
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      with:
+        persist-credentials: false
 
     - name: Use Node.js 22
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: 22
         cache: 'npm'

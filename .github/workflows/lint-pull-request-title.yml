@@ -1,17 +1,24 @@
 name: "Lint Pull Request Title"
 
 on:
-  pull_request_target:
+  # `pull_request_target` is needed so the check also runs for pull requests
+  # from forks. It is safe here because the job never checks out or runs code
+  # from the pull request; it only reads the pull request title.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types:
       - opened
       - edited
       - synchronize
 
+permissions: {}
+
 jobs:
   main:
     name: Lint Pull Request Title
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     steps:
-      - uses: amannn/action-semantic-pull-request@v6
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
