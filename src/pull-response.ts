@@ -1572,7 +1572,11 @@ export class Response {
 
       // A `DONEPROC` token ends a procedure (e.g. `sp_executesql`) rather
       // than a statement.
-      if ((token instanceof DoneToken || token instanceof DoneInProcToken) && !token.attention && (token.rowCount !== undefined || token.sqlError)) {
+      //
+      // The error flag only makes a result if an error was read for the
+      // statement: the server also sets it, without sending an error, on the
+      // `DONE` token that ends a canceled batch.
+      if ((token instanceof DoneToken || token instanceof DoneInProcToken) && !token.attention && (token.rowCount !== undefined || (token.sqlError && this.pendingErrors.length > 0))) {
         const result = new Result(this, []);
         result.rowCount = token.rowCount;
         result.done = true;

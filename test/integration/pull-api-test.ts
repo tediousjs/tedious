@@ -339,6 +339,35 @@ describe('pulling responses', function() {
       assert.deepEqual(await query('SELECT 3'), [[3]]);
     });
 
+    it('returns a result with the error of a failed statement without a result set', async function() {
+      {
+        await using response = connection.execSqlBatch(new Request("SELECT 1 AS a; RAISERROR('boom', 16, 1); SELECT 2 AS b"));
+
+        const results = [];
+        let error: Error | undefined;
+        try {
+          for await (const result of response.results()) {
+            const rows = [];
+            for await (const row of result) {
+              rows.push(row.values());
+            }
+            results.push({ columns: result.columns.map((c) => c.colName), rows, errors: result.errors.map((e) => e.message) });
+          }
+        } catch (err: any) {
+          error = err;
+        }
+
+        assert.deepEqual(results, [
+          { columns: ['a'], rows: [[1]], errors: [] },
+          { columns: [], rows: [], errors: ['boom'] },
+          { columns: ['b'], rows: [[2]], errors: [] }
+        ]);
+        assert.match(error!.message, /boom/);
+      }
+
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+
     it('skips results without rows when reading the rows of a single result set via `rows()`', async function() {
       assert.deepEqual(await query('CREATE TABLE #s (id int); INSERT INTO #s VALUES (1), (2); SELECT id FROM #s ORDER BY id; DELETE FROM #s'), [[1], [2]]);
     });
@@ -1183,20 +1212,18 @@ describe('pulling responses', function() {
         assert.isFalse(first.done);
 
         // The read waits for the second result set, which only arrives after
-        // the `WAITFOR`.
+        // the `WAITFOR`. The canceled batch returns no further result.
         const pending = results.next();
         controller.abort(reason);
 
         let error: unknown;
         try {
           await pending;
-          for await (const result of results) {
-            result.columns;
-          }
         } catch (err) {
           error = err;
         }
         assert.strictEqual(error, reason);
+        assert.deepEqual(response.messages.map((m) => m.message), ['flush']);
       }
 
       assert.deepEqual(await query('SELECT 3'), [[3]]);
