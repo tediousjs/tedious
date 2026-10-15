@@ -69,6 +69,9 @@ export class ResponseReader {
   // Set while a read waits for more data. Reads are processed one at a time.
   declare busy: Promise<Token | null> | undefined;
 
+  // Fails the read that waits for more data, once reading was aborted.
+  declare interrupt: ((error: Error) => void) | undefined;
+
   declare ended: boolean;
   declare error: Error | undefined;
 
@@ -94,6 +97,7 @@ export class ResponseReader {
 
     this.lookahead = undefined;
     this.busy = undefined;
+    this.interrupt = undefined;
     this.ended = false;
     this.error = undefined;
     this.returnStatus = undefined;
@@ -178,10 +182,14 @@ export class ResponseReader {
   /**
    * Fail all further reads with the given error, without reporting it (the
    * request already completed with it).
+   *
+   * A read that waits for more data fails right away: the rest of the
+   * message may never arrive, e.g. when the connection was lost.
    */
   abort(error: Error) {
     if (this.error === undefined && !this.ended) {
       this.error = error;
+      this.interrupt?.(error);
     }
   }
 
@@ -200,7 +208,11 @@ export class ResponseReader {
   async receive(): Promise<Token | null> {
     try {
       while (true) {
-        const result = await this.iterator.next();
+        const result = await new Promise<IteratorResult<Buffer>>((resolve, reject) => {
+          this.interrupt = reject;
+          this.iterator.next().then(resolve, reject);
+        });
+        this.interrupt = undefined;
 
         if (this.error !== undefined) {
           throw this.error;
@@ -335,7 +347,7 @@ class ValueIterator implements AsyncIterableIterator<Buffer> {
     }
 
     try {
-      const result = this.read();
+      const result = this.sequence.response.serialize(() => this.read());
       return result instanceof Promise ? result.catch(rethrow) : Promise.resolve(result);
     } catch (err) {
       return Promise.reject(err).catch(rethrow);
@@ -343,6 +355,11 @@ class ValueIterator implements AsyncIterableIterator<Buffer> {
   }
 
   read(): MaybePromise<IteratorResult<Buffer, undefined>> {
+    // The iteration may have been stopped while this read was queued.
+    if (this.state !== 'reading') {
+      return this.state === 'done' ? DONE : Promise.reject(new Error('The value was skipped before its data was read completely.'));
+    }
+
     const sequence = this.sequence;
     const reader = sequence.response.reader!;
 
@@ -484,7 +501,7 @@ abstract class ValueSequence {
    */
   read(key: number | string): Promise<unknown> {
     try {
-      const value = this.readValue(key);
+      const value = this.response.serialize(() => this.readValue(key));
       return value instanceof Promise ? value.catch(this.response.rethrow) : Promise.resolve(value);
     } catch (err) {
       return Promise.reject(err).catch(this.response.rethrow);
@@ -522,7 +539,7 @@ abstract class ValueSequence {
    */
   stream(key: number | string): Promise<AsyncIterable<Buffer> | null> {
     try {
-      const stream = this.streamValue(key);
+      const stream = this.response.serialize(() => this.streamValue(key));
       return stream instanceof Promise ? stream.catch(this.response.rethrow) : Promise.resolve(stream);
     } catch (err) {
       return Promise.reject(err).catch(this.response.rethrow);
@@ -791,8 +808,11 @@ export class Row extends ValueSequence {
    */
   readValues(): Promise<unknown[]> {
     try {
-      const reading = this.readRemaining();
-      return reading !== undefined ? reading.then(() => this.values()).catch(this.response.rethrow) : Promise.resolve(this.values());
+      const values = this.response.serialize(() => {
+        const reading = this.readRemaining();
+        return reading !== undefined ? reading.then(() => this.values()) : this.values();
+      });
+      return values instanceof Promise ? values.catch(this.response.rethrow) : Promise.resolve(values);
     } catch (err) {
       return Promise.reject(err).catch(this.response.rethrow);
     }
@@ -882,7 +902,7 @@ export class Result implements AsyncIterableIterator<Row> {
 
   next(): Promise<IteratorResult<Row, undefined>> {
     try {
-      const result = this.nextRow();
+      const result = this.response.serialize(() => this.nextRow());
       return result instanceof Promise ? result.catch(this.response.rethrow) : Promise.resolve(result);
     } catch (err) {
       return Promise.reject(err).catch(this.response.rethrow);
@@ -1118,25 +1138,28 @@ export class RowIterator implements AsyncIterableIterator<Row> {
   }
 
   next(): Promise<IteratorResult<Row, undefined>> {
-    const resultSet = this.resultSet;
-    if (resultSet === undefined || this.finished) {
-      return this.nextAsync().catch(this.response.rethrow);
-    }
-
-    let result;
     try {
-      result = resultSet.nextRow();
+      const result = this.response.serialize(() => this.nextRow());
+      return result instanceof Promise ? result.catch(this.response.rethrow) : Promise.resolve(result);
     } catch (err) {
       return Promise.reject(err).catch(this.response.rethrow);
     }
+  }
 
+  nextRow(): MaybePromise<IteratorResult<Row, undefined>> {
+    const resultSet = this.resultSet;
+    if (resultSet === undefined || this.finished) {
+      return this.nextAsync();
+    }
+
+    const result = resultSet.nextRow();
     if (result instanceof Promise) {
       return result.then((result): MaybePromise<IteratorResult<Row, undefined>> => {
         return result.done ? this.end() : result;
-      }).catch(this.response.rethrow);
+      });
     }
 
-    return result.done ? this.end().catch(this.response.rethrow) : Promise.resolve(result);
+    return result.done ? this.end() : result;
   }
 
   async nextAsync(): Promise<IteratorResult<Row, undefined>> {
@@ -1194,7 +1217,7 @@ export class ResultIterator implements AsyncIterableIterator<Result> {
   }
 
   next(): Promise<IteratorResult<Result, undefined>> {
-    return this.nextResultSet().catch(this.response.rethrow);
+    return Promise.resolve(this.response.serialize(() => this.nextResultSet())).catch(this.response.rethrow);
   }
 
   async nextResultSet(): Promise<IteratorResult<Result, undefined>> {
@@ -1307,6 +1330,10 @@ export class Response {
   // the rejection handler of the consumer's calls.
   declare rethrow: (error: unknown) => never;
 
+  // Settles once the consumer's operations that were started so far are
+  // done, while any of them waits for more data.
+  declare pendingOperations: Promise<void> | undefined;
+
   declare outputParametersPromise: Promise<OutputParameters> | undefined;
   declare finishPromise: Promise<RequestSummary> | undefined;
   declare summary: RequestSummary | undefined;
@@ -1350,6 +1377,7 @@ export class Response {
       this.deliveredErrors.add(error);
       throw error;
     };
+    this.pendingOperations = undefined;
     this.outputParametersPromise = undefined;
     this.finishPromise = undefined;
     this.summary = undefined;
@@ -1453,6 +1481,40 @@ export class Response {
     }
 
     this.resolveCompletion();
+  }
+
+  /**
+   * Run an operation of the consumer once all operations started before it
+   * are done, as each operation continues where the previous one stopped
+   * reading (e.g. the next row after the current one).
+   *
+   * Runs the operation right away if no other operation waits for more data,
+   * so operations on data that was received already stay synchronous.
+   */
+  serialize<T>(operation: () => MaybePromise<T>): MaybePromise<T> {
+    const pending = this.pendingOperations;
+    const result = pending === undefined ? operation() : pending.then(operation);
+
+    if (result instanceof Promise) {
+      const done: Promise<void> = result.then(() => this.operationDone(done), () => this.operationDone(done));
+      this.pendingOperations = done;
+    }
+
+    return result;
+  }
+
+  operationDone(done: Promise<void>) {
+    if (this.pendingOperations === done) {
+      this.pendingOperations = undefined;
+    }
+  }
+
+  /**
+   * Read and discard the rest of the response, once the consumer's current
+   * operation is done (e.g. because the request was canceled).
+   */
+  drainInOrder() {
+    this.serialize(() => this.reader!.drain());
   }
 
   getReader(): ResponseReader | Promise<ResponseReader> {
@@ -1605,7 +1667,7 @@ export class Response {
    */
   outputParameters(): Promise<OutputParameters> {
     this.assertPulled();
-    return this.readOutputParametersOnce().catch(this.rethrow);
+    return Promise.resolve(this.serialize(() => this.readOutputParametersOnce())).catch(this.rethrow);
   }
 
   /**
@@ -1675,7 +1737,7 @@ export class Response {
     }
 
     if (this.finishPromise === undefined) {
-      return this.finishPromise = this.readSummary().finally(() => {
+      return this.finishPromise = Promise.resolve(this.serialize(() => this.readSummary())).finally(() => {
         this.onFinished();
       });
     }

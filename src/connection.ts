@@ -2743,6 +2743,9 @@ class Connection extends EventEmitter {
 
   execSqlBatch(request: Request, options?: ExecutionOptions): Response | void {
     const response = request.startExecution(undefined, options?.signal);
+    if (response.completed) {
+      return request.userCallback === undefined ? response : undefined;
+    }
 
     this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
 
@@ -2810,6 +2813,9 @@ class Connection extends EventEmitter {
 
   execSql(request: Request, options?: ExecutionOptions): Response | void {
     const response = request.startExecution(undefined, options?.signal);
+    if (response.completed) {
+      return request.userCallback === undefined ? response : undefined;
+    }
 
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
@@ -3065,6 +3071,9 @@ class Connection extends EventEmitter {
     }));
 
     const response = request.startExecution(false, options?.signal);
+    if (response.completed) {
+      return response.settled().then(() => new PreparedStatement(this, request as PulledRequest));
+    }
     request.preparing = true;
 
     // The prepared statement's handle is stored by the `RequestTokenHandler`.
@@ -3086,6 +3095,9 @@ class Connection extends EventEmitter {
    */
   unprepare(request: Request): Response {
     const response = request.startExecution(false);
+    if (response.completed) {
+      return response;
+    }
 
     const parameters: ResolvedParameter[] = [];
 
@@ -3141,6 +3153,9 @@ class Connection extends EventEmitter {
 
   execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): Response | void {
     const response = request.startExecution(undefined, options?.signal);
+    if (response.completed) {
+      return request.userCallback === undefined ? response : undefined;
+    }
 
     const executeParameters: ResolvedParameter[] = [];
 
@@ -3204,6 +3219,9 @@ class Connection extends EventEmitter {
 
   callProcedure(request: Request, options?: ExecutionOptions): Response | void {
     const response = request.startExecution(undefined, options?.signal);
+    if (response.completed) {
+      return request.userCallback === undefined ? response : undefined;
+    }
 
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
@@ -3531,8 +3549,9 @@ class Connection extends EventEmitter {
 
     const onCancel = () => {
       // Nobody consumes the response of a canceled request anymore, but it
-      // still needs to be read completely.
-      reader.drain();
+      // still needs to be read completely - after the read the consumer may
+      // be waiting for, so that read sees the tokens in order.
+      response.drainInOrder();
 
       if (this.attentionSent) {
         attentionPending = true;

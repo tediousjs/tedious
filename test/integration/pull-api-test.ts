@@ -1123,6 +1123,209 @@ describe('pulling responses', function() {
     });
   });
 
+  describe('concurrent operations', function() {
+    it('returns the rows in order when `next()` is called before the previous call settled', async function() {
+      const request = new Request('SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3');
+      await using response = connection.execSql(request);
+
+      const rows = response.rows();
+      const results = await Promise.all([rows.next(), rows.next(), rows.next(), rows.next()]);
+
+      assert.deepEqual(results.map((result) => (result.done ? 'done' : result.value.get('n'))), [1, 2, 3, 'done']);
+    });
+
+    it('returns the rows of many packets in order when `next()` is called before the previous call settled', async function() {
+      const request = new Request('SELECT TOP 5000 CAST(ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS int) AS n FROM sys.all_objects a CROSS JOIN sys.all_objects b ORDER BY n');
+      await using response = connection.execSql(request);
+
+      const rows = response.rows();
+      const reads = [];
+      for (let i = 0; i <= 5000; i++) {
+        reads.push(rows.next());
+      }
+      const results = await Promise.all(reads);
+
+      assert.isTrue(results[5000].done);
+      assert.deepEqual(results.slice(0, 5000).map((result) => (result.done ? 'done' : result.value.get('n'))), Array.from({ length: 5000 }, (_, i) => i + 1));
+    });
+
+    it('reads a value only once the previous operation on the response is done', async function() {
+      skipWithoutMaxTypes(this);
+
+      const data = randomBytes(100000);
+      const request = new Request('SELECT 1 AS id, @data AS data, 2 AS after');
+      request.addParameter('data', TYPES.VarBinary, data);
+      await using response = connection.execSql(request);
+
+      const rows = response.rows();
+      const first = await rows.next();
+      assert.isFalse(first.done);
+
+      // The value spans several packets, so reading it waits for more data -
+      // moving on to the next row must not skip it in the meantime.
+      const reading = (first.value as any).read('data');
+      const done = rows.next();
+
+      assert.deepEqual(await reading, data);
+      assert.isTrue((await done).done);
+    });
+
+    it('raises the reason of an abort from a read that waits for more data', async function() {
+      const controller = new AbortController();
+      const reason = new Error('stop');
+
+      const request = new Request("SELECT 1 AS a; RAISERROR('flush', 0, 1) WITH NOWAIT; WAITFOR DELAY '00:00:05'; SELECT 2 AS b");
+      {
+        await using response = connection.execSqlBatch(request, { signal: controller.signal });
+
+        const results = response.results();
+        const first = await results.next();
+        assert.isFalse(first.done);
+
+        // The read waits for the second result set, which only arrives after
+        // the `WAITFOR`.
+        const pending = results.next();
+        controller.abort(reason);
+
+        let error: unknown;
+        try {
+          await pending;
+          for await (const result of results) {
+            result.columns;
+          }
+        } catch (err) {
+          error = err;
+        }
+        assert.strictEqual(error, reason);
+      }
+
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+  });
+
+  describe('connection loss', function() {
+    it('fails a read that waits for more data when the connection is closed', async function() {
+      const request = new Request("SELECT 1 AS a; RAISERROR('flush', 0, 1) WITH NOWAIT; WAITFOR DELAY '00:00:30'; SELECT 2 AS b");
+      const response = connection.execSqlBatch(request);
+
+      const results = response.results();
+      const first = await results.next();
+      assert.isFalse(first.done);
+      for await (const row of first.value as AsyncIterable<any>) {
+        assert.strictEqual(row.get('a'), 1);
+      }
+
+      // The second result set only arrives after the `WAITFOR`.
+      const pending = results.next();
+      connection.close();
+
+      let error: any;
+      try {
+        await pending;
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual(error.code, 'ECLOSE');
+
+      // The error was raised already, and finishing does not wait for the
+      // rest of the response either.
+      await response.finish();
+    });
+
+    it('finishes a response whose rest never arrives when the connection is closed', async function() {
+      const request = new Request("SELECT 1 AS a; RAISERROR('flush', 0, 1) WITH NOWAIT; WAITFOR DELAY '00:00:30'; SELECT 2 AS b");
+      const response = connection.execSqlBatch(request);
+
+      const finishing = response.finish();
+      setTimeout(() => {
+        connection.close();
+      }, 100);
+
+      let error: any;
+      try {
+        await finishing;
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual(error.code, 'ECLOSE');
+    });
+  });
+
+  describe('executing a request again', function() {
+    async function expectInvalidState(response: Response) {
+      let error: any;
+      try {
+        await response.finish();
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual(error.code, 'EINVALIDSTATE');
+      assert.match(error.message, /still being executed/);
+    }
+
+    it('fails while the previous response is still being read, without affecting it', async function() {
+      const request = new Request('SELECT 1 AS a');
+      const first = connection.execSql(request);
+
+      await expectInvalidState(connection.execSql(request));
+
+      const rows = [];
+      for await (const row of first.rows()) {
+        rows.push(row.values());
+      }
+      await first.finish();
+
+      assert.deepEqual(rows, [[1]]);
+      assert.deepEqual(await query('SELECT 2'), [[2]]);
+    });
+
+    it('fails executing a prepared statement while its previous execution is still being read', async function() {
+      const request = new Request('SELECT @id AS value');
+      request.addParameter('id', TYPES.Int);
+
+      {
+        await using statement = await connection.prepare(request);
+
+        const first = statement.execute({ id: 1 });
+        await expectInvalidState(statement.execute({ id: 2 }));
+
+        const values = [];
+        for await (const row of first.rows()) {
+          values.push(row.get('value'));
+        }
+        await first.finish();
+
+        assert.deepEqual(values, [1]);
+      }
+
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+
+    it('fails executing a request while it is being prepared', async function() {
+      const request = new Request('SELECT @id AS value');
+      request.addParameter('id', TYPES.Int);
+
+      const preparing = connection.prepare(request);
+      await expectInvalidState(connection.execute(request, { id: 1 }));
+
+      {
+        await using statement = await preparing;
+        await using response = statement.execute({ id: 2 });
+
+        const values = [];
+        for await (const row of response.rows()) {
+          values.push(row.get('value'));
+        }
+        assert.deepEqual(values, [2]);
+      }
+
+      assert.deepEqual(await query('SELECT 3'), [[3]]);
+    });
+  });
+
   describe('misuse', function() {
     it('returns no response for a request that has a callback', async function() {
       let completed!: () => void;

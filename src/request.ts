@@ -612,9 +612,23 @@ class RequestClass extends EventEmitter {
    * response of this execution, which is consumed by pulling if the request
    * has no completion callback.
    *
+   * The returned response is completed already if the request can not be
+   * executed right now, and the connection must not execute it then.
+   *
    * @private
    */
   startExecution(pulled = this.userCallback === undefined, signal?: AbortSignal): Response {
+    // The response of an execution of a request without a callback (pulled,
+    // or preparing it) keeps reading the request's state until it completes -
+    // a second execution in the meantime must fail without touching that
+    // state, nor replacing the response.
+    const previous = this.response;
+    if (previous !== undefined && !previous.completed && this.userCallback === undefined) {
+      const response = new Response(this, pulled);
+      response.complete(new RequestError('The request is still being executed. Finish its response before executing it again.', 'EINVALIDSTATE'));
+      return response;
+    }
+
     const response = this.response = new Response(this, pulled);
     if (signal !== undefined) {
       response.listenForAbort(signal);
