@@ -820,6 +820,7 @@ export interface ConnectionOptions {
    * * `7_3_A`
    * * `7_3_B`
    * * `7_4`
+   * * `8_0` (requires `encrypt: 'strict'`)
    *
    * (default: `7_4`)
    */
