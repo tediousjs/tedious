@@ -176,6 +176,82 @@ describe('calling a procedure that takes and returns a TVP', function() {
     connection.callProcedure(request);
   });
 
+  it('returns the same data when string column lengths are left out', function(done) {
+    const request = new Request('__tediousTvpTest', done);
+
+    request.on('doneInProc', function(rowCount, more) {
+      assert.strictEqual(rowCount, 1);
+    });
+
+    request.on('row', function(columns) {
+      assert.strictEqual(columns[7].value, 'asdf');
+      assert.strictEqual(columns[8].value, 'asdf');
+    });
+
+    const table = {
+      columns: [
+        {
+          name: 'a',
+          type: TYPES.Bit
+        },
+        {
+          name: 'b',
+          type: TYPES.TinyInt
+        },
+        {
+          name: 'c',
+          type: TYPES.SmallInt
+        },
+        {
+          name: 'd',
+          type: TYPES.Int
+        },
+        {
+          name: 'e',
+          type: TYPES.BigInt
+        },
+        {
+          name: 'f',
+          type: TYPES.Real
+        },
+        {
+          name: 'g',
+          type: TYPES.Float
+        },
+        {
+          name: 'h',
+          type: TYPES.VarChar
+        },
+        {
+          name: 'i',
+          type: TYPES.NVarChar
+        },
+        {
+          name: 'j',
+          type: TYPES.DateTime
+        }
+      ],
+      rows: [
+        [
+          false,
+          1,
+          2,
+          3,
+          4,
+          5.5,
+          6.6,
+          'asdf',
+          'asdf',
+          new Date(Date.UTC(2014, 0, 1))
+        ]
+      ]
+    };
+
+    request.addParameter('tvp', TYPES.TVP, table, {});
+
+    connection.callProcedure(request);
+  });
+
   it('correctly handles validation errors', function(done) {
     const request = new Request('__tediousTvpTest', (err) => {
       assert.instanceOf(err, InputError);

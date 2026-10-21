@@ -10,6 +10,8 @@ import { InputError } from '../../src/errors';
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
 const collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0xd0, 0x00, 0x34]));
+const utf8Collation = Collation.fromBuffer(Buffer.from([0x09, 0x04, 0x00, 0x26, 0x00]));
+const japaneseCollation = Collation.fromBuffer(Buffer.from([0x11, 0x04, 0x00, 0x02, 0x00]));
 const txnDescriptor = Buffer.from([0, 0, 0, 0, 0, 0, 0, 0]);
 
 const UNKNOWN_PLP_LEN = Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
@@ -180,6 +182,206 @@ describe('streaming parameters', function() {
       assert.deepEqual(fromAsync, fromArray);
       // Sanity: the request really is larger than one flush chunk.
       assert.isAbove(fromArray.length, 8 * 1024);
+    });
+  });
+
+  describe('streamed text preserves surrogate pairs', function() {
+    for (const [name, type, collationArg] of [
+      ['UTF-8 varchar', TYPES.VarChar, utf8Collation],
+      ['legacy varchar', TYPES.VarChar, collation],
+      ['CP932 varchar', TYPES.VarChar, japaneseCollation],
+      ['nvarchar', TYPES.NVarChar, collation]
+    ] as const) {
+      for (const [description, chunks] of [
+        ['empty input', []],
+        ['empty chunks', ['', '']],
+        ['a split pair', ['\uD83D', '\uDE00']],
+        ['surrogate range endpoints', ['\uD800', '', '\uDC00', '\uDBFF', '', '\uDFFF']],
+        ['empty chunks between halves', ['', '\uD83D', '', '', '\uDE00', '']],
+        ['consecutive split pairs', ['a\uD83D', '\uDE00\uD83D', '\uDE01z']],
+        ['an unpaired high surrogate at EOF', ['a', '\uD83D', '', '']],
+        ['an unpaired low surrogate', ['a', '\uDE00', 'b']],
+        ['a high surrogate followed by text', ['\uD83D', '', 'text']],
+        ['consecutive high surrogates', ['\uD83D', '\uD83D', '\uDE00']],
+        ['JSON text with a split pair', ['{"value":"\uD83D', '', '\uDE00"}']]
+      ] as const) {
+        it(`${name} matches in-memory encoding for ${description}`, async function() {
+          const streamed = resolveParameter(param({ type, value: Readable.from(chunks) }), collationArg, options);
+          const inMemory = resolveParameter(param({ type, value: chunks.join(''), length: Infinity }), collationArg, options);
+          const bytes = await collect(new RpcRequestPayload('p', [streamed], txnDescriptor, options));
+          const expected = await collect(new RpcRequestPayload('p', [inMemory], txnDescriptor, options));
+
+          assert.deepEqual(plpData(bytes), plpData(expected));
+          assert.deepEqual(bytes.subarray(-4), PLP_TERMINATOR);
+        });
+      }
+    }
+
+    it('matches UTF-8 encoding at every boundary in a string', async function() {
+      const value = 'a\u{1F600}\u{1F601}b\uD83Dc\uDE00d\uD83D';
+      for (let boundary = 0; boundary <= value.length; boundary++) {
+        const chunks = [value.slice(0, boundary), '', value.slice(boundary)];
+        const resolved = resolveParameter(param({ type: TYPES.VarChar, value: from(chunks) }), utf8Collation, options);
+        const bytes = await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+        assert.deepEqual(plpData(bytes), Buffer.from(value, 'utf8'), `boundary ${boundary}`);
+      }
+    });
+
+    it('does not share a pending surrogate between interleaved parameters', async function() {
+      const firstChunks = ['a'.repeat(WritableTrackingBuffer.CHUNK_SIZE) + '\uD83D', '', '\uDE00'];
+      const secondChunks = ['b'.repeat(WritableTrackingBuffer.CHUNK_SIZE), '\uDE01'];
+      const first = resolveParameter(param({ type: TYPES.VarChar, value: from(firstChunks) }), utf8Collation, options);
+      const second = resolveParameter(param({ type: TYPES.VarChar, value: from(secondChunks) }), utf8Collation, options);
+      const firstIterator = new RpcRequestPayload('p', [first], txnDescriptor, options)[Symbol.asyncIterator]();
+      const secondIterator = new RpcRequestPayload('p', [second], txnDescriptor, options)[Symbol.asyncIterator]();
+      const firstBytes: Buffer[] = [];
+      const secondBytes: Buffer[] = [];
+
+      while (true) {
+        const a = await firstIterator.next();
+        const b = await secondIterator.next();
+        if (!a.done) {
+          firstBytes.push(a.value);
+        }
+        if (!b.done) {
+          secondBytes.push(b.value);
+        }
+        if (a.done && b.done) {
+          break;
+        }
+      }
+
+      assert.deepEqual(plpData(Buffer.concat(firstBytes)), Buffer.from(firstChunks.join(''), 'utf8'));
+      assert.deepEqual(plpData(Buffer.concat(secondBytes)), Buffer.from(secondChunks.join(''), 'utf8'));
+    });
+
+    it('flushes an unpaired surrogate before writing the next parameter', async function() {
+      const parameters = [
+        param({ name: 'first', type: TYPES.VarChar, value: '\uD83D', length: Infinity }),
+        param({ name: 'second', type: TYPES.VarChar, value: '\uDE00', length: Infinity })
+      ];
+      const inMemory = parameters.map((parameter) => resolveParameter(parameter, utf8Collation, options));
+      const streamed = parameters.map((parameter) => resolveParameter({
+        ...parameter, value: from([parameter.value, ''])
+      }, utf8Collation, options));
+      const bytes = await collect(new RpcRequestPayload('p', streamed, txnDescriptor, options));
+      const expected = await collect(new RpcRequestPayload('p', inMemory, txnDescriptor, options));
+
+      assert.deepEqual(bytes, expected);
+    });
+
+    it('sends a full chunk before pulling the rest of a split pair', async function() {
+      let pulled = 0;
+      const prefix = 'a'.repeat(WritableTrackingBuffer.CHUNK_SIZE);
+      async function * chunks() {
+        pulled++;
+        yield prefix + '\uD83D';
+        pulled++;
+        yield '';
+        pulled++;
+        yield '\uDE00';
+      }
+
+      const resolved = resolveParameter(param({ type: TYPES.VarChar, value: chunks() }), utf8Collation, options);
+      const bytes: Buffer[] = [];
+      for await (const piece of new RpcRequestPayload('p', [resolved], txnDescriptor, options)) {
+        if (bytes.length === 0) {
+          assert.strictEqual(pulled, 1);
+        }
+        bytes.push(piece);
+      }
+      assert.strictEqual(pulled, 3);
+      assert.deepEqual(plpData(Buffer.concat(bytes)), Buffer.from(prefix + '\u{1F600}', 'utf8'));
+    });
+
+    it('closes the source with a pending surrogate when the consumer stops', async function() {
+      let closed = false;
+      let pulledRest = false;
+      async function * chunks() {
+        try {
+          yield 'a'.repeat(WritableTrackingBuffer.CHUNK_SIZE) + '\uD83D';
+          pulledRest = true;
+          yield '\uDE00';
+        } finally {
+          closed = true;
+        }
+      }
+      const resolved = resolveParameter(param({ type: TYPES.VarChar, value: chunks() }), utf8Collation, options);
+      for await (const piece of new RpcRequestPayload('p', [resolved], txnDescriptor, options)) {
+        assert.isAbove(piece.length, 0);
+        break;
+      }
+      assert.isTrue(closed);
+      assert.isFalse(pulledRest);
+    });
+
+    it('preserves a consumer error when closing a text source fails', async function() {
+      let closed = false;
+      const consumerError = new Error('consumer gave up');
+      const chunks: AsyncIterable<string> = {
+        [Symbol.asyncIterator]() {
+          return {
+            next: async () => ({ value: 'a'.repeat(WritableTrackingBuffer.CHUNK_SIZE) + '\uD83D', done: false }),
+            return: async () => {
+              closed = true;
+              throw new Error('cleanup failed');
+            }
+          };
+        }
+      };
+      const resolved = resolveParameter(param({ type: TYPES.VarChar, value: chunks }), utf8Collation, options);
+      const iterator = new RpcRequestPayload('p', [resolved], txnDescriptor, options)[Symbol.asyncIterator]();
+      assert.isFalse((await iterator.next()).done);
+
+      let error: unknown;
+      try {
+        await iterator.throw(consumerError);
+      } catch (err) {
+        error = err;
+      }
+      assert.strictEqual(error, consumerError);
+      assert.isTrue(closed);
+    });
+
+    it('surfaces a source failure with a pending surrogate as InputError', async function() {
+      const cause = new Error('source failed');
+      async function * chunks() {
+        yield '\uD83D';
+        throw cause;
+      }
+      const resolved = resolveParameter(param({ name: 'text', type: TYPES.VarChar, value: chunks() }), utf8Collation, options);
+      let error: unknown;
+      try {
+        await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, InputError);
+      assert.strictEqual((error as InputError).message, "Input parameter 'text' could not be validated");
+      assert.strictEqual((error as InputError).cause, cause);
+    });
+
+    it('rejects a non-string chunk after a pending surrogate and closes the source', async function() {
+      let closed = false;
+      async function * chunks() {
+        try {
+          yield '\uD83D';
+          yield Buffer.from('not a string');
+        } finally {
+          closed = true;
+        }
+      }
+      const resolved = resolveParameter(param({ type: TYPES.VarChar, value: chunks() }), utf8Collation, options);
+      let error: unknown;
+      try {
+        await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+      } catch (err) {
+        error = err;
+      }
+      assert.instanceOf(error, InputError);
+      assert.instanceOf((error as InputError).cause, TypeError);
+      assert.strictEqual(((error as InputError).cause as TypeError).message, 'Invalid string.');
+      assert.isTrue(closed);
     });
   });
 
