@@ -70,7 +70,7 @@ function execSql(
       assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
       assert.strictEqual(columns[0].value, String(expectedValue));
-    } else if (type === TYPES.UniqueIdentifier) {
+    } else if (type === TYPES.UniqueIdentifier || Buffer.isBuffer(expectedValue)) {
       assert.deepEqual(columns[0].value, expectedValue);
     } else {
       assert.strictEqual(columns[0].value, expectedValue);
@@ -1250,53 +1250,25 @@ end')\
   });
 
   describe('`binary`', function() {
-    function selectBinary(done: Mocha.Done, value: Buffer, options: ParameterOptions | undefined, expected: Buffer) {
-      const connection = new Connection(getConfig());
-      let row: Buffer | undefined;
-
-      const request = new Request('select @param', function(err) {
-        connection.close();
-        if (err) {
-          return done(err);
-        }
-
-        assert.deepEqual(row, expected);
-        done();
-      });
-
-      request.addParameter('param', TYPES.Binary, value, options);
-      request.on('row', function(columns) {
-        row = columns[0].value;
-      });
-
-      connection.connect(function(err) {
-        if (err) {
-          return done(err);
-        }
-
-        connection.execSql(request);
-      });
-    }
-
     // https://github.com/tediousjs/tedious/issues/1812
     it('infers the length from the value when the length is 0', function(done) {
-      selectBinary(done, Buffer.from('JP'), { length: 0 }, Buffer.from('JP'));
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: 0 });
     });
 
     it('infers the length from the value when the length is NaN', function(done) {
-      selectBinary(done, Buffer.from('JP'), { length: NaN }, Buffer.from('JP'));
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: NaN });
     });
 
     it('pads a value shorter than the declared length', function(done) {
-      selectBinary(done, Buffer.from('JP'), { length: 4 }, Buffer.from('4a500000', 'hex'));
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: 4 }, Buffer.from('4a500000', 'hex'));
     });
 
     it('truncates a value longer than the declared length', function(done) {
-      selectBinary(done, Buffer.from('JP'), { length: 1 }, Buffer.from('J'));
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: 1 }, Buffer.from('J'));
     });
 
     it('sends an empty value', function(done) {
-      selectBinary(done, Buffer.alloc(0), undefined, Buffer.from([0x00]));
+      execSql(done, TYPES.Binary, Buffer.alloc(0), undefined, undefined, Buffer.from([0x00]));
     });
   });
 });

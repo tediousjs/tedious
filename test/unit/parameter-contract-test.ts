@@ -70,6 +70,18 @@ describe('Parameter serialization contract', function() {
       assert.deepEqual(buffer.data, Buffer.from('ad040002004a50', 'hex'));
     });
 
+    it('truncates Binary parameters during resolution without changing the input buffer', function() {
+      const value = Buffer.from('JP');
+      const resolved = resolveParameter({ type: TYPES.Binary, name: 'p', value, length: 1, output: false }, undefined, options);
+      assert.deepEqual(resolved.data, { value: Buffer.from('J'), length: 1 });
+      assert.deepEqual(value, Buffer.from('JP'));
+
+      const buffer = new WritableTrackingBuffer();
+      TYPES.Binary.writeTypeInfo(buffer, resolved.data, options);
+      TYPES.Binary.writeValue(buffer, resolved.data, options);
+      assert.deepEqual(buffer.data, Buffer.from('ad010001004a', 'hex'));
+    });
+
     it('resolves lengths for types with ids outside the legacy variable-length id bit pattern', function() {
       const type: DataType = {
         ...TYPES.VarBinary,

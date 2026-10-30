@@ -29,7 +29,7 @@ const Binary: { maximumLength: number } & DataType = {
     const value = parameter.value as Buffer | null;
 
     if (value != null) {
-      return value.length;
+      return value.length || 1;
     } else {
       return this.maximumLength;
     }
@@ -47,11 +47,14 @@ const Binary: { maximumLength: number } & DataType = {
       return;
     }
 
-    // The data length is the number of bytes actually sent, which can be less
-    // than the declared length; the server pads the value to that length.
-    const length = Math.min(value.length, parameter.length !== undefined ? parameter.length : Binary.maximumLength, Binary.maximumLength);
-    buffer.writeUInt16LE(length);
-    buffer.writeBuffer(value.subarray(0, length));
+    const length = parameter.length != null ? parameter.length : this.maximumLength;
+    if (value.length > length) {
+      throw new TypeError(`Binary value of ${value.length} bytes exceeds the declared length of ${length}.`);
+    }
+
+    // Send the actual byte count; the server pads shorter values.
+    buffer.writeUInt16LE(value.length);
+    buffer.writeBuffer(value);
   },
 
   validate: function(value): Buffer | null {
@@ -67,15 +70,12 @@ const Binary: { maximumLength: number } & DataType = {
   },
 
   resolve(parameter) {
-    const value = this.validate(parameter.value, undefined);
+    let value = this.validate(parameter.value, undefined);
 
-    // A falsy length (`0`, `NaN`) is treated as unspecified, as `declaration`
-    // does, so that the TYPE_INFO matches the declared `binary(n)`. The
-    // server rejects a declared length of 0, so an empty value is declared
-    // as `binary(1)`.
-    let length = parameter.length;
-    if (!length) {
-      length = value != null ? value.length || 1 : this.maximumLength;
+    // Treat a falsy length as unspecified, preserving parameter behavior.
+    const length = parameter.length || this.resolveLength!(parameter);
+    if (value != null && value.length > length) {
+      value = value.subarray(0, length);
     }
 
     return { value, length };
