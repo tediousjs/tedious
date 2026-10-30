@@ -29,7 +29,7 @@ const Binary: { maximumLength: number } & DataType = {
     const value = parameter.value as Buffer | null;
 
     if (value != null) {
-      return value.length;
+      return value.length || 1;
     } else {
       return this.maximumLength;
     }
@@ -47,8 +47,14 @@ const Binary: { maximumLength: number } & DataType = {
       return;
     }
 
-    buffer.writeUInt16LE(parameter.length!);
-    buffer.writeBuffer(value.subarray(0, parameter.length !== undefined ? Math.min(parameter.length, Binary.maximumLength) : Binary.maximumLength));
+    const length = parameter.length != null ? parameter.length : this.maximumLength;
+    if (value.length > length) {
+      throw new TypeError(`Binary value of ${value.length} bytes exceeds the declared length of ${length}.`);
+    }
+
+    // Send the actual byte count; the server pads shorter values.
+    buffer.writeUInt16LE(value.length);
+    buffer.writeBuffer(value);
   },
 
   validate: function(value): Buffer | null {
@@ -61,6 +67,18 @@ const Binary: { maximumLength: number } & DataType = {
     }
 
     return value;
+  },
+
+  resolve(parameter) {
+    let value = this.validate(parameter.value, undefined);
+
+    // Treat a falsy length as unspecified, preserving parameter behavior.
+    const length = parameter.length || this.resolveLength!(parameter);
+    if (value != null && value.length > length) {
+      value = value.subarray(0, length);
+    }
+
+    return { value, length };
   }
 };
 

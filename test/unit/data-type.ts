@@ -100,6 +100,42 @@ describe('Binary', function() {
       assert.deepEqual(buffer, expected);
     });
 
+    it('writes shorter values without padding or truncating them', function() {
+      const value = Buffer.from('JP');
+      const result = serialize(TYPES.Binary, { value, length: 4 }, options);
+      assert.deepEqual(result.length, Buffer.from([0x02, 0x00]));
+      assert.deepEqual(result.data, value);
+    });
+
+    it('defaults an unspecified length to the maximum length', function() {
+      const value = Buffer.from('JP');
+      const result = serialize(TYPES.Binary, { value }, options);
+      assert.deepEqual(result.length, Buffer.from([0x02, 0x00]));
+      assert.deepEqual(result.data, value);
+    });
+
+    it('treats a JavaScript null length as unspecified', function() {
+      const value = Buffer.from('JP');
+      // @ts-expect-error JavaScript callers can supply null for an optional length.
+      const result = serialize(TYPES.Binary, { value, length: null }, options);
+      assert.deepEqual(result.length, Buffer.from([0x02, 0x00]));
+      assert.deepEqual(result.data, value);
+    });
+
+    it('rejects values longer than the declared length before writing any bytes', function() {
+      for (const length of [0, 3]) {
+        const buffer = new WritableTrackingBuffer();
+        assert.throws(() => TYPES.Binary.writeValue(buffer, { value: Buffer.from('ABCDE'), length }, options),
+                      TypeError, `Binary value of 5 bytes exceeds the declared length of ${length}.`);
+        assert.strictEqual(buffer.length, 0);
+      }
+    });
+
+    it('rejects values longer than the default maximum length', function() {
+      assert.throws(() => serialize(TYPES.Binary, { value: Buffer.alloc(8001) }, options),
+                    TypeError, 'Binary value of 8001 bytes exceeds the declared length of 8000.');
+    });
+
     it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from([]);
@@ -119,6 +155,15 @@ describe('Binary', function() {
 
       const result = typeInfo(type, parameter, options);
       assert.deepEqual(result, expected);
+    });
+  });
+
+  describe('.resolveLength', function() {
+    it('never infers a zero length from an empty buffer', function() {
+      const parameter = { type: TYPES.Binary, name: 'p', output: false };
+      assert.strictEqual(TYPES.Binary.resolveLength!({ ...parameter, value: Buffer.alloc(0) }), 1);
+      assert.strictEqual(TYPES.Binary.resolveLength!({ ...parameter, value: Buffer.from('JP') }), 2);
+      assert.strictEqual(TYPES.Binary.resolveLength!({ ...parameter, value: null }), 8000);
     });
   });
 });

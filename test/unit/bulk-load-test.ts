@@ -80,6 +80,25 @@ describe('BulkLoad', function() {
       assert.strictEqual(error.cause, cause);
     });
 
+    it('rejects oversized Binary row values without silently truncating them', async function() {
+      const bulkLoad = new BulkLoad('tablename', undefined, connectionOptions, {}, () => {});
+      bulkLoad.addColumn('value', TYPES.Binary, { length: 3, nullable: true });
+
+      let error: unknown;
+      try {
+        for await (const chunk of new BulkLoadPayload(bulkLoad, [[Buffer.from('ABCDE')]])) {
+          assert.instanceOf(chunk, Buffer);
+        }
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, InputError);
+      assert.strictEqual((error as InputError).message, "Column 'value' could not be serialized");
+      assert.instanceOf((error as InputError).cause, TypeError);
+      assert.strictEqual(((error as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
+    });
+
 
     it('closes the row source when the column metadata cannot be written', async function() {
       let closed = false;

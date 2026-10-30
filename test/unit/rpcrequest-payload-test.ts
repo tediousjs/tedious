@@ -201,4 +201,28 @@ describe('RpcRequestPayload', function() {
     assert.instanceOf(error, InputError);
     assert.strictEqual((error as InputError).message, "Input parameter 'broken' could not be validated");
   });
+
+  it('rejects oversized Binary TVP cells without silently truncating them', async function() {
+    const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
+    const resolved = resolveParameter({
+      type: TYPES.TVP, name: 'tvp', output: false,
+      value: {
+        name: 'TestType',
+        columns: [{ name: 'c', type: TYPES.Binary, length: 3 }],
+        rows: [[Buffer.from('ABCDE')]]
+      }
+    }, undefined, options);
+
+    let error: unknown;
+    try {
+      await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, InputError);
+    assert.strictEqual((error as InputError).message, "Input parameter 'tvp' could not be validated");
+    assert.instanceOf((error as InputError).cause, TypeError);
+    assert.strictEqual(((error as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
+  });
 });
