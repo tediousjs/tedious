@@ -83,6 +83,78 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  describe('Binary columns', function() {
+    for (const length of [3, undefined]) {
+      it(`pads shorter values to ${length === undefined ? 'the default length of 8000' : 'the declared length'}`, function(done) {
+        const expectedLength = length === undefined ? 8000 : length;
+        const values = [Buffer.from('A'), Buffer.from('ABC'), Buffer.alloc(0), null];
+        const expected = values.map((value) => {
+          if (value === null) {
+            return null;
+          }
+
+          const padded = Buffer.alloc(expectedLength);
+          value.copy(padded);
+          return padded;
+        });
+
+        const bulkLoad = connection.newBulkLoad('#binaryTest', (err, rowCount) => {
+          if (err) {
+            return done(err);
+          }
+
+          assert.strictEqual(rowCount, values.length);
+          const rows: unknown[] = [];
+          const request = new Request('SELECT [value] FROM #binaryTest ORDER BY [id]', (err) => {
+            assert.ifError(err);
+            assert.deepEqual(rows, expected);
+            done();
+          });
+          request.on('row', (columns) => rows.push(columns[0].value));
+          connection.execSql(request);
+        });
+        bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+        bulkLoad.addColumn('value', TYPES.Binary, length === undefined ? { nullable: true } : { length, nullable: true });
+
+        connection.execSqlBatch(new Request(bulkLoad.getTableCreationSql(), (err) => {
+          if (err) {
+            return done(err);
+          }
+
+          connection.execBulkLoad(bulkLoad, values.map((value, id) => [id, value]));
+        }));
+      });
+    }
+
+    it('rejects a value longer than the declared length instead of silently truncating it', function(done) {
+      const bulkLoad = connection.newBulkLoad('#binaryTest', (err, rowCount) => {
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err?.message, 'Column \'value\' could not be serialized');
+        assert.instanceOf(err?.cause, TypeError);
+        assert.strictEqual((err?.cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
+        assert.strictEqual(rowCount, 0);
+
+        const rows: unknown[] = [];
+        const request = new Request('SELECT COUNT(*) FROM #binaryTest', (err) => {
+          assert.ifError(err);
+          assert.deepEqual(rows, [0]);
+          done();
+        });
+        request.on('row', (columns) => rows.push(columns[0].value));
+        connection.execSql(request);
+      });
+      bulkLoad.addColumn('value', TYPES.Binary, { length: 3, nullable: true });
+
+      connection.execSqlBatch(new Request(bulkLoad.getTableCreationSql(), (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        connection.execBulkLoad(bulkLoad, [[Buffer.from('ABCDE')]]);
+      }));
+    });
+  });
+
   describe('.addColumn', function() {
     it('throws an error if called after streaming bulk load has started', function(done) {
       const bulkLoad = connection.newBulkLoad('#tmpTestTable2', (err, rowCount) => {
