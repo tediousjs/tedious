@@ -685,6 +685,18 @@ export interface ConnectionOptions {
    * a boolean determining whether or not the connection will be encrypted.
    * When `true`, the connection fails if the server does not negotiate full encryption.
    *
+   * When `false`, the login packet is still encrypted if the server supports encryption, while the rest
+   * of the connection is not encrypted. This matches the behavior of other SQL Server drivers. Note that:
+   *
+   * * The server certificate is not validated for login packet encryption, regardless of `trustServerCertificate`.
+   *   This protects credentials against passive eavesdropping, but not against an active man-in-the-middle.
+   * * Only the first packet of the login message is encrypted. With a `packetSize` of `4096` (the default) or more,
+   *   this covers the SQL Server authentication password. Access tokens and other authentication data are not covered.
+   * * The connection fails if the TLS handshake fails, e.g. if the server only supports TLS versions that are disabled
+   *   by default. Use `cryptoCredentialsDetails` (e.g. `{ minVersion: 'TLSv1' }`) to allow these versions.
+   *
+   * Use `true` or `'strict'` to encrypt the whole connection.
+   *
    * (default: `true`)
    */
   encrypt?: string | boolean;
@@ -838,6 +850,8 @@ export interface ConnectionOptions {
    * If "false", the SQL Server validates the server SSL certificate. If the server certificate validation fails,
    * the driver raises an error and terminates the connection. Make sure the value passed to serverName exactly
    * matches the Common Name (CN) or DNS name in the Subject Alternate Name in the server certificate for an SSL connection to succeed.
+   *
+   * This option has no effect when `encrypt` is `false`: the server certificate is never validated for login packet encryption.
    *
    * (default: `false`)
    */
@@ -2495,8 +2509,8 @@ class Connection extends EventEmitter {
     const payload = new PreloginPayload({
       // If encrypt setting is set to 'strict', then we should have already done the encryption before calling
       // this function. Therefore, the encrypt will be set to false here.
-      // Otherwise, we will set encrypt here based on the encrypt Boolean value from the configuration.
-      encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
+      // If encrypt is `false`, we still ask for the login packet to be encrypted.
+      encrypt: this.config.options.encrypt === 'strict' ? false : this.config.options.encrypt ? true : 'login',
       version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
     });
 
@@ -3404,6 +3418,17 @@ class Connection extends EventEmitter {
         await Promise.race([
           this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, this.config.options.trustServerCertificate).catch((err) => {
             throw this.wrapSocketError(err);
+          }),
+          signalAborted
+        ]);
+      } else if (this.config.options.encrypt === false && preloginPayload.encryptionString === 'OFF') {
+        // The server supports encryption, so the login packet is encrypted even
+        // though the rest of the connection is not. The server certificate is not
+        // validated for this, as with other drivers.
+        this.transitionTo(this.STATE.SENT_TLSSSLNEGOTIATION);
+        await Promise.race([
+          this.messageIo.startTls(this.secureContextOptions, this.config.options.serverName ? this.config.options.serverName : this.routingData?.server ?? this.config.server, true, true).catch((err) => {
+            throw this.wrapSocketError(new Error(`TLS handshake to encrypt the login packet failed: ${err.message}`, { cause: err }));
           }),
           signalAborted
         ]);

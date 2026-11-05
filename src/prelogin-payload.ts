@@ -44,7 +44,10 @@ for (const name in MARS) {
 }
 
 interface Options {
-  encrypt: boolean;
+  // `true` requests encryption (`ENCRYPT_ON`), `'login'` requests encryption of
+  // the login packet only (`ENCRYPT_OFF`), and `false` indicates that encryption
+  // is not supported (`ENCRYPT_NOT_SUP`).
+  encrypt: boolean | 'login';
   version: {
     major: number;
     minor: number;
@@ -138,7 +141,9 @@ class PreloginPayload {
 
   createEncryptionOption() {
     const buffer = new WritableTrackingBuffer();
-    if (this.options.encrypt) {
+    if (this.options.encrypt === 'login') {
+      buffer.writeUInt8(ENCRYPT.OFF);
+    } else if (this.options.encrypt) {
       buffer.writeUInt8(ENCRYPT.ON);
     } else {
       buffer.writeUInt8(ENCRYPT.NOT_SUP);

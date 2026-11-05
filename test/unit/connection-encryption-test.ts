@@ -3,6 +3,7 @@ import { once } from 'events';
 import { readFileSync } from 'fs';
 import * as net from 'net';
 import { type Duplex } from 'stream';
+import * as tls from 'tls';
 import { TLSSocket } from 'tls';
 import DuplexPair from 'native-duplexpair';
 
@@ -133,7 +134,7 @@ describe('Connection encryption negotiation', function() {
   async function assertRejected(response: Buffer, options: ConnectionOptions = {}, authentication = authentications[0], message = /^Server did not negotiate encryption, but the 'encrypt' config option is set to `true`\./) {
     const { connection, socket, result } = await connect(options, authentication);
     const io = new MessageIO(socket, 4096, new Debug());
-    const request = await readPrelogin(io, options.encrypt === false ? 0x02 : 0x01);
+    const request = await readPrelogin(io, options.encrypt === false ? 0x00 : 0x01);
     assertNoCredentials(request);
 
     const received: Buffer[] = [];
@@ -302,22 +303,173 @@ describe('Connection encryption negotiation', function() {
   it('preserves encrypt=false with ENCRYPT_NOT_SUP', async function() {
     const { socket, result } = await connect({ encrypt: false });
     const io = new MessageIO(socket, 4096, new Debug());
-    await readPrelogin(io, 0x02);
+    await readPrelogin(io, 0x00);
     io.sendMessage(TYPE.RESPONSE, preloginResponse(2));
     await finishLogin(io);
     assert.isUndefined(await result);
   });
 
-  // These are legacy compatibility cases, not valid responses to ENCRYPT_NOT_SUP in the spec matrix.
+  // Performs the server side of login-only encryption: the TLS handshake is wrapped
+  // in PRELOGIN messages, then the first LOGIN7 packet arrives as a single TLS record
+  // and all following packets arrive unencrypted.
+  async function receiveLoginOnlyEncryptedLogin7(socket: net.Socket, io: MessageIO, tlsOptions: tls.TlsOptions = {}) {
+    const duplexpair = new DuplexPair();
+    const pair = {
+      cleartext: new TLSSocket(duplexpair.socket1 as net.Socket, {
+        isServer: true,
+        key,
+        cert: certificate,
+        maxVersion: 'TLSv1.2',
+        ...tlsOptions
+      }),
+      encrypted: duplexpair.socket2
+    };
+    securePairs.push(pair);
+    const secure = once(pair.cleartext, 'secure');
+
+    let raw = Buffer.alloc(0);
+    for (let i = 0; i < 2; i++) {
+      pair.encrypted.write(await readMessage(io, TYPE.PRELOGIN));
+      await once(pair.encrypted, 'readable');
+      const chunks: Buffer[] = [];
+      let chunk;
+      while (chunk = pair.encrypted.read()) {
+        chunks.push(chunk);
+      }
+      if (i === 1) {
+        // The client sends the login packet as soon as it receives the last
+        // handshake message, so stop parsing TDS messages before sending it.
+        socket.unpipe();
+        socket.on('data', (data: Buffer) => { raw = Buffer.concat([raw, data]); });
+        socket.resume();
+      }
+      io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+    }
+    await secure;
+
+    const waitFor = async (length: number) => {
+      while (raw.length < length) {
+        await once(socket, 'data');
+      }
+    };
+
+    // TLS record header: content type, version, length.
+    await waitFor(5);
+    assert.strictEqual(raw[0], 0x17, 'the first login packet must be a TLS application data record');
+    const recordLength = 5 + raw.readUInt16BE(3);
+    await waitFor(recordLength);
+    const decrypted = once(pair.cleartext, 'data');
+    pair.encrypted.write(raw.subarray(0, recordLength));
+    const [firstPacket] = await decrypted as [Buffer];
+    assert.strictEqual(firstPacket.readUInt16BE(2), firstPacket.length, 'the TLS record must contain exactly one packet');
+
+    const packets = [firstPacket];
+    let offset = recordLength;
+    while ((packets[packets.length - 1][1] & 0x01) === 0) {
+      await waitFor(offset + 8);
+      const length = raw.readUInt16BE(offset + 2);
+      await waitFor(offset + length);
+      packets.push(raw.subarray(offset, offset + length));
+      offset += length;
+    }
+    for (const packet of packets) {
+      assert.strictEqual(packet[0], TYPE.LOGIN7);
+    }
+
+    const plaintext = Buffer.concat(packets.map((packet) => packet.subarray(8)));
+    socket.removeAllListeners('data');
+    io.outgoingMessageStream.unpipe(socket);
+    return { raw, packets, plaintext, plainIo: new MessageIO(socket, 4096, new Debug()) };
+  }
+
+  for (const trustServerCertificate of [false, true]) {
+    it(`encrypts only the login packet for encrypt=false and ENCRYPT_OFF without validating the certificate (trustServerCertificate=${trustServerCertificate})`, async function() {
+      const { connection, socket, result } = await connect({ encrypt: false, trustServerCertificate });
+      let secureEmitted = false;
+      connection.on('secure', () => { secureEmitted = true; });
+      const io = new MessageIO(socket, 4096, new Debug());
+      await readPrelogin(io, 0x00);
+      io.sendMessage(TYPE.RESPONSE, preloginResponse(0x00));
+
+      // The test certificate is self-signed and not trusted by the client.
+      const { raw, packets, plaintext, plainIo } = await receiveLoginOnlyEncryptedLogin7(socket, io);
+      assert.lengthOf(packets, 1);
+      assertNoCredentials(raw);
+      assert.isTrue(plaintext.includes(Buffer.from(userName, 'ucs2')));
+
+      plainIo.sendMessage(TYPE.RESPONSE, loginAck());
+      await readMessage(plainIo, TYPE.SQL_BATCH);
+      plainIo.sendMessage(TYPE.RESPONSE, Buffer.alloc(0));
+      assert.isUndefined(await result);
+      assert.isFalse(secureEmitted, 'the secure event must not be emitted for login-only encryption');
+      assert.isFalse(connection.messageIo.tlsNegotiationComplete);
+      assert.isUndefined(connection.messageIo.securePair);
+    });
+  }
+
+  it('encrypts only the first packet of a login message spanning multiple packets', async function() {
+    const { socket, result } = await connect({ encrypt: false, packetSize: 512, appName: 'a'.repeat(128), database: 'd'.repeat(128) });
+    const io = new MessageIO(socket, 4096, new Debug());
+    await readPrelogin(io, 0x00);
+    io.sendMessage(TYPE.RESPONSE, preloginResponse(0x00));
+
+    const { raw, packets, plaintext, plainIo } = await receiveLoginOnlyEncryptedLogin7(socket, io);
+    assert.isAbove(packets.length, 1);
+    assert.strictEqual(packets[0].length, 512);
+    assertNoCredentials(raw);
+    assert.isTrue(plaintext.includes(Buffer.from('d'.repeat(128), 'ucs2')));
+    // Every packet but the first is sent unencrypted.
+    for (const packet of packets.slice(1)) {
+      assert.isTrue(raw.includes(packet));
+    }
+
+    plainIo.sendMessage(TYPE.RESPONSE, loginAck());
+    await readMessage(plainIo, TYPE.SQL_BATCH);
+    plainIo.sendMessage(TYPE.RESPONSE, Buffer.alloc(0));
+    assert.isUndefined(await result);
+  });
+
+  it('fails with a clear error when the login packet encryption handshake fails', async function() {
+    const { connection, socket, result } = await connect({ encrypt: false });
+    const io = new MessageIO(socket, 4096, new Debug());
+    await readPrelogin(io, 0x00);
+    const received: Buffer[] = [];
+    socket.on('data', (chunk: Buffer) => { received.push(chunk); });
+    io.sendMessage(TYPE.RESPONSE, preloginResponse(0x00));
+
+    // A server that only supports TLS versions the client does not allow.
+    const duplexpair = new DuplexPair();
+    const serverTls = new TLSSocket(duplexpair.socket1 as net.Socket, {
+      isServer: true, key, cert: certificate, minVersion: 'TLSv1', maxVersion: 'TLSv1'
+    });
+    serverTls.on('error', () => {});
+    securePairs.push({ cleartext: serverTls, encrypted: duplexpair.socket2 });
+    duplexpair.socket2.write(await readMessage(io, TYPE.PRELOGIN));
+    await once(duplexpair.socket2, 'readable');
+    const chunks: Buffer[] = [];
+    let chunk;
+    while (chunk = duplexpair.socket2.read()) {
+      chunks.push(chunk);
+    }
+    io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks));
+
+    const error = await result;
+    assert.instanceOf(error, ConnectionError);
+    assert.strictEqual((error as ConnectionError).code, 'ESOCKET');
+    assert.match(error!.message, /^Failed to connect to .* - TLS handshake to encrypt the login packet failed: /);
+    assert.isTrue(connection.closed);
+    assertNoCredentials(Buffer.concat(received));
+  });
+
+  // These are legacy compatibility cases, not valid responses to ENCRYPT_OFF in the spec matrix.
   for (const [name, response] of [
-    ['OFF', preloginResponse(0)],
     ['omitted ENCRYPTION', preloginResponse()],
     ['unknown ENCRYPTION', preloginResponse(4)]
   ] as const) {
     it(`preserves encrypt=false compatibility with unexpected ${name}`, async function() {
       const { socket, result } = await connect({ encrypt: false });
       const io = new MessageIO(socket, 4096, new Debug());
-      await readPrelogin(io, 0x02);
+      await readPrelogin(io, 0x00);
       io.sendMessage(TYPE.RESPONSE, response);
       await finishLogin(io);
       assert.isUndefined(await result);

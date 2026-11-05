@@ -74,7 +74,12 @@ class MessageIO extends EventEmitter {
   }
 
   // Negotiate TLS encryption.
-  startTls(credentialsDetails: tls.SecureContextOptions, hostname: string, trustServerCertificate: boolean) {
+  //
+  // With `loginOnly`, TLS is only used to encrypt the first packet of the next
+  // message sent (the `LOGIN7` message). As agreed between client and server
+  // for login-only encryption (`ENCRYPT_OFF` in MS-TDS), all following packets
+  // are sent and received unencrypted.
+  startTls(credentialsDetails: tls.SecureContextOptions, hostname: string, trustServerCertificate: boolean, loginOnly = false) {
     if (!credentialsDetails.maxVersion || !['TLSv1.2', 'TLSv1.1', 'TLSv1'].includes(credentialsDetails.maxVersion)) {
       credentialsDetails.maxVersion = 'TLSv1.2';
     }
@@ -83,7 +88,7 @@ class MessageIO extends EventEmitter {
 
     return new Promise<void>((resolve, reject) => {
       const duplexpair = new DuplexPair();
-      const securePair = this.securePair = {
+      const securePair = {
         cleartext: tls.connect({
           socket: duplexpair.socket1 as Socket,
           // The `host` is used to verify the server's certificate identity.
@@ -106,14 +111,23 @@ class MessageIO extends EventEmitter {
 
         // If we encounter any errors from this point on,
         // we just forward them to the actual network socket.
-        securePair.cleartext.once('error', (err) => {
+        const onSecureError = (err: Error) => {
           this.socket.destroy(err);
-        });
+        };
+        securePair.cleartext.once('error', onSecureError);
 
         const cipher = securePair.cleartext.getCipher();
         if (cipher) {
-          this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')');
+          this.debug.log('TLS negotiated (' + cipher.name + ', ' + cipher.version + ')' + (loginOnly ? ' for the login packet only' : ''));
         }
+
+        if (loginOnly) {
+          this.encryptNextPacket(securePair, onSecureError);
+          resolve();
+          return;
+        }
+
+        this.securePair = securePair;
 
         this.emit('secure', securePair.cleartext);
 
@@ -178,6 +192,43 @@ class MessageIO extends EventEmitter {
       securePair.cleartext.once('secureConnect', onSecureConnect);
       securePair.encrypted.once('readable', onReadable);
     });
+  }
+
+  // Send the next outgoing packet through the given login-only TLS session,
+  // then tear the session down and send everything else unencrypted.
+  private encryptNextPacket(securePair: { cleartext: tls.TLSSocket, encrypted: Duplex }, onSecureError: (err: Error) => void) {
+    // The TLS record size must not be capped below the packet size, as the
+    // server expects the encrypted packet to arrive in a single TLS record.
+    securePair.cleartext.setMaxSendFragment(MessageIO.MAX_TLS_SEND_FRAGMENT_SIZE);
+
+    const forwardEncrypted = (data: Buffer) => {
+      this.socket.write(data);
+    };
+
+    this.outgoingMessageStream.unpipe(this.socket);
+    this.outgoingMessageStream.once('data', (packet: Buffer) => {
+      // Hold back the following packets until the encrypted one has been written.
+      this.outgoingMessageStream.pause();
+
+      securePair.encrypted.on('data', forwardEncrypted);
+      securePair.cleartext.write(packet, (err) => {
+        securePair.encrypted.removeListener('data', forwardEncrypted);
+        securePair.cleartext.removeListener('error', onSecureError);
+
+        securePair.cleartext.destroy();
+        securePair.encrypted.destroy();
+
+        if (err) {
+          this.socket.destroy(err);
+          return;
+        }
+
+        this.outgoingMessageStream.pipe(this.socket);
+      });
+    });
+
+    // `unpipe` paused the stream, and adding a `data` listener does not resume it.
+    this.outgoingMessageStream.resume();
   }
 
   // TODO listen for 'drain' event when socket.write returns false.
