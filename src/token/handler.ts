@@ -34,7 +34,7 @@ import {
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
-import { assertSupportedAlgorithm, loadColumnEncryptionKeys } from '../always-encrypted/key-cache';
+import { assertSupportedEncryption, loadColumnEncryptionKeys } from '../always-encrypted/key-cache';
 import { type ColumnEncryptionKeyInfo } from '../always-encrypted/types';
 import { decryptValue } from '../value-parser';
 
@@ -544,7 +544,7 @@ export class RequestTokenHandler extends TokenHandler {
     try {
       for (const { cryptoMetadata } of token.columns) {
         if (cryptoMetadata !== undefined) {
-          assertSupportedAlgorithm(cryptoMetadata.algorithmId, cryptoMetadata.algorithmName);
+          assertSupportedEncryption(cryptoMetadata);
         }
       }
 

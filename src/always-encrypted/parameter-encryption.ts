@@ -1,5 +1,5 @@
 import { ColumnEncryptionCipher } from './cipher';
-import { assertSupportedAlgorithm } from './key-cache';
+import { assertSupportedEncryption } from './key-cache';
 import { type ColumnEncryptionKeyInfo } from './types';
 import { type InternalConnectionOptions } from '../connection';
 import { type DataType, type Parameter, type ParameterData, type ResolvedParameter } from '../data-type';
@@ -188,7 +188,7 @@ export function encryptParameters(
     }
 
     try {
-      assertSupportedAlgorithm(cryptoMetadata.algorithmId, undefined);
+      assertSupportedEncryption(cryptoMetadata);
 
       const cipher = cryptoMetadata.key.cipher!;
       if (resolved.output) {

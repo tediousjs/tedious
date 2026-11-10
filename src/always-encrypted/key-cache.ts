@@ -44,12 +44,21 @@ export function loadColumnEncryptionKeys(keys: ColumnEncryptionKeyInfo[], option
   }
 }
 
+// The only version of the rules that values are normalized by before they
+// are encrypted.
+const NORMALIZATION_RULE_VERSION = 1;
+
 /**
- * Throws if values can not be encrypted or decrypted using the algorithm.
+ * Throws if values can not be encrypted or decrypted the way the server
+ * asks for.
  */
-export function assertSupportedAlgorithm(algorithmId: number, algorithmName: string | undefined) {
+export function assertSupportedEncryption({ algorithmId, algorithmName, normalizationRuleVersion }: { algorithmId: number, algorithmName?: string | undefined, normalizationRuleVersion: number }) {
   if (algorithmId !== ALGORITHM_ID) {
     throw new Error(`Unsupported column encryption algorithm ${algorithmName !== undefined ? `"${algorithmName}"` : algorithmId}, only "${ALGORITHM_NAME}" is supported.`);
+  }
+
+  if (normalizationRuleVersion !== NORMALIZATION_RULE_VERSION) {
+    throw new Error(`Unsupported column encryption normalization rule version ${normalizationRuleVersion}, only version ${NORMALIZATION_RULE_VERSION} is supported.`);
   }
 }
 

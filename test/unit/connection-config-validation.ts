@@ -130,4 +130,63 @@ describe('Connection configuration validation', function() {
     assert.strictEqual(connection.config.options.encrypt, 'strict');
     ensureConnectionIsClosed(connection, () => {});
   });
+
+  describe('columnEncryption', function() {
+    const provider = { decryptColumnEncryptionKey: () => Buffer.alloc(32) };
+
+    it('is not set by default', function() {
+      const connection = new Connection(config);
+      assert.isUndefined(connection.config.options.columnEncryption);
+      assert.isFalse(connection.config.options.serverSupportsColumnEncryption);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('accepts key store providers, and applies defaults', function() {
+      config.options.columnEncryption = { keyStoreProviders: { AZURE_KEY_VAULT: provider } };
+
+      const connection = new Connection(config);
+      const { columnEncryption } = connection.config.options;
+
+      assert.strictEqual(columnEncryption!.keyStoreProviders.get('AZURE_KEY_VAULT'), provider);
+      assert.strictEqual(columnEncryption!.keyCacheTTL, 2 * 60 * 60 * 1000);
+      assert.isUndefined(columnEncryption!.trustedKeyPaths);
+      assert.strictEqual(columnEncryption!.parameterMetadataCacheSize, 1000);
+
+      // Whether the server supports it is only known once it was negotiated.
+      assert.isFalse(connection.config.options.serverSupportsColumnEncryption);
+      ensureConnectionIsClosed(connection, () => {});
+    });
+
+    it('rejects invalid options', function() {
+      config.options.columnEncryption = true;
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError, 'The "config.options.columnEncryption" property must be of type object.');
+
+      config.options.columnEncryption = {};
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError, 'The "config.options.columnEncryption.keyStoreProviders" property must be of type object.');
+
+      config.options.columnEncryption = { keyStoreProviders: { AZURE_KEY_VAULT: {} } };
+      assert.throws(() => {
+        new Connection(config);
+      }, TypeError, 'The "config.options.columnEncryption.keyStoreProviders.AZURE_KEY_VAULT" property must be a key store provider: an object with a "decryptColumnEncryptionKey" method.');
+    });
+
+    it('requires TDS 7.4', function() {
+      config.options.columnEncryption = { keyStoreProviders: { AZURE_KEY_VAULT: provider } };
+
+      for (const tdsVersion of ['7_1', '7_2', '7_3_A', '7_3_B']) {
+        config.options.tdsVersion = tdsVersion;
+
+        assert.throws(() => {
+          new Connection(config);
+        }, TypeError, 'The "config.options.columnEncryption" property requires "config.options.tdsVersion" to be "7_4".');
+      }
+
+      config.options.tdsVersion = '7_4';
+      ensureConnectionIsClosed(new Connection(config), () => {});
+    });
+  });
 });
