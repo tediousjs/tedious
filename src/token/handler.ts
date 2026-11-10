@@ -586,7 +586,12 @@ export class RequestTokenHandler extends TokenHandler {
     }
   }
 
-  onRow(token: RowToken | NBCRowToken) {
+  /**
+   * Whether the rows of the current result set can be passed on: their
+   * values were decrypted, if they are encrypted. The request is failed if
+   * a value could not be decrypted.
+   */
+  rowsDecrypted(): boolean {
     if (this.columnEncryptionKeys !== undefined && !this.decryptionFailed) {
       for (const key of this.columnEncryptionKeys) {
         if (key.error !== undefined) {
@@ -596,7 +601,11 @@ export class RequestTokenHandler extends TokenHandler {
       }
     }
 
-    if (!this.request.canceled && !this.decryptionFailed) {
+    return !this.decryptionFailed;
+  }
+
+  onRow(token: RowToken | NBCRowToken) {
+    if (!this.request.canceled && this.rowsDecrypted()) {
       if (this.connection.config.options.rowCollectionOnRequestCompletion) {
         this.request.rows!.push(token.columns);
       }
@@ -627,20 +636,18 @@ export class RequestTokenHandler extends TokenHandler {
         }
       }
 
-      let value = token.value;
-
       // An encrypted return value is the value of an output parameter,
       // encrypted with the key that the parameter was encrypted with.
-      if (token.metadata.cryptoMetadata !== undefined && value !== null) {
+      if (token.metadata.cryptoMetadata !== undefined && token.value !== null) {
         try {
-          value = this.decryptReturnValue(token);
+          token.value = this.decryptReturnValue(token);
         } catch (error: any) {
           this.addError(new RequestError(`Failed to decrypt the value of the output parameter "${token.paramName}": ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
           return;
         }
       }
 
-      this.request.emit('returnValue', token.paramName, value, token.metadata);
+      this.request.emit('returnValue', token.paramName, token.value, token.metadata);
     }
   }
 
