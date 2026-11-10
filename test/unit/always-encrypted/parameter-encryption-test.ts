@@ -407,18 +407,24 @@ describe('encryptParameters', function() {
         '01'; // normalization rule version
     };
 
-    it('sends an encrypted parameter as a `varbinary` value, followed by how it was encrypted', async function() {
+    // The type of an encrypted value, and the header and trailer of a value
+    // of that type.
+    const VARBINARY_MAX = 'a5ffff';
+    const UNKNOWN_PLP_LENGTH = 'feffffffffffffff';
+    const PLP_NULL = 'ffffffffffffffff';
+    const PLP_TERMINATOR = '00000000';
+
+    it('sends an encrypted parameter as a `varbinary(max)` value, followed by how it was encrypted', async function() {
       const encrypted = encrypt(TYPES.Int, 42);
       const ciphertext = cipher.encrypt(Buffer.from('2a00000000000000', 'hex'), true);
 
       const expected = new WritableTrackingBuffer();
       expected.writeBVarchar('@value', 'ucs2');
       expected.writeUInt8(0x08); // fEncrypted
-      expected.writeUInt8(0xA5); // BIGVARBINARY
-      expected.writeUInt16LE(8000);
-      expected.writeUInt16LE(ciphertext.length);
+      expected.writeBuffer(Buffer.from(VARBINARY_MAX + UNKNOWN_PLP_LENGTH, 'hex'));
+      expected.writeUInt32LE(ciphertext.length);
       expected.writeBuffer(ciphertext);
-      expected.writeBuffer(Buffer.from(cipherInfo('2604'), 'hex')); // INTN, 4 bytes
+      expected.writeBuffer(Buffer.from(PLP_TERMINATOR + cipherInfo('2604'), 'hex')); // INTN, 4 bytes
 
       assert.strictEqual((await payload([encrypted])).toString('hex'), expected.data.toString('hex'));
     });
@@ -434,31 +440,24 @@ describe('encryptParameters', function() {
       const expected = new WritableTrackingBuffer();
       expected.writeBVarchar('@value', 'ucs2');
       expected.writeUInt8(0x09); // fByRefValue | fEncrypted
-      expected.writeUInt8(0xA5);
-      expected.writeUInt16LE(8000);
-      expected.writeUInt16LE(0xFFFF); // NULL
-      expected.writeBuffer(Buffer.from(cipherInfo('2604', '02'), 'hex'));
+      expected.writeBuffer(Buffer.from(VARBINARY_MAX + PLP_NULL + cipherInfo('2604', '02'), 'hex'));
 
       assert.strictEqual((await payload(encryptParameters(parameters, resolved, metadata, new Map(), options))).toString('hex'), expected.data.toString('hex'));
     });
 
-    it('sends encrypted values that are longer than 8000 bytes as `varbinary(max)` values', async function() {
-      const value = Buffer.alloc(8000, 0xAB);
+    it('sends large encrypted values', async function() {
+      const value = Buffer.alloc(20000, 0xAB);
       const ciphertext = cipher.encrypt(value, true);
-      assert.isAbove(ciphertext.length, 8000);
 
       const expected = new WritableTrackingBuffer();
       expected.writeBVarchar('@value', 'ucs2');
       expected.writeUInt8(0x08);
-      expected.writeUInt8(0xA5);
-      expected.writeUInt16LE(0xFFFF); // max
-      expected.writeBuffer(Buffer.from('feffffffffffffff', 'hex')); // unknown PLP length
+      expected.writeBuffer(Buffer.from(VARBINARY_MAX + UNKNOWN_PLP_LENGTH, 'hex'));
       expected.writeUInt32LE(ciphertext.length);
       expected.writeBuffer(ciphertext);
-      expected.writeUInt32LE(0); // PLP terminator
-      expected.writeBuffer(Buffer.from(cipherInfo('a5401f'), 'hex')); // BIGVARBINARY(8000)
+      expected.writeBuffer(Buffer.from(PLP_TERMINATOR + cipherInfo(VARBINARY_MAX), 'hex'));
 
-      assert.strictEqual((await payload([encrypt(TYPES.VarBinary, value, { length: 8000 })])).toString('hex'), expected.data.toString('hex'));
+      assert.strictEqual((await payload([encrypt(TYPES.VarBinary, value, { length: Infinity })])).toString('hex'), expected.data.toString('hex'));
     });
 
     it('describes the type of the encrypted value by the type of the parameter', function() {

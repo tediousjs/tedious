@@ -250,11 +250,10 @@ function encryptParameter(parameter: ResolvedParameter, cryptoMetadata: Paramete
   cipherInfo.writeBuffer(cryptoMetadata.key.metadataVersion);
   cipherInfo.writeUInt8(cryptoMetadata.normalizationRuleVersion);
 
-  const data: EncryptedParameterData = {
-    value,
-    length: value !== null && value.length > VarBinary.maximumLength ? MAX : VarBinary.maximumLength,
-    cipherInfo: cipherInfo.data
-  };
+  // Always sent as `varbinary(max)`: the length of an encrypted value differs
+  // from the length of its type, and the encrypted value that is returned
+  // for an output parameter must not be truncated to the declared length.
+  const data: EncryptedParameterData = { value, length: MAX, cipherInfo: cipherInfo.data };
 
   return { name: parameter.name, output: parameter.output, type: EncryptedValue, data, encrypted: true };
 }
@@ -264,8 +263,8 @@ interface EncryptedParameterData extends ParameterData<Buffer | null> {
 }
 
 /**
- * The type an encrypted parameter is sent as: a `varbinary` that holds the
- * encrypted value, followed by the description of how it was encrypted.
+ * The type an encrypted parameter is sent as: a `varbinary(max)` that holds
+ * the encrypted value, followed by the description of how it was encrypted.
  */
 const EncryptedValue: DataType = {
   id: VarBinary.id,

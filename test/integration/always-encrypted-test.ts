@@ -742,6 +742,38 @@ describe('Always Encrypted', function() {
       assert.deepEqual(outputs, { randomized: null, echo: null });
     });
 
+    it('returns large values for encrypted output parameters', async function() {
+      const procedure = `${names.procedure}_large`;
+      const table = `${names.table}_large`;
+
+      await execSqlBatch(setupConnection!, `CREATE TABLE ${table} (id int NOT NULL, document nvarchar(max) ${BIN2} ${encrypted(names.cek, 'RANDOMIZED')} NULL, data varbinary(8000) ${encrypted(names.cek, 'RANDOMIZED')} NULL)`);
+      cleanup.unshift(`DROP TABLE ${table}`);
+      await execSqlBatch(setupConnection!, `
+        CREATE PROCEDURE ${procedure} @id int, @document nvarchar(max) OUTPUT, @data varbinary(8000) OUTPUT
+        AS SELECT @document = document, @data = data FROM ${table} WHERE id = @id
+      `);
+      cleanup.unshift(`DROP PROCEDURE ${procedure}`);
+
+      // Values whose encrypted values are longer than 8000 bytes.
+      const document = 'ö'.repeat(50000);
+      const data = Buffer.alloc(8000, 0xAB);
+
+      await execSql(connection, `INSERT INTO ${table} (id, document, data) VALUES (@id, @document, @data)`, [
+        ['id', TYPES.Int, 1],
+        ['document', TYPES.NVarChar, document, { length: Infinity }],
+        ['data', TYPES.VarBinary, data, { length: 8000 }]
+      ]);
+
+      const { outputs } = await callProcedure(connection, procedure, [
+        ['id', TYPES.Int, 1],
+        ['document', TYPES.NVarChar, null, { output: true, length: Infinity }],
+        ['data', TYPES.VarBinary, null, { output: true, length: 8000 }]
+      ]);
+
+      assert.strictEqual(outputs.document, document);
+      assert.deepEqual(outputs.data, data);
+    });
+
     it('supports schema qualified procedure names', async function() {
       const { outputs } = await callProcedure(connection, `[dbo].[${names.procedure}]`, [
         ['id', TYPES.Int, 1],
