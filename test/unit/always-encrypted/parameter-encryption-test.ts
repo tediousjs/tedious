@@ -5,14 +5,16 @@ import { ColumnEncryptionCipher } from '../../../src/always-encrypted/cipher';
 import {
   describeProcedureCall,
   encryptParameters,
+  createDescribeRequest,
   ParameterEncryptionMetadataCache,
-  ParameterEncryptionMetadataReader,
+  readParameterEncryptionMetadata,
   type ParameterEncryptionMetadata
 } from '../../../src/always-encrypted/parameter-encryption';
 import { type ColumnEncryptionKeyInfo } from '../../../src/always-encrypted/types';
 import { Collation } from '../../../src/collation';
 import { type InternalConnectionOptions } from '../../../src/connection';
 import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../../src/data-type';
+import { RequestError } from '../../../src/errors';
 import { type ParameterOptions } from '../../../src/request';
 import RpcRequestPayload from '../../../src/rpcrequest-payload';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
@@ -507,7 +509,7 @@ describe('describeProcedureCall', function() {
   });
 });
 
-describe('ParameterEncryptionMetadataReader', function() {
+describe('readParameterEncryptionMetadata', function() {
   const encryptedKey = Buffer.from('010203', 'hex');
   const rotatedEncryptedKey = Buffer.from('040506', 'hex');
   const metadataVersion = Buffer.from('1122334455667788', 'hex');
@@ -527,16 +529,7 @@ describe('ParameterEncryptionMetadataReader', function() {
   const asColumns = (row: unknown[]) => row.map((value) => ({ value }));
 
   function read(resultSets: unknown[][][], toRow: (row: unknown[]) => any = asColumns) {
-    const reader = new ParameterEncryptionMetadataReader();
-
-    for (const rows of resultSets) {
-      reader.onColumnMetadata();
-      for (const row of rows) {
-        reader.onRow(toRow(row));
-      }
-    }
-
-    return reader.read();
+    return readParameterEncryptionMetadata(resultSets.map((rows) => rows.map(toRow)));
   }
 
   it('reads how the parameters of a statement need to be encrypted', function() {
@@ -596,6 +589,65 @@ describe('ParameterEncryptionMetadataReader', function() {
     assert.throws(() => {
       read([keyRows, [[1, '@secret', 2, 1, 3, 1]]]);
     }, 'Unexpected response from sp_describe_parameter_encryption: the column encryption key of the parameter "@secret" is missing.');
+  });
+});
+
+describe('createDescribeRequest', function() {
+  it('creates a request that calls `sp_describe_parameter_encryption` with the statement and its parameters', function() {
+    const request = createDescribeRequest('SELECT @id', '@id int', () => {});
+
+    assert.strictEqual(request.sqlTextOrProcedure, 'sp_describe_parameter_encryption');
+    assert.deepEqual(request.parameters.map(({ name, type, value }) => [name, type.name, value]), [
+      ['tsql', 'NVarChar', 'SELECT @id'],
+      ['params', 'NVarChar', '@id int']
+    ]);
+
+    // Its own parameters are not to be encrypted.
+    assert.strictEqual(request.columnEncryption, 'resultSetOnly');
+  });
+
+  it('reads the parameter encryption metadata from the rows of the response', function() {
+    let result: [Error | null | undefined, ParameterEncryptionMetadata | undefined] | undefined;
+    const request = createDescribeRequest('SELECT @id, @secret', '@id int, @secret int', (error, metadata) => {
+      result = [error, metadata];
+    });
+
+    request.emit('columnMetadata', []);
+    request.emit('row', [1, 5, 7, 1, Buffer.alloc(8), Buffer.alloc(3), 'CUSTOM', 'key/1', 'RSA_OAEP'].map((value) => ({ value })));
+    request.emit('columnMetadata', []);
+    request.emit('row', [1, '@id', 0, 0, 0, 0].map((value) => ({ value })));
+    request.emit('row', [2, '@secret', 2, 1, 1, 1].map((value) => ({ value })));
+    request.callback(null);
+
+    const [error, metadata] = result!;
+    assert.isNull(error);
+    assert.lengthOf(metadata!.keys, 1);
+    assert.deepEqual(Array.from(metadata!.parameters.keys()), ['secret']);
+  });
+
+  it('passes on the error of a failed request', function() {
+    let result: [Error | null | undefined, ParameterEncryptionMetadata | undefined] | undefined;
+    const request = createDescribeRequest('SELECT @id', '@id int', (error, metadata) => {
+      result = [error, metadata];
+    });
+
+    const error = new Error('Invalid object name');
+    request.callback(error);
+
+    assert.deepEqual(result, [error, undefined]);
+  });
+
+  it('fails if the response is not the expected one', function() {
+    let result: [Error | null | undefined, ParameterEncryptionMetadata | undefined] | undefined;
+    const request = createDescribeRequest('SELECT @id', '@id int', (error, metadata) => {
+      result = [error, metadata];
+    });
+
+    request.callback(null);
+
+    assert.instanceOf(result![0], RequestError);
+    assert.strictEqual((result![0] as RequestError).code, 'ECOLUMNENCRYPTION');
+    assert.strictEqual(result![0]!.message, 'Unexpected response from sp_describe_parameter_encryption.');
   });
 });
 

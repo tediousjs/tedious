@@ -42,7 +42,7 @@ import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { loadColumnEncryptionKeys } from './always-encrypted/key-cache';
 import { validateColumnEncryptionOptions } from './always-encrypted/options';
-import { describeProcedureCall, encryptParameters, ParameterEncryptionMetadataCache, ParameterEncryptionMetadataReader, type ParameterEncryptionMetadata } from './always-encrypted/parameter-encryption';
+import { createDescribeRequest, describeProcedureCall, encryptParameters, ParameterEncryptionMetadataCache, type ParameterEncryptionMetadata } from './always-encrypted/parameter-encryption';
 import { type ColumnEncryptionOptions, type InternalColumnEncryptionOptions } from './always-encrypted/types';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
@@ -2839,58 +2839,75 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.encryptRequestParameters(request, request.sqlTextOrProcedure!, request.resolvedParameters, (resolvedParameters) => {
-      const parameters: ResolvedParameter[] = [];
+    const parameters: ResolvedParameter[] = [];
 
+    parameters.push(this.resolveRequestParameter({
+      type: TYPES.NVarChar,
+      name: 'statement',
+      value: request.sqlTextOrProcedure,
+      output: false,
+      length: undefined,
+      precision: undefined,
+      scale: undefined
+    }));
+
+    if (request.parameters.length) {
       parameters.push(this.resolveRequestParameter({
         type: TYPES.NVarChar,
-        name: 'statement',
-        value: request.sqlTextOrProcedure,
+        name: 'params',
+        value: request.makeParamsParameter(request.parameters),
         output: false,
         length: undefined,
         precision: undefined,
         scale: undefined
       }));
 
-      if (request.parameters.length) {
-        parameters.push(this.resolveRequestParameter({
-          type: TYPES.NVarChar,
-          name: 'params',
-          value: request.makeParamsParameter(request.parameters),
-          output: false,
-          length: undefined,
-          precision: undefined,
-          scale: undefined
-        }));
+      parameters.push(...request.resolvedParameters);
+    }
 
-        parameters.push(...resolvedParameters);
-      }
+    this.makeRpcRequest(request, Procedures.Sp_ExecuteSql, parameters);
+  }
 
-      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
+  /**
+   * Makes the RPC request that executes a request with its parameters.
+   *
+   * With Always Encrypted, this is where the parameters that target
+   * encrypted columns get encrypted, before the request is sent.
+   *
+   * @param parameters
+   *   The parameters of the call. The parameters of `request` are the last
+   *   ones, after any parameters of the procedure itself (like the
+   *   statement that `sp_executesql` executes).
+   *
+   * @private
+   */
+  makeRpcRequest(request: Request, procedure: string | number, parameters: ResolvedParameter[]) {
+    this.encryptRequestParameters(request, procedure, parameters, (parameters) => {
+      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(procedure, parameters, this.currentTransactionDescriptor(), this.config.options));
     });
   }
 
   /**
    * Encrypts the parameters of a request that target encrypted columns,
-   * and passes the parameters to send on to `send`.
+   * and passes all `parameters` of the call on to `send`.
    *
    * Which parameters need to be encrypted is asked from the server before
    * the request is sent, unless it is known from an earlier execution of
    * the same statement. `send` is called right away if the server does not
    * have to be asked, and all column encryption keys are available.
    *
-   * @param statement
-   *   The statement that is executed with the parameters.
-   *
    * @private
    */
-  encryptRequestParameters(request: Request, statement: string, resolvedParameters: ResolvedParameter[], send: (parameters: ResolvedParameter[]) => void) {
+  encryptRequestParameters(request: Request, procedure: string | number, parameters: ResolvedParameter[], send: (parameters: ResolvedParameter[]) => void) {
     request.parameterEncryption = undefined;
 
     const fail = (error: Error) => {
       request.error = error;
-      this.debug.log(error.message);
-      request.callback(error);
+
+      process.nextTick(() => {
+        this.debug.log(error.message);
+        request.callback(error);
+      });
     };
 
     const { columnEncryption } = this.config.options;
@@ -2898,128 +2915,101 @@ class Connection extends EventEmitter {
       const parameter = request.parameters.find((parameter) => parameter.forceEncrypt);
       if (parameter !== undefined) {
         const reason = columnEncryption === undefined ? 'the "columnEncryption" option of the connection is not set' : `the "columnEncryption" option of the request is "${request.columnEncryption}"`;
-        process.nextTick(fail, new RequestError(`The parameter "${parameter.name}" is required to be encrypted (\`forceEncrypt\`), but ${reason}.`, 'ECOLUMNENCRYPTION'));
-        return;
+        return fail(new RequestError(`The parameter "${parameter.name}" is required to be encrypted (\`forceEncrypt\`), but ${reason}.`, 'ECOLUMNENCRYPTION'));
       }
 
-      return send(resolvedParameters);
+      return send(parameters);
     }
 
     if (request.parameters.length === 0) {
-      return send(resolvedParameters);
-    }
-
-    const cache = this.parameterEncryptionCache ??= new ParameterEncryptionMetadataCache(columnEncryption.parameterMetadataCacheSize);
-    const declarations = request.makeParamsParameter(request.parameters);
-    const cacheKey = ParameterEncryptionMetadataCache.key(statement, declarations);
-
-    // The connection is busy with this request from here on, even though
-    // the request itself is yet to be sent.
-    const pending: NonNullable<Connection['pendingRequest']> = { request, describeRequest: undefined };
-
-    const onCancel = () => {
-      pending.describeRequest?.cancel();
-    };
-
-    const settle = () => {
-      request.removeListener('cancel', onCancel);
-
-      if (this.pendingRequest === pending) {
-        this.pendingRequest = undefined;
-      }
-    };
-
-    const encryptAndSend = (metadata: ParameterEncryptionMetadata) => {
-      settle();
-
-      const ciphers = new Map();
-
-      let encryptedParameters;
-      try {
-        encryptedParameters = encryptParameters(request.parameters, resolvedParameters, metadata, ciphers, this.config.options);
-      } catch (error: any) {
-        return fail(new RequestError(error.message, 'ECOLUMNENCRYPTION', { cause: error }));
-      }
-
-      request.parameterEncryption = { cacheKey, ciphers };
-      send(encryptedParameters);
-    };
-
-    const loadKeys = (metadata: ParameterEncryptionMetadata) => {
-      const loading = loadColumnEncryptionKeys(metadata.keys, columnEncryption);
-      if (loading === undefined) {
-        return encryptAndSend(metadata);
-      }
-
-      // Continue outside of the promise, so that an exception thrown by a
-      // callback of the request is not turned into a rejection.
-      loading.then(() => {
-        process.nextTick(encryptAndSend, metadata);
-      }, (error) => {
-        process.nextTick(() => {
-          settle();
-          fail(new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
-        });
-      });
-    };
-
-    const cached = cache.get(cacheKey);
-    if (cached !== undefined) {
-      // Nothing to wait for unless a key is needed that is not available.
-      if (cached.keys.length === 0) {
-        return encryptAndSend(cached);
-      }
-
-      if (!this.acceptsRequest(request)) {
-        return;
-      }
-
-      this.pendingRequest = pending;
-      request.once('cancel', onCancel);
-      return loadKeys(cached);
+      return send(parameters);
     }
 
     if (!this.acceptsRequest(request)) {
       return;
     }
 
-    const reader = new ParameterEncryptionMetadataReader();
-    const describeRequest = pending.describeRequest = new Request('sp_describe_parameter_encryption', (error) => {
+    // The connection is busy with the request from here on, even though the
+    // request itself is only sent once its parameters are encrypted.
+    const pending: NonNullable<Connection['pendingRequest']> = this.pendingRequest = { request, describeRequest: undefined };
+
+    const onCancel = () => {
+      pending.describeRequest?.cancel();
+    };
+    request.once('cancel', onCancel);
+
+    // The statement that the parameters are part of: the one of the
+    // request, or the call of the stored procedure.
+    const statement = typeof procedure === 'string' ? describeProcedureCall(procedure, request.parameters) : request.sqlTextOrProcedure!;
+    const declarations = request.makeParamsParameter(request.parameters);
+
+    const cache = this.parameterEncryptionCache ??= new ParameterEncryptionMetadataCache(columnEncryption.parameterMetadataCacheSize);
+    const cacheKey = ParameterEncryptionMetadataCache.key(statement, declarations);
+
+    // The last step: encrypts the parameters and sends the request, or
+    // fails the request if it did not get this far.
+    const encryptAndSend = (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => {
+      request.removeListener('cancel', onCancel);
+      this.pendingRequest = undefined;
+
       if (error) {
-        settle();
         return fail(error);
       }
 
-      let metadata;
+      const ciphers = new Map();
+
+      // The parameters of the request follow those of the procedure.
+      const offset = parameters.length - request.parameters.length;
+
+      let encryptedParameters;
       try {
-        metadata = reader.read();
+        encryptedParameters = encryptParameters(request.parameters, parameters.slice(offset), metadata!, ciphers, this.config.options);
       } catch (error: any) {
-        settle();
         return fail(new RequestError(error.message, 'ECOLUMNENCRYPTION', { cause: error }));
       }
 
-      if (columnEncryption.parameterMetadataCacheSize > 0) {
-        cache.set(cacheKey, metadata);
+      request.parameterEncryption = { cacheKey, ciphers };
+      send([...parameters.slice(0, offset), ...encryptedParameters]);
+    };
+
+    // The step before: makes the keys available that the parameters are
+    // encrypted with, which only takes time if a key store is involved.
+    const loadKeys = (metadata: ParameterEncryptionMetadata) => {
+      const loading = loadColumnEncryptionKeys(metadata.keys, columnEncryption);
+      if (loading === undefined) {
+        return encryptAndSend(null, metadata);
       }
 
-      loadKeys(metadata);
-    }, { columnEncryption: 'disabled' });
+      // Continued outside of the promise, so that an exception thrown by a
+      // callback of the request is not turned into a rejection.
+      loading.then(() => {
+        process.nextTick(encryptAndSend, null, metadata);
+      }, (error) => {
+        process.nextTick(encryptAndSend, new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+      });
+    };
+
+    // The first step: finds out how the server expects the parameters to
+    // be encrypted, by asking it unless it was asked before.
+    const metadata = cache.get(cacheKey);
+    if (metadata !== undefined) {
+      return loadKeys(metadata);
+    }
+
+    const describeRequest = pending.describeRequest = createDescribeRequest(statement, declarations, (error, metadata) => {
+      if (error) {
+        return encryptAndSend(error);
+      }
+
+      if (columnEncryption.parameterMetadataCacheSize > 0) {
+        cache.set(cacheKey, metadata!);
+      }
+
+      loadKeys(metadata!);
+    });
 
     describeRequest.setTimeout(request.timeout);
-    describeRequest.addParameter('tsql', TYPES.NVarChar, statement);
-    describeRequest.addParameter('params', TYPES.NVarChar, declarations);
-    describeRequest.on('columnMetadata', () => {
-      reader.onColumnMetadata();
-    });
-    describeRequest.on('row', (row) => {
-      reader.onRow(row);
-    });
-
-    this.pendingRequest = pending;
-    request.once('cancel', onCancel);
-
-    describeRequest.validateParameters(this.databaseCollation, this.config.options);
-    this.makeRequest(describeRequest, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_describe_parameter_encryption', describeRequest.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+    this.callProcedure(describeRequest);
   }
 
   /**
@@ -3304,10 +3294,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    const [handle, ...resolvedParameters] = executeParameters;
-    this.encryptRequestParameters(request, request.sqlTextOrProcedure!, resolvedParameters, (resolvedParameters) => {
-      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, [handle, ...resolvedParameters], this.currentTransactionDescriptor(), this.config.options));
-    });
+    this.makeRpcRequest(request, Procedures.Sp_Execute, executeParameters);
   }
 
   /**
@@ -3329,9 +3316,7 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.encryptRequestParameters(request, describeProcedureCall(request.sqlTextOrProcedure!, request.parameters), request.resolvedParameters, (resolvedParameters) => {
-      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
-    });
+    this.makeRpcRequest(request, request.sqlTextOrProcedure!, request.resolvedParameters);
   }
 
   /**

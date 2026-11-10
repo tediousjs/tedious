@@ -2,7 +2,7 @@ import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
 import Request, { type ParameterOptions, type RequestOptions } from './request';
 import { AzureKeyVaultKeyStoreProvider, RsaKeyStoreProvider, type AzureKeyVaultCryptographyClient, type AzureKeyVaultKeyStoreProviderOptions, type ColumnEncryptionKeyStoreProvider, type RsaPrivateKey } from './always-encrypted/key-store-provider';
-import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type CryptoMetadata, type EncryptedColumnEncryptionKey } from './always-encrypted/types';
+import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type CryptoMetadata, type EncryptedColumnEncryptionKey, type EncryptionType } from './always-encrypted/types';
 import { name } from './library';
 
 import { ConnectionError, InputError, RequestError } from './errors';
@@ -47,5 +47,6 @@ export type {
   ColumnEncryptionOptions,
   CryptoMetadata,
   EncryptedColumnEncryptionKey,
+  EncryptionType,
   RsaPrivateKey
 };

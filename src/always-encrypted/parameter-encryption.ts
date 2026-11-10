@@ -2,9 +2,11 @@ import { ColumnEncryptionCipher } from './cipher';
 import { assertSupportedEncryption } from './key-cache';
 import { type ColumnEncryptionKeyInfo } from './types';
 import { type InternalConnectionOptions } from '../connection';
-import { type DataType, type Parameter, type ParameterData, type ResolvedParameter } from '../data-type';
+import { typeByName as TYPES, type DataType, type Parameter, type ParameterData, type ResolvedParameter } from '../data-type';
 import VarBinary from '../data-types/varbinary';
 import { timeLength } from '../data-types/temporal';
+import { RequestError } from '../errors';
+import Request from '../request';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
 const MAX = (1 << 16) - 1;
@@ -39,6 +41,10 @@ interface Column {
   value: any;
 }
 
+/**
+ * A row as it is emitted by a request: an array of its columns, or an
+ * object of its columns by name (with the `useColumnNames` option).
+ */
 type Row = Column[] | { [name: string]: Column };
 
 /**
@@ -54,63 +60,89 @@ export function describeProcedureCall(procedure: string, parameters: Parameter[]
 }
 
 /**
- * Collects the two result sets that `sp_describe_parameter_encryption`
+ * Creates the request that asks the server how the parameters of a
+ * statement need to be encrypted.
+ *
+ * @param declarations
+ *   The declarations of the statement's parameters, as they are passed to
+ *   `sp_executesql`.
+ */
+export function createDescribeRequest(statement: string, declarations: string, callback: (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => void): Request {
+  const resultSets: Row[][] = [];
+
+  // The result sets do not contain any encrypted values, and the parameters
+  // of this request itself are not encrypted.
+  const request = new Request('sp_describe_parameter_encryption', (error) => {
+    if (error) {
+      return callback(error);
+    }
+
+    let metadata;
+    try {
+      metadata = readParameterEncryptionMetadata(resultSets);
+    } catch (error: any) {
+      return callback(new RequestError(error.message, 'ECOLUMNENCRYPTION', { cause: error }));
+    }
+
+    callback(null, metadata);
+  }, { columnEncryption: 'resultSetOnly' });
+
+  request.addParameter('tsql', TYPES.NVarChar, statement);
+  request.addParameter('params', TYPES.NVarChar, declarations);
+
+  request.on('columnMetadata', () => {
+    resultSets.push([]);
+  });
+
+  request.on('row', (row: Row) => {
+    resultSets[resultSets.length - 1].push(row);
+  });
+
+  return request;
+}
+
+/**
+ * Reads the two result sets that `sp_describe_parameter_encryption`
  * returns: the column encryption keys, and how each parameter is encrypted.
  */
-export class ParameterEncryptionMetadataReader {
-  declare private resultSets: Row[][];
-
-  constructor() {
-    this.resultSets = [];
+export function readParameterEncryptionMetadata(resultSets: Row[][]): ParameterEncryptionMetadata {
+  if (resultSets.length < 2) {
+    throw new Error('Unexpected response from sp_describe_parameter_encryption.');
   }
 
-  onColumnMetadata() {
-    this.resultSets.push([]);
-  }
+  // Columns are read by position, as the names of columns depend on the
+  // options of the connection.
+  const [keyRows, parameterRows] = resultSets.map((rows) => {
+    return rows.map((row) => (Array.isArray(row) ? row : Object.values(row)).map((column) => column.value));
+  });
 
-  onRow(row: Row) {
-    this.resultSets[this.resultSets.length - 1].push(row);
-  }
-
-  read(): ParameterEncryptionMetadata {
-    if (this.resultSets.length < 2) {
-      throw new Error('Unexpected response from sp_describe_parameter_encryption.');
+  // A key has one row per column master key that protects it.
+  const keysByOrdinal = new Map<number, ColumnEncryptionKeyInfo>();
+  for (const [ordinal, databaseId, keyId, keyVersion, metadataVersion, encryptedKey, keyStoreName, keyPath, algorithm] of keyRows) {
+    let key = keysByOrdinal.get(ordinal);
+    if (key === undefined) {
+      key = { databaseId, keyId, keyVersion, metadataVersion, values: [], cipher: undefined };
+      keysByOrdinal.set(ordinal, key);
     }
 
-    // Columns are read by position, as the names of columns depend on the
-    // options of the connection.
-    const [keyRows, parameterRows] = this.resultSets.map((rows) => {
-      return rows.map((row) => (Array.isArray(row) ? row : Object.values(row)).map((column) => column.value));
-    });
-
-    // A key has one row per column master key that protects it.
-    const keysByOrdinal = new Map<number, ColumnEncryptionKeyInfo>();
-    for (const [ordinal, databaseId, keyId, keyVersion, metadataVersion, encryptedKey, keyStoreName, keyPath, algorithm] of keyRows) {
-      let key = keysByOrdinal.get(ordinal);
-      if (key === undefined) {
-        key = { databaseId, keyId, keyVersion, metadataVersion, values: [], cipher: undefined };
-        keysByOrdinal.set(ordinal, key);
-      }
-
-      key.values.push({ encryptedKey, keyStoreName, keyPath, algorithm });
-    }
-
-    const parameters = new Map<string, ParameterCryptoMetadata>();
-    for (const [/* ordinal */, name, algorithmId, encryptionType, keyOrdinal, normalizationRuleVersion] of parameterRows) {
-      if (encryptionType === ENCRYPTION_TYPE_PLAINTEXT) {
-        continue;
-      }
-
-      const key = keysByOrdinal.get(keyOrdinal);
-      if (key === undefined) {
-        throw new Error(`Unexpected response from sp_describe_parameter_encryption: the column encryption key of the parameter "${name}" is missing.`);
-      }
-
-      parameters.set(name.replace(/^@/, ''), { key, algorithmId, encryptionType, normalizationRuleVersion });
-    }
-
-    return { keys: Array.from(keysByOrdinal.values()), parameters };
+    key.values.push({ encryptedKey, keyStoreName, keyPath, algorithm });
   }
+
+  const parameters = new Map<string, ParameterCryptoMetadata>();
+  for (const [/* ordinal */, name, algorithmId, encryptionType, keyOrdinal, normalizationRuleVersion] of parameterRows) {
+    if (encryptionType === ENCRYPTION_TYPE_PLAINTEXT) {
+      continue;
+    }
+
+    const key = keysByOrdinal.get(keyOrdinal);
+    if (key === undefined) {
+      throw new Error(`Unexpected response from sp_describe_parameter_encryption: the column encryption key of the parameter "${name}" is missing.`);
+    }
+
+    parameters.set(name.replace(/^@/, ''), { key, algorithmId, encryptionType, normalizationRuleVersion });
+  }
+
+  return { keys: Array.from(keysByOrdinal.values()), parameters };
 }
 
 /**
