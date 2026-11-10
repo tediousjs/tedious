@@ -1061,11 +1061,12 @@ class Connection extends EventEmitter {
    * The request whose parameters are being encrypted, which takes place
    * before the request is sent - and might involve asking the server how
    * to encrypt them (with `describeRequest`), and accessing a key store.
-   * No other request can be made in the meantime.
+   * No other request can be made in the meantime, and `abort` fails the
+   * request without waiting for either.
    *
    * @private
    */
-  declare pendingRequest: undefined | { request: Request, describeRequest: Request | undefined };
+  declare pendingRequest: undefined | { request: Request, describeRequest: Request | undefined, abort: (error: Error) => void };
 
   /**
    * How the parameters of the statements that were executed need to be
@@ -2270,6 +2271,9 @@ class Connection extends EventEmitter {
       if (request) {
         request.callback(new RequestError('Connection closed before request completed.', 'ECLOSE'));
       }
+
+      // A request whose parameters are still being encrypted was not sent.
+      this.pendingRequest?.abort(new RequestError('Connection closed before request completed.', 'ECLOSE'));
     }
   }
 
@@ -2913,20 +2917,24 @@ class Connection extends EventEmitter {
       });
     };
 
+    // What the server is asked about, if parameters are to be encrypted.
     const { columnEncryption } = this.config.options;
-    if (columnEncryption === undefined || (request.columnEncryption ?? 'enabled') !== 'enabled') {
+    const enabled = columnEncryption !== undefined && (request.columnEncryption ?? 'enabled') === 'enabled';
+    const described = enabled ? describeStatement(request, procedure) : undefined;
+
+    if (columnEncryption === undefined || described === undefined) {
       const parameter = request.parameters.find((parameter) => parameter.forceEncrypt);
       if (parameter !== undefined) {
-        const reason = columnEncryption === undefined ? 'the "columnEncryption" option of the connection is not set' : `the "columnEncryption" option of the request is "${request.columnEncryption}"`;
+        let reason = 'table-valued parameters can not be encrypted';
+        if (columnEncryption === undefined) {
+          reason = 'the "columnEncryption" option of the connection is not set';
+        } else if (!enabled) {
+          reason = `the "columnEncryption" option of the request is "${request.columnEncryption}"`;
+        }
+
         return fail(new RequestError(`The parameter "${parameter.name}" is required to be encrypted (\`forceEncrypt\`), but ${reason}.`, 'ECOLUMNENCRYPTION'));
       }
 
-      return send(parameters);
-    }
-
-    // The statement that the server is asked about.
-    const described = describeStatement(request, procedure);
-    if (described === undefined) {
       return send(parameters);
     }
 
@@ -2934,21 +2942,21 @@ class Connection extends EventEmitter {
       return;
     }
 
-    // The connection is busy with the request from here on, even though the
-    // request itself is only sent once its parameters are encrypted.
-    const pending: NonNullable<Connection['pendingRequest']> = this.pendingRequest = { request, describeRequest: undefined };
-
-    const onCancel = () => {
-      pending.describeRequest?.cancel();
-    };
-    request.once('cancel', onCancel);
-
     const cache = this.parameterEncryptionCache ??= new ParameterEncryptionMetadataCache(columnEncryption.parameterMetadataCacheSize);
     const cacheKey = ParameterEncryptionMetadataCache.key(described);
+
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
 
     // The last step: encrypts the parameters and sends the request, or
     // fails the request if it did not get this far.
     const encryptAndSend = (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
       request.removeListener('cancel', onCancel);
       this.pendingRequest = undefined;
 
@@ -2972,12 +2980,42 @@ class Connection extends EventEmitter {
       send([...parameters.slice(0, offset), ...encryptedParameters]);
     };
 
+    // The connection is busy with the request from here on, even though the
+    // request itself is only sent once its parameters are encrypted.
+    const pending: NonNullable<Connection['pendingRequest']> = this.pendingRequest = { request, describeRequest: undefined, abort: encryptAndSend };
+
+    // The request that asks the server is canceled like any other request.
+    // There is nothing to cancel while a key store is accessed, the request
+    // just does not wait for it any longer.
+    const onCancel = () => {
+      if (pending.describeRequest !== undefined) {
+        pending.describeRequest.cancel();
+      } else {
+        encryptAndSend(new RequestError('Canceled.', 'ECANCEL'));
+      }
+    };
+    request.once('cancel', onCancel);
+
     // The step before: makes the keys available that the parameters are
     // encrypted with, which only takes time if a key store is involved.
     const loadKeys = (metadata: ParameterEncryptionMetadata) => {
-      const loading = loadColumnEncryptionKeys(metadata.keys, columnEncryption);
+      let loading;
+      try {
+        loading = loadColumnEncryptionKeys(metadata.keys, columnEncryption);
+      } catch (error: any) {
+        return encryptAndSend(new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+      }
+
       if (loading === undefined) {
         return encryptAndSend(null, metadata);
+      }
+
+      // The time a key store takes counts towards the request's timeout.
+      const timeout = request.timeout !== undefined ? request.timeout : this.config.options.requestTimeout;
+      if (timeout) {
+        timer = setTimeout(() => {
+          encryptAndSend(new RequestError('Timeout: Request failed to complete in ' + timeout + 'ms', 'ETIMEOUT'));
+        }, timeout);
       }
 
       // Continued outside of the promise, so that an exception thrown by a
@@ -2997,6 +3035,8 @@ class Connection extends EventEmitter {
     }
 
     const describeRequest = pending.describeRequest = createDescribeRequest(described, (error, metadata) => {
+      pending.describeRequest = undefined;
+
       if (error) {
         return encryptAndSend(error);
       }

@@ -786,7 +786,7 @@ describe('handling tokens with column encryption', function() {
       });
       setup?.(request);
 
-      const connection = { config: { options: parserOptions }, emit() {}, forgetParameterEncryptionMetadata() {} } as unknown as Connection;
+      const connection = { config: { options: parserOptions }, request, emit() {}, forgetParameterEncryptionMetadata() {} } as unknown as Connection;
       const handler = new RequestTokenHandler(connection, request);
 
       const parser = new TokenStreamParser([data], new Debug(), handler, parserOptions);

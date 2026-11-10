@@ -150,6 +150,10 @@ export function readParameterEncryptionMetadata(resultSets: Row[][]): ParameterE
   // A key has one row per column master key that protects it.
   const keysByOrdinal = new Map<number, ColumnEncryptionKeyInfo>();
   for (const [ordinal, databaseId, keyId, keyVersion, metadataVersion, encryptedKey, keyStoreName, keyPath, algorithm] of keyRows) {
+    assertTypes([ordinal, databaseId, keyId, keyVersion], 'number');
+    assertTypes([keyStoreName, keyPath, algorithm], 'string');
+    assertTypes([metadataVersion, encryptedKey], 'buffer');
+
     let key = keysByOrdinal.get(ordinal);
     if (key === undefined) {
       key = { databaseId, keyId, keyVersion, metadataVersion, values: [], cipher: undefined };
@@ -161,6 +165,9 @@ export function readParameterEncryptionMetadata(resultSets: Row[][]): ParameterE
 
   const parameters = new Map<string, ParameterCryptoMetadata>();
   for (const [/* ordinal */, name, algorithmId, encryptionType, keyOrdinal, normalizationRuleVersion] of parameterRows) {
+    assertTypes([name], 'string');
+    assertTypes([algorithmId, encryptionType, keyOrdinal, normalizationRuleVersion], 'number');
+
     if (encryptionType === ENCRYPTION_TYPE_PLAINTEXT) {
       continue;
     }
@@ -174,6 +181,18 @@ export function readParameterEncryptionMetadata(resultSets: Row[][]): ParameterE
   }
 
   return { keys: Array.from(keysByOrdinal.values()), parameters };
+}
+
+/**
+ * The response is what the server makes of it: checks that its values are
+ * what the rest of the code relies on them to be.
+ */
+function assertTypes(values: unknown[], type: 'number' | 'string' | 'buffer') {
+  for (const value of values) {
+    if (type === 'buffer' ? !Buffer.isBuffer(value) : typeof value !== type) {
+      throw new Error('Unexpected response from sp_describe_parameter_encryption.');
+    }
+  }
 }
 
 /**
@@ -406,11 +425,11 @@ function normalize(parameter: ResolvedParameter, options: InternalConnectionOpti
     case 'VarChar':
     case 'Binary':
     case 'VarBinary':
-      return truncate(toBuffer(data.value), data.length!, type);
+      return truncate(toBuffer(data.value), data.length!, type, 1);
 
     case 'NChar':
     case 'NVarChar':
-      return truncate(toBuffer(data.value), data.length! * 2, type);
+      return truncate(toBuffer(data.value), data.length!, type, 2);
 
     default:
       throw new Error(`Values of type ${type.name} can not be encrypted.`);
@@ -443,13 +462,20 @@ function toBuffer(value: unknown): Buffer {
 /**
  * The server truncates values that are longer than their declared type. It
  * can not do so for encrypted values, so that is taken care of here.
+ *
+ * @param length
+ *   The declared length of the type, in bytes or characters.
+ *
+ * @param unitLength
+ *   The number of bytes per unit of length.
  */
-function truncate(value: Buffer, length: number, type: DataType): Buffer {
+function truncate(value: Buffer, length: number, type: DataType, unitLength: number): Buffer {
   const { maximumLength } = type as DataType & { maximumLength: number };
 
-  if (length > maximumLength || value.length <= length) {
+  // A `max` type
+  if (length > maximumLength) {
     return value;
   }
 
-  return value.subarray(0, length);
+  return value.length <= length * unitLength ? value : value.subarray(0, length * unitLength);
 }

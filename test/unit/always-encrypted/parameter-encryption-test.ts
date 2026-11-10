@@ -255,6 +255,14 @@ describe('encryptParameters', function() {
       assert.strictEqual(normalized(TYPES.Binary, Buffer.from('010203040506', 'hex'), { length: 3 }), '010203');
     });
 
+    it('that are longer than a type close to its maximum length to the length of the type', function() {
+      assert.strictEqual(normalized(TYPES.NVarChar, 'x'.repeat(3500), { length: 3000 }), '7800'.repeat(3000));
+      assert.strictEqual(normalized(TYPES.NVarChar, 'x'.repeat(4500), { length: 4000 }), '7800'.repeat(4000));
+      assert.strictEqual(normalized(TYPES.NChar, 'x'.repeat(3500), { length: 3000 }), '7800'.repeat(3000));
+      assert.strictEqual(normalized(TYPES.VarChar, 'x'.repeat(8100), { length: 8000 }), '78'.repeat(8000));
+      assert.strictEqual(normalized(TYPES.VarBinary, Buffer.alloc(8100, 0xAB), { length: 8000 }), 'ab'.repeat(8000));
+    });
+
     it('of the `max` types', function() {
       assert.strictEqual(normalized(TYPES.VarChar, 'x'.repeat(10000)), '78'.repeat(10000));
       assert.strictEqual(normalized(TYPES.NVarChar, 'x'.repeat(10000)), '7800'.repeat(10000));
@@ -643,6 +651,30 @@ describe('readParameterEncryptionMetadata', function() {
   it('fails if a result set is missing', function() {
     assert.throws(() => read([]), 'Unexpected response from sp_describe_parameter_encryption.');
     assert.throws(() => read([keyRows]), 'Unexpected response from sp_describe_parameter_encryption.');
+  });
+
+  it('fails if the values of a row are not what they are expected to be', function() {
+    const keyRow: unknown[] = keyRows[0];
+    const parameterRow: unknown[] = parameterRows[1];
+
+    // Each value of a row in turn, replaced by `null` and by a value of
+    // another type.
+    for (const invalid of [null, {}]) {
+      for (let index = 0; index < keyRow.length; index++) {
+        assert.throws(() => {
+          read([[keyRow.with(index, invalid)], parameterRows]);
+        }, 'Unexpected response from sp_describe_parameter_encryption.', `key column ${index}`);
+      }
+
+      for (let index = 1; index < parameterRow.length; index++) {
+        assert.throws(() => {
+          read([keyRows, [parameterRow.with(index, invalid)]]);
+        }, 'Unexpected response from sp_describe_parameter_encryption.', `parameter column ${index}`);
+      }
+    }
+
+    assert.throws(() => read([[[]], parameterRows]), 'Unexpected response from sp_describe_parameter_encryption.');
+    assert.throws(() => read([keyRows, [[]]]), 'Unexpected response from sp_describe_parameter_encryption.');
   });
 
   it('fails if the key of a parameter is missing', function() {

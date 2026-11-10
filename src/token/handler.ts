@@ -541,6 +541,7 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   loadColumnEncryptionKeys(token: ColMetadataToken): void | Promise<void> {
+    let loading;
     try {
       for (const { cryptoMetadata } of token.columns) {
         if (cryptoMetadata !== undefined) {
@@ -548,12 +549,51 @@ export class RequestTokenHandler extends TokenHandler {
         }
       }
 
-      return loadColumnEncryptionKeys(token.columnEncryptionKeys!, this.connection.config.options.columnEncryption!)?.catch((error) => {
-        this.onDecryptionError(error);
-      });
+      loading = loadColumnEncryptionKeys(token.columnEncryptionKeys!, this.connection.config.options.columnEncryption!);
     } catch (error: any) {
-      this.onDecryptionError(error);
+      return this.onDecryptionError(error);
     }
+
+    if (loading === undefined) {
+      return;
+    }
+
+    // A key store is being accessed, which takes time - during which the
+    // request might be canceled, or fail along with its connection.
+    const request = this.request;
+
+    return new Promise((resolve, reject) => {
+      // The rows of a canceled request are not passed on, so the rest of
+      // its response is read without waiting for the keys.
+      let canceled = false;
+      const onCancel = () => {
+        canceled = true;
+        resolve();
+      };
+      request.once('cancel', onCancel);
+
+      const onLoaded = (error?: Error) => {
+        if (canceled) {
+          return;
+        }
+
+        request.removeListener('cancel', onCancel);
+
+        // The request failed in the meantime, as its connection was closed
+        // or lost: nobody is waiting for the rest of its response.
+        if (this.connection.request !== request) {
+          return reject(new Error('The request is not in progress anymore.'));
+        }
+
+        if (error !== undefined) {
+          this.onDecryptionError(error);
+        }
+
+        resolve();
+      };
+
+      loading.then(() => onLoaded(), onLoaded);
+    });
   }
 
   /**

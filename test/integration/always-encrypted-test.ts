@@ -1200,6 +1200,209 @@ describe('Always Encrypted', function() {
     });
   });
 
+  describe('while a key store is accessed', function() {
+    // A key store that only answers once it is released.
+    class GatedKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
+      calls = 0;
+      release!: () => void;
+
+      private released = new Promise<void>((resolve) => {
+        this.release = resolve;
+      });
+
+      async decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer) {
+        this.calls += 1;
+        await this.released;
+        return await provider.decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey);
+      }
+    }
+
+    let gated: GatedKeyStoreProvider;
+    let waiting: Connection;
+
+    async function waitFor(condition: () => boolean) {
+      while (!condition()) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+
+    beforeEach(async function() {
+      await execSql(connection, `INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`, [
+        ['id', TYPES.Int, 1],
+        ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }]
+      ]);
+
+      gated = new GatedKeyStoreProvider();
+      waiting = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: gated }, keyCacheTTL: 0 }, cancelTimeout: 1000 });
+    });
+
+    afterEach(async function() {
+      gated.release();
+      await close(waiting);
+    });
+
+    // Executes a request, and records what it emits and how it completes.
+    function start(sql: string, parameters: Parameter[] = []) {
+      const events: string[] = [];
+
+      const request = new Request(sql, () => {});
+      for (const [name, type, value, options] of parameters) {
+        request.addParameter(name, type, value, options);
+      }
+      request.on('row', () => events.push('row'));
+      request.on('done', () => events.push('done'));
+      request.on('doneInProc', () => events.push('doneInProc'));
+
+      const completed = new Promise<any>((resolve) => {
+        request.userCallback = (err) => {
+          events.push('callback');
+          resolve(err);
+        };
+      });
+
+      if (parameters.length > 0) {
+        waiting.execSql(request);
+      } else {
+        waiting.execSqlBatch(request);
+      }
+
+      return { request, events, completed };
+    }
+
+    describe('to decrypt a result set', function() {
+      it('completes a request that is canceled without waiting for the key store', async function() {
+        const { request, events, completed } = start(`SELECT id, deterministic FROM ${names.table}`);
+        await waitFor(() => gated.calls === 1);
+
+        request.cancel();
+
+        const error = await completed;
+        assert.strictEqual(error.code, 'ECANCEL');
+
+        // The connection is in use again by the time the key store answers.
+        const { rows } = await execSqlBatch(waiting, 'SELECT 1');
+        assert.deepEqual(rows, [[1]]);
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        assert.deepEqual(events, ['callback']);
+      });
+
+      it('fails a request whose connection is closed, and ignores the rest of its response', async function() {
+        const { events, completed } = start(`SELECT id, deterministic FROM ${names.table}`);
+        await waitFor(() => gated.calls === 1);
+
+        waiting.close();
+
+        const error = await completed;
+        assert.strictEqual(error.code, 'ECLOSE');
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        assert.deepEqual(events, ['callback']);
+      });
+
+      it('decrypts the result set once the key store answered', async function() {
+        const { events, completed } = start(`SELECT id, deterministic FROM ${names.table}`);
+        await waitFor(() => gated.calls === 1);
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.deepEqual(events, []);
+
+        gated.release();
+
+        assert.notExists(await completed);
+        assert.deepEqual(events, ['row', 'done', 'callback']);
+      });
+    });
+
+    describe('to encrypt parameters', function() {
+      const sql = `INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`;
+      const parameters: Parameter[] = [
+        ['id', TYPES.Int, 2],
+        ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }]
+      ];
+
+      async function assertNotInserted() {
+        const { rows } = await execSqlBatch(connection, `SELECT COUNT(*) FROM ${names.table} WHERE id = 2`);
+        assert.deepEqual(rows, [[0]]);
+      }
+
+      it('completes a request that is canceled without waiting for the key store', async function() {
+        const { request, events, completed } = start(sql, parameters);
+        await waitFor(() => gated.calls === 1);
+
+        request.cancel();
+
+        const error = await completed;
+        assert.strictEqual(error.code, 'ECANCEL');
+
+        // Other requests can be made, and the request is not sent later on.
+        const { rows } = await execSqlBatch(waiting, 'SELECT 1');
+        assert.deepEqual(rows, [[1]]);
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        assert.deepEqual(events, ['callback']);
+        await assertNotInserted();
+      });
+
+      it('cancels a request via the connection', async function() {
+        const { completed } = start(sql, parameters);
+        await waitFor(() => gated.calls === 1);
+
+        assert.isTrue(waiting.cancel());
+        assert.strictEqual((await completed).code, 'ECANCEL');
+      });
+
+      it('fails a request that takes longer than its timeout', async function() {
+        const request = new Request(sql, () => {});
+        for (const [name, type, value, options] of parameters) {
+          request.addParameter(name, type, value, options);
+        }
+        request.setTimeout(100);
+
+        const error = await new Promise<any>((resolve) => {
+          request.userCallback = resolve;
+          waiting.execSql(request);
+        });
+
+        assert.strictEqual(error.code, 'ETIMEOUT');
+        assert.strictEqual(error.message, 'Timeout: Request failed to complete in 100ms');
+        assert.strictEqual(gated.calls, 1);
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await assertNotInserted();
+
+        // The connection is still usable, and so is the request.
+        await new Promise<void>((resolve, reject) => {
+          request.userCallback = (err) => (err ? reject(err) : resolve());
+          waiting.execSql(request);
+        });
+      });
+
+      it('fails a request whose connection is closed', async function() {
+        const { events, completed } = start(sql, parameters);
+        await waitFor(() => gated.calls === 1);
+
+        waiting.close();
+
+        const error = await completed;
+        assert.strictEqual(error.code, 'ECLOSE');
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        assert.deepEqual(events, ['callback']);
+        await assertNotInserted();
+      });
+    });
+  });
+
   describe('requests that do not involve encrypted columns', function() {
     it('supports bulk loads', async function() {
       const table = `#tedious_ae_bulk_${suffix}`;
@@ -1237,6 +1440,16 @@ describe('Always Encrypted', function() {
         ['rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1], [2]] }]
       ]).catch((error) => ({ rows: error.message }));
       assert.match(onlyRows as unknown as string, /expects parameter '@offset'/);
+    });
+
+    it('fails procedure calls that force the encryption of a table-valued parameter', async function() {
+      const error = await rejection(callProcedure(connection, 'tedious_procedure_that_is_not_called', [
+        ['rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1]] }, { forceEncrypt: true }]
+      ]));
+
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual(error.code, 'ECOLUMNENCRYPTION');
+      assert.strictEqual(error.message, 'The parameter "rows" is required to be encrypted (`forceEncrypt`), but table-valued parameters can not be encrypted.');
     });
 
     it('supports temporary tables, streamed values and output parameters', async function() {

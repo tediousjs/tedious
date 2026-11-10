@@ -6,7 +6,10 @@ interface CacheEntry {
   // Set once the key was decrypted.
   cipher: ColumnEncryptionCipher | undefined;
   promise: Promise<ColumnEncryptionCipher>;
-  expiresAt: number;
+
+  // When the key store was asked for the key. How long the entry is of use
+  // from then on is up to each of the connections that share the cache.
+  time: number;
 }
 
 // Decrypted column encryption keys are cached per key store provider: what a
@@ -73,7 +76,7 @@ function getCipher(key: ColumnEncryptionKeyInfo, options: InternalColumnEncrypti
     const provider = options.keyStoreProviders.get(value.keyStoreName);
     if (provider !== undefined && isTrustedKeyPath(value.keyPath, options)) {
       const entry = caches.get(provider)?.get(cacheKey(value));
-      if (entry !== undefined && entry.cipher !== undefined && entry.expiresAt > now) {
+      if (entry !== undefined && entry.cipher !== undefined && now - entry.time < options.keyCacheTTL) {
         return entry.cipher;
       }
     }
@@ -125,23 +128,21 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
   const key = cacheKey(value);
 
   const cached = cache.get(key);
-  if (cached !== undefined && cached.expiresAt > now) {
+  if (cached !== undefined && now - cached.time < options.keyCacheTTL) {
     // Requests that need the key while it is being decrypted wait for the
     // same result, instead of each accessing the key store.
     return cached.promise;
   }
 
+  // Entries that are of no use to this connection anymore are dropped, to
+  // not keep keys around that are not used any longer.
   for (const [key, entry] of cache) {
-    if (entry.expiresAt <= now) {
+    if (now - entry.time >= options.keyCacheTTL) {
       cache.delete(key);
     }
   }
 
-  const entry: CacheEntry = {
-    cipher: undefined,
-    promise: decryptWithProvider(provider, value),
-    expiresAt: now + options.keyCacheTTL
-  };
+  const entry: CacheEntry = { cipher: undefined, promise: decryptWithProvider(provider, value), time: now };
   cache.set(key, entry);
 
   entry.promise.then((cipher) => {

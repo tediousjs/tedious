@@ -23,7 +23,8 @@ export interface ColumnEncryptionOptions {
    * the key. `0` disables the cache.
    *
    * Keys are cached per key store provider instance: connections that
-   * share a provider instance share its decrypted keys.
+   * share a provider instance share its decrypted keys, each for as long
+   * as its own option allows.
    *
    * (default: `7200000`, 2 hours)
    */

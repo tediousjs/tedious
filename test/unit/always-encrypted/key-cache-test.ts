@@ -201,6 +201,33 @@ describe('loadColumnEncryptionKeys', function() {
     assert.lengthOf(provider.calls, 2);
   });
 
+  it('applies the lifetime of each connection to the keys of a shared key store provider', async function() {
+    const clock = sinon.useFakeTimers({ toFake: ['Date'] });
+    const value = keyValue();
+
+    // Cached for a connection that keeps keys for a long time ...
+    await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 60000 }));
+    assert.lengthOf(provider.calls, 1);
+
+    // ... which a connection that does not cache keys makes no use of,
+    await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 0 }));
+    assert.lengthOf(provider.calls, 2);
+
+    // and neither does one that keeps keys for a shorter time, once that
+    // time has passed.
+    clock.tick(1000);
+    assert.isUndefined(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 2000 })));
+    assert.lengthOf(provider.calls, 2);
+
+    clock.tick(1000);
+    await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 2000 }));
+    assert.lengthOf(provider.calls, 3);
+
+    // The key is cached anew for all of them.
+    assert.isUndefined(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 60000 })));
+    assert.lengthOf(provider.calls, 3);
+  });
+
   it('does not cache keys if the cache is disabled', async function() {
     const value = keyValue();
     const options = optionsWith({ keyCacheTTL: 0 });
