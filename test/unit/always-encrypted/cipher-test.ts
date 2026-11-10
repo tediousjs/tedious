@@ -104,6 +104,23 @@ describe('ColumnEncryptionCipher', function() {
       }
     });
 
+    it('decrypts values around the length up to which blocks are decrypted one by one', function() {
+      // Verified against a decryption that does not go through the cipher.
+      const encryptionKey = crypto.createHmac('sha256', columnEncryptionKey)
+        .update('Microsoft SQL Server cell encryption key with encryption algorithm:AEAD_AES_256_CBC_HMAC_SHA256 and key length:256', 'utf16le')
+        .digest();
+
+      for (let length = 990; length <= 1050; length++) {
+        const value = crypto.randomBytes(length);
+        const cell = cipher.encrypt(value, false);
+
+        const decipher = crypto.createDecipheriv('aes-256-cbc', encryptionKey, cell.subarray(33, 49));
+        assert.deepEqual(Buffer.concat([decipher.update(cell.subarray(49)), decipher.final()]), value, `value of ${length} bytes`);
+
+        assert.deepEqual(cipher.decrypt(cell), value, `value of ${length} bytes`);
+      }
+    });
+
     it('decrypts large values', function() {
       const value = crypto.randomBytes(1024 * 1024 + 5);
 

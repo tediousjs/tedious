@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHmac, createSecretKey, randomFillSync, timingSafeEqual, type KeyObject } from 'crypto';
+import { createCipheriv, createDecipheriv, createHmac, createSecretKey, randomFillSync, timingSafeEqual, type Decipheriv, type KeyObject } from 'crypto';
 
 /**
  * The id SQL Server uses for the `AEAD_AES_256_CBC_HMAC_SHA256` algorithm,
@@ -24,6 +24,10 @@ const IV_OFFSET = MAC_OFFSET + 32;
 const CIPHERTEXT_OFFSET = IV_OFFSET + BLOCK_LENGTH;
 const MIN_CELL_LENGTH = CIPHERTEXT_OFFSET + BLOCK_LENGTH;
 
+// Up to this length, a ciphertext is decrypted block by block (see
+// `decryptBlocks`) instead of with a cipher of its own.
+const MAX_BLOCKWISE_LENGTH = 1024;
+
 function deriveKey(columnEncryptionKey: Buffer, purpose: 'encryption' | 'MAC' | 'IV'): KeyObject {
   const salt = `Microsoft SQL Server cell ${purpose} key with encryption algorithm:${ALGORITHM_NAME} and key length:${KEY_LENGTH * 8}`;
   return createSecretKey(createHmac('sha256', columnEncryptionKey).update(salt, 'utf16le').digest());
@@ -43,6 +47,9 @@ export class ColumnEncryptionCipher {
   declare private readonly macKey: KeyObject;
   declare private readonly ivKey: KeyObject;
 
+  // Decrypts single blocks, see `decryptBlocks`.
+  declare private readonly blockDecipher: Decipheriv;
+
   constructor(columnEncryptionKey: Buffer) {
     if (columnEncryptionKey.length !== KEY_LENGTH) {
       throw new Error(`A column encryption key for ${ALGORITHM_NAME} must be ${KEY_LENGTH} bytes long, but the key is ${columnEncryptionKey.length} bytes long.`);
@@ -51,6 +58,8 @@ export class ColumnEncryptionCipher {
     this.encryptionKey = deriveKey(columnEncryptionKey, 'encryption');
     this.macKey = deriveKey(columnEncryptionKey, 'MAC');
     this.ivKey = deriveKey(columnEncryptionKey, 'IV');
+
+    this.blockDecipher = createDecipheriv('aes-256-ecb', this.encryptionKey, null).setAutoPadding(false);
   }
 
   /**
@@ -100,10 +109,7 @@ export class ColumnEncryptionCipher {
 
     // Removing the padding by hand lets the whole plaintext be decrypted
     // into a single buffer, without concatenating the cipher's final block.
-    const decipher = createDecipheriv('aes-256-cbc', this.encryptionKey, cell.subarray(IV_OFFSET, CIPHERTEXT_OFFSET));
-    decipher.setAutoPadding(false);
-    const padded = decipher.update(cell.subarray(CIPHERTEXT_OFFSET));
-    decipher.final();
+    const padded = cell.length - CIPHERTEXT_OFFSET <= MAX_BLOCKWISE_LENGTH ? this.decryptBlocks(cell) : this.decryptStream(cell);
 
     const paddingLength = padded[padded.length - 1];
     if (paddingLength < 1 || paddingLength > BLOCK_LENGTH) {
@@ -111,6 +117,38 @@ export class ColumnEncryptionCipher {
     }
 
     return padded.subarray(0, padded.length - paddingLength);
+  }
+
+  /**
+   * Decrypts the ciphertext of a cell with a cipher of its own.
+   */
+  private decryptStream(cell: Buffer): Buffer {
+    const decipher = createDecipheriv('aes-256-cbc', this.encryptionKey, cell.subarray(IV_OFFSET, CIPHERTEXT_OFFSET)).setAutoPadding(false);
+    const padded = decipher.update(cell.subarray(CIPHERTEXT_OFFSET));
+    decipher.final();
+
+    return padded;
+  }
+
+  /**
+   * Decrypts the ciphertext of a cell without a cipher of its own.
+   *
+   * Most encrypted values are short, and setting up a cipher for a value
+   * takes much longer than decrypting a few blocks. As each value has its
+   * own IV, a CBC cipher can not be reused - but a cipher that decrypts
+   * single blocks can, which leaves the chaining of CBC to do: each
+   * decrypted block is combined with the block of ciphertext that precedes
+   * it - which is the IV for the first block, that conveniently precedes
+   * the ciphertext in the cell.
+   */
+  private decryptBlocks(cell: Buffer): Buffer {
+    const padded = this.blockDecipher.update(cell.subarray(CIPHERTEXT_OFFSET));
+
+    for (let i = 0; i < padded.length; i++) {
+      padded[i] ^= cell[IV_OFFSET + i];
+    }
+
+    return padded;
   }
 
   private computeMac(cell: Buffer): Buffer {
