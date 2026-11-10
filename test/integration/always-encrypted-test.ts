@@ -1,3 +1,5 @@
+import { ClientSecretCredential, DefaultAzureCredential } from '@azure/identity';
+import { CryptographyClient } from '@azure/keyvault-keys';
 import { assert } from 'chai';
 import { generateKeyPairSync, randomBytes, type KeyObject } from 'crypto';
 
@@ -5,7 +7,7 @@ import Connection, { type ConnectionOptions } from '../../src/connection';
 import Request, { type ParameterOptions, type RequestOptions } from '../../src/request';
 import { RequestError } from '../../src/errors';
 import { typeByName as TYPES, type DataType } from '../../src/data-type';
-import { RsaKeyStoreProvider, type ColumnEncryptionKeyStoreProvider } from '../../src/always-encrypted/key-store-provider';
+import { AzureKeyVaultKeyStoreProvider, RsaKeyStoreProvider, type ColumnEncryptionKeyStoreProvider } from '../../src/always-encrypted/key-store-provider';
 import { type ColumnEncryptionOptions } from '../../src/always-encrypted/types';
 import { type ColumnMetadata } from '../../src/token/colmetadata-token-parser';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
@@ -268,7 +270,17 @@ describe('Always Encrypted', function() {
 
     columnEncryption = { keyStoreProviders: { TEDIOUS_TEST: provider } };
 
-    await execSqlBatch(setupConnection, `CREATE COLUMN MASTER KEY ${names.cmk} WITH (KEY_STORE_PROVIDER_NAME = 'TEDIOUS_TEST', KEY_PATH = '${keyPath}')`);
+    try {
+      await execSqlBatch(setupConnection, `CREATE COLUMN MASTER KEY ${names.cmk} WITH (KEY_STORE_PROVIDER_NAME = 'TEDIOUS_TEST', KEY_PATH = '${keyPath}')`);
+    } catch (error: any) {
+      // The tests need to be allowed to set up the keys they use.
+      if (/permission/i.test(error.message)) {
+        console.log(`      Skipping the Always Encrypted tests: ${error.message}`);
+        return this.skip();
+      }
+
+      throw error;
+    }
     cleanup.unshift(`DROP COLUMN MASTER KEY ${names.cmk}`);
 
     await execSqlBatch(setupConnection, `CREATE COLUMN MASTER KEY ${names.rotatedCmk} WITH (KEY_STORE_PROVIDER_NAME = 'TEDIOUS_TEST', KEY_PATH = '${rotatedKeyPath}')`);
@@ -1095,6 +1107,63 @@ describe('Always Encrypted', function() {
       } finally {
         await close(before);
         await close(after);
+      }
+    });
+  });
+
+  // Runs if `AZURE_KEY_VAULT_KEY_ID` is set to the identifier (the URL) of
+  // an RSA key in an Azure Key Vault. The key is accessed with the service
+  // principal given by the `AZURE_AD_SP_*` environment variables, or else
+  // with the default Azure credential - either needs to be permitted to
+  // wrap and unwrap keys, and to sign and verify, with the key.
+  describe('with a column master key in Azure Key Vault', function() {
+    const keyId = process.env.AZURE_KEY_VAULT_KEY_ID;
+
+    const cmk = `tedious_akv_cmk_${suffix}`;
+    const cek = `tedious_akv_cek_${suffix}`;
+    const table = `tedious_akv_${suffix}`;
+
+    let keyVault: AzureKeyVaultKeyStoreProvider;
+
+    before(async function() {
+      if (!keyId) {
+        return this.skip();
+      }
+
+      const { AZURE_AD_SP_TENANT_ID: tenantId, AZURE_AD_SP_CLIENT_ID: clientId, AZURE_AD_SP_CLIENT_SECRET: clientSecret } = process.env;
+      const credential = tenantId && clientId && clientSecret ? new ClientSecretCredential(tenantId, clientId, clientSecret) : new DefaultAzureCredential();
+
+      keyVault = new AzureKeyVaultKeyStoreProvider((keyId) => new CryptographyClient(keyId, credential));
+
+      await execSqlBatch(setupConnection!, `CREATE COLUMN MASTER KEY ${cmk} WITH (KEY_STORE_PROVIDER_NAME = 'AZURE_KEY_VAULT', KEY_PATH = '${keyId}')`);
+      cleanup.unshift(`DROP COLUMN MASTER KEY ${cmk}`);
+
+      const encryptedKey = await keyVault.encryptColumnEncryptionKey(keyId, 'RSA_OAEP', randomBytes(32));
+      await execSqlBatch(setupConnection!, `CREATE COLUMN ENCRYPTION KEY ${cek} WITH VALUES (COLUMN_MASTER_KEY = ${cmk}, ALGORITHM = 'RSA_OAEP', ENCRYPTED_VALUE = 0x${encryptedKey.toString('hex')})`);
+      cleanup.unshift(`DROP COLUMN ENCRYPTION KEY ${cek}`);
+
+      await execSqlBatch(setupConnection!, `CREATE TABLE ${table} (id int NOT NULL, value nvarchar(50) ${BIN2} ${encrypted(cek, 'DETERMINISTIC')} NULL)`);
+      cleanup.unshift(`DROP TABLE ${table}`);
+    });
+
+    it('encrypts and decrypts values', async function() {
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { AZURE_KEY_VAULT: keyVault } } });
+
+      try {
+        await execSql(connection, `INSERT INTO ${table} (id, value) VALUES (@id, @value)`, [
+          ['id', TYPES.Int, 1],
+          ['value', TYPES.NVarChar, 'secret', { length: 50 }]
+        ]);
+
+        const { rows, columns: [columns] } = await execSql(connection, `SELECT id, value FROM ${table} WHERE value = @value`, [
+          ['value', TYPES.NVarChar, 'secret', { length: 50 }]
+        ]);
+
+        assert.deepEqual(rows, [[1, 'secret']]);
+        assert.strictEqual(columns[1].cryptoMetadata!.key!.values[0].keyStoreName, 'AZURE_KEY_VAULT');
+        assert.strictEqual(columns[1].cryptoMetadata!.key!.values[0].keyPath, keyId);
+      } finally {
+        await close(connection);
       }
     });
   });

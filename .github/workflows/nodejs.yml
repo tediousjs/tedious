@@ -388,6 +388,11 @@ jobs:
         AZURE_AD_SP_CLIENT_ID: ${{ secrets.AZURE_AD_SP_CLIENT_ID }}
         AZURE_AD_SP_TENANT_ID: ${{ secrets.AZURE_AD_SP_TENANT_ID }}
         AZURE_AD_SP_CLIENT_SECRET: ${{ secrets.AZURE_AD_SP_CLIENT_SECRET }}
+        # The identifier of a key in Azure Key Vault that the service
+        # principal has access to, which the Always Encrypted tests use as
+        # a column master key. The tests that need it are skipped if it is
+        # not set.
+        AZURE_KEY_VAULT_KEY_ID: ${{ secrets.AZURE_KEY_VAULT_KEY_ID }}
       run: npx nyc --reporter=lcov npm run test-integration
 
     - uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
