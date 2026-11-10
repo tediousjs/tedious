@@ -59,7 +59,14 @@ export class Parser extends EventEmitter {
         }
 
         this.debug.token(token);
-        handler[token.handlerName](token as any);
+
+        // A handler that returns a promise holds back the parsing of the
+        // tokens that follow, until what they depend on is available (like
+        // the keys that the rows of encrypted columns are decrypted with).
+        const handled: void | Promise<void> = handler[token.handlerName](token as any);
+        if (handled !== undefined) {
+          await handled;
+        }
       }
     }
 

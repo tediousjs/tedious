@@ -31,6 +31,7 @@ import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
 import { Parser as TokenStreamParser } from './token/token-stream-parser';
+import { type ParserOptions } from './token/stream-parser';
 import { Transaction, ISOLATION_LEVEL, assertValidIsolationLevel } from './transaction';
 import { ConnectionError, RequestError } from './errors';
 import { connectInParallel, connectInSequence } from './connector';
@@ -39,7 +40,10 @@ import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
-import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import { loadColumnEncryptionKeys } from './always-encrypted/key-cache';
+import { validateColumnEncryptionOptions } from './always-encrypted/options';
+import { describeProcedureCall, encryptParameters, ParameterEncryptionMetadataCache, ParameterEncryptionMetadataReader, type ParameterEncryptionMetadata } from './always-encrypted/parameter-encryption';
+import { type ColumnEncryptionOptions, type InternalColumnEncryptionOptions } from './always-encrypted/types';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
@@ -353,8 +357,7 @@ export interface InternalConnectionOptions {
   appName: undefined | string;
   camelCaseColumns: boolean;
   cancelTimeout: number;
-  columnEncryptionKeyCacheTTL: number;
-  columnEncryptionSetting: boolean;
+  columnEncryption: undefined | InternalColumnEncryptionOptions;
   columnNameReplacer: undefined | ((colName: string, index: number, metadata: Metadata) => string);
   connectionRetryInterval: number;
   connector: undefined | (() => Promise<net.Socket>);
@@ -381,7 +384,6 @@ export interface InternalConnectionOptions {
   enableNumericRoundabort: null | boolean;
   enableQuotedIdentifier: null | boolean;
   encrypt: string | boolean;
-  encryptionKeyStoreProviders: KeyStoreProviderMap | undefined;
   fallbackToDefaultDb: boolean;
   instanceName: undefined | string;
   isolationLevel: typeof ISOLATION_LEVEL[keyof typeof ISOLATION_LEVEL];
@@ -399,16 +401,11 @@ export interface InternalConnectionOptions {
   serverSupportsColumnEncryption: boolean;
   tdsVersion: string;
   textsize: number;
-  trustedServerNameAE: string | undefined;
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
-}
-
-interface KeyStoreProviderMap {
-  [key: string]: ColumnEncryptionAzureKeyVaultProvider;
 }
 
 /**
@@ -532,6 +529,43 @@ export interface ConnectionOptions {
    * (default: `5000`).
    */
   cancelTimeout?: number;
+
+  /**
+   * Enables Always Encrypted: the values of encrypted columns are decrypted
+   * when they are read, and the values of parameters that target encrypted
+   * columns are encrypted before they are sent, so that neither the
+   * plaintext values nor the keys that protect them are revealed to the
+   * server.
+   *
+   * ```js
+   * const connection = new Connection({
+   *   // ...
+   *   options: {
+   *     columnEncryption: {
+   *       keyStoreProviders: {
+   *         AZURE_KEY_VAULT: new AzureKeyVaultKeyStoreProvider((keyId) => new CryptographyClient(keyId, credential))
+   *       }
+   *     }
+   *   }
+   * });
+   * ```
+   *
+   * A statement that uses parameters is described by the server before it
+   * is executed, to learn which of its parameters need to be encrypted.
+   * This (and encryption in general) can be controlled per request via
+   * {@link RequestOptions.columnEncryption}.
+   *
+   * To be encrypted, the type of a parameter needs to match the type of
+   * the encrypted column it targets - the server is not able to convert
+   * encrypted values. Bulk loads, table-valued parameters and values that
+   * are read from a stream are sent as they are, and secure enclaves are
+   * not supported.
+   *
+   * Requires TDS 7.4 and SQL Server 2016 or later.
+   *
+   * (default: `undefined`, Always Encrypted is not used)
+   */
+  columnEncryption?: ColumnEncryptionOptions | undefined;
 
   /**
    * A function with parameters `(columnName, index, columnMetaData)` and returning a string. If provided,
@@ -1022,6 +1056,29 @@ class Connection extends EventEmitter {
    * @private
    */
   declare request: undefined | Request | BulkLoad;
+
+  /**
+   * The request whose parameters are being encrypted, which takes place
+   * before the request is sent - and might involve asking the server how
+   * to encrypt them (with `describeRequest`), and accessing a key store.
+   * No other request can be made in the meantime.
+   *
+   * @private
+   */
+  declare pendingRequest: undefined | { request: Request, describeRequest: Request | undefined };
+
+  /**
+   * How the parameters of the statements that were executed need to be
+   * encrypted, if Always Encrypted is enabled.
+   *
+   * @private
+   */
+  declare parameterEncryptionCache: undefined | ParameterEncryptionMetadataCache;
+
+  /**
+   * @private
+   */
+  declare encryptedValuesParserOptions: undefined | ParserOptions;
   /**
    * @private
    */
@@ -1297,8 +1354,7 @@ class Connection extends EventEmitter {
         appName: undefined,
         camelCaseColumns: false,
         cancelTimeout: DEFAULT_CANCEL_TIMEOUT,
-        columnEncryptionKeyCacheTTL: 2 * 60 * 60 * 1000,  // Units: milliseconds
-        columnEncryptionSetting: false,
+        columnEncryption: undefined,
         columnNameReplacer: undefined,
         connectionRetryInterval: DEFAULT_CONNECT_RETRY_INTERVAL,
         connectTimeout: DEFAULT_CONNECT_TIMEOUT,
@@ -1326,7 +1382,6 @@ class Connection extends EventEmitter {
         enableQuotedIdentifier: true,
         encrypt: true,
         fallbackToDefaultDb: false,
-        encryptionKeyStoreProviders: undefined,
         instanceName: undefined,
         isolationLevel: ISOLATION_LEVEL.READ_COMMITTED,
         language: DEFAULT_LANGUAGE,
@@ -1343,7 +1398,6 @@ class Connection extends EventEmitter {
         serverSupportsColumnEncryption: false,
         tdsVersion: DEFAULT_TDS_VERSION,
         textsize: DEFAULT_TEXTSIZE,
-        trustedServerNameAE: undefined,
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
@@ -1387,6 +1441,10 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.cancelTimeout = config.options.cancelTimeout;
+      }
+
+      if (config.options.columnEncryption !== undefined) {
+        this.config.options.columnEncryption = validateColumnEncryptionOptions(config.options.columnEncryption);
       }
 
       if (config.options.columnNameReplacer) {
@@ -1710,6 +1768,10 @@ class Connection extends EventEmitter {
         this.config.options.tdsVersion = config.options.tdsVersion;
       }
 
+      if (this.config.options.columnEncryption !== undefined && this.config.options.tdsVersion < '7_4') {
+        throw new TypeError('The "config.options.columnEncryption" property requires "config.options.tdsVersion" to be "7_4".');
+      }
+
       if (config.options.textsize !== undefined) {
         if (typeof config.options.textsize !== 'number' && config.options.textsize !== null) {
           throw new TypeError('The "config.options.textsize" property must be of type number or null.');
@@ -1797,6 +1859,9 @@ class Connection extends EventEmitter {
     // equivalent behavior for TDS versions before 7.2.
     this.transactionDepth = 0;
     this.isSqlBatch = false;
+    this.pendingRequest = undefined;
+    this.parameterEncryptionCache = undefined;
+    this.encryptedValuesParserOptions = undefined;
     this.closed = false;
     this.messageBuffer = Buffer.alloc(0);
 
@@ -2152,6 +2217,12 @@ class Connection extends EventEmitter {
             return await this.performReRouting();
           }
 
+          // Without the server's support, values would silently be sent and
+          // returned as they are.
+          if (this.config.options.columnEncryption !== undefined && !this.config.options.serverSupportsColumnEncryption) {
+            throw new ConnectionError('The server does not support Always Encrypted, which the "columnEncryption" option asks for.', 'ECOLUMNENCRYPTION');
+          }
+
           this.transitionTo(this.STATE.LOGGED_IN_SENDING_INITIAL_SQL);
           await this.performLoggedInSendingInitialSql(signal);
         } finally {
@@ -2216,8 +2287,23 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message, handler: TokenHandler) {
-    return new TokenStreamParser(message, this.debug, handler, this.config.options);
+  createTokenStreamParser(message: Message, handler: TokenHandler, options: ParserOptions = this.config.options) {
+    return new TokenStreamParser(message, this.debug, handler, options);
+  }
+
+  /**
+   * The options to parse the response of a request with.
+   *
+   * @private
+   */
+  parserOptions(request: Request | BulkLoad): ParserOptions {
+    // The encrypted values in the response of a request that opted out of
+    // column encryption are left as they are.
+    if (this.config.options.columnEncryption !== undefined && request instanceof Request && request.columnEncryption === 'disabled') {
+      return this.encryptedValuesParserOptions ??= { ...this.config.options, columnEncryption: undefined };
+    }
+
+    return this.config.options;
   }
 
   async wrapWithTls(socket: net.Socket, signal: AbortSignal): Promise<tls.TLSSocket> {
@@ -2572,6 +2658,11 @@ class Connection extends EventEmitter {
     payload.readOnlyIntent = this.config.options.readOnlyIntent;
     payload.initDbFatal = !this.config.options.fallbackToDefaultDb;
 
+    // Whether the server supports column encryption is told by its
+    // acknowledgement of the feature.
+    payload.columnEncryption = this.config.options.columnEncryption !== undefined;
+    this.config.options.serverSupportsColumnEncryption = false;
+
     this.routingData = undefined;
     this.messageIo.sendMessage(TYPE.LOGIN7, payload.toBuffer());
 
@@ -2748,33 +2839,224 @@ class Connection extends EventEmitter {
       return;
     }
 
-    const parameters: ResolvedParameter[] = [];
+    this.encryptRequestParameters(request, request.sqlTextOrProcedure!, request.resolvedParameters, (resolvedParameters) => {
+      const parameters: ResolvedParameter[] = [];
 
-    parameters.push(this.resolveRequestParameter({
-      type: TYPES.NVarChar,
-      name: 'statement',
-      value: request.sqlTextOrProcedure,
-      output: false,
-      length: undefined,
-      precision: undefined,
-      scale: undefined
-    }));
-
-    if (request.parameters.length) {
       parameters.push(this.resolveRequestParameter({
         type: TYPES.NVarChar,
-        name: 'params',
-        value: request.makeParamsParameter(request.parameters),
+        name: 'statement',
+        value: request.sqlTextOrProcedure,
         output: false,
         length: undefined,
         precision: undefined,
         scale: undefined
       }));
 
-      parameters.push(...request.resolvedParameters);
+      if (request.parameters.length) {
+        parameters.push(this.resolveRequestParameter({
+          type: TYPES.NVarChar,
+          name: 'params',
+          value: request.makeParamsParameter(request.parameters),
+          output: false,
+          length: undefined,
+          precision: undefined,
+          scale: undefined
+        }));
+
+        parameters.push(...resolvedParameters);
+      }
+
+      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
+    });
+  }
+
+  /**
+   * Encrypts the parameters of a request that target encrypted columns,
+   * and passes the parameters to send on to `send`.
+   *
+   * Which parameters need to be encrypted is asked from the server before
+   * the request is sent, unless it is known from an earlier execution of
+   * the same statement. `send` is called right away if the server does not
+   * have to be asked, and all column encryption keys are available.
+   *
+   * @param statement
+   *   The statement that is executed with the parameters.
+   *
+   * @private
+   */
+  encryptRequestParameters(request: Request, statement: string, resolvedParameters: ResolvedParameter[], send: (parameters: ResolvedParameter[]) => void) {
+    request.parameterEncryption = undefined;
+
+    const fail = (error: Error) => {
+      request.error = error;
+      this.debug.log(error.message);
+      request.callback(error);
+    };
+
+    const { columnEncryption } = this.config.options;
+    if (columnEncryption === undefined || (request.columnEncryption ?? 'enabled') !== 'enabled') {
+      const parameter = request.parameters.find((parameter) => parameter.forceEncrypt);
+      if (parameter !== undefined) {
+        const reason = columnEncryption === undefined ? 'the "columnEncryption" option of the connection is not set' : `the "columnEncryption" option of the request is "${request.columnEncryption}"`;
+        process.nextTick(fail, new RequestError(`The parameter "${parameter.name}" is required to be encrypted (\`forceEncrypt\`), but ${reason}.`, 'ECOLUMNENCRYPTION'));
+        return;
+      }
+
+      return send(resolvedParameters);
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_ExecuteSql, parameters, this.currentTransactionDescriptor(), this.config.options));
+    if (request.parameters.length === 0) {
+      return send(resolvedParameters);
+    }
+
+    const cache = this.parameterEncryptionCache ??= new ParameterEncryptionMetadataCache(columnEncryption.parameterMetadataCacheSize);
+    const declarations = request.makeParamsParameter(request.parameters);
+    const cacheKey = ParameterEncryptionMetadataCache.key(statement, declarations);
+
+    // The connection is busy with this request from here on, even though
+    // the request itself is yet to be sent.
+    const pending: NonNullable<Connection['pendingRequest']> = { request, describeRequest: undefined };
+
+    const onCancel = () => {
+      pending.describeRequest?.cancel();
+    };
+
+    const settle = () => {
+      request.removeListener('cancel', onCancel);
+
+      if (this.pendingRequest === pending) {
+        this.pendingRequest = undefined;
+      }
+    };
+
+    const encryptAndSend = (metadata: ParameterEncryptionMetadata) => {
+      settle();
+
+      const ciphers = new Map();
+
+      let encryptedParameters;
+      try {
+        encryptedParameters = encryptParameters(request.parameters, resolvedParameters, metadata, ciphers, this.config.options);
+      } catch (error: any) {
+        return fail(new RequestError(error.message, 'ECOLUMNENCRYPTION', { cause: error }));
+      }
+
+      request.parameterEncryption = { cacheKey, ciphers };
+      send(encryptedParameters);
+    };
+
+    const loadKeys = (metadata: ParameterEncryptionMetadata) => {
+      const loading = loadColumnEncryptionKeys(metadata.keys, columnEncryption);
+      if (loading === undefined) {
+        return encryptAndSend(metadata);
+      }
+
+      // Continue outside of the promise, so that an exception thrown by a
+      // callback of the request is not turned into a rejection.
+      loading.then(() => {
+        process.nextTick(encryptAndSend, metadata);
+      }, (error) => {
+        process.nextTick(() => {
+          settle();
+          fail(new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+        });
+      });
+    };
+
+    const cached = cache.get(cacheKey);
+    if (cached !== undefined) {
+      // Nothing to wait for unless a key is needed that is not available.
+      if (cached.keys.length === 0) {
+        return encryptAndSend(cached);
+      }
+
+      if (!this.acceptsRequest(request)) {
+        return;
+      }
+
+      this.pendingRequest = pending;
+      request.once('cancel', onCancel);
+      return loadKeys(cached);
+    }
+
+    if (!this.acceptsRequest(request)) {
+      return;
+    }
+
+    const reader = new ParameterEncryptionMetadataReader();
+    const describeRequest = pending.describeRequest = new Request('sp_describe_parameter_encryption', (error) => {
+      if (error) {
+        settle();
+        return fail(error);
+      }
+
+      let metadata;
+      try {
+        metadata = reader.read();
+      } catch (error: any) {
+        settle();
+        return fail(new RequestError(error.message, 'ECOLUMNENCRYPTION', { cause: error }));
+      }
+
+      if (columnEncryption.parameterMetadataCacheSize > 0) {
+        cache.set(cacheKey, metadata);
+      }
+
+      loadKeys(metadata);
+    }, { columnEncryption: 'disabled' });
+
+    describeRequest.setTimeout(request.timeout);
+    describeRequest.addParameter('tsql', TYPES.NVarChar, statement);
+    describeRequest.addParameter('params', TYPES.NVarChar, declarations);
+    describeRequest.on('columnMetadata', () => {
+      reader.onColumnMetadata();
+    });
+    describeRequest.on('row', (row) => {
+      reader.onRow(row);
+    });
+
+    this.pendingRequest = pending;
+    request.once('cancel', onCancel);
+
+    describeRequest.validateParameters(this.databaseCollation, this.config.options);
+    this.makeRequest(describeRequest, TYPE.RPC_REQUEST, new RpcRequestPayload('sp_describe_parameter_encryption', describeRequest.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+  }
+
+  /**
+   * Called when the server reported an error for a request: forgets how
+   * the server expects the parameters of the request's statement to be
+   * encrypted, so that the server is asked again the next time it is
+   * executed.
+   *
+   * @private
+   */
+  forgetParameterEncryptionMetadata(request: Request) {
+    if (request.parameterEncryption !== undefined) {
+      this.parameterEncryptionCache?.delete(request.parameterEncryption.cacheKey);
+    }
+  }
+
+  /**
+   * Whether a request can be made right now. If not, the request is
+   * completed with an error.
+   *
+   * @private
+   */
+  acceptsRequest(request: Request | BulkLoad): boolean {
+    let message;
+
+    const pending = this.pendingRequest;
+    if (pending !== undefined && pending.request !== request && pending.describeRequest !== request) {
+      message = 'Requests can only be made once the previous request has completed';
+    } else if (this.state !== this.STATE.LOGGED_IN) {
+      message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
+    } else {
+      return true;
+    }
+
+    this.debug.log(message);
+    request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    return false;
   }
 
   /**
@@ -3022,7 +3304,10 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, executeParameters, this.currentTransactionDescriptor(), this.config.options));
+    const [handle, ...resolvedParameters] = executeParameters;
+    this.encryptRequestParameters(request, request.sqlTextOrProcedure!, resolvedParameters, (resolvedParameters) => {
+      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Execute, [handle, ...resolvedParameters], this.currentTransactionDescriptor(), this.config.options));
+    });
   }
 
   /**
@@ -3044,7 +3329,9 @@ class Connection extends EventEmitter {
       return;
     }
 
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, request.resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+    this.encryptRequestParameters(request, describeProcedureCall(request.sqlTextOrProcedure!, request.parameters), request.resolvedParameters, (resolvedParameters) => {
+      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(request.sqlTextOrProcedure!, resolvedParameters, this.currentTransactionDescriptor(), this.config.options));
+    });
   }
 
   /**
@@ -3243,10 +3530,8 @@ class Connection extends EventEmitter {
     // even if the request is rejected before being sent.
     request.error = undefined;
 
-    if (this.state !== this.STATE.LOGGED_IN) {
-      const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
-      this.debug.log(message);
-      request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    if (!this.acceptsRequest(request)) {
+      // The request was completed with an error.
     } else if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
@@ -3329,15 +3614,17 @@ class Connection extends EventEmitter {
    * Cancel currently executed request.
    */
   cancel() {
-    if (!this.request) {
+    // A request whose parameters are being encrypted was not sent yet.
+    const request = this.pendingRequest?.request ?? this.request;
+    if (!request) {
       return false;
     }
 
-    if (this.request.canceled) {
+    if (request.canceled) {
       return false;
     }
 
-    this.request.cancel();
+    request.cancel();
     return true;
   }
 
@@ -3801,7 +4088,7 @@ Connection.prototype.STATE = {
         // request timer is stopped on first data package
         this.clearRequestTimer();
 
-        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
+        const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!), this.parserOptions(this.request!));
 
         // A token parse failure leaves the connection at an undefined
         // position in the TDS stream, so it cannot be recovered at the

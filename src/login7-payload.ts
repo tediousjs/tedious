@@ -89,6 +89,9 @@ class Login7Payload {
   declare readOnlyIntent: boolean;
   declare initDbFatal: boolean;
 
+  // Whether to negotiate the column encryption feature (Always Encrypted).
+  declare columnEncryption: boolean;
+
   declare userName: string | undefined;
   declare password: string | undefined;
   declare serverName: string | undefined;
@@ -115,6 +118,7 @@ class Login7Payload {
 
     this.readOnlyIntent = false;
     this.initDbFatal = false;
+    this.columnEncryption = false;
 
     this.fedAuth = undefined;
 
@@ -433,6 +437,18 @@ class Login7Payload {
 
           break;
       }
+    }
+
+    // Signal support for column encryption, without the use of secure
+    // enclaves (which would be version 2 and above).
+    if (this.columnEncryption) {
+      const COLUMNENCRYPTION_FEATURE_ID = 0x04;
+      const COLUMNENCRYPTION_VERSION = 0x01;
+      const buf = Buffer.alloc(6);
+      buf.writeUInt8(COLUMNENCRYPTION_FEATURE_ID, 0);
+      buf.writeUInt32LE(1, 1);
+      buf.writeUInt8(COLUMNENCRYPTION_VERSION, 5);
+      buffers.push(buf);
     }
 
     // Signal UTF-8 support: Value 0x0A, bit 0 must be set to 1. Added in TDS 7.4.

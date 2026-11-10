@@ -1,11 +1,20 @@
 import { Collation } from './collation';
 import { type ParserOptions } from './token/stream-parser';
 import { TYPE, type DataType } from './data-type';
-import { type CryptoMetadata } from './always-encrypted/types';
+import { type ColumnEncryptionKeyInfo, type CryptoMetadata, encryptionTypeFromId } from './always-encrypted/types';
 
 import { formatHex } from './format-hex';
 
 import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
+
+// The column or return value is encrypted, and its type is followed by its
+// `CryptoMetadata`.
+const FLAG_ENCRYPTED = 0x0800;
+
+// The id of a custom encryption algorithm, which is followed by its name.
+const CUSTOM_ALGORITHM_ID = 0;
+
+const MAX = (1 << 16) - 1;
 
 interface XmlSchema {
   dbname: string;
@@ -52,7 +61,12 @@ export type BaseMetadata = {
 }
 
 export type Metadata = {
-  cryptoMetadata?: CryptoMetadata;
+  /**
+   * How the values are encrypted, if the column is encrypted using Always
+   * Encrypted and {@link ConnectionOptions.columnEncryption} is enabled. The
+   * other fields then describe the decrypted values.
+   */
+  cryptoMetadata?: CryptoMetadata | undefined;
 } & BaseMetadata;
 
 function readCollation(buf: Buffer, offset: number): Result<Collation> {
@@ -113,13 +127,98 @@ function readUDTInfo(buf: Buffer, offset: number): Result<UdtInfo> {
   }, offset);
 }
 
-function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Result<Metadata> {
+/**
+ * Reads the metadata of a column or of a return value.
+ *
+ * @param cekTable
+ *   The column encryption keys of the result set the column belongs to, as
+ *   the metadata of an encrypted column refers to one of them.
+ */
+function readMetadata(buf: Buffer, offset: number, options: ParserOptions, cekTable?: ColumnEncryptionKeyInfo[]): Result<Metadata> {
   let userType;
   ({ offset, value: userType } = (options.tdsVersion < '7_2' ? readUInt16LE : readUInt32LE)(buf, offset));
 
   let flags;
   ({ offset, value: flags } = readUInt16LE(buf, offset));
 
+  let metadata;
+  ({ offset, value: metadata } = readTypeInfo(buf, offset, userType, flags));
+
+  if ((flags & FLAG_ENCRYPTED) !== 0 && options.serverSupportsColumnEncryption) {
+    return readCryptoMetadata(buf, offset, metadata, options, cekTable);
+  }
+
+  return new Result(metadata, offset);
+}
+
+/**
+ * Reads the `CryptoMetadata` that follows the type of an encrypted column
+ * or return value.
+ *
+ * The type that precedes it (`encrypted`) is the one of the encrypted
+ * values as they are sent, a `varbinary`. The type of the decrypted values
+ * is part of the `CryptoMetadata`, and is what the returned metadata
+ * describes - unless column encryption is disabled, in which case values
+ * stay encrypted and are described as such.
+ */
+function readCryptoMetadata(buf: Buffer, offset: number, encrypted: Metadata, options: ParserOptions, cekTable: ColumnEncryptionKeyInfo[] | undefined): Result<Metadata> {
+  // Return values do not refer to a column encryption key, they are
+  // encrypted with the key of the parameter they are returned for.
+  let key;
+  if (cekTable !== undefined) {
+    let ordinal;
+    ({ offset, value: ordinal } = readUInt16LE(buf, offset));
+
+    key = cekTable[ordinal];
+    if (key === undefined) {
+      throw new Error(`Unknown column encryption key ordinal ${ordinal}`);
+    }
+  }
+
+  let userType;
+  ({ offset, value: userType } = readUInt32LE(buf, offset));
+
+  let metadata;
+  ({ offset, value: metadata } = readTypeInfo(buf, offset, userType, encrypted.flags));
+
+  let algorithmId;
+  ({ offset, value: algorithmId } = readUInt8(buf, offset));
+
+  let algorithmName;
+  if (algorithmId === CUSTOM_ALGORITHM_ID) {
+    ({ offset, value: algorithmName } = readBVarChar(buf, offset));
+  }
+
+  let encryptionType;
+  ({ offset, value: encryptionType } = readUInt8(buf, offset));
+
+  let normalizationRuleVersion;
+  ({ offset, value: normalizationRuleVersion } = readUInt8(buf, offset));
+
+  if (options.columnEncryption === undefined) {
+    return new Result(encrypted, offset);
+  }
+
+  if (encrypted.type.name !== 'VarBinary' && encrypted.type.name !== 'Binary') {
+    throw new Error(`Unexpected type ${encrypted.type.name} of an encrypted value`);
+  }
+
+  metadata.cryptoMetadata = {
+    key,
+    encryptionType: encryptionTypeFromId(encryptionType),
+    algorithmId,
+    algorithmName,
+    normalizationRuleVersion,
+    isPLP: encrypted.type.name === 'VarBinary' && encrypted.dataLength === MAX
+  };
+
+  return new Result(metadata, offset);
+}
+
+/**
+ * Reads a `TYPE_INFO`.
+ */
+function readTypeInfo(buf: Buffer, offset: number, userType: number, flags: number): Result<Metadata> {
   let typeNumber;
   ({ offset, value: typeNumber } = readUInt8(buf, offset));
 
@@ -151,7 +250,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: undefined,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
 
     case 'IntN':
@@ -172,7 +272,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -189,7 +290,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -212,7 +314,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -233,7 +336,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -251,7 +355,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -268,7 +373,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -285,7 +391,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: undefined,
         schema: schema,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -304,7 +411,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: scale,
         dataLength: undefined,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -328,7 +436,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: scale,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        cryptoMetadata: undefined
       }, offset);
     }
 
@@ -345,7 +454,8 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         scale: undefined,
         dataLength: undefined,
         schema: undefined,
-        udtInfo: udtInfo
+        udtInfo: udtInfo,
+        cryptoMetadata: undefined
       }, offset);
     }
 

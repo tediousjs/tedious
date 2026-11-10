@@ -4,6 +4,7 @@ import { TYPE } from './data-type';
 
 import iconv from 'iconv-lite';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
+import { type ColumnEncryptionCipher } from './always-encrypted/cipher';
 import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
@@ -66,6 +67,10 @@ function readBit(buf: Buffer, offset: number): Result<boolean> {
 }
 
 function readValue(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
+  if (metadata.cryptoMetadata !== undefined) {
+    return readEncryptedValue(buf, offset, metadata, options);
+  }
+
   const type = metadata.type;
 
   switch (type.name) {
@@ -395,6 +400,12 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 }
 
 function isPLPStream(metadata: Metadata) {
+  // Encrypted values are sent as `varbinary` values, whatever the type of
+  // the decrypted values is.
+  if (metadata.cryptoMetadata !== undefined) {
+    return metadata.cryptoMetadata.isPLP;
+  }
+
   switch (metadata.type.name) {
     case 'VarChar':
     case 'NVarChar':
@@ -410,6 +421,212 @@ function isPLPStream(metadata: Metadata) {
       return true;
     }
   }
+}
+
+/**
+ * Reads an encrypted value that is not sent as a PLP value: a `varbinary`
+ * value that holds the encrypted, normalized value.
+ */
+function readEncryptedValue(buf: Buffer, offset: number, metadata: Metadata, options: ParserOptions): Result<unknown> {
+  let dataLength;
+  ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+  if (dataLength === NULL) {
+    return new Result(null, offset);
+  }
+
+  if (buf.length < offset + dataLength) {
+    throw new NotEnoughDataError(offset + dataLength);
+  }
+
+  return new Result(decryptColumnValue(buf.subarray(offset, offset + dataLength), metadata, options), offset + dataLength);
+}
+
+/**
+ * Decrypts an encrypted value of the column described by `metadata`, using
+ * the cipher of the column's encryption key.
+ *
+ * The value is returned as it is while there is no cipher. That is the case
+ * for a column whose key was not loaded (see `loadColumnEncryptionKeys`),
+ * and for return values: they are encrypted with the key of the parameter
+ * they are returned for, which is not known here.
+ *
+ * A value that can not be decrypted does not throw, as that would fail the
+ * parsing of the response, and with it the connection. The error is
+ * recorded on the key instead, for whoever consumes the values to fail the
+ * request - and the values of the key are left encrypted from there on.
+ */
+function decryptColumnValue(encryptedValue: Buffer, metadata: Metadata, options: ParserOptions): unknown {
+  const key = metadata.cryptoMetadata!.key;
+  if (key === undefined || key.cipher === undefined) {
+    return encryptedValue;
+  }
+
+  try {
+    return decryptValue(encryptedValue, metadata, key.cipher, options);
+  } catch (error: any) {
+    key.cipher = undefined;
+    key.error = error;
+
+    return encryptedValue;
+  }
+}
+
+/**
+ * Decrypts an encrypted value of the type described by `metadata`.
+ */
+function decryptValue(encryptedValue: Buffer, metadata: Metadata, cipher: ColumnEncryptionCipher, options: ParserOptions): unknown {
+  return readNormalizedValue(cipher.decrypt(encryptedValue), metadata, options);
+}
+
+function assertNormalizedLength(value: Buffer, length: number, metadata: Metadata) {
+  if (value.length !== length) {
+    throw new Error(`Unexpected length ${value.length} of a decrypted ${metadata.type.name} value, expected ${length}`);
+  }
+}
+
+/**
+ * Reads a decrypted value. Always Encrypted normalizes values before they
+ * are encrypted, into a format that only depends on the value and not on
+ * the declared length, precision or scale of its type. This differs from
+ * the format the type is sent in otherwise:
+ *
+ *   - `bit` and all integer types are 64-bit integers,
+ *   - `smallmoney` values have the format of `money` values,
+ *   - `decimal` and `numeric` values have a magnitude of 16 bytes,
+ *   - `time`, `datetime2` and `datetimeoffset` values have a scale of 7,
+ *   - fixed length `char`, `nchar` and `binary` values are not padded.
+ *
+ * Values have no length prefix - the length is that of the decrypted data.
+ */
+function readNormalizedValue(value: Buffer, metadata: Metadata, options: ParserOptions): unknown {
+  switch (metadata.type.name) {
+    case 'Bit':
+    case 'BitN':
+      assertNormalizedLength(value, 8, metadata);
+      return value.readBigInt64LE(0) !== 0n;
+
+    case 'TinyInt':
+      assertNormalizedLength(value, 8, metadata);
+      return value.readUInt8(0);
+
+    case 'SmallInt':
+      assertNormalizedLength(value, 8, metadata);
+      return value.readInt16LE(0);
+
+    case 'Int':
+      assertNormalizedLength(value, 8, metadata);
+      return value.readInt32LE(0);
+
+    case 'BigInt':
+      assertNormalizedLength(value, 8, metadata);
+      return value.readBigInt64LE(0).toString();
+
+    case 'IntN':
+      assertNormalizedLength(value, 8, metadata);
+
+      switch (metadata.dataLength) {
+        case 1:
+          return value.readUInt8(0);
+        case 2:
+          return value.readInt16LE(0);
+        case 4:
+          return value.readInt32LE(0);
+        case 8:
+          return value.readBigInt64LE(0).toString();
+        default:
+          throw new Error('Unsupported dataLength ' + metadata.dataLength + ' for IntN');
+      }
+
+    case 'Real':
+    case 'Float':
+    case 'FloatN':
+      switch (value.length) {
+        case 4:
+          return value.readFloatLE(0);
+        case 8:
+          return value.readDoubleLE(0);
+        default:
+          throw new Error('Unsupported dataLength ' + value.length + ' for FloatN');
+      }
+
+    case 'SmallMoney':
+    case 'Money':
+    case 'MoneyN':
+      assertNormalizedLength(value, 8, metadata);
+      return readMoney(value, 0).value;
+
+    case 'SmallDateTime':
+    case 'DateTime':
+    case 'DateTimeN':
+      switch (value.length) {
+        case 4:
+          return readSmallDateTime(value, 0, options.useUTC).value;
+        case 8:
+          return readDateTime(value, 0, options.useUTC).value;
+        default:
+          throw new Error('Unsupported dataLength ' + value.length + ' for DateTimeN');
+      }
+
+    case 'NumericN':
+    case 'DecimalN':
+      assertNormalizedLength(value, 17, metadata);
+      return readNumeric(value, 0, 17, metadata.precision!, metadata.scale!).value;
+
+    case 'UniqueIdentifier':
+      assertNormalizedLength(value, 16, metadata);
+      return readUniqueIdentifier(value, 0, options).value;
+
+    case 'Date':
+      assertNormalizedLength(value, 3, metadata);
+      return readDate(value, 0, options.useUTC).value;
+
+    case 'Time':
+      assertNormalizedLength(value, 5, metadata);
+      return readTime(value, 0, 5, 7, options.useUTC).value;
+
+    case 'DateTime2':
+      assertNormalizedLength(value, 8, metadata);
+      return readDateTime2(value, 0, 8, 7, options.useUTC).value;
+
+    case 'DateTimeOffset':
+      assertNormalizedLength(value, 10, metadata);
+      return readDateTimeOffset(value, 0, 10, 7).value;
+
+    case 'Char':
+      return readChars(padEnd(value, metadata.dataLength!, 0x20), 0, Math.max(value.length, metadata.dataLength!), metadata.collation!.codepage!).value;
+
+    case 'VarChar':
+      return readChars(value, 0, value.length, metadata.collation!.codepage!).value;
+
+    case 'NChar':
+      return value.toString('ucs2').padEnd(metadata.dataLength! / 2, ' ');
+
+    case 'NVarChar':
+      return value.toString('ucs2');
+
+    case 'Binary':
+      return padEnd(value, metadata.dataLength!, 0x00);
+
+    case 'VarBinary':
+      return value;
+
+    default:
+      throw new Error(`Unsupported type ${metadata.type.name} of an encrypted value`);
+  }
+}
+
+/**
+ * Pads the value of a fixed length type to the length of the type.
+ */
+function padEnd(value: Buffer, length: number, fill: number): Buffer {
+  if (value.length >= length) {
+    return value;
+  }
+
+  const padded = Buffer.alloc(length, fill);
+  value.copy(padded);
+  return padded;
 }
 
 function readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOptions): Result<string> {
@@ -657,6 +874,10 @@ class PLPReader {
     // much larger) incoming data buffers alive.
     const data = Buffer.concat(this.chunks, this.length);
 
+    if (this.metadata.cryptoMetadata !== undefined) {
+      return decryptColumnValue(data, this.metadata, parser.options);
+    }
+
     switch (this.metadata.type.name) {
       case 'NVarChar':
       case 'Xml':
@@ -829,5 +1050,6 @@ function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, sca
 module.exports.readValue = readValue;
 module.exports.isPLPStream = isPLPStream;
 module.exports.PLPReader = PLPReader;
+module.exports.decryptValue = decryptValue;
 
-export { readValue, isPLPStream, PLPReader };
+export { readValue, isPLPStream, PLPReader, decryptValue };
