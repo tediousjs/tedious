@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 
 import { ColumnEncryptionCipher } from '../../../src/always-encrypted/cipher';
 import {
-  describeProcedureCall,
+  describeStatement,
   encryptParameters,
   createDescribeRequest,
   ParameterEncryptionMetadataCache,
@@ -15,7 +15,7 @@ import { Collation } from '../../../src/collation';
 import { type InternalConnectionOptions } from '../../../src/connection';
 import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../../src/data-type';
 import { RequestError } from '../../../src/errors';
-import { type ParameterOptions } from '../../../src/request';
+import Request, { type ParameterOptions } from '../../../src/request';
 import RpcRequestPayload from '../../../src/rpcrequest-payload';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 
@@ -498,13 +498,74 @@ describe('encryptParameters', function() {
   });
 });
 
-describe('describeProcedureCall', function() {
-  it('builds a statement that calls the procedure with its parameters', function() {
-    assert.strictEqual(describeProcedureCall('dbo.proc', [
-      parameter('id', TYPES.Int, 1),
-      parameter('name', TYPES.NVarChar, 'name'),
-      parameter('result', TYPES.Int, null, { output: true })
-    ]), 'EXEC dbo.proc @id=@id, @name=@name, @result=@result OUTPUT');
+describe('describeStatement', function() {
+  const SP_EXECUTESQL = 10;
+
+  function requestWith(sql: string, configure: (request: Request) => void = () => {}) {
+    const request = new Request(sql, () => {});
+    configure(request);
+    return request;
+  }
+
+  it('describes the statement of a request with the declarations of its parameters', function() {
+    const request = requestWith('SELECT * FROM patients WHERE ssn = @ssn AND id > @id', (request) => {
+      request.addParameter('ssn', TYPES.Char, '795-73-9838', { length: 11 });
+      request.addParameter('id', TYPES.Int, 1);
+    });
+
+    assert.deepEqual(describeStatement(request, SP_EXECUTESQL), {
+      statement: 'SELECT * FROM patients WHERE ssn = @ssn AND id > @id',
+      declarations: '@ssn char(11), @id int'
+    });
+  });
+
+  it('describes the call of a stored procedure', function() {
+    const request = requestWith('dbo.proc', (request) => {
+      request.addParameter('id', TYPES.Int, 1);
+      request.addParameter('name', TYPES.NVarChar, 'name');
+      request.addOutputParameter('result', TYPES.Int);
+    });
+
+    assert.deepEqual(describeStatement(request, 'dbo.proc'), {
+      statement: 'EXEC dbo.proc @id=@id, @name=@name, @result=@result OUTPUT',
+      declarations: '@id int, @name nvarchar(4), @result int OUTPUT'
+    });
+  });
+
+  it('leaves table-valued parameters out of the call of a stored procedure', function() {
+    // The type of a table-valued parameter does not have to be named to
+    // call a procedure.
+    const request = requestWith('dbo.proc', (request) => {
+      request.addParameter('rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1]] });
+      request.addParameter('id', TYPES.Int, 1);
+    });
+
+    assert.deepEqual(describeStatement(request, 'dbo.proc'), {
+      statement: 'EXEC dbo.proc @id=@id',
+      declarations: '@id int'
+    });
+  });
+
+  it('keeps table-valued parameters in the declarations of a statement that uses them', function() {
+    const request = requestWith('SELECT a FROM @rows WHERE a > @id', (request) => {
+      request.addParameter('rows', TYPES.TVP, { name: 'IntTable', schema: 'dbo', columns: [{ name: 'a', type: TYPES.Int }], rows: [[1]] });
+      request.addParameter('id', TYPES.Int, 1);
+    });
+
+    assert.deepEqual(describeStatement(request, SP_EXECUTESQL), {
+      statement: 'SELECT a FROM @rows WHERE a > @id',
+      declarations: '@rows dbo.IntTable readonly, @id int'
+    });
+  });
+
+  it('describes nothing if there are no parameters that could be encrypted', function() {
+    assert.isUndefined(describeStatement(requestWith('SELECT 1'), SP_EXECUTESQL));
+    assert.isUndefined(describeStatement(requestWith('dbo.proc'), 'dbo.proc'));
+
+    const request = requestWith('dbo.proc', (request) => {
+      request.addParameter('rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1]] });
+    });
+    assert.isUndefined(describeStatement(request, 'dbo.proc'));
   });
 });
 
@@ -593,7 +654,7 @@ describe('readParameterEncryptionMetadata', function() {
 
 describe('createDescribeRequest', function() {
   it('creates a request that calls `sp_describe_parameter_encryption` with the statement and its parameters', function() {
-    const request = createDescribeRequest('SELECT @id', '@id int', () => {});
+    const request = createDescribeRequest({ statement: 'SELECT @id', declarations: '@id int' }, () => {});
 
     assert.strictEqual(request.sqlTextOrProcedure, 'sp_describe_parameter_encryption');
     assert.deepEqual(request.parameters.map(({ name, type, value }) => [name, type.name, value]), [
@@ -607,7 +668,7 @@ describe('createDescribeRequest', function() {
 
   it('reads the parameter encryption metadata from the rows of the response', function() {
     let result: [Error | null | undefined, ParameterEncryptionMetadata | undefined] | undefined;
-    const request = createDescribeRequest('SELECT @id, @secret', '@id int, @secret int', (error, metadata) => {
+    const request = createDescribeRequest({ statement: 'SELECT @id, @secret', declarations: '@id int, @secret int' }, (error, metadata) => {
       result = [error, metadata];
     });
 
@@ -626,7 +687,7 @@ describe('createDescribeRequest', function() {
 
   it('passes on the error of a failed request', function() {
     let result: [Error | null | undefined, ParameterEncryptionMetadata | undefined] | undefined;
-    const request = createDescribeRequest('SELECT @id', '@id int', (error, metadata) => {
+    const request = createDescribeRequest({ statement: 'SELECT @id', declarations: '@id int' }, (error, metadata) => {
       result = [error, metadata];
     });
 
@@ -638,7 +699,7 @@ describe('createDescribeRequest', function() {
 
   it('fails if the response is not the expected one', function() {
     let result: [Error | null | undefined, ParameterEncryptionMetadata | undefined] | undefined;
-    const request = createDescribeRequest('SELECT @id', '@id int', (error, metadata) => {
+    const request = createDescribeRequest({ statement: 'SELECT @id', declarations: '@id int' }, (error, metadata) => {
       result = [error, metadata];
     });
 
@@ -659,12 +720,14 @@ describe('ParameterEncryptionMetadataCache', function() {
     const first = metadata();
     const second = metadata();
 
-    cache.set(ParameterEncryptionMetadataCache.key('SELECT @a', '@a int'), first);
-    cache.set(ParameterEncryptionMetadataCache.key('SELECT @a', '@a bigint'), second);
+    const key = (statement: string, declarations: string) => ParameterEncryptionMetadataCache.key({ statement, declarations });
 
-    assert.strictEqual(cache.get(ParameterEncryptionMetadataCache.key('SELECT @a', '@a int')), first);
-    assert.strictEqual(cache.get(ParameterEncryptionMetadataCache.key('SELECT @a', '@a bigint')), second);
-    assert.isUndefined(cache.get(ParameterEncryptionMetadataCache.key('SELECT @b', '@a int')));
+    cache.set(key('SELECT @a', '@a int'), first);
+    cache.set(key('SELECT @a', '@a bigint'), second);
+
+    assert.strictEqual(cache.get(key('SELECT @a', '@a int')), first);
+    assert.strictEqual(cache.get(key('SELECT @a', '@a bigint')), second);
+    assert.isUndefined(cache.get(key('SELECT @b', '@a int')));
   });
 
   it('evicts the least recently used statement once it is full', function() {

@@ -42,7 +42,7 @@ import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { loadColumnEncryptionKeys } from './always-encrypted/key-cache';
 import { validateColumnEncryptionOptions } from './always-encrypted/options';
-import { createDescribeRequest, describeProcedureCall, encryptParameters, ParameterEncryptionMetadataCache, type ParameterEncryptionMetadata } from './always-encrypted/parameter-encryption';
+import { createDescribeRequest, describeStatement, encryptParameters, ParameterEncryptionMetadataCache, type ParameterEncryptionMetadata } from './always-encrypted/parameter-encryption';
 import { type ColumnEncryptionOptions, type InternalColumnEncryptionOptions } from './always-encrypted/types';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
@@ -2899,6 +2899,9 @@ class Connection extends EventEmitter {
    * @private
    */
   encryptRequestParameters(request: Request, procedure: string | number, parameters: ResolvedParameter[], send: (parameters: ResolvedParameter[]) => void) {
+    // Clear what is left over from a previous execution of this request,
+    // even if the request is rejected before being sent.
+    request.error = undefined;
     request.parameterEncryption = undefined;
 
     const fail = (error: Error) => {
@@ -2921,7 +2924,9 @@ class Connection extends EventEmitter {
       return send(parameters);
     }
 
-    if (request.parameters.length === 0) {
+    // The statement that the server is asked about.
+    const described = describeStatement(request, procedure);
+    if (described === undefined) {
       return send(parameters);
     }
 
@@ -2938,13 +2943,8 @@ class Connection extends EventEmitter {
     };
     request.once('cancel', onCancel);
 
-    // The statement that the parameters are part of: the one of the
-    // request, or the call of the stored procedure.
-    const statement = typeof procedure === 'string' ? describeProcedureCall(procedure, request.parameters) : request.sqlTextOrProcedure!;
-    const declarations = request.makeParamsParameter(request.parameters);
-
     const cache = this.parameterEncryptionCache ??= new ParameterEncryptionMetadataCache(columnEncryption.parameterMetadataCacheSize);
-    const cacheKey = ParameterEncryptionMetadataCache.key(statement, declarations);
+    const cacheKey = ParameterEncryptionMetadataCache.key(described);
 
     // The last step: encrypts the parameters and sends the request, or
     // fails the request if it did not get this far.
@@ -2996,7 +2996,7 @@ class Connection extends EventEmitter {
       return loadKeys(metadata);
     }
 
-    const describeRequest = pending.describeRequest = createDescribeRequest(statement, declarations, (error, metadata) => {
+    const describeRequest = pending.describeRequest = createDescribeRequest(described, (error, metadata) => {
       if (error) {
         return encryptAndSend(error);
       }

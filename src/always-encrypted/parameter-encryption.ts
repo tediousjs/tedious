@@ -48,26 +48,57 @@ interface Column {
 type Row = Column[] | { [name: string]: Column };
 
 /**
- * Builds the statement that `sp_describe_parameter_encryption` analyzes for
- * a call of a stored procedure.
+ * What `sp_describe_parameter_encryption` is asked to describe.
  */
-export function describeProcedureCall(procedure: string, parameters: Parameter[]): string {
+export interface DescribedStatement {
+  statement: string;
+
+  /**
+   * The declarations of the statement's parameters, as they are passed to
+   * `sp_executesql`.
+   */
+  declarations: string;
+}
+
+/**
+ * Builds the statement that describes the request: the statement that is
+ * executed with the parameters of the request, or the call of the stored
+ * procedure. Returns `undefined` if none of the parameters can be encrypted.
+ *
+ * @param procedure
+ *   The name of the stored procedure that is called with the parameters, or
+ *   the id of the procedure (like `sp_executesql`) that executes the
+ *   statement of the request.
+ */
+export function describeStatement(request: Request, procedure: string | number): DescribedStatement | undefined {
+  if (typeof procedure === 'number') {
+    if (request.parameters.length === 0) {
+      return undefined;
+    }
+
+    return { statement: request.sqlTextOrProcedure!, declarations: request.makeParamsParameter(request.parameters) };
+  }
+
+  // Table-valued parameters are left out of the call: they can not be
+  // encrypted, and their type (which a declaration requires) does not have
+  // to be specified to call a procedure.
+  const parameters = request.parameters.filter((parameter) => parameter.type !== TYPES.TVP);
+  if (parameters.length === 0) {
+    return undefined;
+  }
+
   const args = parameters.map((parameter) => {
     return `@${parameter.name}=@${parameter.name}${parameter.output ? ' OUTPUT' : ''}`;
   });
 
-  return `EXEC ${procedure} ${args.join(', ')}`;
+  return { statement: `EXEC ${procedure} ${args.join(', ')}`, declarations: request.makeParamsParameter(parameters) };
 }
 
 /**
  * Creates the request that asks the server how the parameters of a
  * statement need to be encrypted.
- *
- * @param declarations
- *   The declarations of the statement's parameters, as they are passed to
- *   `sp_executesql`.
  */
-export function createDescribeRequest(statement: string, declarations: string, callback: (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => void): Request {
+export function createDescribeRequest({ statement, declarations }: DescribedStatement, callback: (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => void): Request {
   const resultSets: Row[][] = [];
 
   // The result sets do not contain any encrypted values, and the parameters
@@ -158,8 +189,8 @@ export class ParameterEncryptionMetadataCache {
     this.entries = new Map();
   }
 
-  static key(statement: string, parameters: string): string {
-    return `${statement}\n${parameters}`;
+  static key({ statement, declarations }: DescribedStatement): string {
+    return `${statement}\n${declarations}`;
   }
 
   get(key: string): ParameterEncryptionMetadata | undefined {

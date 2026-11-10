@@ -1200,6 +1200,90 @@ describe('Always Encrypted', function() {
     });
   });
 
+  describe('requests that do not involve encrypted columns', function() {
+    it('supports bulk loads', async function() {
+      const table = `#tedious_ae_bulk_${suffix}`;
+      await execSqlBatch(connection, `CREATE TABLE ${table} (id int NOT NULL, name nvarchar(50) NULL)`);
+
+      const rowCount = await new Promise<number | undefined>((resolve, reject) => {
+        const bulkLoad = connection.newBulkLoad(table, (err, rowCount) => (err ? reject(err) : resolve(rowCount)));
+        bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+        bulkLoad.addColumn('name', TYPES.NVarChar, { length: 50, nullable: true });
+
+        connection.execBulkLoad(bulkLoad, [[1, 'one'], [2, 'two'], [3, null]]);
+      });
+      assert.strictEqual(rowCount, 3);
+
+      const { rows } = await execSqlBatch(connection, `SELECT id, name FROM ${table} ORDER BY id`);
+      assert.deepEqual(rows, [[1, 'one'], [2, 'two'], [3, null]]);
+    });
+
+    it('supports calling procedures with table-valued parameters whose type is not named', async function() {
+      const type = `tedious_ae_tvp_${suffix}`;
+      const procedure = `tedious_ae_tvp_proc_${suffix}`;
+
+      await execSqlBatch(setupConnection!, `CREATE TYPE ${type} AS TABLE (a int)`);
+      cleanup.unshift(`DROP TYPE ${type}`);
+      await execSqlBatch(setupConnection!, `CREATE PROCEDURE ${procedure} @rows ${type} READONLY, @offset int AS SELECT a + @offset FROM @rows ORDER BY a`);
+      cleanup.unshift(`DROP PROCEDURE ${procedure}`);
+
+      const { rows } = await callProcedure(connection, procedure, [
+        ['rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1], [2]] }],
+        ['offset', TYPES.Int, 10]
+      ]);
+      assert.deepEqual(rows, [[11], [12]]);
+
+      const { rows: onlyRows } = await callProcedure(connection, procedure, [
+        ['rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1], [2]] }]
+      ]).catch((error) => ({ rows: error.message }));
+      assert.match(onlyRows as unknown as string, /expects parameter '@offset'/);
+    });
+
+    it('supports temporary tables, streamed values and output parameters', async function() {
+      await execSqlBatch(connection, 'CREATE TABLE #t (id int, document nvarchar(max))');
+
+      await execSql(connection, 'INSERT INTO #t (id, document) VALUES (@id, @document)', [
+        ['id', TYPES.Int, 1],
+        ['document', TYPES.NVarChar, (async function*() {
+          yield 'streamed ';
+          yield 'value';
+        })()]
+      ]);
+
+      const { rows, outputs } = await execSql(connection, 'SELECT @length = LEN(document) FROM #t WHERE id = @id; SELECT document FROM #t', [
+        ['id', TYPES.Int, 1],
+        ['length', TYPES.Int, null, { output: true }]
+      ]);
+
+      assert.deepEqual(rows, [['streamed value']]);
+      assert.deepEqual(outputs, { length: 14 });
+    });
+
+    it('clears the error of a previous execution of a request that is rejected', async function() {
+      const request = new Request(`SELECT id FROM ${names.table} WHERE id = @id`, () => {});
+      request.addParameter('id', TYPES.Int, 1);
+
+      const other = await connect({ columnEncryption });
+      await close(other);
+
+      // Fails once, with an error of the server ...
+      request.sqlTextOrProcedure = 'SELECT id FROM tedious_table_that_does_not_exist WHERE id = @id';
+      const first = await new Promise<any>((resolve) => {
+        request.userCallback = resolve;
+        connection.execSql(request);
+      });
+      assert.strictEqual(first.code, 'EREQUEST');
+
+      // ... and is then rejected by a connection that was closed.
+      const second = await new Promise<any>((resolve) => {
+        request.userCallback = resolve;
+        other.execSql(request);
+      });
+      assert.strictEqual(second.code, 'EINVALIDSTATE');
+      assert.isUndefined(request.error);
+    });
+  });
+
   describe('connection', function() {
     it('fails to connect with a TDS version that does not support column encryption', function() {
       assert.throws(() => {
