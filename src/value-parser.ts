@@ -455,6 +455,12 @@ function readEncryptedValue(buf: Buffer, offset: number, metadata: Metadata, opt
  * parsing of the response, and with it the connection. The error is
  * recorded on the key instead, for whoever consumes the values to fail the
  * request - and the values of the key are left encrypted from there on.
+ *
+ * TODO: Values are decrypted as they are parsed, as rows are handed out with
+ * all of their values. A consumer that reads values on demand (like the pull
+ * based API of https://github.com/tediousjs/tedious/pull/1797) could leave
+ * them encrypted until they are read, and not decrypt the ones that are not:
+ * decrypting takes about ten times as long as parsing a value does.
  */
 function decryptColumnValue(encryptedValue: Buffer, metadata: Metadata, options: ParserOptions): unknown {
   const key = metadata.cryptoMetadata!.key;
