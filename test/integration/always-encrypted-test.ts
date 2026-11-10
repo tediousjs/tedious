@@ -242,6 +242,9 @@ describe('Always Encrypted', function() {
   let columnEncryption: ColumnEncryptionOptions;
   let connection: Connection;
 
+  // The schema that the objects of the tests are created in.
+  let schema: string;
+
   // Connections to close and objects to drop once the tests are done
   // (or failed to set up).
   let setupConnection: Connection | undefined;
@@ -258,11 +261,18 @@ describe('Always Encrypted', function() {
 
     setupConnection = await connect();
 
-    // Always Encrypted was introduced with SQL Server 2016.
-    const { rows: [[majorVersion]] } = await execSqlBatch(setupConnection, "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)");
-    if (majorVersion !== null && (majorVersion as number) < 13) {
+    // Always Encrypted was introduced with SQL Server 2016. Azure SQL
+    // Database and Azure SQL Managed Instance (engine editions 5 and 8)
+    // support it as well, but have version numbers of their own.
+    const { rows: [[majorVersion, engineEdition, defaultSchema]] } = await execSqlBatch(setupConnection, `
+      SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int), CAST(SERVERPROPERTY('EngineEdition') AS int), SCHEMA_NAME()
+    `);
+    const isAzureSql = engineEdition === 5 || engineEdition === 8;
+    if (!isAzureSql && majorVersion !== null && (majorVersion as number) < 13) {
       return this.skip();
     }
+
+    schema = defaultSchema as string;
 
     ({ privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 }));
     ({ privateKey: rotatedPrivateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 }));
@@ -775,7 +785,7 @@ describe('Always Encrypted', function() {
     });
 
     it('supports schema qualified procedure names', async function() {
-      const { outputs } = await callProcedure(connection, `[dbo].[${names.procedure}]`, [
+      const { outputs } = await callProcedure(connection, `[${schema}].[${names.procedure}]`, [
         ['id', TYPES.Int, 1],
         ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }],
         ['randomized', TYPES.Int, null, { output: true }],
@@ -1233,7 +1243,7 @@ describe('Always Encrypted', function() {
       ]);
 
       gated = new GatedKeyStoreProvider();
-      waiting = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: gated }, keyCacheTTL: 0 }, cancelTimeout: 1000 });
+      waiting = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: gated }, keyCacheTTL: 0 } });
     });
 
     afterEach(async function() {
@@ -1359,6 +1369,13 @@ describe('Always Encrypted', function() {
       });
 
       it('fails a request that takes longer than its timeout', async function() {
+        // The server is asked how to encrypt the parameters by a first
+        // execution, so that the timeout only has the key store to wait for.
+        const first = start(sql, parameters);
+        await waitFor(() => gated.calls === 1);
+        first.request.cancel();
+        assert.strictEqual((await first.completed).code, 'ECANCEL');
+
         const request = new Request(sql, () => {});
         for (const [name, type, value, options] of parameters) {
           request.addParameter(name, type, value, options);
@@ -1372,13 +1389,14 @@ describe('Always Encrypted', function() {
 
         assert.strictEqual(error.code, 'ETIMEOUT');
         assert.strictEqual(error.message, 'Timeout: Request failed to complete in 100ms');
-        assert.strictEqual(gated.calls, 1);
+        assert.strictEqual(gated.calls, 2);
 
         gated.release();
         await new Promise((resolve) => setTimeout(resolve, 50));
         await assertNotInserted();
 
         // The connection is still usable, and so is the request.
+        request.setTimeout(undefined);
         await new Promise<void>((resolve, reject) => {
           request.userCallback = (err) => (err ? reject(err) : resolve());
           waiting.execSql(request);
