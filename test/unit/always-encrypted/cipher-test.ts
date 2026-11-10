@@ -104,13 +104,14 @@ describe('ColumnEncryptionCipher', function() {
       }
     });
 
-    it('decrypts values around the length up to which blocks are decrypted one by one', function() {
-      // Verified against a decryption that does not go through the cipher.
+    it('decrypts values the same way a cipher of their own does', function() {
       const encryptionKey = crypto.createHmac('sha256', columnEncryptionKey)
         .update('Microsoft SQL Server cell encryption key with encryption algorithm:AEAD_AES_256_CBC_HMAC_SHA256 and key length:256', 'utf16le')
         .digest();
 
-      for (let length = 990; length <= 1050; length++) {
+      // Values of various lengths, one after the other: all of them are
+      // decrypted by the same cipher.
+      for (const length of [0, 1, 15, 16, 17, 100, 1000, 1023, 1024, 1025, 4095, 4096, 4097, 5000, 3, 70000, 16]) {
         const value = crypto.randomBytes(length);
         const cell = cipher.encrypt(value, false);
 
@@ -119,6 +120,53 @@ describe('ColumnEncryptionCipher', function() {
 
         assert.deepEqual(cipher.decrypt(cell), value, `value of ${length} bytes`);
       }
+    });
+
+    it('computes the same authentication tag as an `Hmac` does', function() {
+      const macKey = crypto.createHmac('sha256', columnEncryptionKey)
+        .update('Microsoft SQL Server cell MAC key with encryption algorithm:AEAD_AES_256_CBC_HMAC_SHA256 and key length:256', 'utf16le')
+        .digest();
+      const ivKey = crypto.createHmac('sha256', columnEncryptionKey)
+        .update('Microsoft SQL Server cell IV key with encryption algorithm:AEAD_AES_256_CBC_HMAC_SHA256 and key length:256', 'utf16le')
+        .digest();
+
+      // Including the lengths around which short and long messages are
+      // told apart.
+      for (const length of [0, 1, 15, 16, 31, 32, 100, 4000, 4060, 4061, 4062, 4063, 4064, 4070, 4080, 4094, 4095, 4096, 4097, 4100, 10000, 20]) {
+        const value = crypto.randomBytes(length);
+        const cell = cipher.encrypt(value, true);
+
+        const mac = crypto.createHmac('sha256', macKey).update(Buffer.from([0x01])).update(cell.subarray(33)).update(Buffer.from([0x01])).digest();
+        assert.deepEqual(cell.subarray(1, 33), mac, `value of ${length} bytes`);
+
+        const iv = crypto.createHmac('sha256', ivKey).update(value).digest().subarray(0, 16);
+        assert.deepEqual(cell.subarray(33, 49), iv, `value of ${length} bytes`);
+
+        assert.deepEqual(cipher.decrypt(cell), value, `value of ${length} bytes`);
+      }
+    });
+
+    it('decrypts with several ciphers in turn', function() {
+      const other = new ColumnEncryptionCipher(crypto.randomBytes(32));
+
+      for (let i = 0; i < 50; i++) {
+        const first = crypto.randomBytes(i * 7);
+        const second = crypto.randomBytes(i * 3);
+
+        const firstCell = cipher.encrypt(first, i % 2 === 0);
+        const secondCell = other.encrypt(second, i % 2 === 1);
+
+        assert.deepEqual(other.decrypt(secondCell), second);
+        assert.deepEqual(cipher.decrypt(firstCell), first);
+      }
+    });
+
+    it('keeps decrypting after a cell was rejected', function() {
+      const tampered = Buffer.from(deterministic.cell);
+      tampered[tampered.length - 1] ^= 0x01;
+
+      assert.throws(() => cipher.decrypt(tampered), 'The encrypted value has an invalid authentication tag.');
+      assert.deepEqual(cipher.decrypt(deterministic.cell), deterministic.plaintext);
     });
 
     it('decrypts large values', function() {
