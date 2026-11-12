@@ -25,7 +25,7 @@ jobs:
       # Findings are uploaded to the repository's code scanning alerts. The
       # job itself only fails on internal errors, not on findings.
       - name: Run zizmor
-        uses: zizmorcore/zizmor-action@v0.6.4
+        uses: zizmorcore/zizmor-action@v0.8.1
         with:
           # `.gitignore` ignores all dotfiles, so collecting from `.` (the
           # default) finds nothing. Point zizmor at `.github` directly.
