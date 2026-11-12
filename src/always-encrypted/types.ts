@@ -104,9 +104,26 @@ export interface EncryptedColumnEncryptionKey {
  * Describes a column encryption key.
  */
 export interface ColumnEncryptionKeyInfo {
+  /**
+   * The id of the database that the key is defined in.
+   */
   databaseId: number;
+
+  /**
+   * The id of the key in its database, the `column_encryption_key_id` of
+   * `sys.column_encryption_keys`.
+   */
   keyId: number;
+
+  /**
+   * The version of the key. Reserved by the server, always `1` so far.
+   */
   keyVersion: number;
+
+  /**
+   * The version of the key's metadata: an opaque value of 8 bytes, which
+   * is passed back to the server along with encrypted parameters.
+   */
   metadataVersion: Buffer;
 
   /**
@@ -133,6 +150,13 @@ export interface ColumnEncryptionKeyInfo {
   error?: Error | undefined;
 }
 
+/**
+ * How the values of a column are encrypted.
+ *
+ * - `'deterministic'`: equal values are encrypted to equal ciphertexts,
+ *   which allows the server to look up, join and group by them.
+ * - `'randomized'`: each value is encrypted to a different ciphertext.
+ */
 export type EncryptionType = 'deterministic' | 'randomized';
 
 /**
@@ -146,6 +170,9 @@ export interface CryptoMetadata {
    */
   key: ColumnEncryptionKeyInfo | undefined;
 
+  /**
+   * Whether equal values are encrypted to equal ciphertexts.
+   */
   encryptionType: EncryptionType;
 
   /**
@@ -158,6 +185,10 @@ export interface CryptoMetadata {
    */
   algorithmName: string | undefined;
 
+  /**
+   * The version of the rules that values are brought into the form by
+   * that is encrypted. `1` is the only version there is.
+   */
   normalizationRuleVersion: number;
 
   /**

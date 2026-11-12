@@ -555,13 +555,21 @@ export interface ConnectionOptions {
    * This (and encryption in general) can be controlled per request via
    * {@link RequestOptions.columnEncryption}.
    *
-   * To be encrypted, the type of a parameter needs to match the type of
-   * the encrypted column it targets - the server is not able to convert
-   * encrypted values. Bulk loads, table-valued parameters and values that
-   * are read from a stream are sent as they are, and secure enclaves are
-   * not supported.
+   * To be encrypted, the type of a parameter (including its precision and
+   * scale) needs to match the type of the encrypted column it targets -
+   * the server is not able to convert encrypted values. Its length may not
+   * be longer than that of the column. Bulk loads, table-valued parameters
+   * and values that are read from a stream are sent as they are, and
+   * secure enclaves are not supported.
    *
-   * Requires TDS 7.4 and SQL Server 2016 or later.
+   * A request that fails to encrypt its parameters or to decrypt its
+   * results (e.g. because a key store can not be accessed) is completed
+   * with a {@link RequestError} whose `code` is `'ECOLUMNENCRYPTION'`. The
+   * connection can still be used afterwards.
+   *
+   * Requires TDS 7.4 and SQL Server 2016 or later. Connecting fails with a
+   * {@link ConnectionError} whose `code` is `'ECOLUMNENCRYPTION'` if the
+   * server does not support Always Encrypted.
    *
    * (default: `undefined`, Always Encrypted is not used)
    */

@@ -177,6 +177,11 @@ class Request extends EventEmitter {
    * An array like object, where the columns can be accessed either by index
    * or name. Columns with a name that is an integer are not accessible by name,
    * as it would be interpreted as an array index.
+   *
+   * A column that is encrypted using Always Encrypted (see
+   * {@link ConnectionOptions.columnEncryption}) is described by the type of
+   * its decrypted values. How it is encrypted is described by its
+   * `cryptoMetadata`, a {@link CryptoMetadata}.
    */
   on(
     event: 'columnMetadata',

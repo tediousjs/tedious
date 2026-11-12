@@ -217,13 +217,34 @@ export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
  * `wrapKey` and `sign` are only needed to encrypt new column encryption keys.
  */
 export interface AzureKeyVaultCryptographyClient {
+  /**
+   * Decrypts a column encryption key with the column master key.
+   */
   unwrapKey(algorithm: 'RSA-OAEP', encryptedKey: Uint8Array): Promise<{ result: Uint8Array }>;
+
+  /**
+   * Verifies the signature of an encrypted column encryption key, given
+   * the SHA-256 digest of what was signed.
+   */
   verify(algorithm: 'RS256', digest: Uint8Array, signature: Uint8Array): Promise<{ result: boolean }>;
 
+  /**
+   * Encrypts a column encryption key with the column master key. Only
+   * used by {@link AzureKeyVaultKeyStoreProvider.encryptColumnEncryptionKey}.
+   */
   wrapKey?(algorithm: 'RSA-OAEP', key: Uint8Array): Promise<{ result: Uint8Array }>;
+
+  /**
+   * Signs an encrypted column encryption key, given the SHA-256 digest of
+   * what is to be signed. Only used by
+   * {@link AzureKeyVaultKeyStoreProvider.encryptColumnEncryptionKey}.
+   */
   sign?(algorithm: 'RS256', digest: Uint8Array): Promise<{ result: Uint8Array }>;
 }
 
+/**
+ * The options of an {@link AzureKeyVaultKeyStoreProvider}.
+ */
 export interface AzureKeyVaultKeyStoreProviderOptions {
   /**
    * The domain names column master keys are allowed to be stored at: the
@@ -281,6 +302,10 @@ export class AzureKeyVaultKeyStoreProvider implements ColumnEncryptionKeyStorePr
    *   Creates the client for the key with the given key identifier (the URL
    *   of the key, which is the key path of the column master key). Called
    *   once per key.
+   *
+   * @param options
+   *   Which key vaults the provider is allowed to use, see
+   *   {@link AzureKeyVaultKeyStoreProviderOptions}.
    */
   constructor(createCryptographyClient: (keyId: string) => AzureKeyVaultCryptographyClient, options?: AzureKeyVaultKeyStoreProviderOptions) {
     if (typeof createCryptographyClient !== 'function') {
