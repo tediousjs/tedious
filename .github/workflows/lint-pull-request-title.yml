@@ -10,6 +10,11 @@ on:
       - edited
       - synchronize
 
+concurrency:
+  # A newer event for the same pull request supersedes the older check.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:

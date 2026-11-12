@@ -7,6 +7,13 @@ on:
   pull_request:
     branches: [ "master", "alpha", "beta", "*.x" ]
 
+concurrency:
+  # Pull request runs share a group per PR, so a new push cancels the older
+  # run. Push and scheduled runs get a unique group (the run id), so they are
+  # never cancelled or replaced while queued.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
