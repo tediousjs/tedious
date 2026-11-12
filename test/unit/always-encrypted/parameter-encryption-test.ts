@@ -523,8 +523,35 @@ describe('describeStatement', function() {
 
     assert.deepEqual(describeStatement(request, SP_EXECUTESQL), {
       statement: 'SELECT * FROM patients WHERE ssn = @ssn AND id > @id',
-      declarations: '@ssn char(11), @id int'
+      declarations: '@ssn char(11), @id int',
+      signature: '@ssn Char, @id Int'
     });
+  });
+
+  it('gives statements the same signature whatever the values of their parameters are', function() {
+    const signature = (name: string | null, amount: number | null, at: Date | null) => {
+      const request = requestWith('UPDATE accounts SET name = @name, amount = @amount, at = @at', (request) => {
+        request.addParameter('name', TYPES.NVarChar, name);
+        request.addParameter('amount', TYPES.Decimal, amount);
+        request.addParameter('at', TYPES.DateTime2, at);
+      });
+
+      return describeStatement(request, SP_EXECUTESQL)!;
+    };
+
+    const short = signature('a', 1, new Date());
+    const long = signature('a'.repeat(5000), 1, new Date());
+    const empty = signature(null, null, null);
+
+    // The values make for different declarations ...
+    assert.strictEqual(short.declarations, '@name nvarchar(1), @amount decimal(18, 0), @at datetime2(7)');
+    assert.strictEqual(long.declarations, '@name nvarchar(max), @amount decimal(18, 0), @at datetime2(7)');
+    assert.strictEqual(empty.declarations, '@name nvarchar(1), @amount decimal(1, 0), @at datetime2(0)');
+
+    // ... of the same parameters.
+    assert.strictEqual(short.signature, '@name NVarChar, @amount Decimal, @at DateTime2');
+    assert.strictEqual(long.signature, short.signature);
+    assert.strictEqual(empty.signature, short.signature);
   });
 
   it('describes the call of a stored procedure', function() {
@@ -536,7 +563,8 @@ describe('describeStatement', function() {
 
     assert.deepEqual(describeStatement(request, 'dbo.proc'), {
       statement: 'EXEC dbo.proc @id=@id, @name=@name, @result=@result OUTPUT',
-      declarations: '@id int, @name nvarchar(4), @result int OUTPUT'
+      declarations: '@id int, @name nvarchar(4), @result int OUTPUT',
+      signature: '@id Int, @name NVarChar, @result Int OUTPUT'
     });
   });
 
@@ -550,7 +578,8 @@ describe('describeStatement', function() {
 
     assert.deepEqual(describeStatement(request, 'dbo.proc'), {
       statement: 'EXEC dbo.proc @id=@id',
-      declarations: '@id int'
+      declarations: '@id int',
+      signature: '@id Int'
     });
   });
 
@@ -562,7 +591,8 @@ describe('describeStatement', function() {
 
     assert.deepEqual(describeStatement(request, SP_EXECUTESQL), {
       statement: 'SELECT a FROM @rows WHERE a > @id',
-      declarations: '@rows dbo.IntTable readonly, @id int'
+      declarations: '@rows dbo.IntTable readonly, @id int',
+      signature: '@rows TVP, @id Int'
     });
   });
 
@@ -752,14 +782,14 @@ describe('ParameterEncryptionMetadataCache', function() {
     const first = metadata();
     const second = metadata();
 
-    const key = (statement: string, declarations: string) => ParameterEncryptionMetadataCache.key({ statement, declarations });
+    const key = (statement: string, signature: string) => ParameterEncryptionMetadataCache.key({ statement, signature });
 
-    cache.set(key('SELECT @a', '@a int'), first);
-    cache.set(key('SELECT @a', '@a bigint'), second);
+    cache.set(key('SELECT @a', '@a Int'), first);
+    cache.set(key('SELECT @a', '@a BigInt'), second);
 
-    assert.strictEqual(cache.get(key('SELECT @a', '@a int')), first);
-    assert.strictEqual(cache.get(key('SELECT @a', '@a bigint')), second);
-    assert.isUndefined(cache.get(key('SELECT @b', '@a int')));
+    assert.strictEqual(cache.get(key('SELECT @a', '@a Int')), first);
+    assert.strictEqual(cache.get(key('SELECT @a', '@a BigInt')), second);
+    assert.isUndefined(cache.get(key('SELECT @b', '@a Int')));
   });
 
   it('evicts the least recently used statement once it is full', function() {

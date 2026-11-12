@@ -830,14 +830,68 @@ describe('Always Encrypted', function() {
       await insert(connection, 3);
       assert.strictEqual(counter.count, 1);
 
-      // A different statement, and the same statement with other parameters
+      // A different statement, whatever the length of its parameter is
+      // declared as
       await execSql(connection, `SELECT id FROM ${names.table} WHERE deterministic = @deterministic`, [
         ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }]
       ]);
       await execSql(connection, `SELECT id FROM ${names.table} WHERE deterministic = @deterministic`, [
         ['deterministic', TYPES.NVarChar, 'secret', { length: 20 }]
       ]);
+      assert.strictEqual(counter.count, 2);
+
+      // The same statement with other parameters
+      await execSql(connection, `SELECT id FROM ${names.table} WHERE deterministic = @deterministic`, [
+        ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }],
+        ['unused', TYPES.Int, 1]
+      ]);
       assert.strictEqual(counter.count, 3);
+    });
+
+    it('asks the server only once for values of different lengths', async function() {
+      const counter = countDescribeRequests(connection);
+
+      // The length of a parameter that is not specified is that of its
+      // value, which the parameter is declared with.
+      const values = ['a', 'secret', 'x'.repeat(50), ''];
+      for (const [id, value] of values.entries()) {
+        await execSql(connection, `INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`, [
+          ['id', TYPES.Int, id],
+          ['deterministic', TYPES.NVarChar, value]
+        ]);
+      }
+
+      assert.strictEqual(counter.count, 1);
+
+      const { rows } = await execSqlBatch(connection, `SELECT deterministic FROM ${names.table} ORDER BY id`);
+      assert.deepEqual(rows, values.map((value) => [value]));
+    });
+
+    it('leaves it to the server to reject values that do not fit the column of a known statement', async function() {
+      const counter = countDescribeRequests(connection);
+      const insertValue = (id: number, value: string) => {
+        return execSql(connection, `INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`, [
+          ['id', TYPES.Int, id],
+          ['deterministic', TYPES.NVarChar, value]
+        ]);
+      };
+
+      await insertValue(1, 'secret');
+      assert.strictEqual(counter.count, 1);
+
+      // The server is not asked about the statement again, but refuses a
+      // parameter that is longer than the column.
+      const error = await rejection(insertValue(2, 'x'.repeat(51)));
+      const [serverError] = error.errors ?? [error];
+      assert.strictEqual(serverError.code, 'EREQUEST');
+      assert.match(serverError.message, /Operand type clash: nvarchar\(51\) encrypted with/);
+      assert.strictEqual(counter.count, 1);
+
+      await insertValue(3, 'another secret');
+      assert.strictEqual(counter.count, 2);
+
+      const { rows } = await execSqlBatch(connection, `SELECT id, deterministic FROM ${names.table} ORDER BY id`);
+      assert.deepEqual(rows, [[1, 'secret'], [3, 'another secret']]);
     });
 
     it('does not ask the server for statements without parameters', async function() {

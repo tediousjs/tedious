@@ -74,8 +74,9 @@ Column master keys are accessed through key store providers:
 Things to know:
 
 - Requires TDS 7.4 and SQL Server 2016 or later.
-- The type of a parameter (including its length, precision and scale) needs to match the type of the encrypted column it targets, as
-  the server is not able to convert encrypted values.
+- The type of a parameter (including its precision and scale) needs to match the type of the encrypted column it targets, as the
+  server is not able to convert encrypted values. Its length may not be longer than that of the column. A length that is not
+  specified is that of the value.
 - Before a request with parameters is executed for the first time, the server is asked which of its parameters need to be encrypted.
   Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
 - The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make

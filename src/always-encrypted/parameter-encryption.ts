@@ -58,6 +58,18 @@ export interface DescribedStatement {
    * `sp_executesql`.
    */
   declarations: string;
+
+  /**
+   * The names and types of the statement's parameters, without their
+   * lengths, precisions and scales.
+   *
+   * Together with the statement, this is what the server's answer is
+   * remembered by. How the parameters are declared beyond that does not
+   * change the answer, only whether the server accepts the statement at
+   * all - and lengths that are not specified are those of the values, so
+   * the server would be asked again for each length of a string.
+   */
+  signature: string;
 }
 
 /**
@@ -76,7 +88,7 @@ export function describeStatement(request: Request, procedure: string | number):
       return undefined;
     }
 
-    return { statement: request.sqlTextOrProcedure!, declarations: request.makeParamsParameter(request.parameters) };
+    return describedStatement(request, request.sqlTextOrProcedure!, request.parameters);
   }
 
   // Table-valued parameters are left out of the call: they can not be
@@ -91,14 +103,22 @@ export function describeStatement(request: Request, procedure: string | number):
     return `@${parameter.name}=@${parameter.name}${parameter.output ? ' OUTPUT' : ''}`;
   });
 
-  return { statement: `EXEC ${procedure} ${args.join(', ')}`, declarations: request.makeParamsParameter(parameters) };
+  return describedStatement(request, `EXEC ${procedure} ${args.join(', ')}`, parameters);
+}
+
+function describedStatement(request: Request, statement: string, parameters: Parameter[]): DescribedStatement {
+  const signature = parameters.map((parameter) => {
+    return `@${parameter.name} ${parameter.type.name}${parameter.output ? ' OUTPUT' : ''}`;
+  });
+
+  return { statement, declarations: request.makeParamsParameter(parameters), signature: signature.join(', ') };
 }
 
 /**
  * Creates the request that asks the server how the parameters of a
  * statement need to be encrypted.
  */
-export function createDescribeRequest({ statement, declarations }: DescribedStatement, callback: (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => void): Request {
+export function createDescribeRequest({ statement, declarations }: Pick<DescribedStatement, 'statement' | 'declarations'>, callback: (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => void): Request {
   const resultSets: Row[][] = [];
 
   // The result sets do not contain any encrypted values, and the parameters
@@ -208,8 +228,8 @@ export class ParameterEncryptionMetadataCache {
     this.entries = new Map();
   }
 
-  static key({ statement, declarations }: DescribedStatement): string {
-    return `${statement}\n${declarations}`;
+  static key({ statement, signature }: Pick<DescribedStatement, 'statement' | 'signature'>): string {
+    return `${statement}\n${signature}`;
   }
 
   get(key: string): ParameterEncryptionMetadata | undefined {
