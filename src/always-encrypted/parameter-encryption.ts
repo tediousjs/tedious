@@ -60,16 +60,20 @@ export interface DescribedStatement {
   declarations: string;
 
   /**
-   * The names and types of the statement's parameters, without their
-   * lengths, precisions and scales.
+   * The names of the statement's parameters, in an order that does not
+   * depend on the order they were added in.
    *
    * Together with the statement, this is what the server's answer is
-   * remembered by. How the parameters are declared beyond that does not
-   * change the answer, only whether the server accepts the statement at
-   * all - and lengths that are not specified are those of the values, so
-   * the server would be asked again for each length of a string.
+   * remembered by. How the parameters are declared does not change the
+   * answer, only whether the server accepts the statement at all - and
+   * lengths that are not specified are those of the values, so the server
+   * would be asked again for each length of a string.
+   *
+   * The names are needed, though: they are not given by the statement
+   * (`@Name` is the `@name` of a statement to a server that ignores case),
+   * and a parameter that the answer does not cover is sent as it is.
    */
-  signature: string;
+  parameterNames: string;
 }
 
 /**
@@ -107,11 +111,9 @@ export function describeStatement(request: Request, procedure: string | number):
 }
 
 function describedStatement(request: Request, statement: string, parameters: Parameter[]): DescribedStatement {
-  const signature = parameters.map((parameter) => {
-    return `@${parameter.name} ${parameter.type.name}${parameter.output ? ' OUTPUT' : ''}`;
-  });
+  const parameterNames = parameters.map((parameter) => `@${parameter.name}`).sort().join(', ');
 
-  return { statement, declarations: request.makeParamsParameter(parameters), signature: signature.join(', ') };
+  return { statement, declarations: request.makeParamsParameter(parameters), parameterNames };
 }
 
 /**
@@ -228,8 +230,8 @@ export class ParameterEncryptionMetadataCache {
     this.entries = new Map();
   }
 
-  static key({ statement, signature }: Pick<DescribedStatement, 'statement' | 'signature'>): string {
-    return `${statement}\n${signature}`;
+  static key({ statement, parameterNames }: Pick<DescribedStatement, 'statement' | 'parameterNames'>): string {
+    return `${statement}\n${parameterNames}`;
   }
 
   get(key: string): ParameterEncryptionMetadata | undefined {

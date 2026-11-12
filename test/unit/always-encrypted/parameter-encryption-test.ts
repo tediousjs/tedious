@@ -544,34 +544,52 @@ describe('describeStatement', function() {
     assert.deepEqual(describeStatement(request, SP_EXECUTESQL), {
       statement: 'SELECT * FROM patients WHERE ssn = @ssn AND id > @id',
       declarations: '@ssn char(11), @id int',
-      signature: '@ssn Char, @id Int'
+      parameterNames: '@id, @ssn'
     });
   });
 
-  it('gives statements the same signature whatever the values of their parameters are', function() {
-    const signature = (name: string | null, amount: number | null, at: Date | null) => {
-      const request = requestWith('UPDATE accounts SET name = @name, amount = @amount, at = @at', (request) => {
-        request.addParameter('name', TYPES.NVarChar, name);
-        request.addParameter('amount', TYPES.Decimal, amount);
-        request.addParameter('at', TYPES.DateTime2, at);
-      });
-
-      return describeStatement(request, SP_EXECUTESQL)!;
+  it('names the parameters of a statement regardless of how they are declared', function() {
+    const describe = (configure: (request: Request) => void) => {
+      return describeStatement(requestWith('UPDATE accounts SET name = @name, amount = @amount, at = @at', configure), SP_EXECUTESQL)!;
     };
 
-    const short = signature('a', 1, new Date());
-    const long = signature('a'.repeat(5000), 1, new Date());
-    const empty = signature(null, null, null);
+    const short = describe((request) => {
+      request.addParameter('name', TYPES.NVarChar, 'a');
+      request.addParameter('amount', TYPES.Decimal, 1);
+      request.addParameter('at', TYPES.DateTime2, new Date());
+    });
 
-    // The values make for different declarations ...
+    // Other values make for other lengths, precisions and scales, ...
+    const long = describe((request) => {
+      request.addParameter('name', TYPES.NVarChar, 'a'.repeat(5000));
+      request.addParameter('amount', TYPES.Decimal, null);
+      request.addParameter('at', TYPES.DateTime2, null);
+    });
+
+    // ... and parameters can be of other types, and be added in another
+    // order.
+    const other = describe((request) => {
+      request.addOutputParameter('at', TYPES.DateTimeOffset);
+      request.addParameter('amount', TYPES.Int, 1);
+      request.addParameter('name', TYPES.VarChar, 'a');
+    });
+
     assert.strictEqual(short.declarations, '@name nvarchar(1), @amount decimal(18, 0), @at datetime2(7)');
-    assert.strictEqual(long.declarations, '@name nvarchar(max), @amount decimal(18, 0), @at datetime2(7)');
-    assert.strictEqual(empty.declarations, '@name nvarchar(1), @amount decimal(1, 0), @at datetime2(0)');
+    assert.strictEqual(long.declarations, '@name nvarchar(max), @amount decimal(1, 0), @at datetime2(0)');
+    assert.strictEqual(other.declarations, '@at datetimeoffset(7) OUTPUT, @amount int, @name varchar(1)');
 
-    // ... of the same parameters.
-    assert.strictEqual(short.signature, '@name NVarChar, @amount Decimal, @at DateTime2');
-    assert.strictEqual(long.signature, short.signature);
-    assert.strictEqual(empty.signature, short.signature);
+    assert.strictEqual(short.parameterNames, '@amount, @at, @name');
+    assert.strictEqual(long.parameterNames, short.parameterNames);
+    assert.strictEqual(other.parameterNames, short.parameterNames);
+  });
+
+  it('tells apart parameters whose names only differ by case', function() {
+    const describe = (name: string) => {
+      return describeStatement(requestWith('SELECT @name', (request) => request.addParameter(name, TYPES.Int, 1)), SP_EXECUTESQL)!;
+    };
+
+    // Whether these are the same parameter is up to the server.
+    assert.notStrictEqual(describe('name').parameterNames, describe('Name').parameterNames);
   });
 
   it('describes the call of a stored procedure', function() {
@@ -584,7 +602,7 @@ describe('describeStatement', function() {
     assert.deepEqual(describeStatement(request, 'dbo.proc'), {
       statement: 'EXEC dbo.proc @id=@id, @name=@name, @result=@result OUTPUT',
       declarations: '@id int, @name nvarchar(4), @result int OUTPUT',
-      signature: '@id Int, @name NVarChar, @result Int OUTPUT'
+      parameterNames: '@id, @name, @result'
     });
   });
 
@@ -599,7 +617,7 @@ describe('describeStatement', function() {
     assert.deepEqual(describeStatement(request, 'dbo.proc'), {
       statement: 'EXEC dbo.proc @id=@id',
       declarations: '@id int',
-      signature: '@id Int'
+      parameterNames: '@id'
     });
   });
 
@@ -612,7 +630,7 @@ describe('describeStatement', function() {
     assert.deepEqual(describeStatement(request, SP_EXECUTESQL), {
       statement: 'SELECT a FROM @rows WHERE a > @id',
       declarations: '@rows dbo.IntTable readonly, @id int',
-      signature: '@rows TVP, @id Int'
+      parameterNames: '@id, @rows'
     });
   });
 
@@ -802,14 +820,14 @@ describe('ParameterEncryptionMetadataCache', function() {
     const first = metadata();
     const second = metadata();
 
-    const key = (statement: string, signature: string) => ParameterEncryptionMetadataCache.key({ statement, signature });
+    const key = (statement: string, parameterNames: string) => ParameterEncryptionMetadataCache.key({ statement, parameterNames });
 
-    cache.set(key('SELECT @a', '@a Int'), first);
-    cache.set(key('SELECT @a', '@a BigInt'), second);
+    cache.set(key('SELECT @a', '@a'), first);
+    cache.set(key('SELECT @a', '@a, @b'), second);
 
-    assert.strictEqual(cache.get(key('SELECT @a', '@a Int')), first);
-    assert.strictEqual(cache.get(key('SELECT @a', '@a BigInt')), second);
-    assert.isUndefined(cache.get(key('SELECT @b', '@a Int')));
+    assert.strictEqual(cache.get(key('SELECT @a', '@a')), first);
+    assert.strictEqual(cache.get(key('SELECT @a', '@a, @b')), second);
+    assert.isUndefined(cache.get(key('SELECT @b', '@a')));
   });
 
   it('evicts the least recently used statement once it is full', function() {

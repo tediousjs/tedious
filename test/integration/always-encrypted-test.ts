@@ -867,6 +867,49 @@ describe('Always Encrypted', function() {
       assert.deepEqual(rows, values.map((value) => [value]));
     });
 
+    it('asks the server only once for parameters of other types and in another order', async function() {
+      const counter = countDescribeRequests(connection);
+      const sql = `INSERT INTO ${names.table} (id, plain, deterministic) VALUES (@id, @plain, @deterministic)`;
+
+      await execSql(connection, sql, [
+        ['id', TYPES.Int, 1],
+        ['plain', TYPES.NVarChar, 'plain'],
+        ['deterministic', TYPES.NVarChar, 'secret']
+      ]);
+
+      // The types of parameters that are derived from values differ from
+      // one value to the next.
+      await execSql(connection, sql, [
+        ['deterministic', TYPES.NVarChar, null],
+        ['plain', TYPES.VarChar, 'plain'],
+        ['id', TYPES.BigInt, 2]
+      ]);
+
+      assert.strictEqual(counter.count, 1);
+
+      const { rows } = await execSqlBatch(connection, `SELECT id, plain, deterministic FROM ${names.table} ORDER BY id`);
+      assert.deepEqual(rows, [[1, 'plain', 'secret'], [2, 'plain', null]]);
+    });
+
+    it('leaves it to the server to reject parameters of a type that does not fit the column of a known statement', async function() {
+      const counter = countDescribeRequests(connection);
+      const sql = `INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`;
+
+      await execSql(connection, sql, [['id', TYPES.Int, 1], ['deterministic', TYPES.NVarChar, 'secret']]);
+      assert.strictEqual(counter.count, 1);
+
+      // The value is encrypted as the server asked for, but is not of the
+      // type of the column.
+      const error = await rejection(execSql(connection, sql, [['id', TYPES.Int, 2], ['deterministic', TYPES.Int, 42]]));
+      const [serverError] = error.errors ?? [error];
+      assert.strictEqual(serverError.code, 'EREQUEST');
+      assert.match(serverError.message, /Operand type clash: int encrypted with/);
+      assert.strictEqual(counter.count, 1);
+
+      const { rows } = await execSqlBatch(connection, `SELECT id, deterministic FROM ${names.table} ORDER BY id`);
+      assert.deepEqual(rows, [[1, 'secret']]);
+    });
+
     it('leaves it to the server to reject values that do not fit the column of a known statement', async function() {
       const counter = countDescribeRequests(connection);
       const insertValue = (id: number, value: string) => {

@@ -47,6 +47,9 @@ export interface ColumnEncryptionOptions {
    * encryption metadata of, which saves asking the server for it each time
    * such a statement is executed. `0` disables the cache.
    *
+   * A statement is remembered by its text and the names of its parameters,
+   * whatever their types and values are.
+   *
    * (default: `1000`)
    */
   parameterMetadataCacheSize?: number | undefined;
