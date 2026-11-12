@@ -853,7 +853,7 @@ describe('Always Encrypted', function() {
 
       // The length of a parameter that is not specified is that of its
       // value, which the parameter is declared with.
-      const values = ['a', 'secret', 'x'.repeat(50), ''];
+      const values = ['a', 'secret', 'x'.repeat(50), '', null];
       for (const [id, value] of values.entries()) {
         await execSql(connection, `INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`, [
           ['id', TYPES.Int, id],

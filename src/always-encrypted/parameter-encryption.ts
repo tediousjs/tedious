@@ -297,11 +297,26 @@ export function encryptParameters(
         ciphers.set(resolved.name, cipher);
       }
 
-      return encryptParameter(resolved, cryptoMetadata, cipher, options);
+      return encryptParameter(withDeclaredLength(resolved, parameters[index]), cryptoMetadata, cipher, options);
     } catch (error: any) {
       throw new Error(`Failed to encrypt the parameter "${resolved.name}": ${error.message}`, { cause: error });
     }
   });
+}
+
+/**
+ * The server is told the type of each value that was encrypted, which has
+ * to fit the column like the type that the parameter is declared with does.
+ *
+ * A `null` whose length is not specified is declared with a length of 1,
+ * but resolved to the maximum length of its type - longer than most columns.
+ */
+function withDeclaredLength(resolved: ResolvedParameter, parameter: Parameter): ResolvedParameter {
+  if (resolved.data.length === undefined || parameter.length || parameter.value !== null || parameter.output) {
+    return resolved;
+  }
+
+  return { ...resolved, data: { ...resolved.data, length: 1 } };
 }
 
 function encryptParameter(parameter: ResolvedParameter, cryptoMetadata: ParameterCryptoMetadata, cipher: ColumnEncryptionCipher, options: InternalConnectionOptions): ResolvedParameter {

@@ -437,6 +437,26 @@ describe('encryptParameters', function() {
       assert.strictEqual((await payload([encrypted])).toString('hex'), expected.data.toString('hex'));
     });
 
+    it('describes a `null` without a length by the type that it is declared with', function() {
+      const cipherInfoOf = (type: DataType, parameterOptions?: ParameterOptions) => {
+        return (encrypt(type, null, parameterOptions).data as any).cipherInfo.toString('hex');
+      };
+
+      for (const type of [TYPES.NVarChar, TYPES.VarChar, TYPES.NChar, TYPES.Char, TYPES.VarBinary, TYPES.Binary]) {
+        // Declared with a length of 1, not with the maximum length of the
+        // type that the parameter is resolved to: no column is too short
+        // for that.
+        assert.strictEqual(cipherInfoOf(type), cipherInfoOf(type, { length: 1 }), type.name);
+        assert.notStrictEqual(cipherInfoOf(type), cipherInfoOf(type, { length: type.maximumLength }), type.name);
+
+        // An output parameter is declared with the maximum length.
+        assert.strictEqual(cipherInfoOf(type, { output: true }), cipherInfoOf(type, { output: true, length: type.maximumLength }), type.name);
+
+        // A length that is specified is kept.
+        assert.notStrictEqual(cipherInfoOf(type, { length: 20 }), cipherInfoOf(type, { length: 1 }), type.name);
+      }
+    });
+
     it('sends an encrypted output parameter by reference', async function() {
       const parameters = [parameter('value', TYPES.Int, null, { output: true })];
       const resolved = parameters.map((parameter) => resolveParameter(parameter, collation, options));
