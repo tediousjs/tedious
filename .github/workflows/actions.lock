@@ -4,70 +4,70 @@
 version: 'v0.0.3'
 workflows:
     '.github/workflows/claude-code-review.yml':
-        - 'actions/checkout@v6.1.0'
-        - 'anthropics/claude-code-action@v1.0.249'
+        - 'actions/checkout@v7.0.1'
+        - 'anthropics/claude-code-action@v1.0.268'
     '.github/workflows/claude.yml':
-        - 'actions/checkout@v6.1.0'
-        - 'anthropics/claude-code-action@v1.0.249'
+        - 'actions/checkout@v7.0.1'
+        - 'anthropics/claude-code-action@v1.0.268'
     '.github/workflows/codeql-analysis.yml':
-        - 'actions/checkout@v6.1.0'
-        - 'github/codeql-action@v4.38.3'
+        - 'actions/checkout@v7.0.1'
+        - 'github/codeql-action@v4.39.3'
     '.github/workflows/lint-pull-request-title.yml':
-        - 'amannn/action-semantic-pull-request@v6.1.1'
+        - 'amannn/action-semantic-pull-request@v6.1.2'
     '.github/workflows/nodejs.yml':
-        - 'actions/checkout@v6.1.0'
-        - 'actions/setup-node@v6.5.0'
-        - 'codecov/codecov-action@v5.5.5'
+        - 'actions/checkout@v7.0.1'
+        - 'actions/setup-node@v7.1.0'
+        - 'codecov/codecov-action@v7.1.1'
         - 'tediousjs/setup-sqlserver@v4.1.1'
     '.github/workflows/release.yml':
-        - 'actions/checkout@v6.1.0'
-        - 'actions/setup-node@v6.5.0'
+        - 'actions/checkout@v7.0.1'
+        - 'actions/setup-node@v7.1.0'
     '.github/workflows/zizmor.yml':
-        - 'actions/checkout@v6.1.0'
+        - 'actions/checkout@v7.0.1'
         - 'zizmorcore/zizmor-action@v0.8.1'
 dependencies:
-    'actions/checkout@v6.1.0':
-        ref: 'v6.1.0'
-        commit: 'sha1-d23441a48e516b6c34aea4fa41551a30e30af803'
+    'actions/checkout@v7.0.1':
+        ref: 'v7.0.1'
+        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea':
-        ref: 'v7.0.1'
-        commit: 'sha1-60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+    'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd':
+        ref: 'v8.0.0'
+        commit: 'sha1-ed597411d8f924073f98dfc5c65a23a2325f34cd'
         owner_id: 44036562
         repo_id: 205262760
-    'actions/setup-node@v6.5.0':
-        ref: 'v6.5.0'
-        commit: 'sha1-249970729cb0ef3589644e2896645e5dc5ba9c38'
+    'actions/setup-node@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-949feb2413d6458794dcd2491c4babbbce0c15c1'
         owner_id: 44036562
         repo_id: 189476904
-    'amannn/action-semantic-pull-request@v6.1.1':
-        ref: 'v6.1.1'
-        commit: 'sha1-48f256284bd46cdaab1048c3721360e808335d50'
+    'amannn/action-semantic-pull-request@v6.1.2':
+        ref: 'v6.1.2'
+        commit: 'sha1-2252a14e810aa9b85c2d560bd7070c802206ecf6'
         owner_id: 4038316
         repo_id: 220418983
-    'anthropics/claude-code-action@v1.0.249':
-        ref: 'v1.0.249'
-        commit: 'sha1-34968b5981d5d170904281aa3df6f3c0d4a28855'
+    'anthropics/claude-code-action@v1.0.268':
+        ref: 'v1.0.268'
+        commit: 'sha1-c0949c50a78c1ec8ce2647db36629b870e715d0c'
         owner_id: 76263028
         repo_id: 986421638
         uses:
             - 'oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6'
-    'codecov/codecov-action@v5.5.5':
-        ref: 'v5.5.5'
-        commit: 'sha1-0fb7174895f61a3b6b78fc075e0cd60383518dac'
+    'codecov/codecov-action@v7.1.1':
+        ref: 'v7.1.1'
+        commit: 'sha1-303a32d7a59b442fa8d48b6a1cc6825c09c847a5'
         owner_id: 8226205
         repo_id: 200299178
         uses:
-            - 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+            - 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd'
     'github/codeql-action@9b3254085494b55a0f7c4c2b3d2d52cc712ce370':
         ref: 'v4.39.1'
         commit: 'sha1-9b3254085494b55a0f7c4c2b3d2d52cc712ce370'
         owner_id: 9919
         repo_id: 259445878
-    'github/codeql-action@v4.38.3':
-        ref: 'v4.38.3'
-        commit: 'sha1-24c54180a607b1449ed407dd24f251e4e9147c8d'
+    'github/codeql-action@v4.39.3':
+        ref: 'v4.39.3'
+        commit: 'sha1-33d7b85da1a04171e211befe2c739303b9a4c066'
         owner_id: 9919
         repo_id: 259445878
     'oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6':
