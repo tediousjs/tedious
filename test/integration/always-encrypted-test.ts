@@ -226,9 +226,11 @@ describe('Always Encrypted', function() {
     rotatedCmk: `tedious_cmk2_${suffix}`,
     cek: `tedious_cek_${suffix}`,
     rotatedCek: `tedious_cek2_${suffix}`,
+    retiredCek: `tedious_cek3_${suffix}`,
     table: `tedious_ae_${suffix}`,
     typesTable: `tedious_ae_types_${suffix}`,
     rotatedTable: `tedious_ae_rotated_${suffix}`,
+    retiredTable: `tedious_ae_retired_${suffix}`,
     procedure: `tedious_ae_proc_${suffix}`
   };
 
@@ -880,6 +882,101 @@ describe('Always Encrypted', function() {
 
       await insert(connection, 2);
       assert.strictEqual(counter.count, 2);
+    });
+
+    it('asks the server again once the column master key of a statement was retired', async function() {
+      // The column encryption key is protected by the first column master
+      // key, which it is rotated away from below.
+      const columnEncryptionKey = randomBytes(32);
+      const encryptedKey = await provider.encryptColumnEncryptionKey(keyPath, 'RSA_OAEP', columnEncryptionKey);
+      const rotatedEncryptedKey = await provider.encryptColumnEncryptionKey(rotatedKeyPath, 'RSA_OAEP', columnEncryptionKey);
+
+      await execSqlBatch(setupConnection!, `CREATE COLUMN ENCRYPTION KEY ${names.retiredCek} WITH VALUES (COLUMN_MASTER_KEY = ${names.cmk}, ALGORITHM = 'RSA_OAEP', ENCRYPTED_VALUE = 0x${encryptedKey.toString('hex')})`);
+      cleanup.unshift(`DROP COLUMN ENCRYPTION KEY ${names.retiredCek}`);
+
+      await execSqlBatch(setupConnection!, `CREATE TABLE ${names.retiredTable} (id int NOT NULL, value int ${encrypted(names.retiredCek, 'DETERMINISTIC')} NULL)`);
+      cleanup.unshift(`DROP TABLE ${names.retiredTable}`);
+
+      // A key store that the first column master key is removed from. Keys
+      // are not cached, like after the lifetime of the key cache passed.
+      const retired = new Set<string>();
+      const keyStore: ColumnEncryptionKeyStoreProvider = {
+        async decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey) {
+          if (retired.has(masterKeyPath.toLowerCase())) {
+            throw new Error(`the key store does not have the key "${masterKeyPath}" anymore`);
+          }
+
+          return await provider.decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey);
+        }
+      };
+
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: keyStore }, keyCacheTTL: 0 } });
+
+      try {
+        const counter = countDescribeRequests(connection);
+        const insertValue = (id: number) => {
+          return execSql(connection, `INSERT INTO ${names.retiredTable} (id, value) VALUES (@id, @value)`, [['id', TYPES.Int, id], ['value', TYPES.Int, 42]]);
+        };
+
+        await insertValue(1);
+        assert.strictEqual(counter.count, 1);
+
+        await execSqlBatch(setupConnection!, `ALTER COLUMN ENCRYPTION KEY ${names.retiredCek} ADD VALUE (COLUMN_MASTER_KEY = ${names.rotatedCmk}, ALGORITHM = 'RSA_OAEP', ENCRYPTED_VALUE = 0x${rotatedEncryptedKey.toString('hex')})`);
+        await execSqlBatch(setupConnection!, `ALTER COLUMN ENCRYPTION KEY ${names.retiredCek} DROP VALUE (COLUMN_MASTER_KEY = ${names.cmk})`);
+        retired.add(keyPath.toLowerCase());
+
+        // What the connection remembers of the statement refers to the
+        // column master key that is gone.
+        await insertValue(2);
+        assert.strictEqual(counter.count, 2);
+
+        await insertValue(3);
+        assert.strictEqual(counter.count, 2);
+
+        const { rows } = await execSqlBatch(connection, `SELECT id, value FROM ${names.retiredTable} ORDER BY id`);
+        assert.deepEqual(rows, [[1, 42], [2, 42], [3, 42]]);
+      } finally {
+        await close(connection);
+      }
+    });
+
+    it('asks the server only once more if the keys of a statement can not be decrypted', async function() {
+      let available = true;
+      const keyStore: ColumnEncryptionKeyStoreProvider = {
+        async decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey) {
+          if (!available) {
+            throw new Error('the key store is not available');
+          }
+
+          return await provider.decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey);
+        }
+      };
+
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: keyStore }, keyCacheTTL: 0 } });
+
+      try {
+        const counter = countDescribeRequests(connection);
+
+        await insert(connection, 1);
+        assert.strictEqual(counter.count, 1);
+
+        available = false;
+
+        for (const count of [2, 3]) {
+          const error = await rejection(insert(connection, 2));
+          assert.instanceOf(error, RequestError);
+          assert.strictEqual(error.code, 'ECOLUMNENCRYPTION');
+          assert.match(error.message, /Failed to encrypt the parameters of the request: .*the key store is not available/);
+          assert.strictEqual(counter.count, count);
+        }
+
+        available = true;
+
+        await insert(connection, 2);
+        assert.strictEqual(counter.count, 3);
+      } finally {
+        await close(connection);
+      }
     });
 
     it('fails the request if the server can not describe its statement', async function() {

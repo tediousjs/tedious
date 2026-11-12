@@ -2996,14 +2996,52 @@ class Connection extends EventEmitter {
     };
     request.once('cancel', onCancel);
 
-    // The step before: makes the keys available that the parameters are
+    // The first step: asks the server how it expects the parameters to be
+    // encrypted.
+    const describe = () => {
+      const describeRequest = pending.describeRequest = createDescribeRequest(described, (error, metadata) => {
+        pending.describeRequest = undefined;
+
+        if (error) {
+          return encryptAndSend(error);
+        }
+
+        if (columnEncryption.parameterMetadataCacheSize > 0) {
+          cache.set(cacheKey, metadata!);
+        }
+
+        loadKeys(metadata!, false);
+      });
+
+      describeRequest.setTimeout(request.timeout);
+      this.callProcedure(describeRequest);
+    };
+
+    // The step in between: makes the keys available that the parameters are
     // encrypted with, which only takes time if a key store is involved.
-    const loadKeys = (metadata: ParameterEncryptionMetadata) => {
+    const loadKeys = (metadata: ParameterEncryptionMetadata, cached: boolean) => {
+      const failed = (error: Error) => {
+        if (settled) {
+          return;
+        }
+
+        // What is remembered of a statement includes where the keys of its
+        // parameters are stored. That changes when a column master key is
+        // rotated, so the server is asked again before giving up.
+        if (cached) {
+          clearTimeout(timer);
+          cache.delete(cacheKey);
+          return describe();
+        }
+
+        encryptAndSend(new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+      };
+
       let loading;
       try {
         loading = loadColumnEncryptionKeys(metadata.keys, columnEncryption);
       } catch (error: any) {
-        return encryptAndSend(new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+        return failed(error);
       }
 
       if (loading === undefined) {
@@ -3023,33 +3061,18 @@ class Connection extends EventEmitter {
       loading.then(() => {
         process.nextTick(encryptAndSend, null, metadata);
       }, (error) => {
-        process.nextTick(encryptAndSend, new RequestError(`Failed to encrypt the parameters of the request: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+        process.nextTick(failed, error);
       });
     };
 
-    // The first step: finds out how the server expects the parameters to
-    // be encrypted, by asking it unless it was asked before.
+    // The server is only asked about a statement that it was not asked
+    // about before.
     const metadata = cache.get(cacheKey);
     if (metadata !== undefined) {
-      return loadKeys(metadata);
+      loadKeys(metadata, true);
+    } else {
+      describe();
     }
-
-    const describeRequest = pending.describeRequest = createDescribeRequest(described, (error, metadata) => {
-      pending.describeRequest = undefined;
-
-      if (error) {
-        return encryptAndSend(error);
-      }
-
-      if (columnEncryption.parameterMetadataCacheSize > 0) {
-        cache.set(cacheKey, metadata!);
-      }
-
-      loadKeys(metadata!);
-    });
-
-    describeRequest.setTimeout(request.timeout);
-    this.callProcedure(describeRequest);
   }
 
   /**
