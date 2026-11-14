@@ -14,6 +14,31 @@ import { typeByName as TYPES, type DataType } from '../../src/data-type';
 const connectionOptions = { tdsVersion: '7_2' } as InternalConnectionOptions;
 
 describe('BulkLoad', function() {
+  describe('column metadata', function() {
+    function colMetaData(options: InternalConnectionOptions) {
+      const bulkLoad = new BulkLoad('tmpTestTable', undefined, options, {}, () => {});
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+
+      return bulkLoad.getColMetaData().toString('hex');
+    }
+
+    const TOKEN_TYPE = '81';
+    const COLUMN_COUNT = '0100';
+    const NO_COLUMN_ENCRYPTION_KEYS = '0000';
+
+    // The user type, flags, type and name of the column
+    const COLUMN = ['00000000', '0400', '2604', '02', Buffer.from('id', 'ucs2').toString('hex')].join('');
+
+    it('is made up of the number of columns and the columns', function() {
+      assert.strictEqual(colMetaData({ tdsVersion: '7_4' } as InternalConnectionOptions), TOKEN_TYPE + COLUMN_COUNT + COLUMN);
+      assert.strictEqual(colMetaData({ tdsVersion: '7_4', serverSupportsColumnEncryption: false } as InternalConnectionOptions), TOKEN_TYPE + COLUMN_COUNT + COLUMN);
+    });
+
+    it('includes an empty table of column encryption keys if column encryption was negotiated', function() {
+      assert.strictEqual(colMetaData({ tdsVersion: '7_4', serverSupportsColumnEncryption: true } as InternalConnectionOptions), TOKEN_TYPE + COLUMN_COUNT + NO_COLUMN_ENCRYPTION_KEYS + COLUMN);
+    });
+  });
+
   describe('serialization errors', function() {
     function buildType(overrides: Partial<DataType>): DataType {
       return {

@@ -35,6 +35,56 @@ Node.js is a prerequisite for installing tedious. Once you have installed [Node.
 ## Documentation
 More documentation and code samples are available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
+<a name="always-encrypted"></a>
+## Always Encrypted
+[Always Encrypted](https://learn.microsoft.com/en-us/sql/relational-databases/security/encryption/always-encrypted-database-engine) keeps
+the values of encrypted columns, and the keys that protect them, from being revealed to SQL Server. With the `columnEncryption` option
+set, `tedious` decrypts the values of encrypted columns when they are read, and encrypts the values of the parameters that target
+encrypted columns before they are sent:
+
+```js
+const { Connection, AzureKeyVaultKeyStoreProvider } = require('tedious');
+const { DefaultAzureCredential } = require('@azure/identity');
+const { CryptographyClient } = require('@azure/keyvault-keys');
+
+const credential = new DefaultAzureCredential();
+
+const connection = new Connection({
+  // ...
+  options: {
+    columnEncryption: {
+      // By the name of the key store that the column master keys were created with
+      keyStoreProviders: {
+        AZURE_KEY_VAULT: new AzureKeyVaultKeyStoreProvider((keyId) => new CryptographyClient(keyId, credential))
+      }
+    }
+  }
+});
+```
+
+Column master keys are accessed through key store providers:
+
+- `AzureKeyVaultKeyStoreProvider` for keys stored in Azure Key Vault or Managed HSM. It is given a function that creates the
+  `CryptographyClient` of a key, so `tedious` does not depend on `@azure/keyvault-keys` itself.
+- `RsaKeyStoreProvider` for RSA keys that the application has at hand, e.g. the exported private key of a certificate. It reads the
+  format of the `MSSQL_CERTIFICATE_STORE` and `MSSQL_JAVA_KEYSTORE` key stores.
+- Any object with a `decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey)` method, for other key
+  stores.
+
+Things to know:
+
+- Requires TDS 7.4 and SQL Server 2016 or later.
+- The type of a parameter (including its precision and scale) needs to match the type of the encrypted column it targets, as the
+  server is not able to convert encrypted values. Its length may not be longer than that of the column. A length that is not
+  specified is that of the value.
+- Before a request with parameters is executed for the first time, the server is asked which of its parameters need to be encrypted.
+  Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
+- The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make
+  a request fail instead of sending such a value as it is.
+- Bulk loads, table-valued parameters and values that are read from a stream are not encrypted, and secure enclaves are not supported.
+
+See [`examples/always-encrypted.js`](examples/always-encrypted.js) for a complete example.
+
 <a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.

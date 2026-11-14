@@ -4,7 +4,9 @@ import { RequestError } from './errors';
 
 import Connection, { type InternalConnectionOptions } from './connection';
 import { type Metadata } from './metadata-parser';
-import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/types';
+import { type ColumnEncryptionCipher } from './always-encrypted/cipher';
+import { validateRequestColumnEncryption } from './always-encrypted/options';
+import { type RequestColumnEncryption } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { type ColumnInfo } from './token/token';
 import { Collation } from './collation';
@@ -48,10 +50,38 @@ export interface ParameterOptions {
    * and 0 for `null` values.
    */
   scale?: number;
+
+  /**
+   * Requires the value of the parameter to be encrypted (see
+   * {@link ConnectionOptions.columnEncryption}): the request fails if the
+   * server does not ask for the parameter to be encrypted, instead of
+   * sending the value as it is.
+   *
+   * The server is what tells which parameters target encrypted columns.
+   * Setting this for the parameters that hold sensitive values keeps a
+   * compromised server from getting hold of them by claiming otherwise.
+   */
+  forceEncrypt?: boolean;
 }
 
-interface RequestOptions {
-  statementColumnEncryptionSetting?: SQLServerStatementColumnEncryptionSetting;
+export interface RequestOptions {
+  /**
+   * How the request makes use of Always Encrypted, if it is enabled for
+   * the connection (see {@link ConnectionOptions.columnEncryption}):
+   *
+   * - `'enabled'`: parameters that target encrypted columns are encrypted,
+   *   and the values of encrypted columns are decrypted.
+   * - `'resultSetOnly'`: the values of encrypted columns are decrypted, but
+   *   parameters are sent as they are. This saves asking the server which
+   *   parameters need to be encrypted, for statements whose parameters do
+   *   not target encrypted columns.
+   * - `'disabled'`: parameters are sent as they are, and the values of
+   *   encrypted columns are returned as they are stored: encrypted, as
+   *   `varbinary` values.
+   *
+   * (default: `'enabled'`)
+   */
+  columnEncryption?: 'enabled' | 'resultSetOnly' | 'disabled' | undefined;
 }
 
 /**
@@ -135,8 +165,19 @@ class Request extends EventEmitter {
 
 
   declare shouldHonorAE?: boolean;
-  declare statementColumnEncryptionSetting: SQLServerStatementColumnEncryptionSetting;
-  declare cryptoMetadataLoaded: boolean;
+  /**
+   * @private
+   */
+  declare columnEncryption: RequestColumnEncryption | undefined;
+
+  /**
+   * How the parameters of the current execution were encrypted: the key of
+   * the statement in the connection's cache of parameter encryption
+   * metadata, and the ciphers of the encrypted output parameters by name.
+   *
+   * @private
+   */
+  declare parameterEncryption: { cacheKey: string, ciphers: Map<string, ColumnEncryptionCipher> } | undefined;
 
   /**
    * This event, describing result set columns, will be emitted before row
@@ -146,6 +187,11 @@ class Request extends EventEmitter {
    * An array like object, where the columns can be accessed either by index
    * or name. Columns with a name that is an integer are not accessible by name,
    * as it would be interpreted as an array index.
+   *
+   * A column that is encrypted using Always Encrypted (see
+   * {@link ConnectionOptions.columnEncryption}) is described by the type of
+   * its decrypted values. How it is encrypted is described by its
+   * `cryptoMetadata`, a {@link CryptoMetadata}.
    */
   on(
     event: 'columnMetadata',
@@ -422,8 +468,8 @@ class Request extends EventEmitter {
     this.connection = undefined;
     this.timeout = undefined;
     this.userCallback = callback;
-    this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
-    this.cryptoMetadataLoaded = false;
+    this.columnEncryption = validateRequestColumnEncryption(options?.columnEncryption);
+    this.parameterEncryption = undefined;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
       // A cancellation only applies to the execution it was made for, so it
       // must not fail later executions of the request - including ones that
@@ -478,7 +524,7 @@ class Request extends EventEmitter {
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
-    const { output = false, length, precision, scale } = options ?? {};
+    const { output = false, length, precision, scale, forceEncrypt } = options ?? {};
 
     const parameter: Parameter = {
       type: type,
@@ -489,6 +535,10 @@ class Request extends EventEmitter {
       precision: precision,
       scale: scale
     };
+
+    if (forceEncrypt) {
+      parameter.forceEncrypt = true;
+    }
 
     this.parameters.push(parameter);
     this.parametersByName[name] = parameter;

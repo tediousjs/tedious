@@ -58,4 +58,63 @@ describe('Feature Ext Parser', () => {
 
     assert.isTrue((await parser.next()).done);
   });
+
+  it('should parse the acknowledgement of column encryption', async function() {
+    const buffer = new WritableTrackingBuffer();
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(1); // datalen
+    buffer.writeUInt8(0x01); // version
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], options);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.strictEqual(token.columnEncryptionVersion, 1);
+    assert.isUndefined(token.utf8Support);
+    assert.isUndefined(token.fedAuth);
+
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse the acknowledgement of column encryption by a server with a secure enclave', async function() {
+    const enclaveType = Buffer.from('VBS', 'ucs2');
+    const buffer = new WritableTrackingBuffer();
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x04); // COLUMNENCRYPTION feature id
+    buffer.writeUInt32LE(2 + enclaveType.length); // datalen
+    buffer.writeUInt8(0x01); // version
+    buffer.writeUInt8(enclaveType.length / 2);
+    buffer.writeBuffer(enclaveType);
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], options);
+    const token = (await parser.next()).value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.strictEqual(token.columnEncryptionVersion, 1);
+  });
+
+  it('should not report column encryption if it was not acknowledged', async function() {
+    const buffer = new WritableTrackingBuffer();
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x0A); // UTF8_SUPPORT feature id
+    buffer.writeUInt32LE(1); // datalen
+    buffer.writeUInt8(0x01); // supported
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], options);
+    const token = (await parser.next()).value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.isUndefined(token.columnEncryptionVersion);
+  });
 });

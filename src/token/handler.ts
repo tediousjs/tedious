@@ -34,6 +34,9 @@ import {
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
+import { assertSupportedEncryption, loadColumnEncryptionKeys } from '../always-encrypted/key-cache';
+import { type ColumnEncryptionKeyInfo } from '../always-encrypted/types';
+import { decryptValue } from '../value-parser';
 
 export class UnexpectedTokenError extends Error {
   constructor(handler: TokenHandler, token: Token) {
@@ -128,7 +131,7 @@ export class TokenHandler {
     throw new UnexpectedTokenError(this, token);
   }
 
-  onColMetadata(token: ColMetadataToken) {
+  onColMetadata(token: ColMetadataToken): void | Promise<void> {
     throw new UnexpectedTokenError(this, token);
   }
 
@@ -348,10 +351,16 @@ export class Login7TokenHandler extends TokenHandler {
       } else if (token.fedAuth.length !== 0) {
         this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
       }
-    } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
+    } else if (token.fedAuth === undefined && token.utf8Support === undefined && token.columnEncryptionVersion === undefined) {
       this.loginError = new ConnectionError('Received acknowledgement for unknown feature');
     } else if (token.fedAuth) {
       this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
+    }
+
+    // From here on, the server sends encryption metadata along with the
+    // metadata of columns and return values.
+    if (token.columnEncryptionVersion !== undefined && token.columnEncryptionVersion >= 1 && this.connection.config.options.columnEncryption !== undefined) {
+      this.connection.config.options.serverSupportsColumnEncryption = true;
     }
   }
 
@@ -409,12 +418,31 @@ export class RequestTokenHandler extends TokenHandler {
   declare request: Request | BulkLoad;
   declare errors: RequestError[];
 
+  // The keys that the encrypted columns of the current result set are
+  // decrypted with.
+  declare columnEncryptionKeys: ColumnEncryptionKeyInfo[] | undefined;
+
+  // Set if the current result set could not be decrypted. Its remaining
+  // rows are not passed on.
+  declare decryptionFailed: boolean;
+
   constructor(connection: Connection, request: Request | BulkLoad) {
     super();
 
     this.connection = connection;
     this.request = request;
     this.errors = [];
+
+    this.columnEncryptionKeys = undefined;
+    this.decryptionFailed = false;
+  }
+
+  addError(error: RequestError) {
+    this.errors.push(error);
+    this.request.error = error;
+    if (this.request instanceof Request && this.errors.length > 1) {
+      this.request.error = new AggregateError(this.errors);
+    }
   }
 
   onInfoMessage(token: InfoMessageToken) {
@@ -433,15 +461,21 @@ export class RequestTokenHandler extends TokenHandler {
       error.serverName = token.serverName;
       error.procName = token.procName;
       error.lineNumber = token.lineNumber;
-      this.errors.push(error);
-      this.request.error = error;
-      if (this.request instanceof Request && this.errors.length > 1) {
-        this.request.error = new AggregateError(this.errors);
+      this.addError(error);
+
+      // The server might have rejected how the parameters were encrypted,
+      // which is no longer how it expects them to be.
+      if (this.request instanceof Request) {
+        this.connection.forgetParameterEncryptionMetadata(this.request);
       }
     }
   }
 
   onDatabaseChange(token: DatabaseEnvChangeToken) {
+    // The statements whose parameter encryption metadata is cached refer
+    // to the objects of the previous database.
+    this.connection.parameterEncryptionCache?.clear();
+
     this.connection.emit('databaseChange', token.newValue);
   }
 
@@ -495,6 +529,83 @@ export class RequestTokenHandler extends TokenHandler {
         this.request.emit('columnMetadata', token.columns);
       }
     }
+
+    this.columnEncryptionKeys = token.columnEncryptionKeys;
+    this.decryptionFailed = false;
+
+    // The rows of encrypted columns can only be decrypted once the column
+    // encryption keys are available, which might involve a key store.
+    if (token.columnEncryptionKeys !== undefined && !this.request.canceled) {
+      return this.loadColumnEncryptionKeys(token);
+    }
+  }
+
+  loadColumnEncryptionKeys(token: ColMetadataToken): void | Promise<void> {
+    let loading;
+    try {
+      for (const { cryptoMetadata } of token.columns) {
+        if (cryptoMetadata !== undefined) {
+          assertSupportedEncryption(cryptoMetadata);
+        }
+      }
+
+      loading = loadColumnEncryptionKeys(token.columnEncryptionKeys!, this.connection.config.options.columnEncryption!);
+    } catch (error: any) {
+      return this.onDecryptionError(error);
+    }
+
+    if (loading === undefined) {
+      return;
+    }
+
+    // A key store is being accessed, which takes time - during which the
+    // request might be canceled, or fail along with its connection.
+    const request = this.request;
+
+    return new Promise((resolve, reject) => {
+      // The rows of a canceled request are not passed on, so the rest of
+      // its response is read without waiting for the keys.
+      let canceled = false;
+      const onCancel = () => {
+        canceled = true;
+        resolve();
+      };
+      request.once('cancel', onCancel);
+
+      const onLoaded = (error?: Error) => {
+        if (canceled) {
+          return;
+        }
+
+        request.removeListener('cancel', onCancel);
+
+        // The request failed in the meantime, as its connection was closed
+        // or lost: nobody is waiting for the rest of its response.
+        if (this.connection.request !== request) {
+          return reject(new Error('The request is not in progress anymore.'));
+        }
+
+        if (error !== undefined) {
+          this.onDecryptionError(error);
+        }
+
+        resolve();
+      };
+
+      loading.then(() => onLoaded(), onLoaded);
+    });
+  }
+
+  /**
+   * Fails the request, as (some of) the values of the current result set
+   * can not be decrypted. The rest of the response is still read.
+   */
+  onDecryptionError(error: Error) {
+    this.decryptionFailed = true;
+
+    if (!this.request.canceled) {
+      this.addError(new RequestError(`Failed to decrypt the values of an encrypted column: ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+    }
   }
 
   onTabName(token: TabNameToken) {
@@ -515,8 +626,26 @@ export class RequestTokenHandler extends TokenHandler {
     }
   }
 
+  /**
+   * Whether the rows of the current result set can be passed on: their
+   * values were decrypted, if they are encrypted. The request is failed if
+   * a value could not be decrypted.
+   */
+  rowsDecrypted(): boolean {
+    if (this.columnEncryptionKeys !== undefined && !this.decryptionFailed) {
+      for (const key of this.columnEncryptionKeys) {
+        if (key.error !== undefined) {
+          this.onDecryptionError(key.error);
+          break;
+        }
+      }
+    }
+
+    return !this.decryptionFailed;
+  }
+
   onRow(token: RowToken | NBCRowToken) {
-    if (!this.request.canceled) {
+    if (!this.request.canceled && this.rowsDecrypted()) {
       if (this.connection.config.options.rowCollectionOnRequestCompletion) {
         this.request.rows!.push(token.columns);
       }
@@ -547,8 +676,28 @@ export class RequestTokenHandler extends TokenHandler {
         }
       }
 
+      // An encrypted return value is the value of an output parameter,
+      // encrypted with the key that the parameter was encrypted with.
+      if (token.metadata.cryptoMetadata !== undefined && token.value !== null) {
+        try {
+          token.value = this.decryptReturnValue(token);
+        } catch (error: any) {
+          this.addError(new RequestError(`Failed to decrypt the value of the output parameter "${token.paramName}": ${error.message}`, 'ECOLUMNENCRYPTION', { cause: error }));
+          return;
+        }
+      }
+
       this.request.emit('returnValue', token.paramName, token.value, token.metadata);
     }
+  }
+
+  decryptReturnValue(token: ReturnValueToken): unknown {
+    const cipher = this.request instanceof Request ? this.request.parameterEncryption?.ciphers.get(token.paramName) : undefined;
+    if (cipher === undefined) {
+      throw new Error('The parameter was not encrypted.');
+    }
+
+    return decryptValue(token.value as Buffer, token.metadata, cipher, this.connection.config.options);
   }
 
   onDoneProc(token: DoneProcToken) {
@@ -606,6 +755,8 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onResetConnection(token: ResetConnectionEnvChangeToken) {
+    this.connection.parameterEncryptionCache?.clear();
+
     this.connection.emit('resetConnection');
   }
 }

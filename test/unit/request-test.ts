@@ -8,6 +8,35 @@ describe('Request', function() {
     assert.strictEqual(request.canceled, false);
   });
 
+  describe('column encryption', function() {
+    it('follows the connection by default', function() {
+      assert.isUndefined(new Request('SELECT 1', () => {}).columnEncryption);
+      assert.isUndefined(new Request('SELECT 1', () => {}, {}).columnEncryption);
+    });
+
+    it('can be set per request', function() {
+      for (const columnEncryption of ['enabled', 'resultSetOnly', 'disabled'] as const) {
+        assert.strictEqual(new Request('SELECT 1', () => {}, { columnEncryption }).columnEncryption, columnEncryption);
+      }
+    });
+
+    it('rejects invalid settings', function() {
+      assert.throws(() => {
+        new Request('SELECT 1', () => {}, { columnEncryption: true as any });
+      }, TypeError, 'The "options.columnEncryption" property must be one of "enabled", "resultSetOnly" or "disabled".');
+    });
+
+    it('can be forced for a parameter', function() {
+      const request = new Request('SELECT @a, @b, @c', () => {});
+      request.addParameter('a', TYPES.Int, 1, { forceEncrypt: true });
+      request.addParameter('b', TYPES.Int, 1, { forceEncrypt: false });
+      request.addOutputParameter('c', TYPES.Int, 1, { forceEncrypt: true });
+
+      assert.deepEqual(request.parameters.map((parameter) => parameter.forceEncrypt), [true, undefined, true]);
+      assert.isTrue(request.parameters[2].output);
+    });
+  });
+
   describe('#cancel', function() {
     it('marks the request as canceled', function() {
       const request = new Request('', () => {});

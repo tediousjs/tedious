@@ -501,5 +501,59 @@ describe('Login7Payload', function() {
         assert.oneOf(firstFeatureId, [0x02, 0x0A], 'First feature should be FEDAUTH (0x02) or UTF8_SUPPORT (0x0A)');
       });
     });
+
+    describe('column encryption', function() {
+      // The features, each with the length and the contents of its data.
+      const FEDAUTH = '02020000000501';
+      const COLUMNENCRYPTION = '040100000001';
+      const UTF8_SUPPORT = '0a0100000001';
+      const TERMINATOR = 'ff';
+
+      function featureExt(configure: (payload: Login7Payload) => void): Buffer {
+        const payload = new Login7Payload({
+          tdsVersion: 0x74000004,
+          packetSize: 1024,
+          clientProgVer: 0,
+          clientPid: 12345,
+          connectionId: 0,
+          clientTimeZone: 120,
+          clientLcid: 0x00000409,
+        });
+
+        payload.hostname = 'testhost';
+        payload.userName = 'testuser';
+        payload.password = 'testpass';
+        payload.appName = 'TestApp';
+        payload.serverName = 'testserver';
+        payload.language = 'us_english';
+        payload.database = 'master';
+        payload.libraryName = 'Tedious';
+        configure(payload);
+
+        const data = payload.toBuffer();
+        return data.subarray(data.readUInt32LE(data.readUInt16LE(56)));
+      }
+
+      it('is not negotiated by default', function() {
+        assert.strictEqual(featureExt(() => {}).toString('hex'), UTF8_SUPPORT + TERMINATOR);
+      });
+
+      it('is negotiated if requested', function() {
+        const data = featureExt((payload) => {
+          payload.columnEncryption = true;
+        });
+
+        assert.strictEqual(data.toString('hex'), COLUMNENCRYPTION + UTF8_SUPPORT + TERMINATOR);
+      });
+
+      it('is negotiated along with federated authentication', function() {
+        const data = featureExt((payload) => {
+          payload.columnEncryption = true;
+          payload.fedAuth = { type: 'ADAL', echo: true, workflow: 'default' };
+        });
+
+        assert.strictEqual(data.toString('hex'), FEDAUTH + COLUMNENCRYPTION + UTF8_SUPPORT + TERMINATOR);
+      });
+    });
   });
 });
