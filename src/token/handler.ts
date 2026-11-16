@@ -76,7 +76,7 @@ export const azureActiveDirectoryPasswordDeprecationWarning = {
     this.emitted = true;
 
     process.emitWarning(
-      'Support for `azure-active-directory-password` authentication is deprecated and will be removed in a future version of `tedious`.',
+      'Support for `azure-active-directory-password` authentication is deprecated and will be removed in a future version of `tedious`. Use `token-credential` authentication with a suitable credential instead.',
       { type: 'DeprecationWarning', code: 'TEDIOUS_DEP_AAD_PASSWORD' }
     );
   }

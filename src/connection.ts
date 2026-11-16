@@ -1193,8 +1193,6 @@ class Connection extends EventEmitter {
           throw new TypeError('The "config.authentication.options.tenantId" property must be of type string.');
         }
 
-        azureActiveDirectoryPasswordDeprecationWarning.emit();
-
         authentication = {
           type: 'azure-active-directory-password',
           options: {
@@ -3646,6 +3644,7 @@ class Connection extends EventEmitter {
             credentials = authentication.options.credential;
             break;
           case 'azure-active-directory-password':
+            azureActiveDirectoryPasswordDeprecationWarning.emit();
             credentials = new UsernamePasswordCredential(
               authentication.options.tenantId ?? 'common',
               authentication.options.clientId,
