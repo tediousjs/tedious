@@ -808,20 +808,32 @@ function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: n
   return new Result(date, offset);
 }
 
-function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<DateWithNanosecondsDelta> {
+/**
+ * A `datetimeoffset` value: the instant, and the offset from UTC it was
+ * written with, in minutes east of UTC (`330` for `+05:30`).
+ */
+interface DateWithOffset extends DateWithNanosecondsDelta {
+  offsetMinutes: number;
+}
+
+function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<DateWithOffset> {
   let time;
   ({ offset, value: time } = readTimeValue(buf, offset, dataLength - 5, scale));
 
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  // time offset?
-  ({ offset } = readUInt16LE(buf, offset));
+  let offsetMinutes;
+  ({ offset, value: offsetMinutes } = readInt16LE(buf, offset));
 
-  const date = new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000)) as DateWithNanosecondsDelta;
+  const date = new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000)) as DateWithOffset;
   Object.defineProperty(date, 'nanosecondsDelta', {
     enumerable: false,
     value: (time % 10000) / 1e7
+  });
+  Object.defineProperty(date, 'offsetMinutes', {
+    enumerable: false,
+    value: offsetMinutes
   });
   return new Result(date, offset);
 }

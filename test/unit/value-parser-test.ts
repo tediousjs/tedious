@@ -227,8 +227,17 @@ describe('readValue', function() {
         // The time portion is already in UTC - the timezone offset does not shift the value.
         assert.strictEqual(value.getTime(), Date.parse('2015-06-04T12:34:56.789Z'), `offset ${offsetMinutes}`);
         assert.strictEqual(value.nanosecondsDelta, 1011 / 1e7, `offset ${offsetMinutes}`);
+        assert.strictEqual((value as DateWithNanosecondsDelta & { offsetMinutes: number }).offsetMinutes, offsetMinutes, `offset ${offsetMinutes}`);
         assert.strictEqual(result.offset, buf.length, `offset ${offsetMinutes}`);
       }
+    });
+
+    it('should expose `offsetMinutes` as a non-enumerable property', function() {
+      const buf = buildDateTimeOffsetBuffer(45296, 3, wireDays('2015-06-04'), -90);
+      const value = readValue(buf, 0, buildMetadata(dataTypeByName.DateTimeOffset, 0), utcOptions).value as Date;
+
+      assert.notInclude(Object.keys(value), 'offsetMinutes');
+      assert.strictEqual(Object.getOwnPropertyDescriptor(value, 'offsetMinutes')?.value, -90);
     });
 
     it('should parse values at the minimum scale', function() {

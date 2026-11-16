@@ -33,7 +33,9 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
     buffer.writeUInt8(timeLength(parameter.scale) + 5);
     writeTimeOfDay(buffer, value, parameter.scale!, true);
     buffer.writeUInt24LE(daysSinceYearOne(value, true));
-    buffer.writeInt16LE(-value.getTimezoneOffset());
+    // A `Date` read from a `datetimeoffset` keeps the offset it was written
+    // with; any other is written with the host's.
+    buffer.writeInt16LE(value.offsetMinutes ?? -value.getTimezoneOffset());
   },
 
   validate: function(value: any, collation, options): null | number {
@@ -60,6 +62,11 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
 
     if (isNaN(value)) {
       throw new TypeError('Invalid date.');
+    }
+
+    const offsetMinutes = (value as TemporalValue).offsetMinutes;
+    if (offsetMinutes != null && !(Number.isInteger(offsetMinutes) && offsetMinutes >= -840 && offsetMinutes <= 840)) {
+      throw new TypeError('The offset must be a whole number of minutes from -840 to 840.');
     }
 
     return value;

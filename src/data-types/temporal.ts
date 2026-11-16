@@ -9,6 +9,11 @@ const YEAR_ONE = LocalDate.ofYearDay(1, 1);
  */
 export interface TemporalValue extends Date {
   nanosecondDelta?: number;
+  /**
+   * The offset from UTC a `datetimeoffset` value is written with, in minutes
+   * east of UTC, as a value read from one carries it.
+   */
+  offsetMinutes?: number;
 }
 
 /**

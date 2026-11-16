@@ -243,6 +243,47 @@ describe('Datatypes in results test', function() {
     ]
   });
 
+  describe('datetimeoffset offsets', function() {
+    let connection: Connection;
+
+    beforeEach(function(done) {
+      connection = new Connection(config);
+      connection.connect(done);
+    });
+
+    afterEach(function(done) {
+      if (!connection.closed) {
+        connection.on('end', done);
+        connection.close();
+      } else {
+        done();
+      }
+    });
+
+    it('should expose the offset each value was written with as `offsetMinutes`', function(done) {
+      if (process.env.TEDIOUS_TDS_VERSION && process.env.TEDIOUS_TDS_VERSION < '7_3_A') {
+        return this.skip();
+      }
+
+      const request = new Request(`select
+        cast('2014-02-14 22:59:59.9999999 +05:30' as datetimeoffset),
+        cast('2014-02-14 22:59:59.9999999 -14:00' as datetimeoffset),
+        cast('0001-01-01 14:00:00 +14:00' as datetimeoffset(0)),
+        cast(cast('2014-02-14 22:59:59 -01:30' as datetimeoffset) as sql_variant)`, done);
+
+      request.on('row', function(columns) {
+        assert.deepEqual(columns.map((column: { value: Date }) => [column.value.getTime(), (column.value as Date & { offsetMinutes: number }).offsetMinutes]), [
+          [Date.UTC(2014, 1, 14, 17, 29, 59, 999), 330],
+          [Date.UTC(2014, 1, 15, 12, 59, 59, 999), -840],
+          [Date.parse('0001-01-01T00:00:00Z'), 840],
+          [Date.UTC(2014, 1, 15, 0, 29, 59), -90]
+        ]);
+      });
+
+      connection.execSqlBatch(request);
+    });
+  });
+
   testDataType(TYPES.Numeric, {
     'should test numeric small value': [
       'select cast(9.3 as numeric(3,2))', 9.3
