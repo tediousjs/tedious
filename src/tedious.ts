@@ -1,11 +1,12 @@
 import BulkLoad from './bulk-load';
-import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
+import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions, type VectorTypeSupport } from './connection';
 import Request from './request';
 import { name } from './library';
 
 import { ConnectionError, InputError, RequestError } from './errors';
 
 import { TYPES } from './data-type';
+import { type VectorValue } from './data-types/vector';
 import { ISOLATION_LEVEL } from './transaction';
 import { versions as TDS_VERSION } from './tds-versions';
 
@@ -33,5 +34,7 @@ export {
 export type {
   ConnectionAuthentication,
   ConnectionConfiguration,
-  ConnectionOptions
+  ConnectionOptions,
+  VectorTypeSupport,
+  VectorValue
 };

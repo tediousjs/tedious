@@ -1,6 +1,7 @@
 import Parser, { type ParserOptions } from './token/stream-parser';
 import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
+import { decodeVector, type VectorDataType } from './data-types/vector';
 
 import iconv from 'iconv-lite';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
@@ -386,6 +387,21 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       }
 
       return readVariant(buf, offset, options, dataLength);
+    }
+
+    case 'Vector':
+    case 'VectorFloat16': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+      if (dataLength === NULL) {
+        return new Result(null, offset);
+      }
+
+      let data;
+      ({ offset, value: data } = readBinary(buf, offset, dataLength));
+
+      return new Result(decodeVector(data, (type as VectorDataType).dimensionType), offset);
     }
 
     default: {

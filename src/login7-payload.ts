@@ -104,6 +104,12 @@ class Login7Payload {
 
   declare fedAuth: { type: 'ADAL', echo: boolean, workflow: 'default' | 'integrated' } | { type: 'SECURITYTOKEN', echo: boolean, fedAuthToken: string } | undefined;
 
+  /**
+   * The highest VECTORSUPPORT version to request, or `undefined` to not
+   * request vector support.
+   */
+  declare vectorSupportVersion: number | undefined;
+
   constructor({ tdsVersion, packetSize, clientProgVer, clientPid, connectionId, clientTimeZone, clientLcid }: Options) {
     this.tdsVersion = tdsVersion;
     this.packetSize = packetSize;
@@ -117,6 +123,7 @@ class Login7Payload {
     this.initDbFatal = false;
 
     this.fedAuth = undefined;
+    this.vectorSupportVersion = undefined;
 
     this.userName = undefined;
     this.password = undefined;
@@ -443,6 +450,18 @@ class Login7Payload {
     buf.writeUInt32LE(1, 1);
     buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
     buffers.push(buf);
+
+    // Signal vector support: Value 0x0E, the single data byte is the highest
+    // VECTORSUPPORT version the client supports. Without it, the server
+    // exchanges `vector` values as JSON text in `varchar(max)`.
+    if (this.vectorSupportVersion !== undefined) {
+      const VECTOR_SUPPORT_FEATURE_ID = 0x0e;
+      const vectorSupportBuf = Buffer.alloc(6);
+      vectorSupportBuf.writeUInt8(VECTOR_SUPPORT_FEATURE_ID, 0);
+      vectorSupportBuf.writeUInt32LE(1, 1);
+      vectorSupportBuf.writeUInt8(this.vectorSupportVersion, 5);
+      buffers.push(vectorSupportBuf);
+    }
 
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 

@@ -475,6 +475,10 @@ class Request extends EventEmitter {
    *   `request.addParameter('createdAt', TYPES.DateTime2, date, { scale: 3 })`
    *   sends the value with three fractional-second digits. For DateTime2
    *   parameters, the default is 7 for non-null values and 0 for `null` values.
+   *
+   *   For `TYPES.Vector` and `TYPES.VectorFloat16`, `length` is the number of
+   *   dimensions. It is inferred from the value, and required when the value
+   *   is `null` or `undefined`, e.g. for an output parameter.
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {

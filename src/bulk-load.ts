@@ -97,6 +97,8 @@ interface ColumnOptions {
 
   /**
    * For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
+   *
+   * For Vector and VectorFloat16, the number of dimensions (required).
    */
   length?: number;
 
@@ -289,6 +291,7 @@ class BulkLoad extends EventEmitter {
    * @param type One of the supported `data types`.
    * @param __namedParameters Additional column type information. At a minimum, `nullable` must be set to true or false.
    * @param length For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
+   *   For Vector and VectorFloat16, the number of dimensions (required).
    * @param nullable Indicates whether the column accepts NULL values.
    * @param objName If the name of the column is different from the name of the property found on `rowObj` arguments passed to {@link addRow} or {@link Connection.execBulkLoad}, then you can use this option to specify the property name.
    * @param precision For Numeric, Decimal.

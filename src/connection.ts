@@ -41,7 +41,8 @@ import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
-import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
+import { type Parameter, type ResolvedParameter, type DataType, TYPES, resolveParameter } from './data-type';
+import { VECTOR_SUPPORT_VERSION, requiredVectorSupportVersion } from './data-types/vector';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -196,6 +197,44 @@ const DEFAULT_LANGUAGE = 'us_english';
  * @private
  */
 const DEFAULT_DATEFORMAT = 'mdy';
+
+/**
+ * The values of the `vectorTypeSupport` connection option, see {@link ConnectionOptions.vectorTypeSupport}.
+ */
+export type VectorTypeSupport = 'off' | 'v1' | 'v2';
+
+/**
+ * The VECTORSUPPORT version requested at login for each `vectorTypeSupport`
+ * value.
+ *
+ * @private
+ */
+const VECTOR_TYPE_SUPPORT_VERSIONS: { [key in VectorTypeSupport]: number } = {
+  off: 0,
+  v1: VECTOR_SUPPORT_VERSION.V1,
+  v2: VECTOR_SUPPORT_VERSION.V2
+};
+
+/**
+ * The types of RPC parameters, including the column types of table-valued
+ * parameters.
+ *
+ * @private
+ */
+function * parameterTypes(parameters: ResolvedParameter[]): Generator<DataType> {
+  for (const parameter of parameters) {
+    yield parameter.type;
+
+    if (parameter.type === TYPES.TVP) {
+      const table = parameter.data.value as { columns: Array<{ type: DataType }> } | null;
+      if (table) {
+        for (const column of table.columns) {
+          yield column.type;
+        }
+      }
+    }
+  }
+}
 
 interface AzureActiveDirectoryMsiAppServiceAuthentication {
   type: 'azure-active-directory-msi-app-service';
@@ -403,6 +442,7 @@ export interface InternalConnectionOptions {
   trustServerCertificate: boolean;
   useColumnNames: boolean;
   useUTC: boolean;
+  vectorTypeSupport: VectorTypeSupport;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
 }
@@ -862,6 +902,22 @@ export interface ConnectionOptions {
   useUTC?: boolean;
 
   /**
+   * Determines whether, and up to which version, native support for the `vector` data type is negotiated with the
+   * server at login (requires TDS 7.4).
+   *
+   * * `'off'`: vector support is not requested. The server sends `vector` values as JSON array text in
+   *   `varchar(max)`, and `TYPES.Vector` / `TYPES.VectorFloat16` parameters and bulk load columns are rejected.
+   * * `'v1'`: `vector` values with `float32` elements are exchanged in the native binary format.
+   * * `'v2'`: `vector` values with `float32` or `float16` elements are exchanged in the native binary format.
+   *
+   * The server acknowledges the highest version both sides support. Servers without the `vector` data type ignore
+   * the request.
+   *
+   * (default: `'v2'`)
+   */
+  vectorTypeSupport?: VectorTypeSupport;
+
+  /**
    * The workstation ID (WSID) of the client, default os.hostname().
    * Used for identifying a specific client in profiling, logging or
    * tracing client activity in SQLServer.
@@ -1069,6 +1125,14 @@ class Connection extends EventEmitter {
    * @private
    */
   declare databaseCollation: Collation | undefined;
+
+  /**
+   * The VECTORSUPPORT version acknowledged by the server at login, or `0` if
+   * vector support was not negotiated. See `vectorTypeSupport`.
+   *
+   * @private
+   */
+  declare vectorSupportVersion: number;
 
   /**
    * @private
@@ -1347,6 +1411,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
+        vectorTypeSupport: 'v2',
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -1770,6 +1835,14 @@ class Connection extends EventEmitter {
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
       }
+
+      if (config.options.vectorTypeSupport !== undefined) {
+        if (!Object.hasOwn(VECTOR_TYPE_SUPPORT_VERSIONS, config.options.vectorTypeSupport)) {
+          throw new TypeError('The "config.options.vectorTypeSupport" property must be one of \'off\', \'v1\' or \'v2\'.');
+        }
+
+        this.config.options.vectorTypeSupport = config.options.vectorTypeSupport;
+      }
     }
 
     this.secureContextOptions = this.config.options.cryptoCredentialsDetails;
@@ -1806,6 +1879,7 @@ class Connection extends EventEmitter {
     this.state = this.STATE.INITIALIZED;
 
     this.attentionSent = false;
+    this.vectorSupportVersion = 0;
 
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
@@ -2510,6 +2584,10 @@ class Connection extends EventEmitter {
    * @private
    */
   sendLogin7Packet() {
+    // A new login attempt (e.g. after a transient failure or rerouting)
+    // negotiates vector support from scratch.
+    this.vectorSupportVersion = 0;
+
     const payload = new Login7Payload({
       tdsVersion: versions[this.config.options.tdsVersion],
       packetSize: this.config.options.packetSize,
@@ -2519,6 +2597,11 @@ class Connection extends EventEmitter {
       clientTimeZone: new Date().getTimezoneOffset(),
       clientLcid: 0x00000409
     });
+
+    const requestedVectorSupportVersion = this.requestedVectorSupportVersion();
+    if (requestedVectorSupportVersion > 0) {
+      payload.vectorSupportVersion = requestedVectorSupportVersion;
+    }
 
     const { authentication } = this.config;
     switch (authentication.type) {
@@ -2720,6 +2803,53 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * The VECTORSUPPORT version requested at login: the version selected with
+   * `vectorTypeSupport`, or `0` if vector support is not requested.
+   * Feature extensions require TDS 7.4.
+   *
+   * @private
+   */
+  requestedVectorSupportVersion(): number {
+    if (versions[this.config.options.tdsVersion] < versions['7_4']) {
+      return 0;
+    }
+
+    return VECTOR_TYPE_SUPPORT_VERSIONS[this.config.options.vectorTypeSupport];
+  }
+
+  /**
+   * Returns an error if any of the given types is a vector type that can not
+   * be sent on this connection because the required vector support was not
+   * negotiated, and `undefined` otherwise.
+   *
+   * @private
+   */
+  checkVectorSupport(types: Iterable<DataType>): RequestError | undefined {
+    let required = 0;
+    for (const type of types) {
+      required = Math.max(required, requiredVectorSupportVersion(type));
+    }
+
+    if (required <= this.vectorSupportVersion) {
+      return undefined;
+    }
+
+    let message;
+    if (versions[this.config.options.tdsVersion] < versions['7_4']) {
+      message = 'Vector support was not negotiated with the server because the TDS version in use (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.Vector` and `TYPES.VectorFloat16` require TDS version `7_4`.';
+    } else if (this.requestedVectorSupportVersion() < required) {
+      message = 'Vector support version ' + required + ' is required, but the `vectorTypeSupport` option (`' + this.config.options.vectorTypeSupport + '`) ' +
+        (this.config.options.vectorTypeSupport === 'off' ? 'disables vector support.' : 'requests only version ' + this.requestedVectorSupportVersion() + '. `TYPES.VectorFloat16` requires `\'v2\'`.');
+    } else if (this.vectorSupportVersion === 0) {
+      message = 'The server does not support the `vector` data type. `TYPES.Vector` and `TYPES.VectorFloat16` require SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in Microsoft Fabric.';
+    } else {
+      message = 'The server only supports vector support version ' + this.vectorSupportVersion + ', which does not include `float16` vectors. `TYPES.VectorFloat16` requires version ' + required + '.';
+    }
+
+    return new RequestError(message, 'EVECTORNOTSUPPORTED');
+  }
+
+  /**
    *  Execute the SQL represented by {@link Request}.
    *
    * As `sp_executesql` is used to execute the SQL, if the same SQL is executed multiples times
@@ -2874,6 +3004,19 @@ class Connection extends EventEmitter {
     // the rest are read once the server has accepted the `INSERT BULK`
     // statement, and the source is closed if that never happens.
     const payload = new BulkLoadPayload(bulkLoad, rows ?? []);
+
+    // Checked before the `INSERT BULK` statement is sent: once the server has
+    // accepted it, it expects the bulk load data.
+    const vectorError = this.state === this.STATE.LOGGED_IN && !bulkLoad.canceled ? this.checkVectorSupport(bulkLoad.columns.map((column) => column.type)) : undefined;
+    if (vectorError) {
+      this.debug.log(vectorError.message);
+      payload.close();
+      bulkLoad.error = vectorError;
+      process.nextTick(() => {
+        bulkLoad.callback(vectorError);
+      });
+      return;
+    }
 
     const onCancel = () => {
       request.cancel();
@@ -3243,6 +3386,9 @@ class Connection extends EventEmitter {
     // even if the request is rejected before being sent.
     request.error = undefined;
 
+    // Vector values can only be sent once vector support was negotiated.
+    const vectorError = payload instanceof RpcRequestPayload ? this.checkVectorSupport(parameterTypes(payload.parameters)) : undefined;
+
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
@@ -3250,6 +3396,11 @@ class Connection extends EventEmitter {
     } else if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
+      });
+    } else if (vectorError) {
+      this.debug.log(vectorError.message);
+      process.nextTick(() => {
+        request.callback(vectorError);
       });
     } else {
       if (packetType === TYPE.SQL_BATCH) {

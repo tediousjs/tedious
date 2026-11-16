@@ -4,6 +4,7 @@ import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { formatHex } from './format-hex';
+import { vectorDimensionsFromTypeInfo, vectorTypeForDimensionType } from './data-types/vector';
 
 import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
 
@@ -32,7 +33,7 @@ export type BaseMetadata = {
 
   collation: Collation | undefined;
   /**
-   * The precision. Only applicable to numeric and decimal.
+   * The precision. Only applicable to numeric and decimal, and the number of dimensions of vector.
    */
   precision: number | undefined;
 
@@ -42,7 +43,7 @@ export type BaseMetadata = {
   scale: number | undefined;
 
   /**
-   * The length, for char, varchar, nvarchar and varbinary.
+   * The length, for char, varchar, nvarchar and varbinary, and the maximum length in bytes of vector.
    */
   dataLength: number | undefined;
 
@@ -346,6 +347,29 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: undefined,
         schema: undefined,
         udtInfo: udtInfo
+      }, offset);
+    }
+
+    case 'Vector': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+      let dimensionType;
+      ({ offset, value: dimensionType } = readUInt8(buf, offset));
+
+      return new Result({
+        userType: userType,
+        flags: flags,
+        // The dimension type determines the element type, and with it
+        // whether this is a `Vector` or a `VectorFloat16` column.
+        type: vectorTypeForDimensionType(dimensionType),
+        collation: undefined,
+        // The number of dimensions.
+        precision: vectorDimensionsFromTypeInfo(dataLength, dimensionType),
+        scale: undefined,
+        dataLength: dataLength,
+        schema: undefined,
+        udtInfo: undefined
       }, offset);
     }
 
