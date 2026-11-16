@@ -129,7 +129,7 @@ describe('BulkLoad', function() {
     it('rejects a value longer than the declared length instead of silently truncating it', function(done) {
       const bulkLoad = connection.newBulkLoad('#binaryTest', (err, rowCount) => {
         assert.instanceOf(err, InputError);
-        assert.strictEqual(err?.message, 'Column \'value\' could not be serialized');
+        assert.strictEqual(err?.message, 'Column \'value\' could not be serialized at row index 0');
         assert.instanceOf(err?.cause, TypeError);
         assert.strictEqual((err?.cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
         assert.strictEqual(rowCount, 0);
@@ -1720,8 +1720,10 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err.message, "Column 'value' could not be validated at row index 0");
+        assert.instanceOf(err.cause, TypeError);
+        assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
 
         done();
       }
@@ -1736,8 +1738,10 @@ describe('BulkLoad', function() {
       connection.execBulkLoad(bulkLoad, rowSource);
 
       function completeBulkLoad(err: Error | undefined | null, rowCount: undefined | number) {
-        assert.instanceOf(err, TypeError);
-        assert.strictEqual(err.message, 'Invalid date.');
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err.message, "Column 'value' could not be validated at row index 0");
+        assert.instanceOf(err.cause, TypeError);
+        assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
 
         assert.strictEqual(rowCount, 0);
 
