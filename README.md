@@ -13,7 +13,7 @@ See the [changelog](https://github.com/tediousjs/tedious/releases) for version h
 - TDS 7.3.B (SQL Server 2008 R2)
 - TDS 7.3.A (SQL Server 2008)
 - TDS 7.2 (SQL Server 2005)
-- TDS 7.1 (SQL Server 2000) - deprecated
+- TDS 7.1 (SQL Server 2000) - *deprecated, support will be removed in a future version*
 
 ## Installation
 
@@ -51,9 +51,12 @@ const connection = new Connection({
     }
   },
   options: {
-    database: process.env.DB_DATABASE,
-    encrypt: true
+    database: process.env.DB_DATABASE
   }
+});
+
+connection.on('error', (error) => {
+  console.error('Connection error:', error);
 });
 
 connection.connect((error) => {
@@ -77,12 +80,16 @@ connection.connect((error) => {
 });
 ```
 
-For SQL Server 2022 or later when using TDS 8.0, set both
-`tdsVersion: '8_0'` and `encrypt: 'strict'`. Strict encryption requires a
+Encryption and server certificate validation are enabled by default. Local or
+Docker SQL Server instances often use self-signed certificates; for development
+only, set `trustServerCertificate: true` in `options` to bypass certificate validation.
+
+For TDS 8.0 with SQL Server 2022 or later, set `encrypt: 'strict'` in `options`;
+leave `tdsVersion` at its default. Strict encryption requires a
 valid server certificate; `trustServerCertificate` does not bypass certificate
 validation in this mode. See the
 [API documentation](https://tediousjs.github.io/tedious/) and
-[examples](examples/) for more options and usage patterns.
+[examples](https://github.com/tediousjs/tedious/tree/master/examples) for more options and usage patterns.
 
 <a name="documentation"></a>
 ## Documentation
