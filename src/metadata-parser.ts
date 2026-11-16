@@ -4,7 +4,7 @@ import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { formatHex } from './format-hex';
-import { vectorDimensionsFromTypeInfo, vectorTypeForDimensionType } from './data-types/vector';
+import { vectorBaseTypeFromDimensionType, vectorDimensionsFromTypeInfo, type VectorBaseType } from './data-types/vector';
 
 import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
 
@@ -50,6 +50,12 @@ export type BaseMetadata = {
   schema: XmlSchema | undefined;
 
   udtInfo: UdtInfo | undefined;
+
+  /**
+   * The base type of the elements of a vector column: `'float32'` or
+   * `'float16'`. Only present for vector columns.
+   */
+  baseType?: VectorBaseType | undefined;
 }
 
 export type Metadata = {
@@ -360,16 +366,15 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
       return new Result({
         userType: userType,
         flags: flags,
-        // The dimension type determines the element type, and with it
-        // whether this is a `Vector` or a `VectorFloat16` column.
-        type: vectorTypeForDimensionType(dimensionType),
+        type: type,
         collation: undefined,
         // The number of dimensions.
         precision: vectorDimensionsFromTypeInfo(dataLength, dimensionType),
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
-        udtInfo: undefined
+        udtInfo: undefined,
+        baseType: vectorBaseTypeFromDimensionType(dimensionType)
       }, offset);
     }
 

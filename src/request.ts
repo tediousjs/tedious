@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { type Parameter, type DataType, type ResolvedParameter, resolveParameter } from './data-type';
+import { type VectorBaseType } from './data-types/vector';
 import { RequestError } from './errors';
 
 import Connection, { type InternalConnectionOptions } from './connection';
@@ -37,6 +38,12 @@ export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
+
+  /**
+   * For Vector, the base type of the elements: `'float32'` (the default) or
+   * `'float16'`.
+   */
+  baseType?: VectorBaseType;
 
   /**
    * For Numeric and Decimal, the number of digits after the decimal point.
@@ -476,13 +483,15 @@ class Request extends EventEmitter {
    *   sends the value with three fractional-second digits. For DateTime2
    *   parameters, the default is 7 for non-null values and 0 for `null` values.
    *
-   *   For `TYPES.Vector` and `TYPES.VectorFloat16`, `length` is the number of
-   *   dimensions. It is inferred from the value, and required when the value
-   *   is `null` or `undefined`, e.g. for an output parameter.
+   *   For `TYPES.Vector`, `length` is the number of dimensions. It is
+   *   inferred from the value, and required when the value is `null` or
+   *   `undefined`, e.g. for an output parameter. `baseType` is the base type
+   *   of the elements: `'float32'` (the default) or `'float16'`:
+   *   `request.addParameter('embedding', TYPES.Vector, values, { baseType: 'float16' })`.
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
-    const { output = false, length, precision, scale } = options ?? {};
+    const { output = false, length, precision, scale, baseType } = options ?? {};
 
     const parameter: Parameter = {
       type: type,
@@ -491,7 +500,8 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
-      scale: scale
+      scale: scale,
+      baseType: baseType
     };
 
     this.parameters.push(parameter);

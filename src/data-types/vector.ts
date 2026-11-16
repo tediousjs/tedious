@@ -12,13 +12,17 @@ import { type DataType, type Parameter, type ParameterData } from '../data-type'
 // columns and bulk load columns. The server only uses it after the
 // VECTORSUPPORT feature extension was negotiated at login; without it,
 // `vector` values are exchanged as JSON array text in `varchar(max)`.
+//
+// There is a single `TYPES.Vector` data type. Its base type (`float32` or
+// `float16`), selected with the `baseType` option, determines the dimension
+// type byte, the element encoding and the maximum number of dimensions.
 
 const VECTOR_TYPE_ID = 0xF5;
 
 /**
  * Size of the header that precedes the elements of a vector value.
  */
-export const VECTOR_HEADER_LENGTH = 8;
+const VECTOR_HEADER_LENGTH = 8;
 
 const LAYOUT_FORMAT = 0xA9;
 const LAYOUT_VERSION = 0x01;
@@ -43,7 +47,7 @@ export const VECTOR_SUPPORT_VERSION = {
 /**
  * Values of the dimension type byte in a vector's TYPE_INFO and header.
  */
-export const VECTOR_DIMENSION_TYPE = {
+const VECTOR_DIMENSION_TYPE = {
   FLOAT32: 0x00,
   FLOAT16: 0x01
 } as const;
@@ -52,7 +56,13 @@ export const VECTOR_DIMENSION_TYPE = {
  * A `vector` parameter, column or cell value: an array of numbers, or a
  * `Float32Array`. One element per dimension.
  */
-export type VectorValue = number[] | Float32Array;
+type VectorValue = number[] | Float32Array;
+
+/**
+ * The base type of a `vector`'s elements, as in `vector(n, float16)`.
+ * `float32` is the default.
+ */
+export type VectorBaseType = 'float32' | 'float16';
 
 interface ElementType {
   dimensionType: number;
@@ -61,7 +71,7 @@ interface ElementType {
   // The minimum negotiated VECTORSUPPORT version that can transport it.
   minVersion: number;
   // The T-SQL base type, as used in a declaration.
-  baseType: 'float32' | 'float16';
+  baseType: VectorBaseType;
   // Rounds a number to the element type's precision.
   round(value: number): number;
   write(buffer: Buffer, value: number, offset: number): void;
@@ -91,7 +101,7 @@ function roundHalfEven(value: number): number {
  * Encodes a number as an IEEE 754 half-precision (binary16) float, rounding
  * to nearest, ties to even.
  */
-export function toFloat16Bits(value: number): number {
+function toFloat16Bits(value: number): number {
   if (Number.isNaN(value)) {
     return 0x7E00;
   }
@@ -135,7 +145,7 @@ export function toFloat16Bits(value: number): number {
 /**
  * Decodes an IEEE 754 half-precision (binary16) float.
  */
-export function fromFloat16Bits(bits: number): number {
+function fromFloat16Bits(bits: number): number {
   const sign = bits & 0x8000 ? -1 : 1;
   const exponent = (bits >> 10) & 0x1F;
   const mantissa = bits & 0x3FF;
@@ -183,7 +193,33 @@ const FLOAT16: ElementType = {
   }
 };
 
-function validateVector(value: unknown, elementType: ElementType): VectorValue | null {
+// The element type for a `baseType` option; `float32` if it is not given.
+function elementTypeForBaseType(baseType: unknown): ElementType {
+  switch (baseType) {
+    case undefined:
+    case null:
+    case 'float32':
+      return FLOAT32;
+    case 'float16':
+      return FLOAT16;
+    default:
+      throw new TypeError('Invalid vector base type: the `baseType` option must be \'float32\' or \'float16\'.');
+  }
+}
+
+/**
+ * Validates a `baseType` option and returns the base type it selects:
+ * `float32` if it is not given.
+ */
+export function validateVectorBaseType(baseType: unknown): VectorBaseType {
+  return elementTypeForBaseType(baseType).baseType;
+}
+
+// Checks that a value is a vector: an array of finite numbers or a
+// `Float32Array`, with at least one element. Whether it fits a base type is
+// checked by `validateForBaseType` once the base type is known: by `resolve`
+// for parameters, and by `writeValue` for bulk load and TVP cells.
+function validateVector(value: unknown): VectorValue | null {
   if (value == null) {
     return null;
   }
@@ -192,7 +228,9 @@ function validateVector(value: unknown, elementType: ElementType): VectorValue |
     throw new TypeError('Invalid vector: the value must be an array of numbers or a Float32Array.');
   }
 
-  validateDimensions(value.length, elementType);
+  if (value.length === 0) {
+    throw new TypeError('Invalid vector: a vector must have at least one dimension.');
+  }
 
   // Error messages name the offending index, but do not quote the value:
   // they end up in the `EPARAM` error and the debug log.
@@ -205,13 +243,21 @@ function validateVector(value: unknown, elementType: ElementType): VectorValue |
     if (!Number.isFinite(element)) {
       throw new TypeError(`Invalid vector: the element at index ${i} is not a finite number.`);
     }
-
-    if (!Number.isFinite(elementType.round(element))) {
-      throw new TypeError(`Invalid vector: the element at index ${i} is out of range for ${elementType.baseType}.`);
-    }
   }
 
   return value;
+}
+
+// Checks a vector against a base type: its number of dimensions, and that
+// no element rounds to infinity.
+function validateForBaseType(value: VectorValue, elementType: ElementType) {
+  validateDimensions(value.length, elementType);
+
+  for (let i = 0, len = value.length; i < len; i++) {
+    if (!Number.isFinite(elementType.round(value[i]))) {
+      throw new TypeError(`Invalid vector: the element at index ${i} is out of range for ${elementType.baseType}.`);
+    }
+  }
 }
 
 function validateDimensions(dimensions: number, elementType: ElementType) {
@@ -276,12 +322,12 @@ function elementTypeForDimensionType(dimensionType: number): ElementType {
 }
 
 /**
- * Decodes a `vector` value received from the server. `dimensionType` is the
- * dimension type from the column's TYPE_INFO, which the value's header must
- * match.
+ * Decodes a `vector` value received from the server. `baseType` is the base
+ * type from the column's TYPE_INFO, which the value's header must match.
  */
-export function decodeVector(data: Buffer, dimensionType: number): number[] {
-  const elementType = elementTypeForDimensionType(dimensionType);
+export function decodeVector(data: Buffer, baseType: VectorBaseType): number[] {
+  const elementType = elementTypeForBaseType(baseType);
+  const dimensionType = elementType.dimensionType;
 
   if (data.length < VECTOR_HEADER_LENGTH) {
     throw new Error(`Invalid vector value: expected at least ${VECTOR_HEADER_LENGTH} bytes, but got ${data.length}`);
@@ -323,87 +369,86 @@ export function vectorDimensionsFromTypeInfo(maxLength: number, dimensionType: n
   return dataLength / elementType.bytesPerElement;
 }
 
-export type VectorDataType = DataType & {
-  /** The dimension type byte of the TYPE_INFO. */
-  dimensionType: number;
-  /** The minimum negotiated VECTORSUPPORT version required to send it. */
-  minVersion: number;
+/**
+ * The base type of a `vector` column, from the dimension type of its
+ * TYPE_INFO.
+ */
+export function vectorBaseTypeFromDimensionType(dimensionType: number): VectorBaseType {
+  return elementTypeForDimensionType(dimensionType).baseType;
+}
+
+/**
+ * `vector(n)` or `vector(n, float16)`. The number of dimensions is given with
+ * the `length` option (inferred from a non-null parameter value), and the base
+ * type with the `baseType` option (`float32` by default).
+ */
+export const Vector: DataType = {
+  id: VECTOR_TYPE_ID,
+  type: 'VECTOR',
+  name: 'Vector',
+
+  declaration(parameter: Parameter) {
+    const elementType = elementTypeForBaseType(parameter.baseType);
+    const dimensions = resolveDimensions(parameter, elementType);
+    return elementType === FLOAT32 ? `vector(${dimensions})` : `vector(${dimensions}, ${elementType.baseType})`;
+  },
+
+  resolveLength(parameter: Parameter) {
+    return resolveDimensions(parameter, elementTypeForBaseType(parameter.baseType));
+  },
+
+  resolve(parameter) {
+    const elementType = elementTypeForBaseType(parameter.baseType);
+    const value = validateVector(parameter.value);
+    if (value !== null) {
+      validateForBaseType(value, elementType);
+    }
+
+    return {
+      value: value,
+      length: resolveDimensions({ length: parameter.length, value }, elementType),
+      baseType: elementType.baseType
+    };
+  },
+
+  writeTypeInfo(buffer, parameter) {
+    const elementType = elementTypeForBaseType(parameter.baseType);
+    const dimensions = resolveDimensions({ length: parameter.length, value: null }, elementType);
+    buffer.writeUInt8(VECTOR_TYPE_ID);
+    buffer.writeUInt16LE(VECTOR_HEADER_LENGTH + dimensions * elementType.bytesPerElement);
+    buffer.writeUInt8(elementType.dimensionType);
+  },
+
+  writeValue(buffer, parameter) {
+    const value = parameter.value as VectorValue | null | undefined;
+    if (value == null) {
+      buffer.writeBuffer(NULL_LENGTH);
+      return;
+    }
+
+    const elementType = elementTypeForBaseType(parameter.baseType);
+
+    // Bulk load and TVP cells are only checked by `validate`: their
+    // dimensions must match the column's, and fit its base type.
+    resolveDimensions({ length: parameter.length, value }, elementType);
+    validateForBaseType(value, elementType);
+
+    const data = encodeVector(value, elementType);
+    buffer.writeUInt16LE(data.length);
+    buffer.writeBuffer(data);
+  },
+
+  validate(value): VectorValue | null {
+    return validateVector(value);
+  }
 };
 
-function createVectorType(name: 'Vector' | 'VectorFloat16', elementType: ElementType): VectorDataType {
-  return {
-    id: VECTOR_TYPE_ID,
-    type: 'VECTOR',
-    name: name,
-    dimensionType: elementType.dimensionType,
-    minVersion: elementType.minVersion,
-
-    declaration(parameter: Parameter) {
-      const dimensions = resolveDimensions(parameter, elementType);
-      return elementType === FLOAT32 ? `vector(${dimensions})` : `vector(${dimensions}, ${elementType.baseType})`;
-    },
-
-    resolveLength(parameter: Parameter) {
-      return resolveDimensions(parameter, elementType);
-    },
-
-    resolve(parameter) {
-      const value = validateVector(parameter.value, elementType);
-      return { value, length: resolveDimensions({ length: parameter.length, value }, elementType) };
-    },
-
-    writeTypeInfo(buffer, parameter) {
-      const dimensions = resolveDimensions({ length: parameter.length, value: null }, elementType);
-      buffer.writeUInt8(VECTOR_TYPE_ID);
-      buffer.writeUInt16LE(VECTOR_HEADER_LENGTH + dimensions * elementType.bytesPerElement);
-      buffer.writeUInt8(elementType.dimensionType);
-    },
-
-    writeValue(buffer, parameter) {
-      const value = parameter.value as VectorValue | null | undefined;
-      if (value == null) {
-        buffer.writeBuffer(NULL_LENGTH);
-        return;
-      }
-
-      // Bulk load and TVP cells are validated on their own; their
-      // dimensions must match the column's.
-      resolveDimensions({ length: parameter.length, value }, elementType);
-
-      const data = encodeVector(value, elementType);
-      buffer.writeUInt16LE(data.length);
-      buffer.writeBuffer(data);
-    },
-
-    validate(value): VectorValue | null {
-      return validateVector(value, elementType);
-    }
-  };
-}
-
 /**
- * `vector(n)`: a vector of `float32` elements.
+ * The VECTORSUPPORT version needed to send a value of the given data type
+ * and, for `TYPES.Vector`, base type; 0 if it is not a vector type.
  */
-export const Vector = createVectorType('Vector', FLOAT32);
-
-/**
- * `vector(n, float16)`: a vector of half-precision `float16` elements.
- */
-export const VectorFloat16 = createVectorType('VectorFloat16', FLOAT16);
-
-/**
- * The vector data type for the dimension type of a `vector` TYPE_INFO.
- */
-export function vectorTypeForDimensionType(dimensionType: number): VectorDataType {
-  return elementTypeForDimensionType(dimensionType) === FLOAT32 ? Vector : VectorFloat16;
-}
-
-/**
- * The VECTORSUPPORT version a data type requires to be sent to the server,
- * or 0 if it is not a vector type.
- */
-export function requiredVectorSupportVersion(type: DataType): number {
-  return type === Vector || type === VectorFloat16 ? (type as VectorDataType).minVersion : 0;
+export function requiredVectorSupportVersion(type: DataType, baseType?: VectorBaseType): number {
+  return type === Vector ? elementTypeForBaseType(baseType).minVersion : 0;
 }
 
 export default Vector;

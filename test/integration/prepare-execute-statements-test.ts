@@ -519,4 +519,46 @@ describe('Prepare Execute Statement', function() {
       connection.on('debug', console.log);
     }
   });
+
+  it('should prepare execute with vector parameters', async function() {
+    const connection = new Connection(getConfig());
+    await new Promise<void>((resolve, reject) => connection.connect((err) => (err ? reject(err) : resolve())));
+
+    try {
+      // Requires a server with the `vector` data type, and TDS 7.4.
+      if (connection.vectorSupportVersion < 1) {
+        this.skip();
+      }
+
+      const values: unknown[] = [];
+      await new Promise<void>((resolve, reject) => {
+        let executions = 0;
+        const request = new Request('select @param', (err) => {
+          if (err) {
+            return reject(err);
+          }
+
+          if (++executions === 2) {
+            return resolve();
+          }
+
+          connection.execute(request, { param: null });
+        });
+
+        // A prepared vector parameter needs its number of dimensions.
+        request.addParameter('param', TYPES.Vector, undefined, { length: 3 });
+        request.on('row', (columns) => values.push(columns[0].value));
+        request.on('error', reject);
+        request.on('prepared', () => connection.execute(request, { param: [1, 2.5, -3] }));
+        connection.prepare(request);
+      });
+
+      assert.deepEqual(values, [[1, 2.5, -3], null]);
+    } finally {
+      await new Promise<void>((resolve) => {
+        connection.on('end', () => resolve());
+        connection.close();
+      });
+    }
+  });
 });

@@ -392,4 +392,70 @@ set @paramOut = @paramIn\
     }
   });
 
+  describe('vector parameters', function() {
+    function run(sqlOrProcedure: string, method: 'execSqlBatch' | 'callProcedure', addParameters: (request: Request) => void = () => {}) {
+      return new Promise<{ rows: unknown[][], outputs: { [name: string]: { value: unknown, metadata: any } } }>((resolve, reject) => {
+        const rows: unknown[][] = [];
+        const outputs: { [name: string]: { value: unknown, metadata: any } } = {};
+        const request = new Request(sqlOrProcedure, (err) => (err ? reject(err) : resolve({ rows, outputs })));
+        request.on('row', (columns) => rows.push(columns.map((column: { value: unknown }) => column.value)));
+        request.on('returnValue', (name, value, metadata) => {
+          outputs[name] = { value, metadata };
+        });
+        addParameters(request);
+        connection[method](request);
+      });
+    }
+
+    beforeEach(function() {
+      // Requires a server with the `vector` data type, and TDS 7.4.
+      if (connection.vectorSupportVersion < 1) {
+        this.skip();
+      }
+    });
+
+    it('should call a procedure with vector input and output parameters', async function() {
+      await run(`
+        CREATE PROCEDURE #test_vector_proc @in vector(3), @out vector(3) OUTPUT, @nullOut vector(2) OUTPUT
+        AS
+        BEGIN
+          SET @out = @in;
+          SET @nullOut = NULL;
+          SELECT @in, VECTOR_NORM(@in, 'norm1');
+        END
+      `, 'execSqlBatch');
+
+      const { rows, outputs } = await run('#test_vector_proc', 'callProcedure', (request) => {
+        request.addParameter('in', TYPES.Vector, [1, -2, 3]);
+        request.addOutputParameter('out', TYPES.Vector, null, { length: 3 });
+        request.addOutputParameter('nullOut', TYPES.Vector, null, { length: 2 });
+      });
+
+      assert.deepEqual(rows, [[[1, -2, 3], 6]]);
+      assert.deepEqual(outputs.out.value, [1, -2, 3]);
+      assert.strictEqual(outputs.out.metadata.baseType, 'float32');
+      assert.isNull(outputs.nullOut.value);
+    });
+
+    it('should call a procedure with float16 vector input and output parameters', async function() {
+      // `float16` vectors require vector support version 2.
+      if (connection.vectorSupportVersion < 2) {
+        this.skip();
+      }
+
+      await run(`
+        CREATE PROCEDURE #test_vector16_proc @in vector(3, float16), @out vector(3, float16) OUTPUT
+        AS
+        SET @out = @in
+      `, 'execSqlBatch');
+
+      const { outputs } = await run('#test_vector16_proc', 'callProcedure', (request) => {
+        request.addParameter('in', TYPES.Vector, [1, 2.5, -3], { baseType: 'float16' });
+        request.addOutputParameter('out', TYPES.Vector, null, { length: 3, baseType: 'float16' });
+      });
+
+      assert.deepEqual(outputs.out.value, [1, 2.5, -3]);
+      assert.strictEqual(outputs.out.metadata.baseType, 'float16');
+    });
+  });
 });

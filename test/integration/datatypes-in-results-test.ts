@@ -572,3 +572,75 @@ describe('Datatypes in results test', function() {
     ]
   });
 });
+
+describe('Vector in results', function() {
+  let connection: Connection;
+
+  function connect(options = {}): Promise<Connection> {
+    return new Promise((resolve, reject) => {
+      const newConnection = new Connection({ ...config, options: { ...config.options, ...options } });
+      newConnection.connect((err) => (err ? reject(err) : resolve(newConnection)));
+    });
+  }
+
+  function query(connection: Connection, sql: string): Promise<Array<Array<{ value: any, metadata: any }>>> {
+    return new Promise((resolve, reject) => {
+      const rows: Array<Array<{ value: any, metadata: any }>> = [];
+      const request = new Request(sql, (err) => (err ? reject(err) : resolve(rows)));
+      request.on('row', (columns) => rows.push(columns));
+      connection.execSqlBatch(request);
+    });
+  }
+
+  function close(connection: Connection): Promise<void> {
+    return new Promise((resolve) => {
+      connection.on('end', () => resolve());
+      connection.close();
+    });
+  }
+
+  beforeEach(async function() {
+    connection = await connect();
+
+    // Requires a server with the `vector` data type, and TDS 7.4.
+    if (connection.vectorSupportVersion < 1) {
+      this.skip();
+    }
+  });
+
+  afterEach(async function() {
+    await close(connection);
+  });
+
+  it('returns float32 vector columns as arrays of numbers', async function() {
+    const [[vector, nullVector]] = await query(connection, "SELECT CAST('[1, 2.5, -3]' AS vector(3)), CAST(NULL AS vector(3))");
+
+    assert.deepEqual(vector.value, [1, 2.5, -3]);
+    assert.strictEqual(vector.metadata.type, TYPES.Vector);
+    assert.strictEqual(vector.metadata.baseType, 'float32');
+    assert.strictEqual(vector.metadata.precision, 3);
+    assert.isNull(nullVector.value);
+  });
+
+  it('returns float16 vector columns as arrays of numbers', async function() {
+    // `float16` vectors are sent in binary form from vector support version 2.
+    if (connection.vectorSupportVersion < 2) {
+      this.skip();
+    }
+
+    const [[vector]] = await query(connection, "SELECT CAST('[1, 2.5, -3]' AS vector(3, float16))");
+    assert.deepEqual(vector.value, [1, 2.5, -3]);
+    assert.strictEqual(vector.metadata.baseType, 'float16');
+  });
+
+  it('returns vector columns as JSON text with `vectorTypeSupport: \'off\'`', async function() {
+    const off = await connect({ vectorTypeSupport: 'off' });
+    try {
+      const [[vector]] = await query(off, "SELECT CAST('[1, 2.5, -3]' AS vector(3))");
+      assert.isString(vector.value);
+      assert.deepEqual(JSON.parse(vector.value), [1, 2.5, -3]);
+    } finally {
+      await close(off);
+    }
+  });
+});

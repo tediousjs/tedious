@@ -1784,4 +1784,75 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
 
   });
+
+  describe('Vector columns', function() {
+    // Creates the table for the bulk load's columns, loads the rows and reads
+    // them back.
+    function load(bulkLoad: ReturnType<Connection['newBulkLoad']>, rows: Array<{ [name: string]: unknown }>, done: (error: Error | null | undefined, rowCount?: number) => void) {
+      connection.execSqlBatch(new Request(bulkLoad.getTableCreationSql(), (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        connection.execBulkLoad(bulkLoad, rows);
+      }));
+    }
+
+    function select(sql: string): Promise<unknown[][]> {
+      return new Promise((resolve, reject) => {
+        const rows: unknown[][] = [];
+        const request = new Request(sql, (err) => (err ? reject(err) : resolve(rows)));
+        request.on('row', (columns) => rows.push(columns.map((column: { value: unknown }) => column.value)));
+        connection.execSqlBatch(request);
+      });
+    }
+
+    beforeEach(function() {
+      // Requires a server with the `vector` data type, and TDS 7.4.
+      if (connection.vectorSupportVersion < 1) {
+        this.skip();
+      }
+    });
+
+    it('loads vector values', async function() {
+      const rowCount = await new Promise<number | undefined>((resolve, reject) => {
+        const bulkLoad = connection.newBulkLoad('#tmpVectors', (err, rowCount) => (err ? reject(err) : resolve(rowCount)));
+        bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+        // A vector column needs its number of dimensions.
+        bulkLoad.addColumn('v', TYPES.Vector, { length: 3, nullable: true });
+        load(bulkLoad, [{ id: 1, v: [1, 2.5, -3] }, { id: 2, v: new Float32Array([4, 5, 6]) }, { id: 3, v: null }], (err) => err && reject(err));
+      });
+
+      assert.strictEqual(rowCount, 3);
+      assert.deepEqual(await select('SELECT id, v FROM #tmpVectors ORDER BY id'), [[1, [1, 2.5, -3]], [2, [4, 5, 6]], [3, null]]);
+    });
+
+    it('loads float16 vector values', async function() {
+      // `float16` vectors require vector support version 2.
+      if (connection.vectorSupportVersion < 2) {
+        this.skip();
+      }
+
+      const rowCount = await new Promise<number | undefined>((resolve, reject) => {
+        const bulkLoad = connection.newBulkLoad('#tmpVectors16', (err, rowCount) => (err ? reject(err) : resolve(rowCount)));
+        bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+        bulkLoad.addColumn('h', TYPES.Vector, { length: 3, nullable: true, baseType: 'float16' });
+        load(bulkLoad, [{ id: 1, h: [1, 2.5, -3] }, { id: 2, h: null }], (err) => err && reject(err));
+      });
+
+      assert.strictEqual(rowCount, 2);
+      assert.deepEqual(await select('SELECT id, h FROM #tmpVectors16 ORDER BY id'), [[1, [1, 2.5, -3]], [2, null]]);
+    });
+
+    it('fails the bulk load for invalid vector values', async function() {
+      const error = await new Promise<Error | null | undefined>((resolve) => {
+        const bulkLoad = connection.newBulkLoad('#tmpVectors', (err) => resolve(err));
+        bulkLoad.addColumn('v', TYPES.Vector, { length: 3, nullable: true });
+        load(bulkLoad, [{ v: [1, 2] }], resolve);
+      });
+
+      assert.instanceOf(error, InputError);
+      assert.match((error as Error).message, /Column 'v' could not be serialized/);
+    });
+  });
 });

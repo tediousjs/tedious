@@ -42,7 +42,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, type ResolvedParameter, type DataType, TYPES, resolveParameter } from './data-type';
-import { VECTOR_SUPPORT_VERSION, requiredVectorSupportVersion } from './data-types/vector';
+import { VECTOR_SUPPORT_VERSION, requiredVectorSupportVersion, type VectorBaseType } from './data-types/vector';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -216,21 +216,30 @@ const VECTOR_TYPE_SUPPORT_VERSIONS: { [key in VectorTypeSupport]: number } = {
 };
 
 /**
+ * A data type as used by a parameter or column, with the base type that
+ * applies to `TYPES.Vector`.
+ *
+ * @private
+ */
+interface VectorTypeUse {
+  type: DataType;
+  baseType?: VectorBaseType | undefined;
+}
+
+/**
  * The types of RPC parameters, including the column types of table-valued
  * parameters.
  *
  * @private
  */
-function * parameterTypes(parameters: ResolvedParameter[]): Generator<DataType> {
+function * parameterTypes(parameters: ResolvedParameter[]): Generator<VectorTypeUse> {
   for (const parameter of parameters) {
-    yield parameter.type;
+    yield { type: parameter.type, baseType: parameter.data.baseType };
 
     if (parameter.type === TYPES.TVP) {
-      const table = parameter.data.value as { columns: Array<{ type: DataType }> } | null;
+      const table = parameter.data.value as { columns: VectorTypeUse[] } | null;
       if (table) {
-        for (const column of table.columns) {
-          yield column.type;
-        }
+        yield * table.columns;
       }
     }
   }
@@ -906,9 +915,10 @@ export interface ConnectionOptions {
    * server at login (requires TDS 7.4).
    *
    * * `'off'`: vector support is not requested. The server sends `vector` values as JSON array text in
-   *   `varchar(max)`, and `TYPES.Vector` / `TYPES.VectorFloat16` parameters and bulk load columns are rejected.
+   *   `varchar(max)`, and `TYPES.Vector` parameters and bulk load columns are rejected.
    * * `'v1'`: `vector` values with `float32` elements are exchanged in the native binary format.
    * * `'v2'`: `vector` values with `float32` or `float16` elements are exchanged in the native binary format.
+   *   `TYPES.Vector` parameters and columns with `baseType: 'float16'` require it.
    *
    * The server acknowledges the highest version both sides support. Servers without the `vector` data type ignore
    * the request.
@@ -2820,14 +2830,15 @@ class Connection extends EventEmitter {
   /**
    * Returns an error if any of the given types is a vector type that can not
    * be sent on this connection because the required vector support was not
-   * negotiated, and `undefined` otherwise.
+   * negotiated, and `undefined` otherwise. A vector type's required version
+   * depends on its base type.
    *
    * @private
    */
-  checkVectorSupport(types: Iterable<DataType>): RequestError | undefined {
+  checkVectorSupport(types: Iterable<VectorTypeUse>): RequestError | undefined {
     let required = 0;
-    for (const type of types) {
-      required = Math.max(required, requiredVectorSupportVersion(type));
+    for (const { type, baseType } of types) {
+      required = Math.max(required, requiredVectorSupportVersion(type, baseType));
     }
 
     if (required <= this.vectorSupportVersion) {
@@ -2836,14 +2847,14 @@ class Connection extends EventEmitter {
 
     let message;
     if (versions[this.config.options.tdsVersion] < versions['7_4']) {
-      message = 'Vector support was not negotiated with the server because the TDS version in use (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.Vector` and `TYPES.VectorFloat16` require TDS version `7_4`.';
+      message = 'Vector support was not negotiated with the server because the TDS version in use (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.Vector` requires TDS version `7_4`.';
     } else if (this.requestedVectorSupportVersion() < required) {
       message = 'Vector support version ' + required + ' is required, but the `vectorTypeSupport` option (`' + this.config.options.vectorTypeSupport + '`) ' +
-        (this.config.options.vectorTypeSupport === 'off' ? 'disables vector support.' : 'requests only version ' + this.requestedVectorSupportVersion() + '. `TYPES.VectorFloat16` requires `\'v2\'`.');
+        (this.config.options.vectorTypeSupport === 'off' ? 'disables vector support.' : 'requests only version ' + this.requestedVectorSupportVersion() + '. Vectors with `baseType: \'float16\'` require `\'v2\'`.');
     } else if (this.vectorSupportVersion === 0) {
-      message = 'The server does not support the `vector` data type. `TYPES.Vector` and `TYPES.VectorFloat16` require SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in Microsoft Fabric.';
+      message = 'The server does not support the `vector` data type. `TYPES.Vector` requires SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in Microsoft Fabric.';
     } else {
-      message = 'The server only supports vector support version ' + this.vectorSupportVersion + ', which does not include `float16` vectors. `TYPES.VectorFloat16` requires version ' + required + '.';
+      message = 'The server only supports vector support version ' + this.vectorSupportVersion + ', which does not include `float16` vectors. Vectors with `baseType: \'float16\'` require version ' + required + '.';
     }
 
     return new RequestError(message, 'EVECTORNOTSUPPORTED');
@@ -3007,7 +3018,7 @@ class Connection extends EventEmitter {
 
     // Checked before the `INSERT BULK` statement is sent: once the server has
     // accepted it, it expects the bulk load data.
-    const vectorError = this.state === this.STATE.LOGGED_IN && !bulkLoad.canceled ? this.checkVectorSupport(bulkLoad.columns.map((column) => column.type)) : undefined;
+    const vectorError = this.state === this.STATE.LOGGED_IN && !bulkLoad.canceled ? this.checkVectorSupport(bulkLoad.columns) : undefined;
     if (vectorError) {
       this.debug.log(vectorError.message);
       payload.close();

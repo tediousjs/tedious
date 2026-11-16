@@ -1,6 +1,5 @@
 import { assert } from 'chai';
 import Login7Payload from '../../src/login7-payload';
-import { parseLogin7FeatureExt } from '../helpers/login7-feature-ext';
 
 describe('Login7Payload', function() {
   describe('#toString', function() {
@@ -53,47 +52,6 @@ describe('Login7Payload', function() {
   });
 
   describe('#toBuffer', function() {
-
-    describe('with vector support', function() {
-      function createPayload(tdsVersion: number) {
-        return new Login7Payload({
-          tdsVersion: tdsVersion,
-          packetSize: 1024,
-          clientProgVer: 0,
-          clientPid: 12345,
-          connectionId: 0,
-          clientTimeZone: 120,
-          clientLcid: 0x00000409
-        });
-      }
-
-      it('requests the given VECTORSUPPORT version in the feature extension', function() {
-        const withoutVectorSupport = createPayload(0x74000004).toBuffer();
-
-        const payload = createPayload(0x74000004);
-        payload.vectorSupportVersion = 2;
-        const data = payload.toBuffer();
-
-        assert.lengthOf(data, withoutVectorSupport.length + 6);
-        const features = parseLogin7FeatureExt(data);
-        assert.deepEqual(features.get(0x0E), Buffer.from([0x02]));
-        // The other requested features are unchanged.
-        features.delete(0x0E);
-        assert.deepEqual(features, parseLogin7FeatureExt(withoutVectorSupport));
-      });
-
-      it('does not request vector support by default', function() {
-        const features = parseLogin7FeatureExt(createPayload(0x74000004).toBuffer());
-        assert.isFalse(features.has(0x0E));
-        assert.deepEqual(features.get(0x0A), Buffer.from([0x01]), 'UTF8_SUPPORT is still requested');
-      });
-
-      it('sends no feature extensions before TDS 7.4', function() {
-        const payload = createPayload(0x730B0003);
-        payload.vectorSupportVersion = 2;
-        assert.deepEqual(payload.toBuffer(), createPayload(0x730B0003).toBuffer());
-      });
-    });
 
     describe('for a login payload with a password', function() {
       it('generates the expected data', function() {

@@ -130,4 +130,22 @@ describe('Connection configuration validation', function() {
     assert.strictEqual(connection.config.options.encrypt, 'strict');
     ensureConnectionIsClosed(connection, () => {});
   });
+
+  it('vectorTypeSupport', function() {
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.vectorTypeSupport, 'v2');
+    ensureConnectionIsClosed(connection, () => {});
+
+    for (const value of ['off', 'v1', 'v2']) {
+      config.options.vectorTypeSupport = value;
+      const configured = new Connection(config);
+      assert.strictEqual(configured.config.options.vectorTypeSupport, value);
+      ensureConnectionIsClosed(configured, () => {});
+    }
+
+    config.options.vectorTypeSupport = 'v3';
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.vectorTypeSupport" property must be one of \'off\', \'v1\' or \'v2\'.');
+  });
 });

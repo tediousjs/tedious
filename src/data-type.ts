@@ -37,7 +37,7 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
-import { Vector, VectorFloat16 } from './data-types/vector';
+import { Vector, type VectorBaseType } from './data-types/vector';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
@@ -54,6 +54,8 @@ export interface Parameter {
   length?: number | undefined;
   precision?: number | undefined;
   scale?: number | undefined;
+  // For `TYPES.Vector`: the base type of its elements.
+  baseType?: VectorBaseType | undefined;
 
   nullable?: boolean | undefined;
 
@@ -67,6 +69,8 @@ export interface ParameterData<T = any> {
   length?: number | undefined;
   scale?: number | undefined;
   precision?: number | undefined;
+  // For `TYPES.Vector`: the base type of its elements.
+  baseType?: VectorBaseType | undefined;
 
   collation?: Collation | undefined;
 
@@ -267,8 +271,6 @@ export const TYPE = {
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
-  // `VectorFloat16` shares the id; the metadata parser picks it based on the
-  // dimension type in the TYPE_INFO.
   [Vector.id]: Vector,
 };
 
@@ -556,7 +558,7 @@ export const TYPE = {
  *   </tr>
  *   <tr>
  *     <td><code>vector(n, float16)</code></td>
- *     <td><code>{@link TYPES.VectorFloat16}</code></td>
+ *     <td><code>{@link TYPES.Vector}</code> with <code>baseType: 'float16'</code></td>
  *     <td><code>number[]</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
@@ -596,27 +598,27 @@ export const TYPE = {
  *     </p>
  *   </li>
  *   <li>
- *     <h4>Vector, VectorFloat16</h4>
+ *     <h4>Vector</h4>
  *     <p>
  *       Requires SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in
  *       Microsoft Fabric, and TDS 7.4. Vectors are sent and received in SQL Server's native binary format once the
  *       server has acknowledged the vector support feature extension at login, see
  *       {@link ConnectionOptions.vectorTypeSupport}. <code>float16</code> vectors require <code>vectorTypeSupport</code>
- *       <code>'v2'</code> (the default) and a server that supports them (in SQL Server 2025, the
- *       <code>PREVIEW_FEATURES</code> database scoped configuration must be enabled).
+ *       <code>'v2'</code> (the default) and a server that supports them.
  *     </p>
  *     <p>
  *       Values are returned as an array of numbers, one per dimension. <code>float16</code> elements are widened
- *       losslessly. The column's metadata holds the dimension count as <code>precision</code>, and the type
- *       (<code>TYPES.Vector</code> or <code>TYPES.VectorFloat16</code>) identifies the element type.
+ *       losslessly. The column's metadata holds the dimension count as <code>precision</code> and the base type
+ *       (<code>'float32'</code> or <code>'float16'</code>) as <code>baseType</code>.
  *     </p>
  *     <p>
  *       A parameter, bulk load or table-valued parameter value is an array of finite numbers or a
- *       <code>Float32Array</code>. Elements are rounded to the element type (to nearest, ties to even); a value that
- *       rounds to infinity is rejected. The number of dimensions is given with the <code>length</code> option. It is
- *       required for bulk load and table-valued parameter columns and for <code>null</code> parameter values, and
- *       otherwise inferred from the value. A vector has between 1 and 1998 (<code>float32</code>) or 3996
- *       (<code>float16</code>) dimensions.
+ *       <code>Float32Array</code>. The base type is given with the <code>baseType</code> option of the parameter, bulk
+ *       load column or table-valued parameter column: <code>'float32'</code> (the default) or <code>'float16'</code>.
+ *       Elements are rounded to the base type (to nearest, ties to even); a value that rounds to infinity is
+ *       rejected. The number of dimensions is given with the <code>length</code> option. It is required for bulk load
+ *       and table-valued parameter columns and for <code>null</code> parameter values, and otherwise inferred from
+ *       the value. A vector has between 1 and 1998 (<code>float32</code>) or 3996 (<code>float16</code>) dimensions.
  *     </p>
  *   </li>
  * </ol>
@@ -653,8 +655,7 @@ export const TYPES = {
   UDT,
   TVP,
   Variant,
-  Vector,
-  VectorFloat16
+  Vector
 };
 
 export const typeByName = TYPES;

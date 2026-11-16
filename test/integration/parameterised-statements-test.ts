@@ -1272,3 +1272,145 @@ end')\
     });
   });
 });
+
+describe('`vector` parameters', function() {
+  let connection: Connection;
+
+  function connect(options = {}): Promise<Connection> {
+    return new Promise((resolve, reject) => {
+      const config = getConfig();
+      const newConnection = new Connection({ ...config, options: { ...config.options, ...options } });
+      newConnection.connect((err) => (err ? reject(err) : resolve(newConnection)));
+    });
+  }
+
+  function execSqlRequest(connection: Connection, sql: string, addParameters: (request: Request) => void) {
+    return new Promise<{ row: Array<{ value: any, metadata: any }>, outputs: { [name: string]: { value: any, metadata: any } } }>((resolve, reject) => {
+      let row: Array<{ value: any, metadata: any }> = [];
+      const outputs: { [name: string]: { value: any, metadata: any } } = {};
+      const request = new Request(sql, (err) => (err ? reject(err) : resolve({ row, outputs })));
+      request.on('row', (columns) => {
+        row = columns;
+      });
+      request.on('returnValue', (name, value, metadata) => {
+        outputs[name] = { value, metadata };
+      });
+      addParameters(request);
+      connection.execSql(request);
+    });
+  }
+
+  function close(connection: Connection): Promise<void> {
+    return new Promise((resolve) => {
+      connection.on('end', () => resolve());
+      connection.close();
+    });
+  }
+
+  beforeEach(async function() {
+    connection = await connect();
+
+    // Requires a server with the `vector` data type, and TDS 7.4.
+    if (connection.vectorSupportVersion < 1) {
+      this.skip();
+    }
+  });
+
+  afterEach(async function() {
+    await close(connection);
+  });
+
+  it('sends float32 vectors', async function() {
+    const { row } = await execSqlRequest(connection, 'SELECT @v, @f, @n', (request) => {
+      request.addParameter('v', TYPES.Vector, [0.1, 2.5, -3]);
+      request.addParameter('f', TYPES.Vector, new Float32Array([1, 2]));
+      // A `null` vector needs its number of dimensions.
+      request.addParameter('n', TYPES.Vector, null, { length: 3 });
+    });
+
+    assert.deepEqual(row.map((column) => column.value), [[Math.fround(0.1), 2.5, -3], [1, 2], null]);
+    assert.strictEqual(row[0].metadata.baseType, 'float32');
+    assert.strictEqual(row[0].metadata.precision, 3);
+  });
+
+  it('returns vector output parameters', async function() {
+    const { outputs } = await execSqlRequest(connection, 'SET @out = @in', (request) => {
+      request.addParameter('in', TYPES.Vector, [1, 2.5, -3]);
+      request.addOutputParameter('out', TYPES.Vector, null, { length: 3 });
+    });
+
+    assert.deepEqual(outputs.out.value, [1, 2.5, -3]);
+    assert.strictEqual(outputs.out.metadata.baseType, 'float32');
+  });
+
+  it('sends float16 vectors', async function() {
+    // `float16` vectors require vector support version 2.
+    if (connection.vectorSupportVersion < 2) {
+      this.skip();
+    }
+
+    const { row, outputs } = await execSqlRequest(connection, 'SELECT @v; SET @out = @v', (request) => {
+      request.addParameter('v', TYPES.Vector, [1, 2.5, -3], { baseType: 'float16' });
+      request.addOutputParameter('out', TYPES.Vector, null, { length: 3, baseType: 'float16' });
+    });
+
+    assert.deepEqual(row[0].value, [1, 2.5, -3]);
+    assert.strictEqual(row[0].metadata.baseType, 'float16');
+    assert.deepEqual(outputs.out.value, [1, 2.5, -3]);
+    assert.strictEqual(outputs.out.metadata.baseType, 'float16');
+  });
+
+  it('rejects vector parameters without negotiated vector support', async function() {
+    const off = await connect({ vectorTypeSupport: 'off' });
+    try {
+      let error: any;
+      try {
+        await execSqlRequest(off, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, [1, 2, 3]));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error?.code, 'EVECTORNOTSUPPORTED');
+    } finally {
+      await close(off);
+    }
+  });
+
+  it('rejects float16 vector parameters with `vectorTypeSupport: \'v1\'`', async function() {
+    const v1 = await connect({ vectorTypeSupport: 'v1' });
+    try {
+      let error: any;
+      try {
+        await execSqlRequest(v1, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, [1, 2, 3], { baseType: 'float16' }));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error?.code, 'EVECTORNOTSUPPORTED');
+    } finally {
+      await close(v1);
+    }
+  });
+
+  it('rejects invalid vector parameters without sending them', async function() {
+    for (const [value, options, message] of [
+      [[1, NaN, 3], undefined, 'the element at index 1 is not a finite number'],
+      [null, undefined, 'must be specified with the `length` option'],
+      [[70000], { baseType: 'float16' }, 'out of range for float16']
+    ] as const) {
+      let error: any;
+      try {
+        await execSqlRequest(connection, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, value, options));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.strictEqual(error?.code, 'EPARAM');
+      assert.include(error.message, message);
+    }
+
+    // The connection is still usable.
+    const { row } = await execSqlRequest(connection, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, [1]));
+    assert.deepEqual(row[0].value, [1]);
+  });
+});

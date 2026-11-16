@@ -392,4 +392,69 @@ describe('calling a procedure that takes and returns a TVP', function() {
 
     connection.callProcedure(request);
   });
+
+  describe('Vector columns', function() {
+    // Replaces the table type and procedure with ones that take vectors.
+    function createTypeAndProcedure(columns: string) {
+      return new Promise<void>((resolve, reject) => {
+        connection.execSqlBatch(new Request(`
+          DROP PROCEDURE [__tediousTvpTest];
+          DROP TYPE [__tediousTvpType];
+          CREATE TYPE [__tediousTvpType] AS TABLE (id int, ${columns});
+          EXEC('CREATE PROCEDURE [__tediousTvpTest] @tvp __tediousTvpType readonly AS SELECT * FROM @tvp ORDER BY id');
+        `, (err) => (err ? reject(err) : resolve())));
+      });
+    }
+
+    function callProcedure(tvp: object) {
+      return new Promise<unknown[][]>((resolve, reject) => {
+        const rows: unknown[][] = [];
+        const request = new Request('__tediousTvpTest', (err) => (err ? reject(err) : resolve(rows)));
+        request.on('row', (columns) => rows.push(columns.map((column: { value: unknown }) => column.value)));
+        request.addParameter('tvp', TYPES.TVP, tvp);
+        connection.callProcedure(request);
+      });
+    }
+
+    beforeEach(function() {
+      // Requires a server with the `vector` data type, and TDS 7.4.
+      if (connection.vectorSupportVersion < 1) {
+        this.skip();
+      }
+    });
+
+    it('sends vector values', async function() {
+      await createTypeAndProcedure('v vector(3) NULL');
+
+      const rows = await callProcedure({
+        columns: [
+          { name: 'id', type: TYPES.Int },
+          // A vector column needs its number of dimensions.
+          { name: 'v', type: TYPES.Vector, length: 3 }
+        ],
+        rows: [[1, [1, 2.5, -3]], [2, new Float32Array([4, 5, 6])], [3, null]]
+      });
+
+      assert.deepEqual(rows, [[1, [1, 2.5, -3]], [2, [4, 5, 6]], [3, null]]);
+    });
+
+    it('sends float16 vector values', async function() {
+      // `float16` vectors require vector support version 2.
+      if (connection.vectorSupportVersion < 2) {
+        this.skip();
+      }
+
+      await createTypeAndProcedure('h vector(3, float16) NULL');
+
+      const rows = await callProcedure({
+        columns: [
+          { name: 'id', type: TYPES.Int },
+          { name: 'h', type: TYPES.Vector, length: 3, baseType: 'float16' }
+        ],
+        rows: [[1, [1, 2.5, -3]], [2, null]]
+      });
+
+      assert.deepEqual(rows, [[1, [1, 2.5, -3]], [2, null]]);
+    });
+  });
 });
