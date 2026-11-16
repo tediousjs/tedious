@@ -98,7 +98,7 @@ describe('BulkLoad', function() {
       }
 
       assert.instanceOf(error, InputError);
-      assert.strictEqual((error as InputError).message, "Column 'value' could not be serialized");
+      assert.strictEqual((error as InputError).message, "Column 'value' could not be serialized at row index 0");
       assert.instanceOf((error as InputError).cause, TypeError);
       assert.strictEqual(((error as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
     });
@@ -107,8 +107,8 @@ describe('BulkLoad', function() {
       { shape: 'array', rows: [['valid value'], ['sensitive value']] },
       { shape: 'object', rows: [{ inputName: 'valid value' }, { inputName: 'sensitive value' }] }
     ]) {
-      it(`reports the failing column for ${shape} rows without exposing the value`, async function() {
-        const cause = new TypeError('Invalid value.');
+      it(`keeps the rejected value out of the wrapper message for ${shape} rows`, async function() {
+        const cause = new TypeError('Invalid value: sensitive value');
         const type = buildType({
           validate(value) {
             if (value === 'sensitive value') {
@@ -126,14 +126,42 @@ describe('BulkLoad', function() {
 
         assert.instanceOf(error, InputError);
         assert.strictEqual(error.message, "Column 'databaseColumn' could not be validated at row index 1");
-        assert.notInclude((error as InputError).stack, 'sensitive value');
-        // The rejected value is not retained on the error.
-        assert.deepEqual(Object.keys(error as object), []);
+        assert.notInclude(error.message, 'sensitive value');
         assert.strictEqual((error as InputError).cause, cause);
+        assert.strictEqual(((error as InputError).cause as Error).message, 'Invalid value: sensitive value');
       });
     }
 
-    for (const row of [null, undefined]) {
+    it('wraps errors thrown while reading a row value with column and row context', async function() {
+      const cause = new Error('getter failed');
+      const row: { [colName: string]: unknown } = {};
+      Object.defineProperty(row, 'inputName', {
+        get() {
+          throw cause;
+        }
+      });
+
+      const error = await writeRow(
+        buildType({}),
+        [row],
+        'databaseColumn',
+        { objName: 'inputName', nullable: false }
+      );
+
+      assert.instanceOf(error, InputError);
+      assert.strictEqual(error.message, "Column 'databaseColumn' could not be validated at row index 0");
+      assert.strictEqual(error.cause, cause);
+    });
+
+    it('preserves non-TypeError validation failures as the cause', async function() {
+      const error = await writeRow(TYPES.BigInt, [['4111-1111-1111-1111']], 'value');
+
+      assert.instanceOf(error, InputError);
+      assert.strictEqual(error.message, "Column 'value' could not be validated at row index 0");
+      assert.instanceOf(error.cause, SyntaxError);
+    });
+
+    for (const row of [null, undefined, 'abc', 42]) {
       it(`reports the row index when a row is ${row}`, async function() {
         const rows = [[null], row] as unknown as Iterable<Row>;
         const error = await writeRow(buildType({}), rows);

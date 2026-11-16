@@ -149,17 +149,22 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
         const isArray = Array.isArray(row);
         for (let i = 0; i < columns.length; i++) {
           const c = columns[i];
-          const input = isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName];
-          let step = 'validated';
+          let value: unknown;
           try {
-            const value = c.type.validate(input, c.collation);
-            const parameter = {
-              length: c.length,
-              scale: c.scale,
-              precision: c.precision,
-              value: value
-            };
+            const input = isArray ? (row as unknown[])[i] : (row as { [colName: string]: unknown })[c.objName];
+            value = c.type.validate(input, c.collation);
+          } catch (error) {
+            throw new InputError(`Column '${c.name}' could not be validated at row index ${rowIndex}`, { cause: error });
+          }
 
+          const parameter = {
+            length: c.length,
+            scale: c.scale,
+            precision: c.precision,
+            value: value
+          };
+
+          try {
             if (isTextType[i] && value == null) {
               buffer.writeBuffer(textPointerNullBuffer);
             } else {
@@ -167,11 +172,10 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
                 buffer.writeBuffer(textPointerAndTimestampBuffer);
               }
 
-              step = 'serialized';
               c.type.writeValue(buffer, parameter, options);
             }
           } catch (error) {
-            throw new InputError(`Column '${c.name}' could not be ${step} at row index ${rowIndex}`, { cause: error });
+            throw new InputError(`Column '${c.name}' could not be serialized at row index ${rowIndex}`, { cause: error });
           }
 
           // Checked after every cell, not only after every row, so that a
