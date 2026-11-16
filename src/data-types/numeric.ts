@@ -1,5 +1,5 @@
 import { type DataType } from '../data-type';
-import { writeDecimal, writeDecimalTypeInfo } from './decimal-common';
+import { validateDecimal, writeDecimal, writeDecimalTypeInfo } from './decimal-common';
 import NumericN from './numericn';
 
 const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>, resolvePrecision: NonNullable<DataType['resolvePrecision']> } = {
@@ -34,19 +34,10 @@ const Numeric: DataType & { resolveScale: NonNullable<DataType['resolveScale']>,
   },
 
   writeValue(buffer, parameter) {
-    writeDecimal(buffer, parameter.value as number | null, parameter.precision, parameter.scale, 'NUMERIC');
+    writeDecimal(buffer, parameter.value as number | string | null, parameter.precision, parameter.scale, 'NUMERIC');
   },
 
-  validate: function(value): null | number {
-    if (value == null) {
-      return null;
-    }
-    value = parseFloat(value);
-    if (isNaN(value)) {
-      throw new TypeError('Invalid number.');
-    }
-    return value;
-  }
+  validate: validateDecimal
 };
 
 export default Numeric;

@@ -3,6 +3,63 @@ import type WritableTrackingBuffer from '../tracking-buffer/writable-tracking-bu
 const MASK_64 = (1n << 64n) - 1n;
 
 /**
+ * A string written as an exact decimal: an optional sign, then digits with
+ * an optional decimal point, as `'-12.50'` or `'.5'`. Surrounding whitespace
+ * is allowed, as `parseFloat` allows it. Exponents are not: SQL Server does
+ * not convert a string like `'1e5'` to `decimal`, so such a string is still
+ * read as a number.
+ */
+const DECIMAL_STRING = /^\s*([+-])?(?:(\d+)(?:\.(\d*))?|\.(\d+))\s*$/;
+
+/**
+ * Returns `value` multiplied by `10^scale` and rounded half away from zero,
+ * as SQL Server rounds a value converted to a smaller scale, or `undefined`
+ * if `value` is not a decimal string. The result is exact, unlike scaling a
+ * number, which holds only about 15 significant digits.
+ */
+export function scaleDecimalString(value: string, scale: number): bigint | undefined {
+  const match = DECIMAL_STRING.exec(value);
+  if (match === null) {
+    return undefined;
+  }
+
+  const [, sign, integerDigits = '', pointFraction, bareFraction] = match;
+  const fraction = pointFraction ?? bareFraction ?? '';
+
+  let magnitude: bigint;
+  if (fraction.length <= scale) {
+    magnitude = BigInt(integerDigits + fraction.padEnd(scale, '0'));
+  } else {
+    // The first digit past the scale decides the rounding.
+    magnitude = BigInt(integerDigits + fraction.slice(0, scale));
+    if (fraction[scale] >= '5') {
+      magnitude += 1n;
+    }
+  }
+
+  return sign === '-' ? -magnitude : magnitude;
+}
+
+/**
+ * Validates a `decimal` or `numeric` value. A decimal string is kept, without
+ * its surrounding whitespace, to be written exactly; anything else is read as
+ * a number, with `parseFloat`.
+ */
+export function validateDecimal(value: any): number | string | null {
+  if (value == null) {
+    return null;
+  }
+  if (typeof value === 'string' && DECIMAL_STRING.test(value)) {
+    return value.trim();
+  }
+  value = parseFloat(value);
+  if (isNaN(value)) {
+    throw new TypeError('Invalid number.');
+  }
+  return value;
+}
+
+/**
  * The number of bytes the magnitude of a `decimal` or `numeric` value takes
  * at `precision`.
  */
@@ -35,7 +92,7 @@ export function writeDecimalTypeInfo(buffer: WritableTrackingBuffer, id: number,
  * full width for the precision. `name` names the type in the error for a
  * value that does not fit.
  */
-export function writeDecimal(buffer: WritableTrackingBuffer, value: number | null, precision: number | undefined, scale: number | undefined, name: string): void {
+export function writeDecimal(buffer: WritableTrackingBuffer, value: number | string | null, precision: number | undefined, scale: number | undefined, name: string): void {
   if (value == null) {
     buffer.writeUInt8(0x00);
     return;
@@ -45,7 +102,19 @@ export function writeDecimal(buffer: WritableTrackingBuffer, value: number | nul
 
   // A BigInt holds magnitudes beyond 2^64 for high-precision columns.
   // See https://github.com/tediousjs/tedious/issues/1733
-  const magnitude = BigInt(Math.round(Math.abs(value * Math.pow(10, scale!))));
+  let magnitude: bigint;
+  let negative: boolean;
+  if (typeof value === 'string') {
+    const scaled = scaleDecimalString(value, scale!);
+    if (scaled === undefined) {
+      throw new TypeError('Invalid number.');
+    }
+    negative = scaled < 0n;
+    magnitude = negative ? -scaled : scaled;
+  } else {
+    negative = value < 0;
+    magnitude = BigInt(Math.round(Math.abs(value * Math.pow(10, scale!))));
+  }
 
   // Throwing surfaces a catchable error to the caller instead of silently
   // truncating the magnitude.
@@ -54,7 +123,7 @@ export function writeDecimal(buffer: WritableTrackingBuffer, value: number | nul
   }
 
   buffer.writeUInt8(dataLength + 1);
-  buffer.writeUInt8(value < 0 ? 0 : 1);
+  buffer.writeUInt8(negative ? 0 : 1);
 
   switch (dataLength) {
     case 4:

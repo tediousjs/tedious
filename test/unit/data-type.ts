@@ -572,6 +572,45 @@ describe('Decimal', function() {
         serialize(TYPES.Decimal, parameterValue, optionsWithUTCFalse).data;
       }, RangeError, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
     });
+
+    it('converts `string` values exactly', function() {
+      // 12345678901234567.123456789 has more significant digits than a number holds.
+      const value = '12345678901234567.123456789';
+      const expected = Buffer.from('0115532a3daa7e22984c360a0000000000', 'hex');
+
+      const buffer = serialize(TYPES.Decimal, { value, precision: 38, scale: 9 }, options).data;
+      assert.deepEqual(buffer, expected);
+    });
+
+    it('converts the largest `string` value of precision 38', function() {
+      const value = '99999999999999999999999999999999999999';
+      const expected = Buffer.from('01ffffffff3f228a097ac4865aa84c3b4b', 'hex');
+
+      const buffer = serialize(TYPES.Decimal, { value, precision: 38, scale: 0 }, options).data;
+      assert.deepEqual(buffer, expected);
+    });
+
+    it('rounds `string` values half away from zero to the scale', function() {
+      const cases: [string, string][] = [
+        ['0.145', '010f000000'],
+        ['-0.145', '000f000000'],
+        ['0.144', '010e000000'],
+        ['-0.001', '0100000000'],
+        ['.5', '0132000000'],
+        ['+7', '01bc020000']
+      ];
+
+      for (const [value, hex] of cases) {
+        const buffer = serialize(TYPES.Decimal, { value, precision: 5, scale: 2 }, options).data;
+        assert.deepEqual(buffer, Buffer.from(hex, 'hex'), value);
+      }
+    });
+
+    it('throws a RangeError when a `string` value overflows the field width', function() {
+      assert.throws(() => {
+        serialize(TYPES.Decimal, { value: '100000000000', precision: 9, scale: 0 }, options).data;
+      }, RangeError, 'Value 100000000000 is out of range for DECIMAL(9, 0).');
+    });
   });
 
   describe('.writeTypeInfo', function() {
@@ -626,6 +665,14 @@ describe('Decimal', function() {
       assert.equal(TYPES.Decimal.validate('   123', undefined), 123);
       assert.equal(TYPES.Decimal.validate('1-e5', undefined), 1);
       assert.equal(TYPES.Decimal.validate('1e2e3', undefined), 100);
+    });
+
+    it('keeps decimal strings, without surrounding whitespace, to write them exactly', function() {
+      assert.strictEqual(TYPES.Decimal.validate('12345678901234567.123456789', undefined), '12345678901234567.123456789');
+      assert.strictEqual(TYPES.Decimal.validate('   123', undefined), '123');
+      assert.strictEqual(TYPES.Decimal.validate('-.5', undefined), '-.5');
+      assert.strictEqual(TYPES.Decimal.validate('5.', undefined), '5.');
+      assert.strictEqual(TYPES.Decimal.validate('1e3', undefined), 1000);
     });
   });
 });
@@ -822,6 +869,21 @@ describe('Money', function() {
 
       const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
       assert.deepEqual(buffer, expected);
+    });
+
+    it('converts `string` values exactly, rounding half away from zero', function() {
+      const cases: [string, string][] = [
+        ['1234', '00000000204bbc00'],
+        ['922337203685477.5807', 'ffffff7fffffffff'],
+        ['-922337203685477.5808', '0000008000000000'],
+        ['0.00005', '0000000001000000'],
+        ['-0.00005', 'ffffffffffffffff']
+      ];
+
+      for (const [value, hex] of cases) {
+        const buffer = serialize(TYPES.Money, { value }, options).data;
+        assert.deepEqual(buffer, Buffer.from(hex, 'hex'), value);
+      }
     });
 
     it('correctly converts `null` values', function() {
@@ -1313,6 +1375,19 @@ describe('SmallMoney', function() {
 
       const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
       assert.deepEqual(buffer, expected);
+    });
+
+    it('converts `string` values exactly', function() {
+      const cases: [string, string][] = [
+        ['2', '204e0000'],
+        ['214748.3647', 'ffffff7f'],
+        ['-214748.3648', '00000080']
+      ];
+
+      for (const [value, hex] of cases) {
+        const buffer = serialize(TYPES.SmallMoney, { value }, options).data;
+        assert.deepEqual(buffer, Buffer.from(hex, 'hex'), value);
+      }
     });
 
     it('correctly converts `null` values', function() {

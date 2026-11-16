@@ -4,9 +4,14 @@ import { readValue } from '../../src/value-parser';
 import { type Metadata } from '../../src/metadata-parser';
 import { type ParserOptions } from '../../src/token/stream-parser';
 import { type DataType, typeByName as dataTypeByName } from '../../src/data-type';
+import DecimalN from '../../src/data-types/decimaln';
+import NumericN from '../../src/data-types/numericn';
+import MoneyN from '../../src/data-types/moneyn';
 
 const utcOptions = { useUTC: true } as ParserOptions;
 const localOptions = { useUTC: false } as ParserOptions;
+const numberOptions = { decimalAsString: false } as ParserOptions;
+const stringOptions = { decimalAsString: true } as ParserOptions;
 
 function buildMetadata(type: DataType, scale?: number): Metadata {
   return {
@@ -330,6 +335,103 @@ describe('readValue', function() {
       const value = result.value as Date;
 
       assert.strictEqual(value.getTime(), new Date(1900, 0, 3, 0, 0, 45).getTime());
+    });
+  });
+});
+
+describe('readValue with `decimalAsString`', function() {
+  // A `decimal` or `numeric` value: its length, its sign (1 for positive),
+  // then its magnitude as a little-endian unsigned integer.
+  function decimalBuffer(sign: number, magnitude: string): Buffer {
+    const bytes = Buffer.from(magnitude, 'hex');
+    return Buffer.concat([Buffer.from([bytes.length + 1, sign]), bytes]);
+  }
+
+  describe('for `decimal` values', function() {
+    it('should parse values of every length exactly', function() {
+      const cases: [number, number, string, string][] = [
+        [2, 1, '96000000', '1.50'],
+        [2, 0, '96000000', '-1.50'],
+        [0, 1, '2a000000', '42'],
+        [0, 1, '0100000000002000', '9007199254740993'],
+        [28, 1, 'ffffff0f6102253e5ece4f20', '0.9999999999999999999999999999'],
+        [9, 1, '15532a3daa7e22984c360a0000000000', '12345678901234567.123456789'],
+        [0, 0, 'ffffffff3f228a097ac4865aa84c3b4b', '-99999999999999999999999999999999999999']
+      ];
+
+      for (const [scale, sign, magnitude, expected] of cases) {
+        const buf = decimalBuffer(sign, magnitude);
+        const result = readValue(buf, 0, buildMetadata(DecimalN, scale), stringOptions);
+
+        assert.strictEqual(result.value, expected);
+        assert.strictEqual(result.offset, buf.length);
+      }
+    });
+
+    it('should parse a negative zero as zero', function() {
+      const result = readValue(decimalBuffer(0, '00000000'), 0, buildMetadata(NumericN, 2), stringOptions);
+      assert.strictEqual(result.value, '0.00');
+    });
+
+    it('should parse values as numbers when the option is off', function() {
+      const result = readValue(decimalBuffer(1, '96000000'), 0, buildMetadata(DecimalN, 2), numberOptions);
+      assert.strictEqual(result.value, 1.5);
+    });
+
+    it('should parse `NULL` values', function() {
+      const result = readValue(Buffer.from([0x00]), 0, buildMetadata(DecimalN, 2), stringOptions);
+      assert.isNull(result.value);
+    });
+  });
+
+  describe('for `money` and `smallmoney` values', function() {
+    it('should parse values exactly, with four fractional digits', function() {
+      const cases: [DataType, string, string][] = [
+        [MoneyN, '08ffffff7fffffffff', '922337203685477.5807'],
+        [MoneyN, '080000008000000000', '-922337203685477.5808'],
+        [MoneyN, '08ffffffffffffffff', '-0.0001'],
+        [MoneyN, '0400000080', '-214748.3648'],
+        [dataTypeByName.Money, '00000000204bbc00', '1234.0000'],
+        [dataTypeByName.SmallMoney, '204e0000', '2.0000']
+      ];
+
+      for (const [type, hex, expected] of cases) {
+        const buf = Buffer.from(hex, 'hex');
+        const result = readValue(buf, 0, buildMetadata(type), stringOptions);
+
+        assert.strictEqual(result.value, expected);
+        assert.strictEqual(result.offset, buf.length);
+      }
+    });
+
+    it('should parse values as numbers when the option is off', function() {
+      const result = readValue(Buffer.from('08ffffffffffffffff', 'hex'), 0, buildMetadata(MoneyN), numberOptions);
+      assert.strictEqual(result.value, -0.0001);
+    });
+  });
+
+  describe('for `sql_variant` values', function() {
+    it('should parse `decimal` values exactly', function() {
+      // The variant's length, the base type and its property length, then
+      // the precision and scale, then the value.
+      const value = decimalBuffer(0, '15532a3daa7e22984c360a0000000000').subarray(1);
+      const header = Buffer.alloc(4);
+      header.writeUInt32LE(4 + value.length);
+      const buf = Buffer.concat([header, Buffer.from([DecimalN.id, 2, 38, 9]), value]);
+
+      const result = readValue(buf, 0, buildMetadata(dataTypeByName.Variant), stringOptions);
+      assert.strictEqual(result.value, '-12345678901234567.123456789');
+      assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse `money` values exactly', function() {
+      const value = Buffer.from('ffffff7fffffffff', 'hex');
+      const header = Buffer.alloc(4);
+      header.writeUInt32LE(2 + value.length);
+      const buf = Buffer.concat([header, Buffer.from([dataTypeByName.Money.id, 0]), value]);
+
+      const result = readValue(buf, 0, buildMetadata(dataTypeByName.Variant), stringOptions);
+      assert.strictEqual(result.value, '922337203685477.5807');
     });
   });
 });

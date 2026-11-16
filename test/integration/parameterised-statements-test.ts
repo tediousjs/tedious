@@ -103,7 +103,8 @@ function execSqlOutput(
   type: DataType,
   value: unknown,
   expectedValue?: unknown,
-  connectionOptions?: ConnectionOptions
+  connectionOptions?: ConnectionOptions,
+  options?: ParameterOptions
 ): void {
   const config = getConfig();
 
@@ -113,8 +114,8 @@ function execSqlOutput(
     connection.close();
   });
 
-  request.addParameter('paramIn', type, value);
-  request.addOutputParameter('paramOut', type);
+  request.addParameter('paramIn', type, value, options);
+  request.addOutputParameter('paramOut', type, undefined, options);
 
   request.on('doneInProc', function(rowCount, more) {
     assert.isTrue(more);
@@ -269,6 +270,50 @@ describe('Parameterised Statements Test', function() {
 
   it('should test money', function(done) {
     execSql(done, TYPES.Money, 956455842.4566);
+  });
+
+  describe('decimal strings', function() {
+    const decimalAsString = { decimalAsString: true };
+
+    it('should send a decimal string exactly', function(done) {
+      execSql(done, TYPES.Decimal, '12345678901234567.123456789', null, { precision: 38, scale: 9 }, '12345678901234567.123456789', true);
+    });
+
+    it('should send a numeric string exactly', function(done) {
+      execSql(done, TYPES.Numeric, '-99999999999999999999999999999999999999', null, { precision: 38, scale: 0 }, '-99999999999999999999999999999999999999', true);
+    });
+
+    it('should round a decimal string half away from zero to the scale', function(done) {
+      execSql(done, TYPES.Decimal, '-0.145', null, { precision: 5, scale: 2 }, '-0.15', true);
+    });
+
+    it('should send a money string exactly', function(done) {
+      execSql(done, TYPES.Money, '922337203685477.5807', null, null, '922337203685477.5807', false, decimalAsString);
+    });
+
+    it('should send a smallmoney string exactly', function(done) {
+      execSql(done, TYPES.SmallMoney, '-214748.3648', null, null, '-214748.3648', false, decimalAsString);
+    });
+
+    it('should read a decimal parameter back as a string with `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, '12345678901234567.123456789', null, { precision: 38, scale: 9 }, '12345678901234567.123456789', false, decimalAsString);
+    });
+
+    it('should read a decimal number back as a string with `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, -5555.55, null, { precision: 6, scale: 2 }, '-5555.55', false, decimalAsString);
+    });
+
+    it('should read a decimal string back as a number without `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, '-5555.55', null, { precision: 6, scale: 2 }, -5555.55);
+    });
+
+    it('should read a decimal output parameter as a string with `decimalAsString`', function(done) {
+      execSqlOutput(done, TYPES.Decimal, '12345678901234567.123456789', '12345678901234567.123456789', decimalAsString, { precision: 38, scale: 9 });
+    });
+
+    it('should read a money output parameter as a string with `decimalAsString`', function(done) {
+      execSqlOutput(done, TYPES.Money, '-922337203685477.5808', '-922337203685477.5808', decimalAsString);
+    });
   });
 
   it('UniqueIdentifier when `lowerCaseGuids` option is `false`', function(done) {

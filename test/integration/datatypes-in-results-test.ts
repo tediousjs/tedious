@@ -82,6 +82,65 @@ describe('Datatypes in results test', function() {
     });
   }
 
+  describe('with `decimalAsString`', function() {
+    let connection: Connection;
+
+    beforeEach(function(done) {
+      connection = new Connection({ ...config, options: { ...config.options, decimalAsString: true } });
+      connection.connect(done);
+    });
+
+    afterEach(function(done) {
+      if (!connection.closed) {
+        connection.on('end', done);
+        connection.close();
+      } else {
+        done();
+      }
+    });
+
+    it('should return `decimal`, `numeric`, `money` and `smallmoney` values as exact strings', function(done) {
+      const request = new Request(`select
+        cast('12345678901234567.123456789' as decimal(38, 9)),
+        cast('-99999999999999999999999999999999999999' as numeric(38, 0)),
+        cast('0.9999999999999999999999999999' as decimal(28, 28)),
+        cast(9007199254740993 as decimal(19, 0)),
+        cast(0.5 as decimal(10, 2)),
+        cast(-0.0 as decimal(5, 2)),
+        cast(1.5 as decimal(9, 0)),
+        cast('922337203685477.5807' as money),
+        cast('-922337203685477.5808' as money),
+        cast(-0.0001 as money),
+        cast('-214748.3648' as smallmoney),
+        cast(cast('-1234.5678' as decimal(20, 4)) as sql_variant),
+        cast(cast(12.5 as money) as sql_variant),
+        cast(null as decimal(10, 2)),
+        cast(null as money)`, done);
+
+      request.on('row', function(columns) {
+        assert.deepEqual(columns.map((column: { value: unknown }) => column.value), [
+          '12345678901234567.123456789',
+          '-99999999999999999999999999999999999999',
+          '0.9999999999999999999999999999',
+          '9007199254740993',
+          '0.50',
+          '0.00',
+          '2',
+          '922337203685477.5807',
+          '-922337203685477.5808',
+          '-0.0001',
+          '-214748.3648',
+          '-1234.5678',
+          '12.5000',
+          null,
+          null
+        ]);
+      });
+
+      connection.execSqlBatch(request);
+    });
+  });
+
   testDataType(TYPES.TinyInt, {
     'should handle small value': ['select cast(8 as tinyint)', 8],
     'should handle large value': ['select cast(252 as tinyint)', 252],
