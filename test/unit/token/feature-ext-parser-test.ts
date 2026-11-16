@@ -58,4 +58,46 @@ describe('Feature Ext Parser', () => {
 
     assert.isTrue((await parser.next()).done);
   });
+
+  it('should parse vector support token', async function() {
+    const buffer = new WritableTrackingBuffer();
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x0A); // UTF8_SUPPORT feature id
+    buffer.writeUInt32LE(1); // datalen
+    buffer.writeUInt8(0x01); // supported
+    buffer.writeUInt8(0x0E); // VECTORSUPPORT feature id
+    buffer.writeUInt32LE(1); // datalen
+    buffer.writeUInt8(0x02); // version
+
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], options);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.deepEqual(token.vectorSupport, Buffer.from([0x02]));
+    assert.strictEqual(token.utf8Support, true);
+    assert.isUndefined(token.fedAuth);
+
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should leave vector support undefined if not acknowledged', async function() {
+    const buffer = new WritableTrackingBuffer();
+
+    buffer.writeUInt8(0xAE); // FEATUREEXTACK token header
+    buffer.writeUInt8(0x0A); // UTF8_SUPPORT feature id
+    buffer.writeUInt32LE(1); // datalen
+    buffer.writeUInt8(0x01); // supported
+    buffer.writeUInt8(0xFF); // TERMINATOR
+
+    const parser = StreamParser.parseTokens([buffer.data], options);
+    const token = (await parser.next()).value;
+
+    assert.instanceOf(token, FeatureExtAckToken);
+    assert.isUndefined(token.vectorSupport);
+  });
 });
