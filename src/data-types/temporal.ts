@@ -372,14 +372,41 @@ export function toZonedDateTime(value: unknown): Temporal.ZonedDateTime {
 }
 
 /**
- * Throws if `date` is outside of `[min, max]`.
+ * A bound of the range of a date and time type, as the day number since
+ * 1970-01-01 and the nanoseconds since midnight of that day.
  */
-export function checkRange(date: Temporal.PlainDate | Temporal.PlainDateTime, min: Temporal.PlainDateTime, max: Temporal.PlainDateTime): void {
-  const value = date instanceof Temporal.PlainDate ? date.toPlainDateTime() : date;
-  if (Temporal.PlainDateTime.compare(value, min) < 0 || Temporal.PlainDateTime.compare(value, max) > 0) {
-    throw new TypeError('Out of range.');
-  }
+export interface RangeBound {
+  readonly epochDays: number;
+  readonly nanoseconds: number;
 }
 
-export const MIN_DATETIME2 = new Temporal.PlainDateTime(1, 1, 1);
-export const MAX_DATETIME2 = new Temporal.PlainDateTime(9999, 12, 31, 23, 59, 59, 999, 999, 999);
+export function rangeBound(year: number, month: number, day: number, nanoseconds = 0): RangeBound {
+  return { epochDays: epochDaysFromDate(year, month, day), nanoseconds };
+}
+
+/**
+ * Throws if `value` is outside of `[min, max]`. A value without time fields
+ * (a `Temporal.PlainDate`) is taken as midnight.
+ *
+ * This compares numbers computed from the value's field getters rather than
+ * using `Temporal.PlainDateTime.compare`, which is several times slower in
+ * native implementations (and needs both sides to be the same type).
+ */
+export function checkRange(value: DateFields | (DateFields & TimeFields), min: RangeBound, max: RangeBound): void {
+  const epochDays = epochDaysFromDate(value.year, value.month, value.day);
+  if (epochDays > min.epochDays && epochDays < max.epochDays) {
+    return;
+  }
+
+  if (epochDays >= min.epochDays && epochDays <= max.epochDays) {
+    const nanoseconds = 'hour' in value ? nanosecondsSinceMidnight(value) : 0;
+    if ((epochDays !== min.epochDays || nanoseconds >= min.nanoseconds) && (epochDays !== max.epochDays || nanoseconds <= max.nanoseconds)) {
+      return;
+    }
+  }
+
+  throw new TypeError('Out of range.');
+}
+
+export const MIN_DATETIME2 = rangeBound(1, 1, 1);
+export const MAX_DATETIME2 = rangeBound(9999, 12, 31, NANOSECONDS_PER_DAY - 1);

@@ -88,7 +88,7 @@ const DateTimeOffset: DataType & { resolveScale: NonNullable<DataType['resolveSc
 
     // Both the value as given and in UTC, which is how it is sent, must be
     // within range.
-    checkRange(zoned.toPlainDateTime(), MIN_DATETIME2, MAX_DATETIME2);
+    checkRange(zoned, MIN_DATETIME2, MAX_DATETIME2);
     const epochMilliseconds = zoned.epochMilliseconds;
     if (epochMilliseconds < MIN_EPOCH_MILLISECONDS || epochMilliseconds > MAX_EPOCH_MILLISECONDS) {
       throw new TypeError('Out of range.');

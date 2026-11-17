@@ -1,6 +1,6 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-import { checkRange, epochDaysFromDate, EPOCH_DAYS_1900_01_01, nanosecondsSinceMidnight, Temporal, toPlainDateTime } from './temporal';
+import { checkRange, epochDaysFromDate, EPOCH_DAYS_1900_01_01, nanosecondsSinceMidnight, rangeBound, toPlainDateTime, type Temporal } from './temporal';
 
 const TYPE_INFO = Buffer.from([DateTimeN.id, 0x08]);
 
@@ -8,8 +8,9 @@ const TYPE_INFO = Buffer.from([DateTimeN.id, 0x08]);
 const TICKS_PER_DAY = 25_920_000;
 
 // The latest value that does not round up into the year 10000.
-const MIN_DATETIME = new Temporal.PlainDateTime(1753, 1, 1);
-const MAX_DATETIME = new Temporal.PlainDateTime(9999, 12, 31, 23, 59, 59, 998, 333, 333);
+const MIN_DATETIME = rangeBound(1753, 1, 1);
+// 23:59:59.998333333
+const MAX_DATETIME = rangeBound(9999, 12, 31, 86_399_998_333_333);
 
 const DateTime: DataType = {
   id: 0x3D,

@@ -1,13 +1,13 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-import { checkRange, epochDaysFromDate, EPOCH_DAYS_1900_01_01, Temporal, toPlainDateTime } from './temporal';
+import { checkRange, epochDaysFromDate, EPOCH_DAYS_1900_01_01, NANOSECONDS_PER_DAY, rangeBound, toPlainDateTime, type Temporal } from './temporal';
 
 const TYPE_INFO = Buffer.from([DateTimeN.id, 0x04]);
 
 // `smalldatetime` has minute precision; seconds and below are truncated.
 // See: https://learn.microsoft.com/en-us/sql/t-sql/data-types/smalldatetime-transact-sql
-const MIN_SMALLDATETIME = new Temporal.PlainDateTime(1900, 1, 1);
-const MAX_SMALLDATETIME = new Temporal.PlainDateTime(2079, 6, 6, 23, 59, 59, 999, 999, 999);
+const MIN_SMALLDATETIME = rangeBound(1900, 1, 1);
+const MAX_SMALLDATETIME = rangeBound(2079, 6, 6, NANOSECONDS_PER_DAY - 1);
 
 const SmallDateTime: DataType = {
   id: 0x3A,
