@@ -1,9 +1,15 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
+import { checkRange, epochDaysFromDate, EPOCH_DAYS_1900_01_01, nanosecondsSinceMidnight, Temporal, toPlainDateTime } from './temporal';
 
-const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
 const TYPE_INFO = Buffer.from([DateTimeN.id, 0x08]);
+
+// `datetime` stores the time of day in 1/300 second ticks.
+const TICKS_PER_DAY = 25_920_000;
+
+// The latest value that does not round up into the year 10000.
+const MIN_DATETIME = new Temporal.PlainDateTime(1753, 1, 1);
+const MAX_DATETIME = new Temporal.PlainDateTime(9999, 12, 31, 23, 59, 59, 998, 333, 333);
 
 const DateTime: DataType = {
   id: 0x3D,
@@ -18,63 +24,35 @@ const DateTime: DataType = {
     buffer.writeBuffer(TYPE_INFO);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as Date | null;
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Temporal.PlainDateTime | null;
     if (value == null) {
       buffer.writeUInt8(0x00);
       return;
     }
 
-    let days: number, milliseconds: number;
-    if (options.useUTC) {
-      days = EPOCH_DATE.until(LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()), ChronoUnit.DAYS);
-      milliseconds = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
-    } else {
-      days = EPOCH_DATE.until(LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate()), ChronoUnit.DAYS);
-      milliseconds = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
-    }
+    let days = epochDaysFromDate(value.year, value.month, value.day) - EPOCH_DAYS_1900_01_01;
+    // ticks = nanoseconds * 300 / 10^9
+    let ticks = Math.round(nanosecondsSinceMidnight(value) * 3 / 10_000_000);
 
-    let threeHundredthsOfSecond = Math.round(milliseconds / (3 + (1 / 3)));
-
-    // 25920000 equals one day
-    if (threeHundredthsOfSecond === 25920000) {
+    if (ticks === TICKS_PER_DAY) {
       days += 1;
-      threeHundredthsOfSecond = 0;
+      ticks = 0;
     }
 
     buffer.writeUInt8(0x08);
     buffer.writeInt32LE(days);
-    buffer.writeUInt32LE(threeHundredthsOfSecond);
+    buffer.writeUInt32LE(ticks);
   },
 
-  // TODO: type 'any' needs to be revisited.
-  validate: function(value: any, collation, options): null | number {
+  validate: function(value): null | Temporal.PlainDateTime {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
-    }
-
-    value = value as Date;
-
-    let year;
-    if (options && options.useUTC) {
-      year = value.getUTCFullYear();
-    } else {
-      year = value.getFullYear();
-    }
-
-    if (year < 1753 || year > 9999) {
-      throw new TypeError('Out of range.');
-    }
-
-    if (isNaN(value)) {
-      throw new TypeError('Invalid date.');
-    }
-
-    return value;
+    const dateTime = toPlainDateTime(value);
+    checkRange(dateTime, MIN_DATETIME, MAX_DATETIME);
+    return dateTime;
   }
 };
 

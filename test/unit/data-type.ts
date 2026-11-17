@@ -3,12 +3,18 @@ import { type InternalConnectionOptions } from '../../src/connection';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 // Test options - using type assertion since tests only exercise code paths
 // that use a subset of the full InternalConnectionOptions
 const options: InternalConnectionOptions = {} as InternalConnectionOptions;
-const optionsWithUTCFalse: InternalConnectionOptions = { useUTC: false } as InternalConnectionOptions;
-const optionsWithUTCTrue: InternalConnectionOptions = { useUTC: true } as InternalConnectionOptions;
+
+// A stand-in for a Temporal object of another implementation (e.g. a native
+// `Temporal`, or another copy of the polyfill), which is only recognizable
+// by its `Symbol.toStringTag` and string form.
+function foreignTemporal(type: string, value: string) {
+  return { [Symbol.toStringTag]: `Temporal.${type}`, toString: () => value };
+}
 
 function typeInfo(type: DataType, parameter: ParameterData, options: InternalConnectionOptions) {
   const buffer = new WritableTrackingBuffer();
@@ -44,7 +50,7 @@ describe('BigInt', function() {
       const expected = Buffer.from('15cd5b0700000000', 'hex');
 
       const parameterValue = { value: TYPES.BigInt.validate(value, undefined), length: 4 };
-      const buffer = serialize(TYPES.BigInt, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.BigInt, parameterValue, options).data;
 
       assert.deepEqual(buffer, expected);
     });
@@ -54,7 +60,7 @@ describe('BigInt', function() {
       const expected = Buffer.from('15cd5b0700000000', 'hex');
 
       const parameterValue = { value: TYPES.BigInt.validate(value, undefined), length: 4 };
-      const buffer = serialize(TYPES.BigInt, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.BigInt, parameterValue, options).data;
 
       assert.deepEqual(buffer, expected);
     });
@@ -65,7 +71,7 @@ describe('BigInt', function() {
 
       const parameterValue = { value, length: 4 };
 
-      const buffer = serialize(TYPES.BigInt, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.BigInt, parameterValue, options).data;
 
       assert.deepEqual(buffer, expected);
     });
@@ -96,7 +102,7 @@ describe('Binary', function() {
       const expected = Buffer.from('12340000', 'hex');
       const parameterValue = { value, length: 4 };
 
-      const buffer = serialize(TYPES.Binary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Binary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -141,7 +147,7 @@ describe('Binary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length: 4 };
 
-      const buffer = serialize(TYPES.Binary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Binary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -183,7 +189,7 @@ describe('Bit', function() {
       const expected = Buffer.from([0x01]);
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.Bit, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Bit, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -192,7 +198,7 @@ describe('Bit', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.Bit, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Bit, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -201,7 +207,7 @@ describe('Bit', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.Bit, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Bit, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -229,7 +235,7 @@ describe('Char', function() {
       const value = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.Char, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Char, parameterValue, options).data;
       assert.deepEqual(buffer, value);
     });
 
@@ -238,7 +244,7 @@ describe('Char', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.Char, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.Char, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -257,19 +263,20 @@ describe('Date', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.Date, { value: null }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Date, { value: new Date() }, options).length, Buffer.from([0x03]));
+      assert.deepEqual(serialize(TYPES.Date, { value: Temporal.PlainDate.from('2015-06-19') }, options).length, Buffer.from([0x03]));
     });
   });
 
   describe('.writeValue data', function() {
-    it('correctly converts dates during daylight savings period', function() {
+    it('writes the number of days since 0001-01-01', function() {
       for (const [value, expectedBuffer] of [
-        [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('163a0b', 'hex')],
-        [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('173a0b', 'hex')],
-        [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('173a0b', 'hex')],
-        [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('183a0b', 'hex')]
-      ] as [Date, Buffer][]) {
-        const buffer = serialize(TYPES.Date, { value: value }, optionsWithUTCFalse).data;
+        [new Temporal.PlainDate(1, 1, 1), Buffer.from('000000', 'hex')],
+        [new Temporal.PlainDate(2015, 6, 18), Buffer.from('163a0b', 'hex')],
+        [new Temporal.PlainDate(2015, 6, 19), Buffer.from('173a0b', 'hex')],
+        [new Temporal.PlainDate(2015, 6, 20), Buffer.from('183a0b', 'hex')],
+        [new Temporal.PlainDate(9999, 12, 31), Buffer.from('dab937', 'hex')]
+      ] as [Temporal.PlainDate, Buffer][]) {
+        const buffer = serialize(TYPES.Date, { value: value }, options).data;
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
@@ -286,15 +293,51 @@ describe('Date', function() {
   });
 
   describe('.validate', function() {
+    it('accepts `Temporal.PlainDate` values', function() {
+      const value = Temporal.PlainDate.from('2015-06-19');
+      assert.strictEqual(TYPES.Date.validate(value, undefined), value);
+    });
+
+    it('accepts ISO 8601 strings', function() {
+      assert.isTrue(TYPES.Date.validate('2015-06-19', undefined).equals('2015-06-19'));
+    });
+
+    it('takes the date of `Temporal.PlainDateTime` and `Temporal.ZonedDateTime` values', function() {
+      assert.isTrue(TYPES.Date.validate(Temporal.PlainDateTime.from('2015-06-19T23:59'), undefined).equals('2015-06-19'));
+      assert.isTrue(TYPES.Date.validate(Temporal.ZonedDateTime.from('2015-06-19T23:59-05:00[-05:00]'), undefined).equals('2015-06-19'));
+    });
+
+    it('accepts Temporal objects of other implementations', function() {
+      assert.isTrue(TYPES.Date.validate(foreignTemporal('PlainDate', '2015-06-19'), undefined).equals('2015-06-19'));
+    });
+
+    it('converts Temporal objects of other implementations to the ISO 8601 calendar', function() {
+      const value = {
+        ...foreignTemporal('PlainDate', '5775-03-02[u-ca=hebrew]'),
+        withCalendar: (calendar: string) => {
+          assert.strictEqual(calendar, 'iso8601');
+          return foreignTemporal('PlainDate', '2015-06-19');
+        }
+      };
+
+      const result = TYPES.Date.validate(value, undefined);
+      assert.strictEqual(result.calendarId, 'iso8601');
+      assert.isTrue(result.equals('2015-06-19'));
+    });
+
+    it('rejects `Date` values', function() {
+      assert.throws(() => {
+        TYPES.Date.validate(new Date(), undefined);
+      }, TypeError, 'expected a Temporal.PlainDate, got Date');
+    });
+
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        const testDate = new Date();
-        testDate.setFullYear(0);
-        TYPES.Date.validate(testDate, undefined);
+        TYPES.Date.validate(new Temporal.PlainDate(0, 12, 31), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.Date.validate(new Date('Jan 1, 10000'), undefined);
+        TYPES.Date.validate(new Temporal.PlainDate(10000, 1, 1), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -304,23 +347,42 @@ describe('DateTime', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.DateTime, { value: null }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime, { value: new Date() }, options).length, Buffer.from([0x08]));
+      assert.deepEqual(serialize(TYPES.DateTime, { value: Temporal.PlainDateTime.from('2015-06-19T00:00') }, options).length, Buffer.from([0x08]));
     });
   });
 
   describe('.writeValue data', function() {
-    it('correctly converts dates during daylight savings period', function() {
-      for (const testSet of [
-        [new Date(2015, 5, 18, 23, 59, 59), 42171],
-        [new Date(2015, 5, 19, 0, 0, 0), 42172],
-        [new Date(2015, 5, 19, 23, 59, 59), 42172],
-        [new Date(2015, 5, 20, 0, 0, 0), 42173]
-      ]) {
-        const parameter = { value: testSet[0] };
-        const expectedNoOfDays = testSet[1];
-        const buffer = serialize(TYPES.DateTime, parameter, optionsWithUTCFalse).data;
+    it('writes the number of days since 1900-01-01', function() {
+      for (const [value, expectedNoOfDays] of [
+        [new Temporal.PlainDateTime(1753, 1, 1), -53690],
+        [new Temporal.PlainDateTime(2015, 6, 18, 23, 59, 59), 42171],
+        [new Temporal.PlainDateTime(2015, 6, 19, 0, 0, 0), 42172],
+        [new Temporal.PlainDateTime(2015, 6, 19, 23, 59, 59), 42172],
+        [new Temporal.PlainDateTime(2015, 6, 20, 0, 0, 0), 42173]
+      ] as [Temporal.PlainDateTime, number][]) {
+        const buffer = serialize(TYPES.DateTime, { value }, options).data;
         assert.strictEqual(buffer.readInt32LE(0), expectedNoOfDays);
       }
+    });
+
+    it('rounds the time of day to 1/300 second ticks', function() {
+      for (const [value, expectedTicks] of [
+        ['2015-06-19T00:00:00.001', 0],
+        ['2015-06-19T00:00:00.002', 1],
+        ['2015-06-19T00:00:00.003', 1],
+        ['2015-06-19T00:00:00.005', 2],
+        ['2015-06-19T00:00:00.009', 3],
+        ['2015-06-19T23:59:59.997', 25919999]
+      ] as [string, number][]) {
+        const buffer = serialize(TYPES.DateTime, { value: Temporal.PlainDateTime.from(value) }, options).data;
+        assert.strictEqual(buffer.readUInt32LE(4), expectedTicks, value);
+      }
+    });
+
+    it('carries a time of day that rounds up to midnight into the next day', function() {
+      const buffer = serialize(TYPES.DateTime, { value: Temporal.PlainDateTime.from('2015-06-19T23:59:59.999') }, options).data;
+      assert.strictEqual(buffer.readInt32LE(0), 42173);
+      assert.strictEqual(buffer.readUInt32LE(4), 0);
     });
   });
 
@@ -335,13 +397,29 @@ describe('DateTime', function() {
   });
 
   describe('.validate', function() {
+    it('accepts `Temporal.PlainDateTime` values and ISO 8601 strings', function() {
+      const value = Temporal.PlainDateTime.from('2015-06-19T12:34:56.789');
+      assert.strictEqual(TYPES.DateTime.validate(value, undefined), value);
+      assert.isTrue(TYPES.DateTime.validate('2015-06-19T12:34:56.789', undefined).equals(value));
+    });
+
+    it('takes `Temporal.PlainDate` values as midnight', function() {
+      assert.isTrue(TYPES.DateTime.validate(Temporal.PlainDate.from('2015-06-19'), undefined).equals('2015-06-19T00:00'));
+    });
+
+    it('rejects `Date` values', function() {
+      assert.throws(() => {
+        TYPES.DateTime.validate(new Date(), undefined);
+      }, TypeError, 'expected a Temporal.PlainDateTime, got Date');
+    });
+
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        TYPES.DateTime.validate(new Date('Dec 1, 1752'), undefined);
+        TYPES.DateTime.validate(Temporal.PlainDateTime.from('1752-12-31T23:59:59.999'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.DateTime.validate('Jan 1, 10000', undefined);
+        TYPES.DateTime.validate('9999-12-31T23:59:59.999', undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -350,37 +428,37 @@ describe('DateTime', function() {
 describe('DateTime2', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 0 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 1 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 2 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 3 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 4 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 5 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 6 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale: 7 }, options).length, Buffer.from([0x00]));
-
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 0 }, options).length, Buffer.from([0x06]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 1 }, options).length, Buffer.from([0x06]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 2 }, options).length, Buffer.from([0x06]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 3 }, options).length, Buffer.from([0x07]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 4 }, options).length, Buffer.from([0x07]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 5 }, options).length, Buffer.from([0x08]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 6 }, options).length, Buffer.from([0x08]));
-      assert.deepEqual(serialize(TYPES.DateTime2, { value: new Date(), scale: 7 }, options).length, Buffer.from([0x08]));
+      const value = Temporal.PlainDateTime.from('2015-06-19T12:34:56');
+      for (const [scale, length] of [[0, 0x06], [1, 0x06], [2, 0x06], [3, 0x07], [4, 0x07], [5, 0x08], [6, 0x08], [7, 0x08]]) {
+        assert.deepEqual(serialize(TYPES.DateTime2, { value: null, scale }, options).length, Buffer.from([0x00]));
+        assert.deepEqual(serialize(TYPES.DateTime2, { value, scale }, options).length, Buffer.from([length]));
+      }
     });
   });
 
   describe('.writeValue data', function() {
-    it('correctly converts dates during daylight savings period', function() {
+    it('writes the time of day and the number of days since 0001-01-01', function() {
       for (const [value, expectedBuffer] of [
-        [new Date(2015, 5, 18, 23, 59, 59), Buffer.from('7f5101163a0b', 'hex')],
-        [new Date(2015, 5, 19, 0, 0, 0), Buffer.from('000000173a0b', 'hex')],
-        [new Date(2015, 5, 19, 23, 59, 59), Buffer.from('7f5101173a0b', 'hex')],
-        [new Date(2015, 5, 20, 0, 0, 0), Buffer.from('000000183a0b', 'hex')]
-      ] as [Date, Buffer][]) {
-        const buffer = serialize(TYPES.DateTime2, { value: value, scale: 0 }, optionsWithUTCFalse).data;
+        [new Temporal.PlainDateTime(2015, 6, 18, 23, 59, 59), Buffer.from('7f5101163a0b', 'hex')],
+        [new Temporal.PlainDateTime(2015, 6, 19, 0, 0, 0), Buffer.from('000000173a0b', 'hex')],
+        [new Temporal.PlainDateTime(2015, 6, 19, 23, 59, 59), Buffer.from('7f5101173a0b', 'hex')],
+        [new Temporal.PlainDateTime(2015, 6, 20, 0, 0, 0), Buffer.from('000000183a0b', 'hex')]
+      ] as [Temporal.PlainDateTime, Buffer][]) {
+        const buffer = serialize(TYPES.DateTime2, { value: value, scale: 0 }, options).data;
         assert.deepEqual(buffer, expectedBuffer);
       }
+    });
+
+    it('keeps sub-millisecond precision at scale 7', function() {
+      const value = Temporal.PlainDateTime.from('2015-06-19T00:00:00.1234567');
+      const buffer = serialize(TYPES.DateTime2, { value, scale: 7 }, options).data;
+      assert.strictEqual(buffer.readUIntLE(0, 5), 1234567);
+    });
+
+    it('carries a time of day that rounds up to midnight into the next day', function() {
+      const value = Temporal.PlainDateTime.from('2015-06-19T23:59:59.5');
+      const buffer = serialize(TYPES.DateTime2, { value, scale: 0 }, options).data;
+      assert.deepEqual(buffer, Buffer.from('000000183a0b', 'hex'));
     });
   });
 
@@ -392,16 +470,32 @@ describe('DateTime2', function() {
       assert.deepEqual(buffer, expected);
     });
   });
+
   describe('.validate', function() {
+    it('accepts `Temporal.PlainDateTime` values and ISO 8601 strings', function() {
+      const value = Temporal.PlainDateTime.from('2015-06-19T12:34:56.1234567');
+      assert.strictEqual(TYPES.DateTime2.validate(value, undefined), value);
+      assert.isTrue(TYPES.DateTime2.validate('2015-06-19T12:34:56.1234567', undefined).equals(value));
+    });
+
+    it('accepts Temporal objects of other implementations', function() {
+      const result = TYPES.DateTime2.validate(foreignTemporal('PlainDateTime', '2015-06-19T12:34:56.1234567'), undefined);
+      assert.isTrue(result.equals('2015-06-19T12:34:56.1234567'));
+    });
+
+    it('rejects `Date` values', function() {
+      assert.throws(() => {
+        TYPES.DateTime2.validate(new Date(), undefined);
+      }, TypeError, 'expected a Temporal.PlainDateTime, got Date');
+    });
+
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        const testDate = new Date();
-        testDate.setFullYear(0);
-        TYPES.DateTime2.validate(testDate, undefined);
+        TYPES.DateTime2.validate(new Temporal.PlainDateTime(0, 12, 31, 23, 59, 59), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.DateTime2.validate(new Date('Jan 1, 10000'), undefined);
+        TYPES.DateTime2.validate(new Temporal.PlainDateTime(10000, 1, 1), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -410,43 +504,43 @@ describe('DateTime2', function() {
 describe('DateTimeOffset', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 0 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 1 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 2 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 3 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 4 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 5 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 6 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale: 7 }, options).length, Buffer.from([0x00]));
-
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 0 }, options).length, Buffer.from([0x08]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 1 }, options).length, Buffer.from([0x08]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 2 }, options).length, Buffer.from([0x08]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 3 }, options).length, Buffer.from([0x09]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 4 }, options).length, Buffer.from([0x09]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 5 }, options).length, Buffer.from([0x0A]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 6 }, options).length, Buffer.from([0x0A]));
-      assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: new Date(), scale: 7 }, options).length, Buffer.from([0x0A]));
+      const value = Temporal.ZonedDateTime.from('2015-06-19T12:34:56+00:00[UTC]');
+      for (const [scale, length] of [[0, 0x08], [1, 0x08], [2, 0x08], [3, 0x09], [4, 0x09], [5, 0x0A], [6, 0x0A], [7, 0x0A]]) {
+        assert.deepEqual(serialize(TYPES.DateTimeOffset, { value: null, scale }, options).length, Buffer.from([0x00]));
+        assert.deepEqual(serialize(TYPES.DateTimeOffset, { value, scale }, options).length, Buffer.from([length]));
+      }
     });
   });
 
   describe('.writeValue data', function() {
-    it('correctly converts `Date` values', function() {
-      const value = new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999));
-      const expected = Buffer.from('20fd002d380b', 'hex');
-      const parameterValue = { value, scale: 0 };
+    it('writes the date and time in UTC, followed by the offset', function() {
+      const value = Temporal.ZonedDateTime.from('2014-02-14T17:59:59.999+00:00[UTC]');
+      const buffer = serialize(TYPES.DateTimeOffset, { value, scale: 0 }, options).data;
+      assert.deepEqual(buffer, Buffer.from('20fd002d380b0000', 'hex'));
+    });
 
-      const buffer = serialize(TYPES.DateTimeOffset, parameterValue, optionsWithUTCTrue).data;
-      assert.deepEqual(buffer.slice(0, 6), expected);
+    it('writes the offset of the value in minutes', function() {
+      // 2014-02-14T17:59:59.999Z
+      for (const [value, offset] of [
+        ['2014-02-14T23:29:59.999+05:30[+05:30]', 330],
+        ['2014-02-14T12:59:59.999-05:00[America/New_York]', -300],
+        ['2014-02-14T18:59:59.999+01:00[Europe/Berlin]', 60]
+      ] as [string, number][]) {
+        const buffer = serialize(TYPES.DateTimeOffset, { value: Temporal.ZonedDateTime.from(value), scale: 0 }, options).data;
+        assert.deepEqual(buffer.subarray(0, 6), Buffer.from('20fd002d380b', 'hex'), value);
+        assert.strictEqual(buffer.readInt16LE(6), offset, value);
+      }
+    });
+
+    it('writes `Temporal.Instant` values in UTC', function() {
+      const value = TYPES.DateTimeOffset.validate(Temporal.Instant.from('2014-02-14T17:59:59.999Z'), undefined);
+      const buffer = serialize(TYPES.DateTimeOffset, { value, scale: 0 }, options).data;
+      assert.deepEqual(buffer, Buffer.from('20fd002d380b0000', 'hex'));
     });
 
     it('correctly converts `null` values', function() {
-      const value = null;
-      const expected = Buffer.from([]);
-
-      const parameterValue = { value, scale: 0 };
-      const buffer = serialize(TYPES.DateTimeOffset, parameterValue, optionsWithUTCTrue).data;
-      assert.deepEqual(buffer, expected);
+      const buffer = serialize(TYPES.DateTimeOffset, { value: null, scale: 0 }, options).data;
+      assert.deepEqual(buffer, Buffer.from([]));
     });
   });
 
@@ -460,15 +554,60 @@ describe('DateTimeOffset', function() {
   });
 
   describe('.validate', function() {
+    it('accepts `Temporal.ZonedDateTime` values', function() {
+      const value = Temporal.ZonedDateTime.from('2014-02-14T12:59:59.999-05:00[America/New_York]');
+      assert.strictEqual(TYPES.DateTimeOffset.validate(value, undefined), value);
+    });
+
+    it('accepts `Temporal.Instant` values, in UTC', function() {
+      const result = TYPES.DateTimeOffset.validate(Temporal.Instant.from('2014-02-14T17:59:59.999Z'), undefined);
+      assert.strictEqual(result.timeZoneId, 'UTC');
+      assert.strictEqual(result.epochMilliseconds, Date.UTC(2014, 1, 14, 17, 59, 59, 999));
+    });
+
+    it('accepts ISO 8601 strings with a time zone or UTC offset', function() {
+      assert.strictEqual(TYPES.DateTimeOffset.validate('2014-02-14T12:59:59-05:00[America/New_York]', undefined).timeZoneId, 'America/New_York');
+      assert.strictEqual(TYPES.DateTimeOffset.validate('2014-02-14T12:59:59-05:00', undefined).timeZoneId, '-05:00');
+      assert.strictEqual(TYPES.DateTimeOffset.validate('2014-02-14T17:59:59Z', undefined).timeZoneId, 'UTC');
+    });
+
+    it('rejects strings without a time zone or UTC offset', function() {
+      assert.throws(() => {
+        TYPES.DateTimeOffset.validate('2014-02-14T17:59:59', undefined);
+      }, TypeError, 'Invalid date and time with time zone');
+    });
+
+    it('accepts Temporal objects of other implementations', function() {
+      const result = TYPES.DateTimeOffset.validate(foreignTemporal('ZonedDateTime', '2014-02-14T23:29:59.999+05:30[+05:30]'), undefined);
+      assert.strictEqual(result.offset, '+05:30');
+      assert.strictEqual(result.epochMilliseconds, Date.UTC(2014, 1, 14, 17, 59, 59, 999));
+    });
+
+    it('rejects `Date` values', function() {
+      assert.throws(() => {
+        TYPES.DateTimeOffset.validate(new Date(), undefined);
+      }, TypeError, 'expected a Temporal.ZonedDateTime or Temporal.Instant, got Date');
+    });
+
+    it('rejects offsets that are not whole minutes', function() {
+      // Local mean time of New York, before standard time zones: -04:56:02
+      assert.throws(() => {
+        TYPES.DateTimeOffset.validate(Temporal.ZonedDateTime.from('1880-01-01T00:00[America/New_York]'), undefined);
+      }, TypeError, 'Invalid time zone offset');
+    });
+
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        const testDate = new Date();
-        testDate.setFullYear(0);
-        TYPES.DateTimeOffset.validate(testDate, undefined);
+        TYPES.DateTimeOffset.validate(Temporal.ZonedDateTime.from('0000-12-31T23:59:59+00:00[UTC]'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.DateTimeOffset.validate(new Date('Jan 1, 10000'), undefined);
+        TYPES.DateTimeOffset.validate(Temporal.ZonedDateTime.from('+010000-01-01T00:00:00+00:00[UTC]'), undefined);
+      }, TypeError, 'Out of range.');
+
+      // In range as given, but not in UTC.
+      assert.throws(() => {
+        TYPES.DateTimeOffset.validate(Temporal.ZonedDateTime.from('0001-01-01T00:00:00+01:00[+01:00]'), undefined);
       }, TypeError, 'Out of range.');
     });
   });
@@ -508,7 +647,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -520,7 +659,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -532,7 +671,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -544,7 +683,7 @@ describe('Decimal', function() {
       const type = TYPES.Decimal;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -560,7 +699,7 @@ describe('Decimal', function() {
 
       let buffer!: Buffer;
       assert.doesNotThrow(() => {
-        buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+        buffer = serialize(type, parameterValue, options).data;
       });
       assert.deepEqual(buffer, expected);
     });
@@ -569,7 +708,7 @@ describe('Decimal', function() {
       const parameterValue = { value: -3.4028234663852886e+38, precision: 7, scale: 4 };
 
       assert.throws(() => {
-        serialize(TYPES.Decimal, parameterValue, optionsWithUTCFalse).data;
+        serialize(TYPES.Decimal, parameterValue, options).data;
       }, RangeError, 'Value -3.4028234663852886e+38 is out of range for DECIMAL(7, 4).');
     });
   });
@@ -646,7 +785,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -657,7 +796,7 @@ describe('Float', function() {
       const type = TYPES.Float;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -716,7 +855,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const parameterValue = { value, length: 100 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, value);
     });
 
@@ -727,7 +866,7 @@ describe('Image', function() {
       const type = TYPES.Image;
       const parameterValue = { value, length: -1 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -759,7 +898,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -770,7 +909,7 @@ describe('Int', function() {
       const type = TYPES.Int;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -820,7 +959,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -831,7 +970,7 @@ describe('Money', function() {
       const type = TYPES.Money;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -881,7 +1020,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, value);
     });
 
@@ -892,7 +1031,7 @@ describe('NChar', function() {
       const type = TYPES.NChar;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -942,7 +1081,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -954,7 +1093,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -966,7 +1105,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -978,7 +1117,7 @@ describe('Numeric', function() {
       const type = TYPES.Numeric;
       const parameterValue = { value, precision, scale: 0 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -994,7 +1133,7 @@ describe('Numeric', function() {
 
       let buffer!: Buffer;
       assert.doesNotThrow(() => {
-        buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+        buffer = serialize(type, parameterValue, options).data;
       });
       assert.deepEqual(buffer, expected);
     });
@@ -1003,7 +1142,7 @@ describe('Numeric', function() {
       const parameterValue = { value: -3.4028234663852886e+38, precision: 7, scale: 4 };
 
       assert.throws(() => {
-        serialize(TYPES.Numeric, parameterValue, optionsWithUTCFalse).data;
+        serialize(TYPES.Numeric, parameterValue, options).data;
       }, RangeError, 'Value -3.4028234663852886e+38 is out of range for NUMERIC(7, 4).');
     });
   });
@@ -1055,7 +1194,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1067,7 +1206,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1080,7 +1219,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length: undefined };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1091,7 +1230,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length: NaN };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1103,7 +1242,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1115,7 +1254,7 @@ describe('NVarChar', function() {
       const type = TYPES.NVarChar;
       const parameterValue = { value, length };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1158,7 +1297,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1169,7 +1308,7 @@ describe('Real', function() {
       const type = TYPES.Real;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1189,21 +1328,23 @@ describe('SmallDateTime', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {
       assert.deepEqual(serialize(TYPES.SmallDateTime, { value: null }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.SmallDateTime, { value: new Date() }, options).length, Buffer.from([0x04]));
+      assert.deepEqual(serialize(TYPES.SmallDateTime, { value: Temporal.PlainDateTime.from('2015-06-19T00:00') }, options).length, Buffer.from([0x04]));
     });
   });
 
   describe('.writeValue data', function() {
-    it('correctly converts dates during daylight savings period', function() {
-      for (const [value, expectedNoOfDays] of [
-        [new Date(2015, 5, 18, 23, 59, 59), 42171],
-        [new Date(2015, 5, 19, 0, 0, 0), 42172],
-        [new Date(2015, 5, 19, 23, 59, 59), 42172],
-        [new Date(2015, 5, 20, 0, 0, 0), 42173]
-      ]) {
-        const buffer = serialize(TYPES.SmallDateTime, { value }, optionsWithUTCFalse).data;
+    it('writes the number of days since 1900-01-01 and minutes since midnight', function() {
+      for (const [value, expectedNoOfDays, expectedMinutes] of [
+        [new Temporal.PlainDateTime(1900, 1, 1), 0, 0],
+        [new Temporal.PlainDateTime(2015, 6, 18, 23, 59, 59), 42171, 1439],
+        [new Temporal.PlainDateTime(2015, 6, 19, 0, 0, 0), 42172, 0],
+        [new Temporal.PlainDateTime(2015, 6, 19, 23, 59, 59), 42172, 1439],
+        [new Temporal.PlainDateTime(2015, 6, 20, 0, 0, 0), 42173, 0]
+      ] as [Temporal.PlainDateTime, number, number][]) {
+        const buffer = serialize(TYPES.SmallDateTime, { value }, options).data;
 
         assert.strictEqual(buffer.readUInt16LE(0), expectedNoOfDays);
+        assert.strictEqual(buffer.readUInt16LE(2), expectedMinutes);
       }
     });
   });
@@ -1218,18 +1359,26 @@ describe('SmallDateTime', function() {
   });
 
   describe('.validate', function() {
+    it('rejects `Date` values', function() {
+      assert.throws(() => {
+        TYPES.SmallDateTime.validate(new Date(), undefined);
+      }, TypeError, 'expected a Temporal.PlainDateTime, got Date');
+    });
+
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('Dec 31, 1889'), undefined);
+        TYPES.SmallDateTime.validate(Temporal.PlainDateTime.from('1889-12-31T00:00'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('Jan 1, 2080'), undefined);
+        TYPES.SmallDateTime.validate(Temporal.PlainDateTime.from('2080-01-01T00:00'), undefined);
       }, TypeError, 'Out of range.');
 
       assert.throws(() => {
-        TYPES.SmallDateTime.validate(new Date('June 7, 2079'), undefined);
+        TYPES.SmallDateTime.validate(Temporal.PlainDateTime.from('2079-06-07T00:00'), undefined);
       }, TypeError, 'Out of range.');
+
+      assert.isTrue(TYPES.SmallDateTime.validate('2079-06-06T23:59', undefined).equals('2079-06-06T23:59'));
     });
   });
 });
@@ -1250,7 +1399,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1261,7 +1410,7 @@ describe('SmallInt', function() {
       const type = TYPES.SmallInt;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1311,7 +1460,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1322,7 +1471,7 @@ describe('SmallMoney', function() {
       const type = TYPES.SmallMoney;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1372,7 +1521,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const parameterValue = { value, length: 15 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1383,7 +1532,7 @@ describe('Text', function() {
       const type = TYPES.Text;
       const parameterValue = { value, length: -1 };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1402,56 +1551,36 @@ describe('Text', function() {
 describe('Time', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 0 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 1 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 2 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 3 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 4 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 5 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 6 }, options).length, Buffer.from([0x00]));
-      assert.deepEqual(serialize(TYPES.Time, { value: null, scale: 7 }, options).length, Buffer.from([0x00]));
-
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 0 }, options).length, Buffer.from([0x03]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 1 }, options).length, Buffer.from([0x03]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 2 }, options).length, Buffer.from([0x03]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 3 }, options).length, Buffer.from([0x04]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 4 }, options).length, Buffer.from([0x04]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 5 }, options).length, Buffer.from([0x05]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 6 }, options).length, Buffer.from([0x05]));
-      assert.deepEqual(serialize(TYPES.Time, { value: new Date(), scale: 7 }, options).length, Buffer.from([0x05]));
+      const value = Temporal.PlainTime.from('12:34:56');
+      for (const [scale, length] of [[0, 0x03], [1, 0x03], [2, 0x03], [3, 0x04], [4, 0x04], [5, 0x05], [6, 0x05], [7, 0x05]]) {
+        assert.deepEqual(serialize(TYPES.Time, { value: null, scale }, options).length, Buffer.from([0x00]));
+        assert.deepEqual(serialize(TYPES.Time, { value, scale }, options).length, Buffer.from([length]));
+      }
     });
   });
+
   describe('.writeValue data', function() {
-    // Test rounding of nanosecondDelta
-    it('correctly converts `Date` values with a `nanosecondDelta` property', function() {
-      const type = TYPES.Time;
-      // Date with nanosecondDelta is an extended Date type used by the library for sub-millisecond precision
-      interface DateWithNanosecondDelta extends Date {
-        nanosecondDelta: number;
-      }
-      interface TimeTestCase {
-        value: DateWithNanosecondDelta;
-        scale: number;
-        expectedBuffer: Buffer;
-      }
-
-      const createTestDate = (date: Date, nanosecondDelta: number): DateWithNanosecondDelta => {
-        const d = date as DateWithNanosecondDelta;
-        d.nanosecondDelta = nanosecondDelta;
-        return d;
-      };
-
-      const testCases: TimeTestCase[] = [
-        { value: createTestDate(new Date(2017, 6, 29, 17, 20, 3, 503), 0.0006264), scale: 7, expectedBuffer: Buffer.from('68fc624b91', 'hex') },
-        { value: createTestDate(new Date(2017, 9, 1, 1, 31, 4, 12), 0.0004612), scale: 7, expectedBuffer: Buffer.from('c422ceb80c', 'hex') },
-        { value: createTestDate(new Date(2017, 7, 3, 12, 52, 28, 373), 0.0007118), scale: 7, expectedBuffer: Buffer.from('1e94c8e96b', 'hex') }
-      ];
-
-      for (const { value, scale, expectedBuffer } of testCases) {
-        const parameter = { value, scale };
-        const buffer = serialize(type, parameter, optionsWithUTCFalse).data;
+    it('writes the time of day with sub-millisecond precision', function() {
+      for (const [value, scale, expectedBuffer] of [
+        ['17:20:03.5036264', 7, Buffer.from('68fc624b91', 'hex')],
+        ['01:31:04.0124612', 7, Buffer.from('c422ceb80c', 'hex')],
+        ['12:52:28.3737118', 7, Buffer.from('1e94c8e96b', 'hex')]
+      ] as [string, number, Buffer][]) {
+        const buffer = serialize(TYPES.Time, { value: Temporal.PlainTime.from(value), scale }, options).data;
         assert.deepEqual(buffer, expectedBuffer);
       }
+    });
+
+    it('rounds to the scale', function() {
+      const value = Temporal.PlainTime.from('00:00:01.25');
+      assert.strictEqual(serialize(TYPES.Time, { value, scale: 0 }, options).data.readUIntLE(0, 3), 1);
+      assert.strictEqual(serialize(TYPES.Time, { value, scale: 1 }, options).data.readUIntLE(0, 3), 13);
+      assert.strictEqual(serialize(TYPES.Time, { value, scale: 2 }, options).data.readUIntLE(0, 3), 125);
+    });
+
+    it('wraps a time that rounds up to midnight around to 00:00', function() {
+      const value = Temporal.PlainTime.from('23:59:59.5');
+      assert.deepEqual(serialize(TYPES.Time, { value, scale: 0 }, options).data, Buffer.from('000000', 'hex'));
     });
   });
 
@@ -1462,6 +1591,28 @@ describe('Time', function() {
 
       const reuslt = typeInfo(type, { value: null, scale: 1 }, options);
       assert.deepEqual(reuslt, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('accepts `Temporal.PlainTime` values and ISO 8601 strings', function() {
+      const value = Temporal.PlainTime.from('12:34:56.1234567');
+      assert.strictEqual(TYPES.Time.validate(value, undefined), value);
+      assert.isTrue(TYPES.Time.validate('12:34:56.1234567', undefined).equals(value));
+    });
+
+    it('takes the time of `Temporal.PlainDateTime` values', function() {
+      assert.isTrue(TYPES.Time.validate(Temporal.PlainDateTime.from('2015-06-19T12:34:56'), undefined).equals('12:34:56'));
+    });
+
+    it('accepts Temporal objects of other implementations', function() {
+      assert.isTrue(TYPES.Time.validate(foreignTemporal('PlainTime', '12:34:56.1234567'), undefined).equals('12:34:56.1234567'));
+    });
+
+    it('rejects `Date` values', function() {
+      assert.throws(() => {
+        TYPES.Time.validate(new Date(), undefined);
+      }, TypeError, 'expected a Temporal.PlainTime, got Date');
     });
   });
 });
@@ -1482,7 +1633,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1493,7 +1644,7 @@ describe('TinyInt', function() {
       const type = TYPES.TinyInt;
       const parameterValue = { value };
 
-      const buffer = serialize(type, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(type, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1574,13 +1725,13 @@ describe('TVP', function() {
       };
       const expected = Buffer.from('01000000000000002604000001040f00000000', 'hex');
 
-      assert.deepEqual(await write({ value }, optionsWithUTCFalse), expected);
+      assert.deepEqual(await write({ value }, options), expected);
     });
 
     it('writes `null` values as a null table', async function() {
       const expected = Buffer.from([0xFF, 0xFF, 0x00, 0x00]);
 
-      assert.deepEqual(await write({ value: null }, optionsWithUTCFalse), expected);
+      assert.deepEqual(await write({ value: null }, options), expected);
     });
   });
 
@@ -1609,7 +1760,7 @@ describe('UniqueIdentifier', function() {
       const expected = Buffer.from('34ae62e0e56df3478ba329d25f77e71a', 'hex');
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.UniqueIdentifier, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.UniqueIdentifier, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1619,7 +1770,7 @@ describe('UniqueIdentifier', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value };
 
-      const buffer = serialize(TYPES.UniqueIdentifier, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.UniqueIdentifier, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1667,7 +1818,7 @@ describe('VarBinary', function() {
       ];
       for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
-        const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+        const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
         assert.deepEqual(buffer, expected);
       }
     });
@@ -1678,7 +1829,7 @@ describe('VarBinary', function() {
       ];
       for (const { value, length, expected } of testCases) {
         const parameterValue = { value, length };
-        const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+        const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
         assert.deepEqual(buffer, expected);
       }
     });
@@ -1689,7 +1840,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('3100', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1699,7 +1850,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('02000000310000000000', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1710,7 +1861,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('02000000123400000000', 'hex');
       const parameterValue = { value, length: undefined };
 
-      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1719,7 +1870,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from('02000000123400000000', 'hex');
       const parameterValue = { value, length: NaN };
 
-      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1729,7 +1880,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1739,7 +1890,7 @@ describe('VarBinary', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarBinary, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarBinary, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });
@@ -1783,7 +1934,7 @@ describe('VarChar', function() {
       const expected = Buffer.from('68656c6c6f20776f726c64', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarChar, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarChar, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1793,7 +1944,7 @@ describe('VarChar', function() {
       const expected = Buffer.from('0b00000068656c6c6f20776f726c6400000000', 'hex');
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarChar, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarChar, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1803,7 +1954,7 @@ describe('VarChar', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarChar, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarChar, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
 
@@ -1813,7 +1964,7 @@ describe('VarChar', function() {
       const expected = Buffer.from([]);
       const parameterValue = { value, length };
 
-      const buffer = serialize(TYPES.VarChar, parameterValue, optionsWithUTCFalse).data;
+      const buffer = serialize(TYPES.VarChar, parameterValue, options).data;
       assert.deepEqual(buffer, expected);
     });
   });

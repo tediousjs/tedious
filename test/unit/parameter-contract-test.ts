@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 import { typeByName as TYPES, type DataType, resolveParameter } from '../../src/data-type';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
@@ -20,10 +21,10 @@ describe('Parameter serialization contract', function() {
     });
 
     it('keeps an explicitly specified zero', function() {
-      const resolved = resolveParameter({ type: TYPES.DateTime2, name: 'p', value: new Date(0), scale: 0, output: false }, undefined, options);
+      const resolved = resolveParameter({ type: TYPES.DateTime2, name: 'p', value: Temporal.PlainDateTime.from('1970-01-01T00:00'), scale: 0, output: false }, undefined, options);
       assert.strictEqual(resolved.data.scale, 0);
 
-      const unresolved = resolveParameter({ type: TYPES.DateTime2, name: 'p', value: new Date(0), output: false }, undefined, options);
+      const unresolved = resolveParameter({ type: TYPES.DateTime2, name: 'p', value: Temporal.PlainDateTime.from('1970-01-01T00:00'), output: false }, undefined, options);
       assert.strictEqual(unresolved.data.scale, 7);
     });
 

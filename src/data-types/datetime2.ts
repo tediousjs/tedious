@@ -1,5 +1,5 @@
 import { type DataType } from '../data-type';
-import { daysSinceYearOne, timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
+import { checkRange, daysSinceYearOne, MAX_DATETIME2, MIN_DATETIME2, roundTimeOfDay, timeLength, toPlainDateTime, writeTimeIntervals, type Temporal } from './temporal';
 
 const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']> } = {
   id: 0x2A,
@@ -25,45 +25,28 @@ const DateTime2: DataType & { resolveScale: NonNullable<DataType['resolveScale']
     buffer.writeUInt8(parameter.scale!);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as TemporalValue | null;
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Temporal.PlainDateTime | null;
     if (value == null) {
       buffer.writeUInt8(0x00);
       return;
     }
 
+    const { carry, intervals } = roundTimeOfDay(value, parameter.scale!);
+
     buffer.writeUInt8(timeLength(parameter.scale) + 3);
-    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
-    buffer.writeUInt24LE(daysSinceYearOne(value, options.useUTC));
+    writeTimeIntervals(buffer, intervals, parameter.scale!);
+    buffer.writeUInt24LE(daysSinceYearOne(value) + carry);
   },
 
-  validate: function(value: any, collation, options): null | number {
+  validate: function(value): null | Temporal.PlainDateTime {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
-    }
-
-    value = value as Date;
-
-    let year;
-    if (options && options.useUTC) {
-      year = value.getUTCFullYear();
-    } else {
-      year = value.getFullYear();
-    }
-
-    if (year < 1 || year > 9999) {
-      throw new TypeError('Out of range.');
-    }
-
-    if (isNaN(value)) {
-      throw new TypeError('Invalid date.');
-    }
-
-    return value;
+    const dateTime = toPlainDateTime(value);
+    checkRange(dateTime, MIN_DATETIME2, MAX_DATETIME2);
+    return dateTime;
   }
 };
 

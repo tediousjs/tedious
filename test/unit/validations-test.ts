@@ -1,6 +1,7 @@
 import { Collation } from '../../src/collation';
 import { typeByName as TYPE } from '../../src/data-type';
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 describe('Validations', function() {
   it('Bit', function() {
@@ -92,80 +93,94 @@ describe('Validations', function() {
     let value = TYPE.SmallDateTime.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.SmallDateTime.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const dateTime = Temporal.PlainDateTime.from('2015-02-12T16:43:13.632');
+    value = TYPE.SmallDateTime.validate(dateTime, undefined);
+    assert.strictEqual(value, dateTime);
 
-    value = TYPE.SmallDateTime.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.SmallDateTime.validate('2015-02-12T16:43:13.632', undefined);
+    assert.instanceOf(value, Temporal.PlainDateTime);
+    assert.isTrue(value!.equals(dateTime));
 
     assert.throws(() => {
       TYPE.SmallDateTime.validate('xxx', undefined);
-    }, TypeError, 'Invalid date.');
+    }, TypeError, 'Invalid date and time');
   });
 
   it('DateTime', function() {
     let value = TYPE.DateTime.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.DateTime.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const dateTime = Temporal.PlainDateTime.from('2015-02-12T16:43:13.632');
+    value = TYPE.DateTime.validate(dateTime, undefined);
+    assert.strictEqual(value, dateTime);
 
-    value = TYPE.DateTime.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.DateTime.validate('2015-02-12T16:43:13.632', undefined);
+    assert.instanceOf(value, Temporal.PlainDateTime);
+    assert.isTrue(value!.equals(dateTime));
 
     assert.throws(() => {
       TYPE.DateTime.validate('xxx', undefined);
-    }, TypeError, 'Invalid date.');
+    }, TypeError, 'Invalid date and time');
   });
 
   it('DateTime2', function() {
     let value = TYPE.DateTime2.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.DateTime2.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const dateTime = Temporal.PlainDateTime.from('2015-02-12T16:43:13.6321234');
+    value = TYPE.DateTime2.validate(dateTime, undefined);
+    assert.strictEqual(value, dateTime);
 
-    value = TYPE.DateTime2.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.DateTime2.validate('2015-02-12T16:43:13.6321234', undefined);
+    assert.instanceOf(value, Temporal.PlainDateTime);
+    assert.isTrue(value!.equals(dateTime));
+
+    // A UTC designator does not describe a wall-clock date and time.
+    assert.throws(() => {
+      TYPE.DateTime2.validate('2015-02-12T16:43:13.632Z', undefined);
+    }, TypeError, 'Invalid date and time');
+
+    assert.throws(() => {
+      TYPE.DateTime2.validate('2015-02-30T16:43:13', undefined);
+    }, TypeError, 'Invalid date and time');
 
     assert.throws(() => {
       TYPE.DateTime2.validate('xxx', undefined);
-    }, TypeError, 'Invalid date.');
+    }, TypeError, 'Invalid date and time');
   });
 
   it('Time', function() {
     let value = TYPE.Time.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.Time.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const time = Temporal.PlainTime.from('16:43:13.6321234');
+    value = TYPE.Time.validate(time, undefined);
+    assert.strictEqual(value, time);
 
-    value = TYPE.Time.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    value = TYPE.Time.validate('16:43:13.6321234', undefined);
+    assert.instanceOf(value, Temporal.PlainTime);
+    assert.isTrue(value!.equals(time));
 
     assert.throws(() => {
       TYPE.Time.validate('xxx', undefined);
-    }, TypeError, 'Invalid time.');
+    }, TypeError, 'Invalid time');
   });
 
   it('DateTimeOffset', function() {
     let value = TYPE.DateTimeOffset.validate(null, undefined);
     assert.strictEqual(value, null);
 
-    const date = new Date();
-    value = TYPE.DateTimeOffset.validate(date, undefined);
-    assert.strictEqual(+value!, +date);
+    const zoned = Temporal.ZonedDateTime.from('2015-02-12T16:43:13.632+01:00[Europe/Berlin]');
+    value = TYPE.DateTimeOffset.validate(zoned, undefined);
+    assert.strictEqual(value, zoned);
 
     value = TYPE.DateTimeOffset.validate('2015-02-12T16:43:13.632Z', undefined);
-    assert.strictEqual(+value!, 1423759393632);
+    assert.instanceOf(value, Temporal.ZonedDateTime);
+    assert.strictEqual(value!.epochMilliseconds, 1423759393632);
 
     assert.throws(() => {
       TYPE.DateTimeOffset.validate('xxx', undefined);
-    }, TypeError, 'Invalid date.');
+    }, TypeError, 'Invalid date and time with time zone');
   });
 
   it('Real', function() {

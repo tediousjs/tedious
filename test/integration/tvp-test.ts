@@ -1,6 +1,7 @@
 import { TYPES } from '../../src/tedious';
 
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
@@ -164,7 +165,8 @@ describe('calling a procedure that takes and returns a TVP', function() {
       assert.strictEqual(columns[6].value, 6.6);
       assert.strictEqual(columns[7].value, 'asdf');
       assert.strictEqual(columns[8].value, 'asdf');
-      assert.strictEqual(+columns[9].value, +new Date(Date.UTC(2014, 0, 1)));
+      assert.instanceOf(columns[9].value, Temporal.PlainDateTime);
+      assert.strictEqual(columns[9].value.toString(), '2014-01-01T00:00:00');
     });
 
     const table = {
@@ -224,7 +226,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
           6.6,
           'asdf',
           'asdf',
-          new Date(Date.UTC(2014, 0, 1))
+          Temporal.PlainDateTime.from('2014-01-01T00:00')
         ]
       ]
     };
@@ -300,7 +302,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
           6.6,
           'asdf',
           'asdf',
-          new Date(Date.UTC(2014, 0, 1))
+          Temporal.PlainDateTime.from('2014-01-01T00:00')
         ]
       ]
     };
@@ -383,7 +385,7 @@ describe('calling a procedure that takes and returns a TVP', function() {
           6.6,
           'asdf',
           'asdf',
-          new Date(Date.UTC(2014, 0, 1))
+          Temporal.PlainDateTime.from('2014-01-01T00:00')
         ]
       ]
     };

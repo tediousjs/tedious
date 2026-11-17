@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 import RpcRequestPayload from '../../src/rpcrequest-payload';
 import { typeByName as TYPES, type DataType, type Parameter, type ParameterData, resolveParameter } from '../../src/data-type';
@@ -93,7 +94,8 @@ async function collect(iterable: Iterable<Buffer> | AsyncIterable<Buffer>) {
 }
 
 function parameters(withCollation: boolean): Parameter[] {
-  const date = new Date(Date.UTC(2024, 1, 29, 13, 37, 42, 123));
+  const dateTime = Temporal.PlainDateTime.from('2024-02-29T13:37:42.1234567');
+  const zoned = Temporal.ZonedDateTime.from('2024-02-29T13:37:42.1234567+05:30[Asia/Kolkata]');
   // These types need a collation to validate their values.
   const collated: Parameter[] = withCollation ? [
     { type: TYPES.VarChar, name: 'varchar', value: 'hello', output: false },
@@ -130,13 +132,13 @@ function parameters(withCollation: boolean): Parameter[] {
     { type: TYPES.Binary, name: 'binary', value: Buffer.from([9, 8]), length: 4, output: false },
     { type: TYPES.Image, name: 'image', value: Buffer.from([4, 5, 6]), output: false },
     { type: TYPES.UniqueIdentifier, name: 'guid', value: 'e062ae34-6de5-47f3-8ba3-29d25f77e71a', output: false },
-    { type: TYPES.DateTime, name: 'datetime', value: date, output: false },
-    { type: TYPES.SmallDateTime, name: 'smalldatetime', value: date, output: false },
-    { type: TYPES.DateTime2, name: 'datetime2', value: date, scale: 7, output: false },
-    { type: TYPES.DateTime2, name: 'datetime2s0', value: date, scale: 0, output: false },
-    { type: TYPES.DateTimeOffset, name: 'dto', value: date, output: false },
-    { type: TYPES.Date, name: 'date', value: date, output: false },
-    { type: TYPES.Time, name: 'time', value: date, scale: 3, output: false },
+    { type: TYPES.DateTime, name: 'datetime', value: dateTime, output: false },
+    { type: TYPES.SmallDateTime, name: 'smalldatetime', value: dateTime, output: false },
+    { type: TYPES.DateTime2, name: 'datetime2', value: dateTime, scale: 7, output: false },
+    { type: TYPES.DateTime2, name: 'datetime2s0', value: dateTime, scale: 0, output: false },
+    { type: TYPES.DateTimeOffset, name: 'dto', value: zoned, output: false },
+    { type: TYPES.Date, name: 'date', value: dateTime.toPlainDate(), output: false },
+    { type: TYPES.Time, name: 'time', value: dateTime.toPlainTime(), scale: 3, output: false },
     { type: TYPES.TVP, name: 'tvp', value: { name: 'TestType', columns: [{ name: 'id', type: TYPES.Int }, { name: 'name', type: TYPES.NVarChar, length: 20 }], rows: [[1, 'one'], [2, 'two']] }, output: false },
     { type: TYPES.TVP, name: 'tvpNull', value: null, output: false }
   ];

@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
@@ -84,8 +85,9 @@ describe('RPC test', function() {
     });
 
     request.on('row', function(columns) {
-      if (value instanceof Date) {
-        assert.strictEqual(columns[0].value.getTime(), value.getTime());
+      if (value instanceof Temporal.PlainDateTime) {
+        assert.instanceOf(columns[0].value, Temporal.PlainDateTime);
+        assert.isTrue(value.equals(columns[0].value));
       } else {
         assert.strictEqual(columns[0].value, value);
       }
@@ -126,8 +128,9 @@ select @param\
 
     request.on('returnValue', function(name, returnValue, metadata) {
       assert.strictEqual(name, 'paramOut');
-      if (value instanceof Date && returnValue instanceof Date) {
-        assert.strictEqual(returnValue.getTime(), value.getTime());
+      if (value instanceof Temporal.PlainDateTime) {
+        assert.instanceOf(returnValue, Temporal.PlainDateTime);
+        assert.isTrue(value.equals(returnValue as Temporal.PlainDateTime));
       } else {
         assert.strictEqual(returnValue, value);
       }
@@ -206,7 +209,7 @@ set @paramOut = @paramIn\
       done,
       TYPES.SmallDateTime,
       'smalldatetime',
-      new Date('December 4, 2011 10:04:00')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:00')
     );
   });
 
@@ -219,7 +222,7 @@ set @paramOut = @paramIn\
       done,
       TYPES.DateTime,
       'datetime',
-      new Date('December 4, 2011 10:04:23')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:23')
     );
   });
 
@@ -272,7 +275,7 @@ set @paramOut = @paramIn\
       done,
       TYPES.SmallDateTime,
       'smalldatetime',
-      new Date('December 4, 2011 10:04:00')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:00')
     );
   });
 
@@ -285,7 +288,7 @@ set @paramOut = @paramIn\
       done,
       TYPES.DateTime,
       'datetime',
-      new Date('December 4, 2011 10:04:23')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:23')
     );
   });
 

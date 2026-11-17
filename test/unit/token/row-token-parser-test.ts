@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 import MoneyN from '../../../src/data-types/moneyn';
 import Money from '../../../src/data-types/money';
 import SmallMoney from '../../../src/data-types/smallmoney';
@@ -1101,10 +1102,8 @@ describe('Row Token Parser', function() {
       const token = result.value;
       assert.instanceOf(token, RowToken);
       assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(
-        token.columns[0].value.getTime(),
-        new Date('January 3, 1900 00:00:45').getTime()
-      );
+      assert.instanceOf(token.columns[0].value, Temporal.PlainDateTime);
+      assert.strictEqual(token.columns[0].value.toString(), '1900-01-03T00:00:45');
 
       result = await parser.next();
       assert.isTrue(result.done);
@@ -1120,10 +1119,9 @@ describe('Row Token Parser', function() {
       const token = result.value;
       assert.instanceOf(token, RowToken);
       assert.strictEqual(token.columns.length, 1);
-      assert.strictEqual(
-        token.columns[0].value.getTime(),
-        new Date('January 3, 1900 00:00:45 GMT').getTime()
-      );
+      // `useUTC` has no effect on the date and time types.
+      assert.instanceOf(token.columns[0].value, Temporal.PlainDateTime);
+      assert.strictEqual(token.columns[0].value.toString(), '1900-01-03T00:00:45');
 
       result = await parser.next();
       assert.isTrue(result.done);

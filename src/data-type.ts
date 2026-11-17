@@ -142,10 +142,8 @@ export function resolveParameter(parameter: Parameter, collation: Collation | un
     return { name: parameter.name, output: parameter.output, type, data: type.resolve(parameter, collation, options) };
   }
 
-  // `validate` is deliberately not given the connection options: no caller
-  // ever passed them, so the `useUTC`-dependent range checks in the date and
-  // time types have never been active. Enabling them is a behaviour change
-  // to make on its own.
+  // `validate` is deliberately not given the connection options; no type's
+  // validation depends on them.
   const value = type.validate(parameter.value, collation);
   const validated: Parameter = { ...parameter, value };
   const data: ParameterData = { value };
@@ -371,47 +369,47 @@ export const TYPE = {
  *
  * <tbody>
  *   <tr class="group-heading">
- *     <th colspan="5">Date and Time</th>
+ *     <th colspan="5">Date and Time<sup>5</sup></th>
  *   </tr>
  *   <tr>
  *     <td><code>smalldatetime</code></td>
  *     <td><code>{@link TYPES.SmallDateTime}</code></td>
- *     <td><code>Date</code></td>
+ *     <td><code>Temporal.PlainDateTime</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>datetime</code></td>
  *     <td><code>{@link TYPES.DateTime}</code></td>
- *     <td><code>Date</code></td>
+ *     <td><code>Temporal.PlainDateTime</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>datetime2</code></td>
  *     <td><code>{@link TYPES.DateTime2}</code></td>
- *     <td><code>Date</code></td>
+ *     <td><code>Temporal.PlainDateTime</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>datetimeoffset</code></td>
  *     <td><code>{@link TYPES.DateTimeOffset}</code></td>
- *     <td><code>Date</code></td>
+ *     <td><code>Temporal.ZonedDateTime</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>time</code></td>
  *     <td><code>{@link TYPES.Time}</code></td>
- *     <td><code>Date</code></td>
+ *     <td><code>Temporal.PlainTime</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>date</code></td>
  *     <td><code>{@link TYPES.Date}</code></td>
- *     <td><code>Date</code></td>
+ *     <td><code>Temporal.PlainDate</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
@@ -569,6 +567,37 @@ export const TYPE = {
  *       Note that the order of bytes is not the same as the character representation. See
  *       <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
  *       for an example of the different ordering of bytes.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>Date and Time</h4>
+ *     <p>
+ *       Values are <a href="https://tc39.es/proposal-temporal/docs/">Temporal</a> objects. Tedious uses the
+ *       <a href="https://github.com/fullcalendar/temporal-polyfill"><code>temporal-polyfill</code></a> package as a
+ *       ponyfill: it uses the native <code>Temporal</code> when the runtime has one, and otherwise its own implementation,
+ *       without ever installing a global <code>Temporal</code>. Import it with
+ *       <code>import { Temporal } from 'temporal-polyfill'</code> to construct values.
+ *     </p>
+ *     <p>
+ *       <code>date</code>, <code>time</code>, <code>smalldatetime</code>, <code>datetime</code> and <code>datetime2</code>
+ *       values are wall-clock values without a time zone, so they are returned exactly as stored, independent of the
+ *       time zone of the Node.js process. <code>datetimeoffset</code> values are returned as a
+ *       <code>Temporal.ZonedDateTime</code> in a fixed-offset time zone such as <code>+05:30</code>, the offset they
+ *       were stored with.
+ *     </p>
+ *     <p>
+ *       For input parameters, values can also be given as ISO 8601 strings (e.g. <code>'2024-02-29T13:37:42.1234567'</code>),
+ *       as Temporal objects of another implementation, or as a <code>Temporal.PlainDateTime</code> where only its date or
+ *       time is needed. <code>datetimeoffset</code> parameters also accept a <code>Temporal.Instant</code>, sent in UTC,
+ *       and a <code>Temporal.ZonedDateTime</code> of any time zone, sent with its offset at that instant (which must be a
+ *       whole number of minutes). <code>Date</code> objects are not accepted, as they do not say which time zone their
+ *       date and time are in; convert them with e.g.
+ *       <code>Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO(timeZone)</code>.
+ *     </p>
+ *     <p>
+ *       Values are rounded to the scale of the parameter (e.g. <code>datetime2(3)</code>), carrying into the next day
+ *       where that rounds up to midnight. <code>datetime</code> values are rounded to its 1/300 second precision and
+ *       <code>smalldatetime</code> values are truncated to the minute.
  *     </p>
  *   </li>
  * </ol>

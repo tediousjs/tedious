@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import async from 'async';
@@ -22,6 +23,17 @@ function getConfig() {
 }
 
 type DataType = typeof TYPES[keyof typeof TYPES];
+
+function isTemporal(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && String((value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag]).startsWith('Temporal.');
+}
+
+// Asserts that `actual` is a Temporal object of the same type as, and equal
+// in every field to, `expected`.
+function assertSameTemporal(actual: unknown, expected: unknown) {
+  assert.strictEqual(Object.prototype.toString.call(actual), Object.prototype.toString.call(expected));
+  assert.strictEqual(String(actual), String(expected));
+}
 type TdsVersion = '7_0' | '7_1' | '7_2' | '7_3_A' | '7_4' | null | undefined;
 
 function execSql(
@@ -66,8 +78,8 @@ function execSql(
       assert.isNull(columns[0].value);
     } else if (cast) {
       assert.strictEqual(columns[0].value, expectedValue);
-    } else if (expectedValue instanceof Date) {
-      assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
+    } else if (isTemporal(expectedValue)) {
+      assertSameTemporal(columns[0].value, expectedValue);
     } else if (type === TYPES.BigInt) {
       assert.strictEqual(columns[0].value, String(expectedValue));
     } else if (type === TYPES.UniqueIdentifier || Buffer.isBuffer(expectedValue)) {
@@ -128,8 +140,8 @@ function execSqlOutput(
       expectedValue = value;
     }
 
-    if (expectedValue instanceof Date && returnValue instanceof Date) {
-      assert.strictEqual(returnValue.getTime(), expectedValue.getTime());
+    if (isTemporal(expectedValue)) {
+      assertSameTemporal(returnValue, expectedValue);
     } else if (type === TYPES.BigInt) {
       assert.strictEqual(returnValue, String(expectedValue));
     } else if (type === TYPES.UniqueIdentifier) {
@@ -462,15 +474,15 @@ describe('Parameterised Statements Test', function() {
       execSql(done, TYPES.Time, null, '7_3_A', null);
     });
 
-    it('ignores the date part of given `Date` values', function(done) {
-      execSql(done, TYPES.Time, new Date('2000-02-19T12:34:56Z'), '7_3_A', null, new Date('1970-01-01T12:34:56Z'));
+    it('ignores the date part of given `Temporal.PlainDateTime` values', function(done) {
+      execSql(done, TYPES.Time, Temporal.PlainDateTime.from('2000-02-19T12:34:56'), '7_3_A', null, Temporal.PlainTime.from('12:34:56'));
     });
 
     it('should handle `string` values', function(done) {
-      execSql(done, TYPES.Time, '1970-01-01T12:34:56Z', '7_3_A', null, '12:34:56.0000000', true);
+      execSql(done, TYPES.Time, '12:34:56', '7_3_A', null, '12:34:56.0000000', true);
     });
 
-    const testTime = Object.assign(new Date('1970-01-01T00:00:00Z'), { nanosecondDelta: 0.1111111 });
+    const testTime = Temporal.PlainTime.from('00:00:00.1111111');
 
     it('should test time', function(done) {
       execSql(done, TYPES.Time, testTime, '7_3_A', null, '00:00:00.1111111', true);
@@ -506,11 +518,11 @@ describe('Parameterised Statements Test', function() {
   });
 
   describe('`smalldatetime`', function() {
-    it('should handle `Date` values', function(done) {
+    it('should handle `Temporal.PlainDateTime` values', function(done) {
       execSql(
         done,
         TYPES.SmallDateTime,
-        new Date('December 4, 2011 10:04:00')
+        Temporal.PlainDateTime.from('2011-12-04T10:04:00')
       );
     });
 
@@ -519,13 +531,13 @@ describe('Parameterised Statements Test', function() {
     });
 
     it('should handle `string` values', function(done) {
-      execSql(done, TYPES.SmallDateTime, '2015-10-31 00:00:00', undefined, undefined, new Date('2015-10-31 00:00:00'));
+      execSql(done, TYPES.SmallDateTime, '2015-10-31 00:00:00', undefined, undefined, Temporal.PlainDateTime.from('2015-10-31T00:00:00'));
     });
   });
 
   describe('`datetime`', function() {
-    it('should handle `Date` values', function(done) {
-      execSql(done, TYPES.DateTime, new Date('December 4, 2011 10:04:23'));
+    it('should handle `Temporal.PlainDateTime` values', function(done) {
+      execSql(done, TYPES.DateTime, Temporal.PlainDateTime.from('2011-12-04T10:04:23'));
     });
 
     it('should handle `null` values', function(done) {
@@ -533,7 +545,7 @@ describe('Parameterised Statements Test', function() {
     });
 
     it('should handle `string` values', function(done) {
-      execSql(done, TYPES.DateTime, '2015-10-31 00:00:00', undefined, undefined, new Date('2015-10-31 00:00:00'));
+      execSql(done, TYPES.DateTime, '2015-10-31 00:00:00', undefined, undefined, Temporal.PlainDateTime.from('2015-10-31T00:00:00'));
     });
 
     // The tests below validate DateTime precision on the input side, as described in
@@ -543,10 +555,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.990'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.990'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.990')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.990')
       );
     });
 
@@ -554,10 +566,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.991'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.991'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.990')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.990')
       );
     });
 
@@ -565,10 +577,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.992'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.992'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.993')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
       );
     });
 
@@ -576,10 +588,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.993'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.993'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.993')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
       );
     });
 
@@ -587,10 +599,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.994'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.994'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.993')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
       );
     });
 
@@ -598,10 +610,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.995'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.995'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.997')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
       );
     });
 
@@ -609,10 +621,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.996'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.996'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.997')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
       );
     });
 
@@ -620,10 +632,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.997'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.997'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.997')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
       );
     });
 
@@ -631,10 +643,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.998'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.998'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.997')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
       );
     });
 
@@ -642,10 +654,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:58.999'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:58.999'),
         null,
         null,
-        new Date('January 1, 1998 23:59:59.000')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.000')
       );
     });
 
@@ -653,10 +665,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:58:59.999'),
+        Temporal.PlainDateTime.from('1998-01-01T23:58:59.999'),
         null,
         null,
-        new Date('January 1, 1998 23:59:00.000')
+        Temporal.PlainDateTime.from('1998-01-01T23:59:00.000')
       );
     });
 
@@ -664,10 +676,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 22:59:59.999'),
+        Temporal.PlainDateTime.from('1998-01-01T22:59:59.999'),
         null,
         null,
-        new Date('January 1, 1998 23:00:00.000')
+        Temporal.PlainDateTime.from('1998-01-01T23:00:00.000')
       );
     });
 
@@ -675,20 +687,20 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTime,
-        new Date('January 1, 1998 23:59:59.999'),
+        Temporal.PlainDateTime.from('1998-01-01T23:59:59.999'),
         null,
         null,
-        new Date('January 2, 1998 00:00:00.000')
+        Temporal.PlainDateTime.from('1998-01-02T00:00:00.000')
       );
     });
   });
 
   describe('`datetime2`', function() {
-    it('should handle `Date` values', function(done) {
+    it('should handle `Temporal.PlainDateTime` values', function(done) {
       execSql(
         done,
         TYPES.DateTime2,
-        new Date('December 4, 2011 10:04:23'),
+        Temporal.PlainDateTime.from('2011-12-04T10:04:23'),
         '7_3_A'
       );
     });
@@ -697,45 +709,76 @@ describe('Parameterised Statements Test', function() {
       execSql(done, TYPES.DateTime2, null, '7_3_A');
     });
 
-    it('should correctly handle `Date` values with high precision', function(done) {
-      const value = new Date(2019, 11, 19, 23, 59, 59, 997);
-      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9970000', true, { useUTC: false });
+    it('should correctly handle `Temporal.PlainDateTime` values with high precision', function(done) {
+      const value = Temporal.PlainDateTime.from('2019-12-19T23:59:59.997');
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9970000', true);
     });
 
-    it('should correctly handle `Date` values with high precision', function(done) {
-      const value = new Date(2019, 11, 19, 23, 59, 59, 997);
-      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined, { useUTC: false });
+    it('should correctly handle `Temporal.PlainDateTime` values with high precision', function(done) {
+      const value = Temporal.PlainDateTime.from('2019-12-19T23:59:59.997');
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined);
     });
 
-    it('should correctly handle `Date` values with high precision', function(done) {
-      const value = new Date(2019, 11, 19, 23, 59, 59, 998);
-      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9980000', true, { useUTC: false });
+    it('should correctly handle `Temporal.PlainDateTime` values with high precision', function(done) {
+      const value = Temporal.PlainDateTime.from('2019-12-19T23:59:59.998');
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, '2019-12-19 23:59:59.9980000', true);
     });
 
-    it('should correctly handle `Date` values with high precision', function(done) {
-      const value = new Date(2019, 11, 19, 23, 59, 59, 998);
-      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined, { useUTC: false });
+    it('should correctly handle `Temporal.PlainDateTime` values with high precision', function(done) {
+      const value = Temporal.PlainDateTime.from('2019-12-19T23:59:59.998');
+      execSql(done, TYPES.DateTime2, value, '7_3_A', undefined, undefined, undefined);
     });
 
     it('should handle `string` values', function(done) {
       execSql(
         done,
         TYPES.DateTime2,
-        'December 4, 2011 10:04:23',
+        '2011-12-04 10:04:23',
         '7_3_A',
         null,
-        new Date('December 4, 2011 10:04:23')
+        Temporal.PlainDateTime.from('2011-12-04T10:04:23')
       );
     });
   });
 
   describe('`datetimeoffset`', function() {
-    it('should handle `Date` values', function(done) {
+    it('should handle `Temporal.ZonedDateTime` values', function(done) {
       execSql(
         done,
         TYPES.DateTimeOffset,
-        new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
+        Temporal.ZonedDateTime.from('2014-02-14T17:59:59.999+00:00[+00:00]'),
         '7_3_A'
+      );
+    });
+
+    it('should keep the offset of `Temporal.ZonedDateTime` values', function(done) {
+      execSql(
+        done,
+        TYPES.DateTimeOffset,
+        Temporal.ZonedDateTime.from('2014-02-14T23:29:59.9999999+05:30[+05:30]'),
+        '7_3_A'
+      );
+    });
+
+    it('should send named time zones as their offset', function(done) {
+      execSql(
+        done,
+        TYPES.DateTimeOffset,
+        Temporal.ZonedDateTime.from('2014-07-14T12:00:00-04:00[America/New_York]'),
+        '7_3_A',
+        null,
+        Temporal.ZonedDateTime.from('2014-07-14T12:00:00-04:00[-04:00]')
+      );
+    });
+
+    it('should handle `Temporal.Instant` values', function(done) {
+      execSql(
+        done,
+        TYPES.DateTimeOffset,
+        Temporal.Instant.from('2014-02-14T17:59:59.999Z'),
+        '7_3_A',
+        null,
+        Temporal.ZonedDateTime.from('2014-02-14T17:59:59.999+00:00[+00:00]')
       );
     });
 
@@ -747,10 +790,10 @@ describe('Parameterised Statements Test', function() {
       execSql(
         done,
         TYPES.DateTimeOffset,
-        'December 4, 2011 10:04:23',
+        '2011-12-04T10:04:23+01:00',
         '7_3_A',
         null,
-        new Date('December 4, 2011 10:04:23')
+        Temporal.ZonedDateTime.from('2011-12-04T10:04:23+01:00[+01:00]')
       );
     });
   });
@@ -844,7 +887,7 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.SmallDateTime,
-      new Date('December 4, 2011 10:04:00')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:00')
     );
   });
 
@@ -856,7 +899,7 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('December 4, 2011 10:04:23')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:23')
     );
   });
 
@@ -871,8 +914,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.990'),
-      new Date('January 1, 1998 23:59:59.990')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.990'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.990')
     );
   });
 
@@ -880,8 +923,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.991'),
-      new Date('January 1, 1998 23:59:59.990')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.991'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.990')
     );
   });
 
@@ -889,8 +932,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.992'),
-      new Date('January 1, 1998 23:59:59.993')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.992'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
     );
   });
 
@@ -898,8 +941,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.993'),
-      new Date('January 1, 1998 23:59:59.993')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
     );
   });
 
@@ -907,8 +950,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.994'),
-      new Date('January 1, 1998 23:59:59.993')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.994'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
     );
   });
 
@@ -916,8 +959,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.995'),
-      new Date('January 1, 1998 23:59:59.997')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.995'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     );
   });
 
@@ -925,8 +968,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.996'),
-      new Date('January 1, 1998 23:59:59.997')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.996'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     );
   });
 
@@ -934,8 +977,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.997'),
-      new Date('January 1, 1998 23:59:59.997')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     );
   });
 
@@ -943,8 +986,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:59.998'),
-      new Date('January 1, 1998 23:59:59.997')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.998'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     );
   });
 
@@ -952,8 +995,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:59:58.999'),
-      new Date('January 1, 1998 23:59:59.000')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:58.999'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.000')
     );
   });
 
@@ -961,8 +1004,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 23:58:59.999'),
-      new Date('January 1, 1998 23:59:00.000')
+      Temporal.PlainDateTime.from('1998-01-01T23:58:59.999'),
+      Temporal.PlainDateTime.from('1998-01-01T23:59:00.000')
     );
   });
 
@@ -970,8 +1013,8 @@ describe('Parameterised Statements Test', function() {
     execSqlOutput(
       done,
       TYPES.DateTime,
-      new Date('January 1, 1998 22:59:59.999'),
-      new Date('January 1, 1998 23:00:00.000')
+      Temporal.PlainDateTime.from('1998-01-01T22:59:59.999'),
+      Temporal.PlainDateTime.from('1998-01-01T23:00:00.000')
     );
   });
 
@@ -1091,7 +1134,7 @@ describe('Parameterised Statements Test', function() {
               6.6,
               'asdf',
               'asdf',
-              new Date(Date.UTC(2014, 0, 1))
+              Temporal.PlainDateTime.from('2014-01-01T00:00')
             ]
           ]
         });
@@ -1112,7 +1155,7 @@ describe('Parameterised Statements Test', function() {
           assert.strictEqual(columns[6].value, 6.6);
           assert.strictEqual(columns[7].value, 'asdf');
           assert.strictEqual(columns[8].value, 'asdf');
-          assert.deepEqual(columns[9].value, new Date(Date.UTC(2014, 0, 1)));
+          assertSameTemporal(columns[9].value, Temporal.PlainDateTime.from('2014-01-01T00:00'));
         });
 
         connection.on('end', function() {
@@ -1126,7 +1169,7 @@ describe('Parameterised Statements Test', function() {
 
   // This test fails on the version of SQL Server in AppVeyor.
   // exports.outputDatePrecision_9_day_flip = (test) ->
-  //  execSqlOutput(test, TYPES.DateTime, new Date('January 1, 1998 23:59:59.999'), new Date('January 2, 1998 00:00:00.000'))
+  //  execSqlOutput(test, TYPES.DateTime, Temporal.PlainDateTime.from('1998-01-01T23:59:59.999'), Temporal.PlainDateTime.from('1998-01-02T00:00:00.000'))
   it('should test multiple parameters', function(done) {
     const config = getConfig();
 

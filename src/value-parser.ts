@@ -5,6 +5,7 @@ import { TYPE } from './data-type';
 import iconv from 'iconv-lite';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
+import { dateFromEpochDays, dateTimeFromEpochDays, EPOCH_DAYS_0001_01_01, EPOCH_DAYS_1900_01_01, NANOSECONDS_PER_DAY, Temporal, timeFromNanoseconds } from './data-types/temporal';
 
 const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
@@ -280,11 +281,11 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'SmallDateTime': {
-      return readSmallDateTime(buf, offset, options.useUTC);
+      return readSmallDateTime(buf, offset);
     }
 
     case 'DateTime': {
-      return readDateTime(buf, offset, options.useUTC);
+      return readDateTime(buf, offset);
     }
 
     case 'DateTimeN': {
@@ -296,9 +297,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
           return new Result(null, offset);
 
         case 4:
-          return readSmallDateTime(buf, offset, options.useUTC);
+          return readSmallDateTime(buf, offset);
         case 8:
-          return readDateTime(buf, offset, options.useUTC);
+          return readDateTime(buf, offset);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for DateTimeN');
@@ -313,7 +314,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readTime(buf, offset, dataLength, metadata.scale!, options.useUTC);
+      return readTime(buf, offset, dataLength, metadata.scale!);
     }
 
     case 'Date': {
@@ -324,7 +325,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readDate(buf, offset, options.useUTC);
+      return readDate(buf, offset);
     }
 
     case 'DateTime2': {
@@ -335,7 +336,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readDateTime2(buf, offset, dataLength, metadata.scale!, options.useUTC);
+      return readDateTime2(buf, offset, dataLength, metadata.scale!);
     }
 
     case 'DateTimeOffset': {
@@ -472,10 +473,10 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       return readBigInt(buf, offset);
 
     case 'SmallDateTime':
-      return readSmallDateTime(buf, offset, options.useUTC);
+      return readSmallDateTime(buf, offset);
 
     case 'DateTime':
-      return readDateTime(buf, offset, options.useUTC);
+      return readDateTime(buf, offset);
 
     case 'Real':
       return readReal(buf, offset);
@@ -490,20 +491,20 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       return readMoney(buf, offset);
 
     case 'Date':
-      return readDate(buf, offset, options.useUTC);
+      return readDate(buf, offset);
 
     case 'Time': {
       let scale;
       ({ value: scale, offset } = readUInt8(buf, offset));
 
-      return readTime(buf, offset, dataLength, scale, options.useUTC);
+      return readTime(buf, offset, dataLength, scale);
     }
 
     case 'DateTime2': {
       let scale;
       ({ value: scale, offset } = readUInt8(buf, offset));
 
-      return readDateTime2(buf, offset, dataLength, scale, options.useUTC);
+      return readDateTime2(buf, offset, dataLength, scale);
     }
 
     case 'DateTimeOffset': {
@@ -671,57 +672,35 @@ class PLPReader {
   }
 }
 
-// Epoch offsets for building UTC `Date` values via plain arithmetic, which
-// avoids the (comparatively slow) `Date.UTC` calendar calculations.
-//
-// Note that the day constants in the UTC and local time branches below differ
-// by one, even though both branches describe the same date: `days` arrives as
-// the wire-format day count since 0001-01-01 (e.g. 2000-01-01 is 730119). The
-// local time branches pass `days - 730118` as the *1-based* day-of-month
-// argument of `new Date(2000, 0, ...)`, while the UTC branches multiply
-// `days - 730119` as a *0-based* day offset from `UTC_EPOCH_2000`.
-const UTC_EPOCH_1900 = Date.UTC(1900, 0, 1);
-const UTC_EPOCH_2000 = Date.UTC(2000, 0, 1);
-const MILLISECONDS_PER_DAY = 86400000;
+// The date and time types are read as `Temporal` objects (from the
+// `temporal-polyfill` ponyfill): `date` as `Temporal.PlainDate`, `time` as
+// `Temporal.PlainTime`, `smalldatetime`, `datetime` and `datetime2` as
+// `Temporal.PlainDateTime`, and `datetimeoffset` as `Temporal.ZonedDateTime`
+// in a fixed-offset time zone. None of them depend on the `useUTC` option or
+// the local time zone of the process.
 
-function readSmallDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
+function readSmallDateTime(buf: Buffer, offset: number): Result<Temporal.PlainDateTime> {
   let days;
   ({ offset, value: days } = readUInt16LE(buf, offset));
 
   let minutes;
   ({ offset, value: minutes } = readUInt16LE(buf, offset));
 
-  let value;
-  if (useUTC) {
-    value = new Date(UTC_EPOCH_1900 + days * MILLISECONDS_PER_DAY + minutes * 60000);
-  } else {
-    value = new Date(1900, 0, 1 + days, 0, minutes);
-  }
-
-  return new Result(value, offset);
+  return new Result(dateTimeFromEpochDays(EPOCH_DAYS_1900_01_01 + days, minutes * 60_000_000_000), offset);
 }
 
-function readDateTime(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
+function readDateTime(buf: Buffer, offset: number): Result<Temporal.PlainDateTime> {
   let days;
   ({ offset, value: days } = readInt32LE(buf, offset));
 
   let threeHundredthsOfSecond;
   ({ offset, value: threeHundredthsOfSecond } = readInt32LE(buf, offset));
 
+  // `datetime` is precise to 1/300 of a second, which SQL Server itself
+  // presents rounded to milliseconds (.000, .003 or .007), as is done here.
   const milliseconds = Math.round(threeHundredthsOfSecond * THREE_AND_A_THIRD);
 
-  let value;
-  if (useUTC) {
-    value = new Date(UTC_EPOCH_1900 + days * MILLISECONDS_PER_DAY + milliseconds);
-  } else {
-    value = new Date(1900, 0, 1 + days, 0, 0, 0, milliseconds);
-  }
-
-  return new Result(value, offset);
-}
-
-interface DateWithNanosecondsDelta extends Date {
-  nanosecondsDelta: number;
+  return new Result(dateTimeFromEpochDays(EPOCH_DAYS_1900_01_01 + days, milliseconds * 1_000_000), offset);
 }
 
 // Reads a `time` value, returned in units of 100 nanoseconds since midnight.
@@ -758,72 +737,52 @@ function readTimeValue(buf: Buffer, offset: number, dataLength: number, scale: n
   return new Result(value, offset);
 }
 
-function readTime(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
+function readTime(buf: Buffer, offset: number, dataLength: number, scale: number): Result<Temporal.PlainTime> {
   let value;
   ({ offset, value } = readTimeValue(buf, offset, dataLength, scale));
 
-  let date;
-  if (useUTC) {
-    date = new Date(value / 10000) as DateWithNanosecondsDelta;
-  } else {
-    date = new Date(1970, 0, 1, 0, 0, 0, value / 10000) as DateWithNanosecondsDelta;
-  }
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (value % 10000) / 1e7
-  });
-
-  return new Result(date, offset);
+  return new Result(timeFromNanoseconds(value * 100), offset);
 }
 
-function readDate(buf: Buffer, offset: number, useUTC: boolean): Result<Date> {
+function readDate(buf: Buffer, offset: number): Result<Temporal.PlainDate> {
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  if (useUTC) {
-    return new Result(new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY), offset);
-  } else {
-    return new Result(new Date(2000, 0, days - 730118), offset);
-  }
+  return new Result(dateFromEpochDays(EPOCH_DAYS_0001_01_01 + days), offset);
 }
 
-function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: number, useUTC: boolean): Result<DateWithNanosecondsDelta> {
+function readDateTime2(buf: Buffer, offset: number, dataLength: number, scale: number): Result<Temporal.PlainDateTime> {
   let time;
   ({ offset, value: time } = readTimeValue(buf, offset, dataLength - 3, scale));
 
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  let date;
-  if (useUTC) {
-    date = new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000)) as DateWithNanosecondsDelta;
-  } else {
-    date = new Date(2000, 0, days - 730118, 0, 0, 0, time / 10000) as DateWithNanosecondsDelta;
-  }
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (time % 10000) / 1e7
-  });
-
-  return new Result(date, offset);
+  return new Result(dateTimeFromEpochDays(EPOCH_DAYS_0001_01_01 + days, time * 100), offset);
 }
 
-function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<DateWithNanosecondsDelta> {
+function readDateTimeOffset(buf: Buffer, offset: number, dataLength: number, scale: number): Result<Temporal.ZonedDateTime> {
   let time;
   ({ offset, value: time } = readTimeValue(buf, offset, dataLength - 5, scale));
 
   let days;
   ({ offset, value: days } = readUInt24LE(buf, offset));
 
-  // time offset?
-  ({ offset } = readUInt16LE(buf, offset));
+  let offsetMinutes;
+  ({ offset, value: offsetMinutes } = readInt16LE(buf, offset));
 
-  const date = new Date(UTC_EPOCH_2000 + (days - 730119) * MILLISECONDS_PER_DAY + Math.trunc(time / 10000)) as DateWithNanosecondsDelta;
-  Object.defineProperty(date, 'nanosecondsDelta', {
-    enumerable: false,
-    value: (time % 10000) / 1e7
-  });
-  return new Result(date, offset);
+  // The date and time are in UTC; the offset is that of the original value.
+  const epochNanoseconds = BigInt(EPOCH_DAYS_0001_01_01 + days) * NANOSECONDS_PER_DAY_BIGINT + BigInt(time) * 100n;
+  return new Result(new Temporal.ZonedDateTime(epochNanoseconds, formatOffset(offsetMinutes)), offset);
+}
+
+const NANOSECONDS_PER_DAY_BIGINT = BigInt(NANOSECONDS_PER_DAY);
+
+// Formats an offset in minutes as a `±HH:MM` time zone identifier.
+function formatOffset(minutes: number): string {
+  const sign = minutes < 0 ? '-' : '+';
+  const absolute = Math.abs(minutes);
+  return sign + String(Math.floor(absolute / 60)).padStart(2, '0') + ':' + String(absolute % 60).padStart(2, '0');
 }
 
 module.exports.readValue = readValue;

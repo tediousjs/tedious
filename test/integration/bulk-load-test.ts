@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 import { typeByName as TYPES } from '../../src/data-type';
 
@@ -72,11 +73,11 @@ describe('BulkLoad', function() {
       }
 
       connection.execBulkLoad(bulkLoad, [
-        { nnn: 201, sss: 'one zero one', ddd: new Date(1986, 6, 20) },
-        [202, 'one zero two', new Date()],
-        [203, 'one zero three', new Date(2013, 7, 12)],
-        { nnn: 204, sss: 'one zero four', ddd: new Date() },
-        { nnn: 205, sss: 'one zero five', ddd: new Date() },
+        { nnn: 201, sss: 'one zero one', ddd: Temporal.PlainDateTime.from('1986-07-20T00:00') },
+        [202, 'one zero two', Temporal.Now.plainDateTimeISO()],
+        [203, 'one zero three', Temporal.PlainDateTime.from('2013-08-12T00:00')],
+        { nnn: 204, sss: 'one zero four', ddd: Temporal.Now.plainDateTimeISO() },
+        { nnn: 205, sss: 'one zero five', ddd: Temporal.Now.plainDateTimeISO() },
       ]);
     });
 
@@ -1723,7 +1724,7 @@ describe('BulkLoad', function() {
         assert.instanceOf(err, InputError);
         assert.strictEqual(err.message, "Column 'value' could not be validated at row index 0");
         assert.instanceOf(err.cause, TypeError);
-        assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
+        assert.strictEqual((err.cause as TypeError).message, 'Invalid date: "invalid date".');
 
         done();
       }
@@ -1741,7 +1742,7 @@ describe('BulkLoad', function() {
         assert.instanceOf(err, InputError);
         assert.strictEqual(err.message, "Column 'value' could not be validated at row index 0");
         assert.instanceOf(err.cause, TypeError);
-        assert.strictEqual((err.cause as TypeError).message, 'Invalid date.');
+        assert.strictEqual((err.cause as TypeError).message, 'Invalid date: "invalid date".');
 
         assert.strictEqual(rowCount, 0);
 

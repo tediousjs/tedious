@@ -855,9 +855,15 @@ export interface ConnectionOptions {
   useColumnNames?: boolean;
 
   /**
-   * A boolean determining whether to pass time values in UTC or local time.
+   * A boolean that used to determine whether `Date` values of the date and
+   * time types were sent and received in UTC or in local time.
    *
-   * (default: `true`).
+   * The date and time types are now based on `Temporal` (see {@link TYPES}):
+   * `date`, `time`, `smalldatetime`, `datetime` and `datetime2` values are
+   * plain, time zone-less wall-clock values, and `datetimeoffset` values
+   * carry their own offset, so this option no longer has any effect.
+   *
+   * @deprecated This option no longer has any effect.
    */
   useUTC?: boolean;
 
@@ -2826,8 +2832,8 @@ class Connection extends EventEmitter {
    * // number of rows (e.g. by reading from a CSV file),
    * // passing an `AsyncIterable` is advisable to keep memory usage low.
    * connection.execBulkLoad(bulkLoad, [
-   *   { 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': new Date('02-24-1955') },
-   *   { 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': new Date('10-28-1955') }
+   *   { 'first_name': 'Steve', 'last_name': 'Jobs', 'day_of_birth': Temporal.PlainDate.from('1955-02-24') },
+   *   { 'first_name': 'Bill', 'last_name': 'Gates', 'day_of_birth': Temporal.PlainDate.from('1955-10-28') }
    * ]);
    * ```
    *
@@ -2852,7 +2858,7 @@ class Connection extends EventEmitter {
    *   try {
    *     for await (const line of file.readLines()) {
    *       const [first_name, last_name, day_of_birth] = line.split(',');
-   *       yield { first_name, last_name, day_of_birth: new Date(day_of_birth) };
+   *       yield { first_name, last_name, day_of_birth: Temporal.PlainDate.from(day_of_birth) };
    *     }
    *   } finally {
    *     await file.close();

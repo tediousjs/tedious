@@ -1,5 +1,5 @@
 import { type DataType } from '../data-type';
-import { timeLength, writeTimeOfDay, type TemporalValue } from './temporal';
+import { roundTimeOfDay, timeLength, toPlainTime, writeTimeIntervals, type Temporal } from './temporal';
 
 const Time: DataType = {
   id: 0x29,
@@ -25,31 +25,27 @@ const Time: DataType = {
     buffer.writeUInt8(parameter.scale!);
   },
 
-  writeValue(buffer, parameter, options) {
-    const value = parameter.value as TemporalValue | null;
+  writeValue(buffer, parameter) {
+    const value = parameter.value as Temporal.PlainTime | null;
     if (value == null) {
       buffer.writeUInt8(0x00);
       return;
     }
 
+    // A time that rounds up to midnight wraps around to 00:00, like
+    // `Temporal.PlainTime#round` does.
+    const { intervals } = roundTimeOfDay(value, parameter.scale!);
+
     buffer.writeUInt8(timeLength(parameter.scale));
-    writeTimeOfDay(buffer, value, parameter.scale!, options.useUTC);
+    writeTimeIntervals(buffer, intervals, parameter.scale!);
   },
 
-  validate: function(value): null | number | Date {
+  validate: function(value): null | Temporal.PlainTime {
     if (value == null) {
       return null;
     }
 
-    if (!(value instanceof Date)) {
-      value = new Date(Date.parse(value));
-    }
-
-    if (isNaN(value)) {
-      throw new TypeError('Invalid time.');
-    }
-
-    return value;
+    return toPlainTime(value);
   }
 };
 

@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 import { readValue } from '../../src/value-parser';
 import { type Metadata } from '../../src/metadata-parser';
@@ -60,58 +61,41 @@ function buildDateTimeOffsetBuffer(timeValue: number, timeByteLength: number, da
   return buf;
 }
 
-type DateWithNanosecondsDelta = Date & { nanosecondsDelta: number };
+// The date and time types no longer depend on `useUTC`: parsing gives the
+// same value with either setting.
+const allOptions: Array<[string, ParserOptions]> = [['useUTC: true', utcOptions], ['useUTC: false', localOptions]];
 
 describe('readValue', function() {
   describe('for `time` values', function() {
     it('should parse values at every scale', function() {
-      // [scale, byteLength, rawValue, expected milliseconds since midnight, expected nanosecondsDelta]
-      const cases: Array<[number, number, number, number, number]> = [
-        [0, 3, 45296, 45296000, 0], // 12:34:56
-        [1, 3, 863999, 86399900, 0], // 23:59:59.9
-        [2, 3, 99, 990, 0], // 00:00:00.99
-        [3, 4, 45296789, 45296789, 0], // 12:34:56.789
-        [4, 4, 452967891, 45296789, 1000 / 1e7], // 12:34:56.7891
-        [5, 5, 4529678912, 45296789, 1200 / 1e7], // 12:34:56.78912
-        [6, 5, 86399999999, 86399999, 9990 / 1e7], // 23:59:59.999999
-        [7, 5, 863999999999, 86399999, 9999 / 1e7] // 23:59:59.9999999
+      // [scale, byteLength, rawValue, expected time]
+      const cases: Array<[number, number, number, string]> = [
+        [0, 3, 45296, '12:34:56'],
+        [1, 3, 863999, '23:59:59.9'],
+        [2, 3, 99, '00:00:00.99'],
+        [3, 4, 45296789, '12:34:56.789'],
+        [4, 4, 452967891, '12:34:56.7891'],
+        [5, 5, 4529678912, '12:34:56.78912'],
+        [6, 5, 86399999999, '23:59:59.999999'],
+        [7, 5, 863999999999, '23:59:59.9999999']
       ];
 
-      for (const [scale, byteLength, rawValue, expectedMs, expectedNanosecondsDelta] of cases) {
-        const buf = buildTimeBuffer(rawValue, byteLength);
-        const result = readValue(buf, 0, buildMetadata(dataTypeByName.Time, scale), utcOptions);
-        const value = result.value as DateWithNanosecondsDelta;
+      for (const [scale, byteLength, rawValue, expected] of cases) {
+        for (const [label, options] of allOptions) {
+          const buf = buildTimeBuffer(rawValue, byteLength);
+          const result = readValue(buf, 0, buildMetadata(dataTypeByName.Time, scale), options);
+          const value = result.value as Temporal.PlainTime;
 
-        assert.instanceOf(value, Date, `scale ${scale}`);
-        assert.strictEqual(value.getTime(), expectedMs, `scale ${scale}`);
-        assert.strictEqual(value.nanosecondsDelta, expectedNanosecondsDelta, `scale ${scale}`);
-        assert.strictEqual(result.offset, buf.length, `scale ${scale}`);
+          assert.instanceOf(value, Temporal.PlainTime, `scale ${scale}, ${label}`);
+          assert.strictEqual(value.toString(), expected, `scale ${scale}, ${label}`);
+          assert.strictEqual(result.offset, buf.length, `scale ${scale}, ${label}`);
+        }
       }
     });
 
     it('should parse midnight', function() {
       const result = readValue(buildTimeBuffer(0, 5), 0, buildMetadata(dataTypeByName.Time, 7), utcOptions);
-      const value = result.value as DateWithNanosecondsDelta;
-
-      assert.strictEqual(value.getTime(), 0);
-      assert.strictEqual(value.nanosecondsDelta, 0);
-    });
-
-    it('should parse values as local time when `useUTC` is disabled', function() {
-      const result = readValue(buildTimeBuffer(45296789, 4), 0, buildMetadata(dataTypeByName.Time, 3), localOptions);
-      const value = result.value as DateWithNanosecondsDelta;
-
-      assert.strictEqual(value.getTime(), new Date(1970, 0, 1, 12, 34, 56, 789).getTime());
-    });
-
-    it('should expose `nanosecondsDelta` as a non-enumerable property', function() {
-      const result = readValue(buildTimeBuffer(863999999999, 5), 0, buildMetadata(dataTypeByName.Time, 7), utcOptions);
-      const value = result.value as DateWithNanosecondsDelta;
-
-      const descriptor = Object.getOwnPropertyDescriptor(value, 'nanosecondsDelta');
-      assert.isDefined(descriptor);
-      assert.isFalse(descriptor!.enumerable);
-      assert.notInclude(Object.keys(value), 'nanosecondsDelta');
+      assert.strictEqual((result.value as Temporal.PlainTime).toString(), '00:00:00');
     });
 
     it('should parse `NULL` values', function() {
@@ -124,29 +108,20 @@ describe('readValue', function() {
 
   describe('for `date` values', function() {
     it('should parse values across the supported range', function() {
-      for (const isoDate of ['0001-01-01', '1753-01-01', '1969-12-31', '1970-01-01', '2000-01-01', '2025-06-15', '9999-12-31']) {
-        const buf = Buffer.alloc(4);
-        buf.writeUInt8(3, 0);
-        buf.writeUIntLE(wireDays(isoDate), 1, 3);
+      for (const isoDate of ['0001-01-01', '0001-03-01', '1582-10-15', '1753-01-01', '1900-03-01', '1969-12-31', '1970-01-01', '2000-01-01', '2000-02-29', '2025-06-15', '9999-12-31']) {
+        for (const [label, options] of allOptions) {
+          const buf = Buffer.alloc(4);
+          buf.writeUInt8(3, 0);
+          buf.writeUIntLE(wireDays(isoDate), 1, 3);
 
-        const result = readValue(buf, 0, buildMetadata(dataTypeByName.Date), utcOptions);
-        const value = result.value as Date;
+          const result = readValue(buf, 0, buildMetadata(dataTypeByName.Date), options);
+          const value = result.value as Temporal.PlainDate;
 
-        assert.instanceOf(value, Date, isoDate);
-        assert.strictEqual(value.getTime(), Date.parse(isoDate + 'T00:00:00Z'), isoDate);
-        assert.strictEqual(result.offset, buf.length, isoDate);
+          assert.instanceOf(value, Temporal.PlainDate, `${isoDate}, ${label}`);
+          assert.strictEqual(value.toString(), isoDate, `${isoDate}, ${label}`);
+          assert.strictEqual(result.offset, buf.length, `${isoDate}, ${label}`);
+        }
       }
-    });
-
-    it('should parse values as local time when `useUTC` is disabled', function() {
-      const buf = Buffer.alloc(4);
-      buf.writeUInt8(3, 0);
-      buf.writeUIntLE(wireDays('2025-06-15'), 1, 3);
-
-      const result = readValue(buf, 0, buildMetadata(dataTypeByName.Date), localOptions);
-      const value = result.value as Date;
-
-      assert.strictEqual(value.getTime(), new Date(2025, 5, 15).getTime());
     });
 
     it('should parse `NULL` values', function() {
@@ -159,53 +134,41 @@ describe('readValue', function() {
 
   describe('for `datetime2` values', function() {
     it('should parse values at different scales', function() {
-      // [scale, time byte length, raw time value, expected milliseconds into the day, expected nanosecondsDelta]
-      const cases: Array<[number, number, number, number, number]> = [
-        [0, 3, 45296, 45296000, 0], // 12:34:56
-        [3, 4, 45296789, 45296789, 0], // 12:34:56.789
-        [7, 5, 452967891011, 45296789, 1011 / 1e7] // 12:34:56.7891011
+      // [scale, time byte length, raw time value, expected time of day]
+      const cases: Array<[number, number, number, string]> = [
+        [0, 3, 45296, '12:34:56'],
+        [3, 4, 45296789, '12:34:56.789'],
+        [7, 5, 452967891011, '12:34:56.7891011']
       ];
 
-      for (const [scale, timeByteLength, timeValue, expectedMs, expectedNanosecondsDelta] of cases) {
-        const buf = buildDateTime2Buffer(timeValue, timeByteLength, wireDays('2015-06-04'));
-        const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime2, scale), utcOptions);
-        const value = result.value as DateWithNanosecondsDelta;
+      for (const [scale, timeByteLength, timeValue, expected] of cases) {
+        for (const [label, options] of allOptions) {
+          const buf = buildDateTime2Buffer(timeValue, timeByteLength, wireDays('2015-06-04'));
+          const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime2, scale), options);
+          const value = result.value as Temporal.PlainDateTime;
 
-        assert.instanceOf(value, Date, `scale ${scale}`);
-        assert.strictEqual(value.getTime(), Date.parse('2015-06-04T00:00:00Z') + expectedMs, `scale ${scale}`);
-        assert.strictEqual(value.nanosecondsDelta, expectedNanosecondsDelta, `scale ${scale}`);
-        assert.strictEqual(result.offset, buf.length, `scale ${scale}`);
+          assert.instanceOf(value, Temporal.PlainDateTime, `scale ${scale}, ${label}`);
+          assert.strictEqual(value.toString(), `2015-06-04T${expected}`, `scale ${scale}, ${label}`);
+          assert.strictEqual(result.offset, buf.length, `scale ${scale}, ${label}`);
+        }
       }
     });
 
     it('should parse the minimum and maximum representable values', function() {
       const minBuf = buildDateTime2Buffer(0, 3, wireDays('0001-01-01'));
       const minResult = readValue(minBuf, 0, buildMetadata(dataTypeByName.DateTime2, 0), utcOptions);
-      assert.strictEqual((minResult.value as Date).getTime(), Date.parse('0001-01-01T00:00:00Z'));
+      assert.strictEqual((minResult.value as Temporal.PlainDateTime).toString(), '0001-01-01T00:00:00');
 
       const maxBuf = buildDateTime2Buffer(863999999999, 5, wireDays('9999-12-31'));
       const maxResult = readValue(maxBuf, 0, buildMetadata(dataTypeByName.DateTime2, 7), utcOptions);
-      const maxValue = maxResult.value as DateWithNanosecondsDelta;
-      assert.strictEqual(maxValue.getTime(), Date.parse('9999-12-31T23:59:59.999Z'));
-      assert.strictEqual(maxValue.nanosecondsDelta, 9999 / 1e7);
+      assert.strictEqual((maxResult.value as Temporal.PlainDateTime).toString(), '9999-12-31T23:59:59.9999999');
     });
 
     it('should parse values before the unix epoch', function() {
       const buf = buildDateTime2Buffer(45296, 3, wireDays('1960-05-05'));
       const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime2, 0), utcOptions);
-      const value = result.value as Date;
 
-      assert.isBelow(value.getTime(), 0);
-      assert.strictEqual(value.getTime(), Date.parse('1960-05-05T12:34:56Z'));
-    });
-
-    it('should parse values as local time when `useUTC` is disabled', function() {
-      const buf = buildDateTime2Buffer(45296789, 4, wireDays('2015-06-04'));
-      const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime2, 3), localOptions);
-      const value = result.value as DateWithNanosecondsDelta;
-
-      assert.strictEqual(value.getTime(), new Date(2015, 5, 4, 12, 34, 56, 789).getTime());
-      assert.strictEqual(value.nanosecondsDelta, 0);
+      assert.strictEqual((result.value as Temporal.PlainDateTime).toString(), '1960-05-05T12:34:56');
     });
 
     it('should parse `NULL` values', function() {
@@ -218,15 +181,21 @@ describe('readValue', function() {
 
   describe('for `datetimeoffset` values', function() {
     it('should parse values with positive and negative timezone offsets', function() {
-      for (const offsetMinutes of [0, 330, -90, 840, -840]) {
+      for (const [offsetMinutes, expected] of [
+        [0, '2015-06-04T12:34:56.7891011+00:00[+00:00]'],
+        [330, '2015-06-04T18:04:56.7891011+05:30[+05:30]'],
+        [-90, '2015-06-04T11:04:56.7891011-01:30[-01:30]'],
+        [840, '2015-06-05T02:34:56.7891011+14:00[+14:00]'],
+        [-840, '2015-06-03T22:34:56.7891011-14:00[-14:00]']
+      ] as Array<[number, string]>) {
         const buf = buildDateTimeOffsetBuffer(452967891011, 5, wireDays('2015-06-04'), offsetMinutes);
         const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTimeOffset, 7), utcOptions);
-        const value = result.value as DateWithNanosecondsDelta;
+        const value = result.value as Temporal.ZonedDateTime;
 
-        assert.instanceOf(value, Date, `offset ${offsetMinutes}`);
-        // The time portion is already in UTC - the timezone offset does not shift the value.
-        assert.strictEqual(value.getTime(), Date.parse('2015-06-04T12:34:56.789Z'), `offset ${offsetMinutes}`);
-        assert.strictEqual(value.nanosecondsDelta, 1011 / 1e7, `offset ${offsetMinutes}`);
+        assert.instanceOf(value, Temporal.ZonedDateTime, `offset ${offsetMinutes}`);
+        // The time portion is in UTC - the offset gives the local time of the value.
+        assert.strictEqual(value.toInstant().toString(), '2015-06-04T12:34:56.7891011Z', `offset ${offsetMinutes}`);
+        assert.strictEqual(value.toString(), expected, `offset ${offsetMinutes}`);
         assert.strictEqual(result.offset, buf.length, `offset ${offsetMinutes}`);
       }
     });
@@ -234,11 +203,19 @@ describe('readValue', function() {
     it('should parse values at the minimum scale', function() {
       const buf = buildDateTimeOffsetBuffer(45296, 3, wireDays('2015-06-04'), 0);
       const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTimeOffset, 0), utcOptions);
-      const value = result.value as DateWithNanosecondsDelta;
 
-      assert.strictEqual(value.getTime(), Date.parse('2015-06-04T12:34:56Z'));
-      assert.strictEqual(value.nanosecondsDelta, 0);
+      assert.strictEqual((result.value as Temporal.ZonedDateTime).toString(), '2015-06-04T12:34:56+00:00[+00:00]');
       assert.strictEqual(result.offset, buf.length);
+    });
+
+    it('should parse the minimum and maximum representable values', function() {
+      const minBuf = buildDateTimeOffsetBuffer(0, 3, wireDays('0001-01-01'), 840);
+      const minResult = readValue(minBuf, 0, buildMetadata(dataTypeByName.DateTimeOffset, 0), utcOptions);
+      assert.strictEqual((minResult.value as Temporal.ZonedDateTime).toString(), '0001-01-01T14:00:00+14:00[+14:00]');
+
+      const maxBuf = buildDateTimeOffsetBuffer(863999999999, 5, wireDays('9999-12-31'), -840);
+      const maxResult = readValue(maxBuf, 0, buildMetadata(dataTypeByName.DateTimeOffset, 7), utcOptions);
+      assert.strictEqual((maxResult.value as Temporal.ZonedDateTime).toString(), '9999-12-31T09:59:59.9999999-14:00[-14:00]');
     });
 
     it('should parse `NULL` values', function() {
@@ -251,85 +228,68 @@ describe('readValue', function() {
 
   describe('for `smalldatetime` values', function() {
     it('should parse values across the supported range', function() {
-      // [days, minutes, expected UTC timestamp]
-      const cases: Array<[number, number, number]> = [
-        [0, 0, Date.UTC(1900, 0, 1)],
-        [2, 14, Date.UTC(1900, 0, 3, 0, 14)],
-        [36524, 720, Date.UTC(2000, 0, 1, 12)],
-        [65535, 1439, Date.UTC(2079, 5, 6, 23, 59)]
+      // [days, minutes, expected]
+      const cases: Array<[number, number, string]> = [
+        [0, 0, '1900-01-01T00:00:00'],
+        [2, 14, '1900-01-03T00:14:00'],
+        [36524, 720, '2000-01-01T12:00:00'],
+        [65535, 1439, '2079-06-06T23:59:00']
       ];
 
       for (const [days, minutes, expected] of cases) {
-        const buf = Buffer.alloc(4);
-        buf.writeUInt16LE(days, 0);
-        buf.writeUInt16LE(minutes, 2);
+        for (const [label, options] of allOptions) {
+          const buf = Buffer.alloc(4);
+          buf.writeUInt16LE(days, 0);
+          buf.writeUInt16LE(minutes, 2);
 
-        const result = readValue(buf, 0, buildMetadata(dataTypeByName.SmallDateTime), utcOptions);
-        const value = result.value as Date;
+          const result = readValue(buf, 0, buildMetadata(dataTypeByName.SmallDateTime), options);
+          const value = result.value as Temporal.PlainDateTime;
 
-        assert.instanceOf(value, Date, `days ${days}`);
-        assert.strictEqual(value.getTime(), expected, `days ${days}`);
-        assert.strictEqual(result.offset, buf.length, `days ${days}`);
+          assert.instanceOf(value, Temporal.PlainDateTime, `days ${days}, ${label}`);
+          assert.strictEqual(value.toString(), expected, `days ${days}, ${label}`);
+          assert.strictEqual(result.offset, buf.length, `days ${days}, ${label}`);
+        }
       }
-    });
-
-    it('should parse values as local time when `useUTC` is disabled', function() {
-      const buf = Buffer.alloc(4);
-      buf.writeUInt16LE(2, 0);
-      buf.writeUInt16LE(14, 2);
-
-      const result = readValue(buf, 0, buildMetadata(dataTypeByName.SmallDateTime), localOptions);
-      const value = result.value as Date;
-
-      assert.strictEqual(value.getTime(), new Date(1900, 0, 3, 0, 14).getTime());
     });
   });
 
   describe('for `datetime` values', function() {
     it('should parse values across the supported range', function() {
-      // [days, three-hundredths of a second, expected UTC timestamp]
-      const cases: Array<[number, number, number]> = [
-        [-53690, 0, Date.UTC(1753, 0, 1)],
-        [0, 0, Date.UTC(1900, 0, 1)],
-        [2, 45 * 300, Date.UTC(1900, 0, 3, 0, 0, 45)],
-        [36524, 300 * 86399, Date.UTC(2000, 0, 1, 23, 59, 59)],
-        [2958463, 0, Date.UTC(9999, 11, 31)]
+      // [days, three-hundredths of a second, expected]
+      const cases: Array<[number, number, string]> = [
+        [-53690, 0, '1753-01-01T00:00:00'],
+        [0, 0, '1900-01-01T00:00:00'],
+        [2, 45 * 300, '1900-01-03T00:00:45'],
+        [36524, 300 * 86399, '2000-01-01T23:59:59'],
+        [2958463, 0, '9999-12-31T00:00:00'],
+        [2958463, 25919999, '9999-12-31T23:59:59.997']
       ];
 
       for (const [days, threeHundredths, expected] of cases) {
-        const buf = Buffer.alloc(8);
-        buf.writeInt32LE(days, 0);
-        buf.writeUInt32LE(threeHundredths, 4);
+        for (const [label, options] of allOptions) {
+          const buf = Buffer.alloc(8);
+          buf.writeInt32LE(days, 0);
+          buf.writeUInt32LE(threeHundredths, 4);
 
-        const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime), utcOptions);
-        const value = result.value as Date;
+          const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime), options);
+          const value = result.value as Temporal.PlainDateTime;
 
-        assert.instanceOf(value, Date, `days ${days}`);
-        assert.strictEqual(value.getTime(), expected, `days ${days}`);
-        assert.strictEqual(result.offset, buf.length, `days ${days}`);
+          assert.instanceOf(value, Temporal.PlainDateTime, `days ${days}, ${label}`);
+          assert.strictEqual(value.toString(), expected, `days ${days}, ${label}`);
+          assert.strictEqual(result.offset, buf.length, `days ${days}, ${label}`);
+        }
       }
     });
 
     it('should round sub-second fractions to milliseconds', function() {
-      const buf = Buffer.alloc(8);
-      buf.writeInt32LE(0, 0);
-      buf.writeUInt32LE(299, 4);
+      for (const [ticks, expected] of [[1, '.003'], [2, '.007'], [299, '.997']] as Array<[number, string]>) {
+        const buf = Buffer.alloc(8);
+        buf.writeInt32LE(0, 0);
+        buf.writeUInt32LE(ticks, 4);
 
-      const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime), utcOptions);
-      const value = result.value as Date;
-
-      assert.strictEqual(value.getTime(), Date.UTC(1900, 0, 1, 0, 0, 0, 997));
-    });
-
-    it('should parse values as local time when `useUTC` is disabled', function() {
-      const buf = Buffer.alloc(8);
-      buf.writeInt32LE(2, 0);
-      buf.writeUInt32LE(45 * 300, 4);
-
-      const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime), localOptions);
-      const value = result.value as Date;
-
-      assert.strictEqual(value.getTime(), new Date(1900, 0, 3, 0, 0, 45).getTime());
+        const result = readValue(buf, 0, buildMetadata(dataTypeByName.DateTime), utcOptions);
+        assert.strictEqual((result.value as Temporal.PlainDateTime).toString(), `1900-01-01T00:00:00${expected}`);
+      }
     });
   });
 });

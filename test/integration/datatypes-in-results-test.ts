@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { Temporal } from 'temporal-polyfill';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
@@ -17,6 +18,10 @@ const config = {
     tdsVersion: process.env.TEDIOUS_TDS_VERSION
   }
 };
+
+function isTemporal(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && String((value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag]).startsWith('Temporal.');
+}
 
 describe('Datatypes in results test', function() {
   function testDataType(expectedType: typeof TYPES[keyof typeof TYPES], cases: { [key: string]: [string, any] | [string, any, string] }) {
@@ -64,8 +69,9 @@ describe('Datatypes in results test', function() {
 
           request.on('row', function(columns) {
             const expectedRowVal = (expectedValue instanceof Array) ? expectedValue[rowProcessed++] : expectedValue;
-            if (expectedRowVal instanceof Date) {
-              assert.strictEqual(columns[0].value.getTime(), expectedRowVal.getTime());
+            if (isTemporal(expectedRowVal)) {
+              assert.strictEqual(Object.prototype.toString.call(columns[0].value), Object.prototype.toString.call(expectedRowVal));
+              assert.strictEqual(String(columns[0].value), String(expectedRowVal));
             } else if (
               expectedRowVal instanceof Array ||
               expectedRowVal instanceof Buffer
@@ -125,7 +131,7 @@ describe('Datatypes in results test', function() {
   testDataType(TYPES.DateTime, {
     'should test date time': [
       "select cast('2011-12-4 10:04:23' as datetime)",
-      new Date('December 4, 2011 10:04:23 GMT')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:23')
     ],
 
     'should test date time null': ['select cast(null as datetime)', null],
@@ -135,59 +141,59 @@ describe('Datatypes in results test', function() {
     // https://msdn.microsoft.com/en-us/library/ms187819.aspx
     'should test date time precision_0': [
       "select cast('1998-1-1 23:59:59.990' as datetime)",
-      new Date('January 1, 1998 23:59:59.990 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.990')
     ],
 
     'should test date time precision_1': [
       "select cast('1998-1-1 23:59:59.991' as datetime)",
-      new Date('January 1, 1998 23:59:59.990 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.990')
     ],
 
     'should test date time precision_2': [
       "select cast('1998-1-1 23:59:59.992' as datetime)",
-      new Date('January 1, 1998 23:59:59.993 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
     ],
 
     'should test date time precision_3': [
       "select cast('1998-1-1 23:59:59.993' as datetime)",
-      new Date('January 1, 1998 23:59:59.993 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
     ],
 
     'should test date time precision_4': [
       "select cast('1998-1-1 23:59:59.994' as datetime)",
-      new Date('January 1, 1998 23:59:59.993 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.993')
     ],
 
     'should test date time precision_5': [
       "select cast('1998-1-1 23:59:59.995' as datetime)",
-      new Date('January 1, 1998 23:59:59.997 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     ],
 
     'should test date time precision_6': [
       "select cast('1998-1-1 23:59:59.996' as datetime)",
-      new Date('January 1, 1998 23:59:59.997 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     ],
 
     'should test date time precision_7': [
       "select cast('1998-1-1 23:59:59.997' as datetime)",
-      new Date('January 1, 1998 23:59:59.997 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     ],
 
     'should test date time precision_8': [
       "select cast('1998-1-1 23:59:59.998' as datetime)",
-      new Date('January 1, 1998 23:59:59.997 GMT')
+      Temporal.PlainDateTime.from('1998-01-01T23:59:59.997')
     ],
 
     'should test date time precision_9': [
       "select cast('1998-1-1 23:59:59.999' as datetime)",
-      new Date('January 2, 1998 00:00:00.000 GMT')
+      Temporal.PlainDateTime.from('1998-01-02T00:00:00')
     ]
   });
 
   testDataType(TYPES.SmallDateTime, {
     'should test small date time': [
       "select cast('2011-12-4 10:04:23' as smalldatetime)",
-      new Date('December 4, 2011 10:04:00 GMT')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:00')
     ],
 
     'should test small date time null': [
@@ -198,7 +204,7 @@ describe('Datatypes in results test', function() {
   testDataType(TYPES.DateTime2, {
     'should test datetime2': [
       "select cast('2011-12-4 10:04:23' as datetime2)",
-      new Date('December 4, 2011 10:04:23 +00'),
+      Temporal.PlainDateTime.from('2011-12-04T10:04:23'),
       '7_3_A'
     ],
 
@@ -210,7 +216,7 @@ describe('Datatypes in results test', function() {
   testDataType(TYPES.Time, {
     'should test time': [
       "select cast('10:04:23' as time)",
-      new Date(Date.UTC(1970, 0, 1, 10, 4, 23)),
+      Temporal.PlainTime.from('10:04:23'),
       '7_3_A'
     ],
 
@@ -222,7 +228,7 @@ describe('Datatypes in results test', function() {
   testDataType(TYPES.Date, {
     'should test date': [
       "select cast('2014-03-08' as date)",
-      new Date(Date.UTC(2014, 2, 8)),
+      Temporal.PlainDate.from('2014-03-08'),
       '7_3_A'
     ],
 
@@ -234,7 +240,7 @@ describe('Datatypes in results test', function() {
   testDataType(TYPES.DateTimeOffset, {
     'should test datetimeoffset': [
       "select cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset)",
-      new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
+      Temporal.ZonedDateTime.from('2014-02-14T22:59:59.9999999+05:00[+05:00]'),
       '7_3_A'
     ],
 
@@ -475,7 +481,7 @@ describe('Datatypes in results test', function() {
 
     'should test variant datetimeoffset': [
       "select cast(cast('2014-02-14 22:59:59.9999999 +05:00' as datetimeoffset) as sql_variant)",
-      new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)),
+      Temporal.ZonedDateTime.from('2014-02-14T22:59:59.9999999+05:00[+05:00]'),
       '7_3_A'
     ],
 
@@ -496,7 +502,7 @@ describe('Datatypes in results test', function() {
 
     'should test variant datetime': [
       "select cast(cast('2011-12-4 10:04:23' as datetime) as sql_variant)",
-      new Date('December 4, 2011 10:04:23 GMT')
+      Temporal.PlainDateTime.from('2011-12-04T10:04:23')
     ],
 
     'should test variant null': [
