@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import { ColumnEncryptionCipher } from '../../../src/always-encrypted/cipher';
 import { assertSupportedEncryption, loadColumnEncryptionKeys, type ColumnEncryptionCiphers } from '../../../src/always-encrypted/key-cache';
 import { validateColumnEncryptionOptions } from '../../../src/always-encrypted/options';
-import { type ColumnEncryptionKeyStoreProvider } from '../../../src/always-encrypted/key-store-provider';
+import { type ColumnEncryptionKeyStoreProvider, type KeyCacheOptions } from '../../../src/always-encrypted/key-store-provider';
 import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type EncryptedColumnEncryptionKey } from '../../../src/always-encrypted/types';
 
 /**
@@ -13,6 +13,10 @@ import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type Encryp
  * themselves, and that records what it is asked to decrypt.
  */
 class FakeKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
+  // How long the keys of the key store are kept
+  keyCacheTTL: number | undefined;
+  keyCacheIdleTimeout: number | undefined;
+
   calls: { masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer }[] = [];
 
   // The key paths that fail to decrypt.
@@ -52,7 +56,17 @@ describe('loadColumnEncryptionKeys', function() {
 
   let provider: FakeKeyStoreProvider;
 
-  function optionsWith(options: Partial<ColumnEncryptionOptions> = {}) {
+  // The options of a connection that uses the provider, which is what says
+  // how long its keys are kept.
+  function optionsWith({ keyCacheTTL, keyCacheIdleTimeout, ...options }: Partial<ColumnEncryptionOptions> & KeyCacheOptions = {}) {
+    if (keyCacheTTL !== undefined) {
+      provider.keyCacheTTL = keyCacheTTL;
+    }
+
+    if (keyCacheIdleTimeout !== undefined) {
+      provider.keyCacheIdleTimeout = keyCacheIdleTimeout;
+    }
+
     return validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: provider }, ...options }, serverName);
   }
 
@@ -243,38 +257,74 @@ describe('loadColumnEncryptionKeys', function() {
     assert.lengthOf(provider.calls, 2);
   });
 
-  it('applies the lifetime of each connection to the keys of a shared key store provider', async function() {
+  it('keeps the keys of each key store provider for as long as that provider says', async function() {
     const clock = sinon.useFakeTimers({ toFake: ['Date'] });
     const value = keyValue();
 
-    // Cached for a connection that keeps keys for a long time ...
-    await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 60000 }));
+    const brief = new FakeKeyStoreProvider();
+    brief.keyCacheTTL = 1000;
+
+    // Keys are kept whether they are used or not.
+    provider.keyCacheIdleTimeout = 0;
+    brief.keyCacheIdleTimeout = 0;
+
+    const options = validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: provider, BRIEF: brief } }, serverName);
+    const keys = () => [keyInfo(value), keyInfo({ ...value, keyStoreName: 'BRIEF' })];
+
+    await loadColumnEncryptionKeys(keys(), options);
+
+    clock.tick(1000);
+    await loadColumnEncryptionKeys(keys(), options);
+
+    // The provider that does not say keeps its keys for 2 hours.
+    assert.lengthOf(provider.calls, 1);
+    assert.lengthOf(brief.calls, 2);
+
+    clock.tick(2 * 60 * 60 * 1000 - 1001);
+    assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
+
+    clock.tick(1);
+    await loadColumnEncryptionKeys([keyInfo(value)], options);
+    assert.lengthOf(provider.calls, 2);
+  });
+
+  it('applies a lifetime that the key store provider changed', async function() {
+    const clock = sinon.useFakeTimers({ toFake: ['Date'] });
+    const value = keyValue();
+    const options = optionsWith({ keyCacheTTL: 60000 });
+
+    await loadColumnEncryptionKeys([keyInfo(value)], options);
+
+    clock.tick(1000);
+    assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
     assert.lengthOf(provider.calls, 1);
 
-    // ... which a connection that does not cache keys makes no use of,
-    await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 0 }));
+    // The key was decrypted too long ago for the new lifetime.
+    provider.keyCacheTTL = 1000;
+    await loadColumnEncryptionKeys([keyInfo(value)], options);
     assert.lengthOf(provider.calls, 2);
 
-    // and neither does one that keeps keys for a shorter time, once that
-    // time has passed.
-    clock.tick(1000);
-    assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 2000 })), Map);
-    assert.lengthOf(provider.calls, 2);
-
-    clock.tick(1000);
-    await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 2000 }));
-    assert.lengthOf(provider.calls, 3);
-
-    // The key is cached anew for all of them.
-    assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 60000 })), Map);
-    assert.lengthOf(provider.calls, 3);
+    // Keys are not kept at all.
+    provider.keyCacheTTL = 0;
+    await loadColumnEncryptionKeys([keyInfo(value)], options);
+    await loadColumnEncryptionKeys([keyInfo(value)], options);
+    assert.lengthOf(provider.calls, 4);
   });
 
   describe('idle timeout', function() {
-    // A connection that does not let go of keys on its own: it finds a key
-    // in the cache for as long as nothing removed it.
+    // Whether a key is in the cache, used or not: it is found for as long
+    // as nothing removed it, once neither of the two limits applies.
     const isCached = (value: EncryptedColumnEncryptionKey) => {
-      return loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 0, keyCacheTTL: Infinity })) instanceof Map;
+      const { keyCacheTTL, keyCacheIdleTimeout } = provider;
+      provider.keyCacheTTL = Infinity;
+      provider.keyCacheIdleTimeout = 0;
+
+      try {
+        return loadColumnEncryptionKeys([keyInfo(value)], optionsWith()) instanceof Map;
+      } finally {
+        provider.keyCacheTTL = keyCacheTTL;
+        provider.keyCacheIdleTimeout = keyCacheIdleTimeout;
+      }
     };
 
     it('removes a key once it was not used for the idle timeout', async function() {
@@ -343,24 +393,21 @@ describe('loadColumnEncryptionKeys', function() {
       assert.lengthOf(provider.calls, 2);
     });
 
-    it('applies the shortest idle timeout of the connections that share a key', async function() {
+    it('applies an idle timeout that the key store provider changed, from the next use of a key on', async function() {
       const clock = sinon.useFakeTimers();
       const value = keyValue();
+      const options = optionsWith({ keyCacheIdleTimeout: 5000 });
 
-      await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 5000 }));
-      assert.isTrue(isCached(value));
+      await loadColumnEncryptionKeys([keyInfo(value)], options);
 
-      // Another connection lets go of keys sooner ...
-      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 1000 })), Map);
-
-      // ... which holds, whichever connection uses the key afterwards.
       await clock.tickAsync(500);
-      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 5000 })), Map);
+      provider.keyCacheIdleTimeout = 1000;
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
 
       await clock.tickAsync(999);
-      assert.isTrue(isCached(value));
+      assert.lengthOf(provider.calls, 1);
 
-      await clock.tickAsync(1001);
+      await clock.tickAsync(1);
       assert.isFalse(isCached(value));
     });
 

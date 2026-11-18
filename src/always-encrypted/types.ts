@@ -17,39 +17,6 @@ export interface ColumnEncryptionOptions {
   keyStoreProviders: { [providerName: string]: ColumnEncryptionKeyStoreProvider };
 
   /**
-   * The number of milliseconds a decrypted column encryption key is kept in
-   * memory, so the key store is not accessed for every request that uses
-   * the key. `0` disables the cache.
-   *
-   * Keys are cached per key store provider instance and server: connections
-   * to the same server that share a provider instance share its decrypted
-   * keys, each for as long as its own option allows.
-   *
-   * (default: `7200000`, 2 hours)
-   */
-  keyCacheTTL?: number | undefined;
-
-  /**
-   * The number of milliseconds after which a decrypted column encryption
-   * key that was not used in the meantime is removed from memory. With `0`,
-   * a key is kept for as long as `keyCacheTTL` allows, used or not.
-   *
-   * `keyCacheTTL` limits for how long a key is used before the key store is
-   * asked for it again, however often it is used. This limits for how long
-   * a key that is not used stays around: it is removed when the time is up,
-   * not when it is asked for the next time.
-   *
-   * A key that connections share (see `keyCacheTTL`) is removed once it was
-   * not used for the shortest idle timeout of the connections that used
-   * it. A result set that is being read holds on to its keys until it was
-   * read. Removing a key lets go of it, which does not guarantee that the
-   * memory that held it is overwritten right away.
-   *
-   * (default: `900000`, 15 minutes)
-   */
-  keyCacheIdleTimeout?: number | undefined;
-
-  /**
    * The key paths of the column master keys the server is trusted to refer
    * to. If set, column encryption keys that are protected by any other
    * column master key are rejected.
@@ -81,8 +48,6 @@ export interface ColumnEncryptionOptions {
  */
 export interface InternalColumnEncryptionOptions {
   keyStoreProviders: Map<string, ColumnEncryptionKeyStoreProvider>;
-  keyCacheTTL: number;
-  keyCacheIdleTimeout: number;
   // Lower cased
   trustedKeyPaths: Set<string> | undefined;
   parameterMetadataCacheSize: number;

@@ -131,6 +131,15 @@ class CountingKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
 
   constructor(private provider: ColumnEncryptionKeyStoreProvider) {}
 
+  // Keys are kept for as long as the key store provider itself keeps them.
+  get keyCacheTTL() {
+    return this.provider.keyCacheTTL;
+  }
+
+  get keyCacheIdleTimeout() {
+    return this.provider.keyCacheIdleTimeout;
+  }
+
   decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer) {
     this.calls += 1;
     return this.provider.decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey);
@@ -1097,6 +1106,8 @@ describe('Always Encrypted', function() {
       // are not cached, like after the lifetime of the key cache passed.
       const retired = new Set<string>();
       const keyStore: ColumnEncryptionKeyStoreProvider = {
+        keyCacheTTL: 0,
+
         async decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey) {
           if (retired.has(masterKeyPath.toLowerCase())) {
             throw new Error(`the key store does not have the key "${masterKeyPath}" anymore`);
@@ -1106,7 +1117,7 @@ describe('Always Encrypted', function() {
         }
       };
 
-      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: keyStore }, keyCacheTTL: 0 } });
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: keyStore } } });
 
       try {
         const counter = countDescribeRequests(connection);
@@ -1139,6 +1150,8 @@ describe('Always Encrypted', function() {
     it('asks the server only once more if the keys of a statement can not be decrypted', async function() {
       let available = true;
       const keyStore: ColumnEncryptionKeyStoreProvider = {
+        keyCacheTTL: 0,
+
         async decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey) {
           if (!available) {
             throw new Error('the key store is not available');
@@ -1148,7 +1161,7 @@ describe('Always Encrypted', function() {
         }
       };
 
-      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: keyStore }, keyCacheTTL: 0 } });
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: keyStore } } });
 
       try {
         const counter = countDescribeRequests(connection);
@@ -1269,8 +1282,8 @@ describe('Always Encrypted', function() {
     });
 
     it('decrypts a column encryption key again once it was not used for the idle timeout', async function() {
-      const provider = new CountingKeyStoreProvider(new RsaKeyStoreProvider({ [keyPath]: privateKey }));
-      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: provider }, keyCacheIdleTimeout: 1000 } });
+      const provider = new CountingKeyStoreProvider(new RsaKeyStoreProvider({ [keyPath]: privateKey }, { keyCacheIdleTimeout: 1000 }));
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: provider } } });
 
       try {
         await insertAndSelect(connection, 1);
@@ -1287,8 +1300,8 @@ describe('Always Encrypted', function() {
     });
 
     it('decrypts a column encryption key each time if the cache is disabled', async function() {
-      const provider = new CountingKeyStoreProvider(new RsaKeyStoreProvider({ [keyPath]: privateKey }));
-      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: provider }, keyCacheTTL: 0 } });
+      const provider = new CountingKeyStoreProvider(new RsaKeyStoreProvider({ [keyPath]: privateKey }, { keyCacheTTL: 0 }));
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: provider } } });
 
       try {
         await insertAndSelect(connection, 1);
@@ -1524,6 +1537,9 @@ describe('Always Encrypted', function() {
   describe('while a key store is accessed', function() {
     // A key store that only answers once it is released.
     class GatedKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
+      // The key store is asked each time a key is needed.
+      keyCacheTTL = 0;
+
       calls = 0;
       release!: () => void;
 
@@ -1554,7 +1570,7 @@ describe('Always Encrypted', function() {
       ]);
 
       gated = new GatedKeyStoreProvider();
-      waiting = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: gated }, keyCacheTTL: 0 } });
+      waiting = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: gated } } });
     });
 
     afterEach(async function() {

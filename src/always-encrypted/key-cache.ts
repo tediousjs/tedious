@@ -1,5 +1,5 @@
 import { ALGORITHM_ID, ALGORITHM_NAME, ColumnEncryptionCipher } from './cipher';
-import { type ColumnEncryptionKeyStoreProvider } from './key-store-provider';
+import { DEFAULT_KEY_CACHE_IDLE_TIMEOUT, DEFAULT_KEY_CACHE_TTL, type ColumnEncryptionKeyStoreProvider } from './key-store-provider';
 import { type ColumnEncryptionKeyInfo, type EncryptedColumnEncryptionKey, type InternalColumnEncryptionOptions } from './types';
 
 interface CacheEntry {
@@ -7,15 +7,13 @@ interface CacheEntry {
   cipher: ColumnEncryptionCipher | undefined;
   promise: Promise<ColumnEncryptionCipher>;
 
-  // When the key store was asked for the key. How long the entry is of use
-  // from then on is up to each of the connections that share the cache.
+  // When the key store was asked for the key.
   time: number;
 
   // When the key was last made use of.
   used: number;
 
-  // Removes the entry once it was not used for `idleTimeout` milliseconds:
-  // the shortest idle timeout of the connections that made use of it.
+  // Removes the entry once it was not used for `idleTimeout` milliseconds.
   idleTimeout: number;
   timer: NodeJS.Timeout | undefined;
 }
@@ -24,15 +22,26 @@ type Cache = Map<string, CacheEntry>;
 
 // Decrypted column encryption keys are cached per key store provider: what a
 // provider decrypted once can be used by every connection that trusts the
-// same provider instance, and is released together with the provider.
+// same provider instance, and is released together with the provider. For
+// how long a key is kept is up to the provider as well.
 const caches = new WeakMap<ColumnEncryptionKeyStoreProvider, Cache>();
 
+function keyCacheTTL(provider: ColumnEncryptionKeyStoreProvider): number {
+  return provider.keyCacheTTL ?? DEFAULT_KEY_CACHE_TTL;
+}
+
+function keyCacheIdleTimeout(provider: ColumnEncryptionKeyStoreProvider): number {
+  return provider.keyCacheIdleTimeout ?? DEFAULT_KEY_CACHE_IDLE_TIMEOUT;
+}
+
 /**
- * Whether a connection with the given options can make use of an entry:
- * the key was decrypted recently enough, and did not go unused for too long.
+ * Whether an entry of the cache of a provider is of use: the key was
+ * decrypted recently enough, and did not go unused for too long.
  */
-function isUsable(entry: CacheEntry, now: number, options: InternalColumnEncryptionOptions): boolean {
-  return now - entry.time < options.keyCacheTTL && (options.keyCacheIdleTimeout === 0 || now - entry.used < options.keyCacheIdleTimeout);
+function isUsable(entry: CacheEntry, now: number, provider: ColumnEncryptionKeyStoreProvider): boolean {
+  const idleTimeout = keyCacheIdleTimeout(provider);
+
+  return now - entry.time < keyCacheTTL(provider) && (idleTimeout === 0 || now - entry.used < idleTimeout);
 }
 
 /**
@@ -43,16 +52,21 @@ function isUsable(entry: CacheEntry, now: number, options: InternalColumnEncrypt
  * is asked for again - which is not going to happen for a key that is not
  * used anymore. A timer is what actually lets go of it.
  */
-function use(cache: Cache, key: string, entry: CacheEntry, now: number, options: InternalColumnEncryptionOptions) {
+function use(cache: Cache, key: string, entry: CacheEntry, now: number, provider: ColumnEncryptionKeyStoreProvider) {
   entry.used = now;
 
-  const idleTimeout = options.keyCacheIdleTimeout;
-  if (entry.timer !== undefined && (idleTimeout === 0 || idleTimeout >= entry.idleTimeout)) {
+  const idleTimeout = keyCacheIdleTimeout(provider);
+  if (entry.timer !== undefined && idleTimeout === entry.idleTimeout) {
     entry.timer.refresh();
-  } else if (idleTimeout !== 0) {
-    clearTimeout(entry.timer);
+    return;
+  }
 
-    entry.idleTimeout = idleTimeout;
+  // The first use of the entry, or the idle timeout of the provider changed.
+  clearTimeout(entry.timer);
+  entry.timer = undefined;
+  entry.idleTimeout = idleTimeout;
+
+  if (idleTimeout !== 0) {
     entry.timer = setTimeout(() => {
       remove(cache, key, entry);
     }, idleTimeout);
@@ -141,8 +155,8 @@ function getCipher(key: ColumnEncryptionKeyInfo, options: InternalColumnEncrypti
       const key = cacheKey(value, options);
 
       const entry = cache?.get(key);
-      if (entry !== undefined && entry.cipher !== undefined && isUsable(entry, now, options)) {
-        use(cache!, key, entry, now, options);
+      if (entry !== undefined && entry.cipher !== undefined && isUsable(entry, now, provider)) {
+        use(cache!, key, entry, now, provider);
         return entry.cipher;
       }
     }
@@ -180,7 +194,7 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
     throw new Error(`The column master key path "${value.keyPath}" is not one of the trusted key paths.`);
   }
 
-  if (options.keyCacheTTL <= 0) {
+  if (!(keyCacheTTL(provider) > 0)) {
     return decryptWithProvider(provider, value);
   }
 
@@ -194,24 +208,24 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
   const key = cacheKey(value, options);
 
   const cached = cache.get(key);
-  if (cached !== undefined && isUsable(cached, now, options)) {
+  if (cached !== undefined && isUsable(cached, now, provider)) {
     // Requests that need the key while it is being decrypted wait for the
     // same result, instead of each accessing the key store.
-    use(cache, key, cached, now, options);
+    use(cache, key, cached, now, provider);
     return cached.promise;
   }
 
-  // Entries that are of no use to this connection anymore are dropped, to
-  // not keep keys around that are not used any longer.
+  // Entries that are of no use anymore are dropped, to not keep keys around
+  // that are not used any longer.
   for (const [key, entry] of cache) {
-    if (!isUsable(entry, now, options)) {
+    if (!isUsable(entry, now, provider)) {
       remove(cache, key, entry);
     }
   }
 
   const entry: CacheEntry = { cipher: undefined, promise: decryptWithProvider(provider, value), time: now, used: now, idleTimeout: 0, timer: undefined };
   cache.set(key, entry);
-  use(cache, key, entry, now, options);
+  use(cache, key, entry, now, provider);
 
   entry.promise.then((cipher) => {
     entry.cipher = cipher;

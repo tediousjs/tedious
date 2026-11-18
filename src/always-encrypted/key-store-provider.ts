@@ -1,6 +1,71 @@
 import { constants, createHash, createPrivateKey, KeyObject, privateDecrypt, publicEncrypt, sign, verify } from 'crypto';
 
 /**
+ * For how long a decrypted column encryption key is used, if its key store
+ * provider does not say.
+ */
+export const DEFAULT_KEY_CACHE_TTL = 2 * 60 * 60 * 1000;
+
+/**
+ * For how long a decrypted column encryption key that is not used is kept,
+ * if its key store provider does not say.
+ */
+export const DEFAULT_KEY_CACHE_IDLE_TIMEOUT = 15 * 60 * 1000;
+
+// The longest that a timer can be set for.
+const MAX_TIMEOUT = 2 ** 31 - 1;
+
+/**
+ * How long the column encryption keys that a key store provider decrypted
+ * are kept in memory.
+ */
+export interface KeyCacheOptions {
+  /**
+   * The number of milliseconds a decrypted column encryption key is used
+   * for, before the key store is asked for it again. Keeping keys saves
+   * accessing the key store for every request that uses them. `0` does not
+   * keep keys at all.
+   *
+   * (default: `7200000`, 2 hours)
+   */
+  keyCacheTTL?: number | undefined;
+
+  /**
+   * The number of milliseconds after which a decrypted column encryption
+   * key that was not used in the meantime is removed from memory. With `0`,
+   * a key is kept for as long as `keyCacheTTL` allows, used or not.
+   *
+   * `keyCacheTTL` limits for how long a key is used, however often that
+   * is. This limits for how long a key that is not used stays around: it
+   * is removed when the time is up, not when it is asked for the next time.
+   *
+   * A result set that is being read holds on to its keys until it was
+   * read. Removing a key lets go of it, which does not guarantee that the
+   * memory that held it is overwritten right away.
+   *
+   * (default: `900000`, 15 minutes)
+   */
+  keyCacheIdleTimeout?: number | undefined;
+}
+
+/**
+ * Throws a `TypeError` if the key cache options of a key store provider
+ * are not valid.
+ *
+ * @param name
+ *   What the options are referred to as in the error.
+ */
+export function validateKeyCacheOptions({ keyCacheTTL, keyCacheIdleTimeout }: KeyCacheOptions, name: string) {
+  if (keyCacheTTL !== undefined && (typeof keyCacheTTL !== 'number' || !(keyCacheTTL >= 0))) {
+    throw new TypeError(`The "${name}.keyCacheTTL" property must be a non-negative number.`);
+  }
+
+  if (keyCacheIdleTimeout !== undefined && (typeof keyCacheIdleTimeout !== 'number' || !(keyCacheIdleTimeout >= 0 && keyCacheIdleTimeout <= MAX_TIMEOUT))) {
+    throw new TypeError(`The "${name}.keyCacheIdleTimeout" property must be a number between 0 and ${MAX_TIMEOUT}.`);
+  }
+}
+
+/**
  * A key store provider gives access to the column master keys of a key
  * store, which protect the column encryption keys stored in the database.
  *
@@ -10,14 +75,21 @@ import { constants, createHash, createPrivateKey, KeyObject, privateDecrypt, pub
  *
  * The method names and arguments match those of the key store providers of
  * Microsoft's drivers.
+ *
+ * The column encryption keys that a provider decrypted are kept in memory,
+ * for the connections that use the same provider instance and are made to
+ * the same server. For how long is up to the provider: see
+ * {@link KeyCacheOptions.keyCacheTTL} and
+ * {@link KeyCacheOptions.keyCacheIdleTimeout}, which a provider can have as
+ * properties.
  */
-export interface ColumnEncryptionKeyStoreProvider {
+export interface ColumnEncryptionKeyStoreProvider extends KeyCacheOptions {
   /**
    * Decrypts a column encryption key with a column master key.
    *
-   * The result is cached (see {@link ColumnEncryptionOptions.keyCacheTTL}),
-   * so this is only called when a key is used for the first time, or once
-   * its cache entry expired.
+   * The result is kept (see {@link KeyCacheOptions.keyCacheTTL}), so this
+   * is only called when a key is used for the first time, or once it is
+   * not kept anymore.
    *
    * @param masterKeyPath
    *   The path of the column master key (`KEY_PATH`), in a format specific
@@ -183,6 +255,9 @@ export type RsaPrivateKey = Parameters<typeof createPrivateKey>[0] | KeyObject;
  * ```
  */
 export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
+  declare readonly keyCacheTTL: number | undefined;
+  declare readonly keyCacheIdleTimeout: number | undefined;
+
   declare private readonly lookup: (masterKeyPath: string) => RsaPrivateKey | undefined | Promise<RsaPrivateKey | undefined>;
 
   /**
@@ -194,12 +269,16 @@ export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
    *   an object are held on to for as long as the provider is.
    *
    *   A function is called each time a column encryption key is decrypted
-   *   (which {@link ColumnEncryptionOptions.keyCacheTTL} limits), and what
-   *   it returns is not held on to. That leaves it to the function how
-   *   long a private key is kept in memory, and lets it return another key
-   *   once the key of a path changed.
+   *   (which {@link KeyCacheOptions.keyCacheTTL} limits), and what it
+   *   returns is not held on to. That leaves it to the function how long a
+   *   private key is kept in memory, and lets it return another key once
+   *   the key of a path changed.
+   *
+   * @param options
+   *   How long the column encryption keys that the provider decrypted are
+   *   kept in memory, see {@link KeyCacheOptions}.
    */
-  constructor(keys: { [masterKeyPath: string]: RsaPrivateKey } | ((masterKeyPath: string) => RsaPrivateKey | undefined | Promise<RsaPrivateKey | undefined>)) {
+  constructor(keys: { [masterKeyPath: string]: RsaPrivateKey } | ((masterKeyPath: string) => RsaPrivateKey | undefined | Promise<RsaPrivateKey | undefined>), options: KeyCacheOptions = {}) {
     if (typeof keys === 'function') {
       this.lookup = keys;
     } else if (typeof keys === 'object' && keys !== null) {
@@ -208,6 +287,14 @@ export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
     } else {
       throw new TypeError('The "keys" argument must be of type object or function.');
     }
+
+    if (typeof options !== 'object' || options === null) {
+      throw new TypeError('The "options" argument must be of type object.');
+    }
+
+    validateKeyCacheOptions(options, 'options');
+    this.keyCacheTTL = options.keyCacheTTL;
+    this.keyCacheIdleTimeout = options.keyCacheIdleTimeout;
   }
 
   async decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Promise<Buffer> {
@@ -293,7 +380,7 @@ export interface AzureKeyVaultCryptographyClient {
 /**
  * The options of an {@link AzureKeyVaultKeyStoreProvider}.
  */
-export interface AzureKeyVaultKeyStoreProviderOptions {
+export interface AzureKeyVaultKeyStoreProviderOptions extends KeyCacheOptions {
   /**
    * The domain names column master keys are allowed to be stored at: the
    * host of a key path must be one of these, or a subdomain of one.
@@ -341,6 +428,9 @@ export class AzureKeyVaultKeyStoreProvider implements ColumnEncryptionKeyStorePr
     'managedhsm.microsoftazure.de'
   ]);
 
+  declare readonly keyCacheTTL: number | undefined;
+  declare readonly keyCacheIdleTimeout: number | undefined;
+
   declare private readonly createCryptographyClient: (keyId: string) => AzureKeyVaultCryptographyClient;
   declare private readonly trustedEndpoints: readonly string[];
   declare private readonly clients: Map<string, AzureKeyVaultCryptographyClient>;
@@ -352,15 +442,24 @@ export class AzureKeyVaultKeyStoreProvider implements ColumnEncryptionKeyStorePr
    *   once per key.
    *
    * @param options
-   *   Which key vaults the provider is allowed to use, see
+   *   Which key vaults the provider is allowed to use, and how long the
+   *   column encryption keys that it decrypted are kept in memory, see
    *   {@link AzureKeyVaultKeyStoreProviderOptions}.
    */
-  constructor(createCryptographyClient: (keyId: string) => AzureKeyVaultCryptographyClient, options?: AzureKeyVaultKeyStoreProviderOptions) {
+  constructor(createCryptographyClient: (keyId: string) => AzureKeyVaultCryptographyClient, options: AzureKeyVaultKeyStoreProviderOptions = {}) {
     if (typeof createCryptographyClient !== 'function') {
       throw new TypeError('The "createCryptographyClient" argument must be of type function.');
     }
 
-    const trustedEndpoints = options?.trustedEndpoints ?? AzureKeyVaultKeyStoreProvider.DEFAULT_TRUSTED_ENDPOINTS;
+    if (typeof options !== 'object' || options === null) {
+      throw new TypeError('The "options" argument must be of type object.');
+    }
+
+    validateKeyCacheOptions(options, 'options');
+    this.keyCacheTTL = options.keyCacheTTL;
+    this.keyCacheIdleTimeout = options.keyCacheIdleTimeout;
+
+    const trustedEndpoints = options.trustedEndpoints ?? AzureKeyVaultKeyStoreProvider.DEFAULT_TRUSTED_ENDPOINTS;
     if (!Array.isArray(trustedEndpoints) || !trustedEndpoints.every((endpoint) => typeof endpoint === 'string' && endpoint.length > 0)) {
       throw new TypeError('The "options.trustedEndpoints" property must be an array of domain names.');
     }

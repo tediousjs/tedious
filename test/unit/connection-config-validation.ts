@@ -148,7 +148,6 @@ describe('Connection configuration validation', function() {
       const { columnEncryption } = connection.config.options;
 
       assert.strictEqual(columnEncryption!.keyStoreProviders.get('AZURE_KEY_VAULT'), provider);
-      assert.strictEqual(columnEncryption!.keyCacheTTL, 2 * 60 * 60 * 1000);
       assert.isUndefined(columnEncryption!.trustedKeyPaths);
       assert.strictEqual(columnEncryption!.parameterMetadataCacheSize, 1000);
 

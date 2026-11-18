@@ -12,8 +12,6 @@ describe('validateColumnEncryptionOptions', function() {
     const options = validateColumnEncryptionOptions({ keyStoreProviders: { AZURE_KEY_VAULT: provider } }, 'Server.example.com\\Instance');
 
     assert.deepEqual(Array.from(options.keyStoreProviders), [['AZURE_KEY_VAULT', provider]]);
-    assert.strictEqual(options.keyCacheTTL, 2 * 60 * 60 * 1000);
-    assert.strictEqual(options.keyCacheIdleTimeout, 15 * 60 * 1000);
     assert.isUndefined(options.trustedKeyPaths);
     assert.strictEqual(options.parameterMetadataCacheSize, 1000);
 
@@ -24,13 +22,11 @@ describe('validateColumnEncryptionOptions', function() {
   it('accepts all options', function() {
     const options = validateColumnEncryptionOptions({
       keyStoreProviders: { AZURE_KEY_VAULT: provider, CUSTOM: provider },
-      keyCacheTTL: 0,
       trustedKeyPaths: ['https://Tedious.vault.azure.net/keys/CMK'],
       parameterMetadataCacheSize: 0
     }, 'server');
 
     assert.deepEqual(Array.from(options.keyStoreProviders.keys()), ['AZURE_KEY_VAULT', 'CUSTOM']);
-    assert.strictEqual(options.keyCacheTTL, 0);
     assert.deepEqual(Array.from(options.trustedKeyPaths!), ['https://tedious.vault.azure.net/keys/cmk']);
     assert.strictEqual(options.parameterMetadataCacheSize, 0);
   });
@@ -57,24 +53,25 @@ describe('validateColumnEncryptionOptions', function() {
     }
   });
 
-  it('requires a valid lifetime of the key cache', function() {
+  it('requires the key cache options of a key store provider to be valid', function() {
+    const decryptColumnEncryptionKey = () => Buffer.alloc(32);
+
+    // How long keys are kept is up to their key store provider.
+    for (const keyCacheOptions of [{}, { keyCacheTTL: 0 }, { keyCacheTTL: Infinity, keyCacheIdleTimeout: 0 }, { keyCacheTTL: 60000, keyCacheIdleTimeout: 2 ** 31 - 1 }]) {
+      validateColumnEncryptionOptions({ keyStoreProviders: { CUSTOM: { ...keyCacheOptions, decryptColumnEncryptionKey } } }, 'server');
+    }
+
     for (const keyCacheTTL of [-1, NaN, '1000', null]) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: {}, keyCacheTTL: keyCacheTTL as any }, 'server');
-      }, TypeError, 'The "config.options.columnEncryption.keyCacheTTL" property must be a non-negative number.');
-    }
-  });
-
-  it('requires a valid idle timeout of the key cache', function() {
-    for (const keyCacheIdleTimeout of [0, 1, 60000, 2 ** 31 - 1]) {
-      assert.strictEqual(validateColumnEncryptionOptions({ keyStoreProviders: {}, keyCacheIdleTimeout }, 'server').keyCacheIdleTimeout, keyCacheIdleTimeout);
+        validateColumnEncryptionOptions({ keyStoreProviders: { CUSTOM: { keyCacheTTL: keyCacheTTL as any, decryptColumnEncryptionKey } } }, 'server');
+      }, TypeError, 'The "config.options.columnEncryption.keyStoreProviders.CUSTOM.keyCacheTTL" property must be a non-negative number.');
     }
 
     // No longer than a timer can be set for
     for (const keyCacheIdleTimeout of [-1, NaN, '1000', null, Infinity, 2 ** 31]) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: {}, keyCacheIdleTimeout: keyCacheIdleTimeout as any }, 'server');
-      }, TypeError, 'The "config.options.columnEncryption.keyCacheIdleTimeout" property must be a number between 0 and 2147483647.');
+        validateColumnEncryptionOptions({ keyStoreProviders: { CUSTOM: { keyCacheIdleTimeout: keyCacheIdleTimeout as any, decryptColumnEncryptionKey } } }, 'server');
+      }, TypeError, 'The "config.options.columnEncryption.keyStoreProviders.CUSTOM.keyCacheIdleTimeout" property must be a number between 0 and 2147483647.');
     }
   });
 

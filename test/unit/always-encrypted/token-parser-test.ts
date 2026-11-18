@@ -29,9 +29,8 @@ const cipher = new ColumnEncryptionCipher(columnEncryptionKey);
 // themselves.
 const columnEncryption = validateColumnEncryptionOptions({
   keyStoreProviders: {
-    TEST: { decryptColumnEncryptionKey: (masterKeyPath, encryptionAlgorithm, encryptedKey) => encryptedKey }
-  },
-  keyCacheTTL: 0
+    TEST: { keyCacheTTL: 0, decryptColumnEncryptionKey: (masterKeyPath, encryptionAlgorithm, encryptedKey) => encryptedKey }
+  }
 }, 'server');
 
 const options: ParserOptions = {
@@ -969,13 +968,13 @@ describe('handling tokens with column encryption', function() {
       columnEncryption: validateColumnEncryptionOptions({
         keyStoreProviders: {
           TEST: {
+            keyCacheTTL: 0,
             decryptColumnEncryptionKey() {
               calls += 1;
               return columnEncryptionKey;
             }
           }
-        },
-        keyCacheTTL: 0
+        }
       }, 'server')
     };
 

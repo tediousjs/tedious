@@ -68,6 +68,21 @@ describe('key store providers', function() {
       }
     });
 
+    it('says how long its column encryption keys are kept', function() {
+      // Unless it is told, that is left to the defaults.
+      const provider = new RsaKeyStoreProvider({ [keyPath]: privateKey });
+      assert.isUndefined(provider.keyCacheTTL);
+      assert.isUndefined(provider.keyCacheIdleTimeout);
+
+      const configured = new RsaKeyStoreProvider({ [keyPath]: privateKey }, { keyCacheTTL: 60000, keyCacheIdleTimeout: 0 });
+      assert.strictEqual(configured.keyCacheTTL, 60000);
+      assert.strictEqual(configured.keyCacheIdleTimeout, 0);
+
+      assert.throws(() => new RsaKeyStoreProvider({}, null as any), TypeError, 'The "options" argument must be of type object.');
+      assert.throws(() => new RsaKeyStoreProvider({}, { keyCacheTTL: -1 }), TypeError, 'The "options.keyCacheTTL" property must be a non-negative number.');
+      assert.throws(() => new RsaKeyStoreProvider({}, { keyCacheIdleTimeout: Infinity }), TypeError, 'The "options.keyCacheIdleTimeout" property must be a number between 0 and 2147483647.');
+    });
+
     it('encrypts a column encryption key into the format of Microsoft\'s key store providers', async function() {
       const provider = new RsaKeyStoreProvider({ [keyPath]: privateKey });
       const encryptedKey = await provider.encryptColumnEncryptionKey(keyPath, 'RSA_OAEP', columnEncryptionKey);
@@ -286,6 +301,22 @@ describe('key store providers', function() {
       assert.throws(() => {
         new AzureKeyVaultKeyStoreProvider(undefined as any);
       }, TypeError, 'The "createCryptographyClient" argument must be of type function.');
+    });
+
+    it('says how long its column encryption keys are kept', function() {
+      const createClient = (keyId: string) => new FakeCryptographyClient(keyId);
+
+      const provider = new AzureKeyVaultKeyStoreProvider(createClient);
+      assert.isUndefined(provider.keyCacheTTL);
+      assert.isUndefined(provider.keyCacheIdleTimeout);
+
+      const configured = new AzureKeyVaultKeyStoreProvider(createClient, { keyCacheTTL: 0, keyCacheIdleTimeout: 60000 });
+      assert.strictEqual(configured.keyCacheTTL, 0);
+      assert.strictEqual(configured.keyCacheIdleTimeout, 60000);
+
+      assert.throws(() => new AzureKeyVaultKeyStoreProvider(createClient, null as any), TypeError, 'The "options" argument must be of type object.');
+      assert.throws(() => new AzureKeyVaultKeyStoreProvider(createClient, { keyCacheTTL: '1000' as any }), TypeError, 'The "options.keyCacheTTL" property must be a non-negative number.');
+      assert.throws(() => new AzureKeyVaultKeyStoreProvider(createClient, { keyCacheIdleTimeout: -1 }), TypeError, 'The "options.keyCacheIdleTimeout" property must be a number between 0 and 2147483647.');
     });
 
     it('requires the trusted endpoints to be domain names', function() {
