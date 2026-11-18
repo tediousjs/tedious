@@ -3,6 +3,9 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
+    '.github/workflows/azure-sql.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'codecov/codecov-action@v7.1.1'
     '.github/workflows/claude-code-review.yml':
         - 'actions/checkout@v7.0.1'
         - 'anthropics/claude-code-action@v1.0.268'

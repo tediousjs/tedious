@@ -1,11 +1,10 @@
 import { type ConnectionConfiguration } from '../src/connection';
-import { UsernamePasswordCredential } from '@azure/identity';
+import { ClientSecretCredential } from '@azure/identity';
 
-const tokenCredential = new UsernamePasswordCredential(
+const tokenCredential = new ClientSecretCredential(
   process.env.AZURE_AD_SP_TENANT_ID as string,
   process.env.AZURE_AD_SP_CLIENT_ID as string,
-  process.env.AZURE_AD_USERNAME as string,
-  process.env.AZURE_AD_PASSWORD as string
+  process.env.AZURE_AD_SP_CLIENT_SECRET as string
 );
 
 export default {
