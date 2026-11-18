@@ -84,6 +84,9 @@ Things to know:
   Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
 - The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make
   a request fail instead of sending such a value as it is.
+- The request timeout covers a key store that is accessed to encrypt the parameters of a request. It does not cover one that is
+  accessed to decrypt a result set: like for every request, it ends once the first part of the response arrived. Give the client of
+  a key store a timeout of its own, or cancel the request (`request.cancel()`), to not wait for a key store indefinitely.
 - Bulk loads, table-valued parameters and values that are read from a stream are not encrypted, and secure enclaves are not supported.
 
 See [`examples/always-encrypted.js`](examples/always-encrypted.js) for a complete example.

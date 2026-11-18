@@ -569,6 +569,13 @@ export interface ConnectionOptions {
    * (Microsoft's JDBC driver does the same, SqlClient truncates such a
    * value.)
    *
+   * The time that a key store takes to encrypt the parameters of a request
+   * counts towards the request timeout. The time that one takes to decrypt
+   * a result set does not: like for every request, the request timeout
+   * ends once the first part of the response arrived. To not wait for a
+   * key store indefinitely, give its client a timeout of its own, or
+   * cancel the request.
+   *
    * A request that fails to encrypt its parameters or to decrypt its
    * results (e.g. because a key store can not be accessed) is completed
    * with a {@link RequestError} whose `code` is `'ECOLUMNENCRYPTION'`. The
