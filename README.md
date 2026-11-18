@@ -77,6 +77,9 @@ Things to know:
 - The type of a parameter (including its precision and scale) needs to match the type of the encrypted column it targets, as the
   server is not able to convert encrypted values. Its length may not be longer than that of the column. A length that is not
   specified is that of the value.
+- A `time`, `datetime2` or `datetimeoffset` value that has more precision than its column is rounded to the scale of the column, the
+  way the server rounds it for a column that is not encrypted. Microsoft's JDBC driver does the same, SqlClient truncates such a
+  value instead: a lookup by a value that rounds differently than it truncates does not find what SqlClient wrote, and vice versa.
 - Before a request with parameters is executed for the first time, the server is asked which of its parameters need to be encrypted.
   Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
 - The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make

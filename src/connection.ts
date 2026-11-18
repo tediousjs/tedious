@@ -562,6 +562,13 @@ export interface ConnectionOptions {
    * and values that are read from a stream are sent as they are, and
    * secure enclaves are not supported.
    *
+   * The server is not able to round an encrypted value either: a `time`,
+   * `datetime2` or `datetimeoffset` value that has more precision than its
+   * column is rounded to the scale of the column before it is encrypted,
+   * the way the server rounds it for a column that is not encrypted.
+   * (Microsoft's JDBC driver does the same, SqlClient truncates such a
+   * value.)
+   *
    * A request that fails to encrypt its parameters or to decrypt its
    * results (e.g. because a key store can not be accessed) is completed
    * with a {@link RequestError} whose `code` is `'ECOLUMNENCRYPTION'`. The
