@@ -50,6 +50,9 @@ A run fails if a check fails that is not listed there. It also fails if a
 listed check passes: either the other driver changed, or tedious did, and the
 list is to be updated on purpose.
 
+Dependabot proposes updates of the drivers. When the checks of such an update
+fail, the list of the driver is to be updated in the same pull request.
+
 A column that one of the drivers is not able to write at all names the drivers
 that do write it in the `written by` field of the spec:
 
