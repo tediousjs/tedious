@@ -13,6 +13,7 @@ import {
   type ParameterEncryptionMetadata
 } from '../../../src/always-encrypted/parameter-encryption';
 import { type ColumnEncryptionKeyInfo } from '../../../src/always-encrypted/types';
+import { COLUMN_ENCRYPTION_KEY, JDBC_VECTORS, TIME_ZONE_DEPENDENT } from './jdbc-vectors';
 import { Collation } from '../../../src/collation';
 import { type InternalConnectionOptions } from '../../../src/connection';
 import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../../src/data-type';
@@ -314,6 +315,32 @@ describe('encryptParameters', function() {
       assert.strictEqual(normalized(TYPES.VarBinary, Buffer.alloc(10000, 0xAB)), 'ab'.repeat(10000));
       assert.strictEqual(normalized(TYPES.VarBinary, Buffer.alloc(10000, 0xAB), { length: Infinity }), 'ab'.repeat(10000));
     });
+  });
+
+  it('encrypts values to the same cells as the Microsoft JDBC driver', function() {
+    const jdbcCipher = new ColumnEncryptionCipher(Buffer.from(COLUMN_ENCRYPTION_KEY, 'hex'));
+
+    for (const vector of JDBC_VECTORS) {
+      const message = `${vector.sqlType} ${JSON.stringify(vector.value)}`;
+
+      // The offset of a `datetimeoffset` is that of the local time zone,
+      // and the JDBC driver wrote its values in UTC.
+      if (vector.differs === TIME_ZONE_DEPENDENT && (vector.value as Date).getTimezoneOffset() !== 0) {
+        continue;
+      }
+
+      // With deterministic encryption, the cell of a value only depends on
+      // what the value is normalized to.
+      const type = TYPES[vector.type as keyof typeof TYPES];
+      const cell = jdbcCipher.encrypt(Buffer.from(normalized(type, vector.value, vector.options), 'hex'), true).toString('hex');
+
+      if (vector.differs === undefined || vector.differs === TIME_ZONE_DEPENDENT) {
+        assert.strictEqual(cell, vector.cell, message);
+      } else {
+        // What is known to be normalized differently
+        assert.notStrictEqual(cell, vector.cell, `${message}: ${vector.differs}`);
+      }
+    }
   });
 
   it('does not encrypt `null` values', function() {

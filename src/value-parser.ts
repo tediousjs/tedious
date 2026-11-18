@@ -501,7 +501,7 @@ function assertNormalizedLength(value: Buffer, length: number, metadata: Metadat
  *
  *   - `bit` and all integer types are 64-bit integers,
  *   - `smallmoney` values have the format of `money` values,
- *   - `decimal` and `numeric` values have a magnitude of 16 bytes,
+ *   - `decimal` and `numeric` values have a magnitude of (up to) 16 bytes,
  *   - `time`, `datetime2` and `datetimeoffset` values have a scale of 7,
  *   - fixed length `char`, `nchar` and `binary` values are not padded.
  *
@@ -577,9 +577,18 @@ function readNormalizedValue(value: Buffer, metadata: Metadata, options: ParserO
       }
 
     case 'NumericN':
-    case 'DecimalN':
-      assertNormalizedLength(value, 17, metadata);
-      return readNumeric(value, 0, 17, metadata.precision!, metadata.scale!).value;
+    case 'DecimalN': {
+      // The sign, followed by the magnitude. A magnitude of 16 bytes holds
+      // any value, but not every driver writes all of them: the parameters
+      // that the JDBC driver encrypts have a magnitude of 15 bytes.
+      if (value.length < 2 || value.length > 17) {
+        throw new Error(`Unexpected length ${value.length} of a decrypted ${metadata.type.name} value, expected 2 to 17`);
+      }
+
+      const padded = Buffer.alloc(17);
+      value.copy(padded);
+      return readNumeric(padded, 0, 17, metadata.precision!, metadata.scale!).value;
+    }
 
     case 'UniqueIdentifier':
       assertNormalizedLength(value, 16, metadata);

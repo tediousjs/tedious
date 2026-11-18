@@ -17,6 +17,7 @@ import { type ColumnEncryptionKeyInfo } from '../../../src/always-encrypted/type
 import { type Column } from '../../../src/token/row-token-parser';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { isPLPStream } from '../../../src/value-parser';
+import { COLLATED, COLUMN_ENCRYPTION_KEY, JDBC_VECTORS } from './jdbc-vectors';
 
 const FLAG_NULLABLE = 0x0001;
 const FLAG_ENCRYPTED = 0x0800;
@@ -371,9 +372,9 @@ describe('parsing tokens with column encryption', function() {
     /**
      * Parses a row of a single encrypted column of the given type.
      */
-    function decrypt(typeInfo: string, value: Buffer | null, parserOptions = options): unknown {
+    function decrypt(typeInfo: string, value: Buffer | null, parserOptions = options, valueCipher = cipher): unknown {
       const { parser, tokens: [metadata] } = parse(colMetadata([[key]], [{ name: 'value', typeInfo, encrypted: {} }]), parserOptions);
-      useCipher((metadata as ColMetadataToken).columnEncryptionKeys![0], cipher);
+      useCipher((metadata as ColMetadataToken).columnEncryptionKeys![0], valueCipher);
 
       const [token] = parseMore(parser, row(varbinary(value)));
 
@@ -448,6 +449,13 @@ describe('parsing tokens with column encryption', function() {
         for (const typeInfo of ['6a091204', '6c112604']) {
           assert.strictEqual(decryptNormalized(typeInfo, '01' + magnitude), 12345.6789);
           assert.strictEqual(decryptNormalized(typeInfo, '00' + magnitude), -12345.6789);
+
+          // Not every driver writes all bytes of the magnitude: the JDBC
+          // driver leaves out the last one.
+          for (const length of [4, 8, 15]) {
+            assert.strictEqual(decryptNormalized(typeInfo, '01' + magnitude.slice(0, length * 2)), 12345.6789, `magnitude of ${length} bytes`);
+            assert.strictEqual(decryptNormalized(typeInfo, '00' + magnitude.slice(0, length * 2)), -12345.6789, `magnitude of ${length} bytes`);
+          }
         }
       });
 
@@ -524,6 +532,28 @@ describe('parsing tokens with column encryption', function() {
       });
     });
 
+    it('reads the values that the Microsoft JDBC driver encrypted', function() {
+      const jdbcCipher = new ColumnEncryptionCipher(Buffer.from(COLUMN_ENCRYPTION_KEY, 'hex'));
+
+      for (const vector of JDBC_VECTORS) {
+        const actual = decrypt(vector.typeInfo.replace(COLLATED, COLLATION), Buffer.from(vector.cell, 'hex'), options, jdbcCipher);
+        const expected = vector.read ?? vector.value;
+        const message = `${vector.sqlType} ${JSON.stringify(vector.value)}`;
+
+        if (expected instanceof Date) {
+          assert.instanceOf(actual, Date, message);
+          assert.strictEqual((actual as Date).toISOString(), expected.toISOString(), message);
+
+          // The part of the value that a `Date` does not hold
+          assert.closeTo((actual as Date & { nanosecondsDelta?: number }).nanosecondsDelta ?? 0, (expected as Date & { nanosecondDelta: number }).nanosecondDelta, 1e-10, message);
+        } else if (Buffer.isBuffer(expected)) {
+          assert.deepEqual(actual, expected, message);
+        } else {
+          assert.strictEqual(actual, expected, message);
+        }
+      }
+    });
+
     it('returns `null` for `null` values', function() {
       for (const typeInfo of ['2604', 'e76400' + COLLATION, '2a07', '6a091204']) {
         assert.isNull(decrypt(typeInfo, null));
@@ -536,7 +566,8 @@ describe('parsing tokens with column encryption', function() {
         ['6801', '01', 'Unexpected length 1 of a decrypted BitN value, expected 8'],
         ['6d08', '000000', 'Unsupported dataLength 3 for FloatN'],
         ['6e04', '983a0000', 'Unexpected length 4 of a decrypted MoneyN value, expected 8'],
-        ['6a091204', '0115cd5b07', 'Unexpected length 5 of a decrypted DecimalN value, expected 17'],
+        ['6a091204', '01', 'Unexpected length 1 of a decrypted DecimalN value, expected 2 to 17'],
+        ['6a091204', '01' + '00'.repeat(17), 'Unexpected length 18 of a decrypted DecimalN value, expected 2 to 17'],
         ['2410', '0102', 'Unexpected length 2 of a decrypted UniqueIdentifier value, expected 16'],
         ['28', 'cb400b00', 'Unexpected length 4 of a decrypted Date value, expected 3'],
         ['2903', '87ee97', 'Unexpected length 3 of a decrypted Time value, expected 5'],
