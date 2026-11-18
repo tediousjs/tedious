@@ -1,0 +1,7 @@
+# Character data in a database whose code page is 932, a multi-byte one.
+# name	type	kind	parameters	collation	written by	values (`given=>stored` where the column does not hold what it is given)
+c_char	char(20)	char	20	Japanese_BIN2	all	こんにちは
+c_varchar	varchar(100)	varchar	100	Japanese_BIN2	all	こんにちは世界	abc テスト ｶﾞ
+c_varchar_max	varchar(max)	varcharmax	-	Japanese_BIN2	all	こんにちは世界	repeat:こんにちは世界:700
+c_nvarchar	nvarchar(50)	nvarchar	50	Japanese_BIN2	all	こんにちは世界
+c_int	int	int	-	-	all	42
