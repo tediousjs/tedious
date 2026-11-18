@@ -1,0 +1,254 @@
+name: Azure SQL
+
+# Runs the integration tests against a fresh Azure SQL server that is created
+# for each job and deleted at the end of it. `azure-sql-cleanup.yml` deletes
+# anything a job failed to delete. Setup and the security model are described
+# in `.github/AZURE_SQL_CI.md`.
+#
+# Pull requests are tested via `pull_request_target`, so pull requests from
+# forks can run these tests too. The pull request's code is never run on the
+# runner itself: it is exported without its `.git` directory and run in a
+# locked-down container that only receives the credentials for this job's
+# throwaway server. Everything that holds the Azure credentials (creating and
+# deleting the server) is inline in this file and comes from the base branch.
+
+on:
+  push:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  # See the comment at the top of the file for why this is safe.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  workflow_dispatch:
+
+concurrency:
+  # Pull request runs share a group per PR, so a new push cancels the older
+  # run (the teardown step still runs on cancellation). Other runs get a
+  # unique group (the run id), so they are never cancelled.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+permissions: {}
+
+env:
+  # Pull requests from forks or bots. These run in the `azure-sql-external`
+  # environment (which should require a maintainer's approval) and never get
+  # long-lived credentials.
+  UNTRUSTED: ${{ github.event_name == 'pull_request_target' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.type == 'Bot') }}
+
+  # The image the pull request's code runs in. Pinned by digest.
+  NODE_IMAGE: node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+
+jobs:
+  test:
+    name: Azure SQL (${{ matrix.config }}) / Node.js 22.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # Both environments federate with the same Azure identity. The external
+    # one should be configured to require approval from a maintainer, and
+    # holds no secrets.
+    environment: ${{ (github.event_name == 'pull_request_target' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.type == 'Bot')) && 'azure-sql-external' || 'azure-sql' }}
+
+    permissions:
+      contents: read
+      id-token: write # to log in to Azure via OIDC
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each entry is the suffix of a `test/config.*.ts` file. The
+        # Entra ID password tests need a long-lived user password, so they
+        # are left out for untrusted pull requests (same condition as
+        # `UNTRUSTED` above, which is not available here).
+        config: ${{ fromJSON((github.event_name == 'pull_request_target' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.type == 'Bot')) && '["azure-default", "azure-ad-sp-secret", "token-credential"]' || '["azure-default", "azure-ad-password", "azure-ad-sp-secret", "token-credential"]') }}
+
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_SQL_RESOURCE_GROUP }}
+      AZURE_LOCATION: ${{ vars.AZURE_SQL_LOCATION || 'eastus2' }}
+      AZURE_SQL_SERVICE_OBJECTIVE: ${{ vars.AZURE_SQL_SERVICE_OBJECTIVE || 'S0' }}
+      AZURE_SQL_ADMIN_GROUP_NAME: ${{ vars.AZURE_SQL_ADMIN_GROUP_NAME }}
+      AZURE_SQL_ADMIN_GROUP_ID: ${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}
+      TEST_APP_CLIENT_ID: ${{ vars.AZURE_TEST_APP_CLIENT_ID }}
+      AUTH_CONFIG: ${{ matrix.config }}
+      # Unique per job and attempt, so a re-run never collides with a server
+      # that is still being deleted.
+      SERVER_NAME: tedious-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.config }}
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+        # A fixed commit, so the code that runs is the code that was approved.
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+        path: pr
+
+    # The container gets a copy of the code without `.git`. Otherwise the
+    # tests could write e.g. a `core.fsmonitor` setting into `.git/config`
+    # that runs commands on the runner the next time anything calls `git`.
+    - name: Export source
+      run: |
+        mkdir work
+        git -C pr archive --format=tar HEAD | tar -x -C work
+
+    - name: Provision Azure SQL server
+      id: provision
+      timeout-minutes: 15
+      env:
+        # These should only exist as `azure-sql` environment secrets. The
+        # check is there in case a repository-level copy is left behind.
+        AZURE_AD_USERNAME: ${{ env.UNTRUSTED != 'true' && secrets.AZURE_AD_USERNAME || '' }}
+        AZURE_AD_PASSWORD: ${{ env.UNTRUSTED != 'true' && secrets.AZURE_AD_PASSWORD || '' }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+
+        token=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+        echo "::add-mask::$token"
+        az login --service-principal --username "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID" \
+          --federated-token "$token" --output none
+        az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+        env_file="$RUNNER_TEMP/azure-sql.env"
+        touch "$env_file"
+        chmod 600 "$env_file"
+        {
+          echo "AUTH_CONFIG=$AUTH_CONFIG"
+          echo "AZURE_SERVER=$SERVER_NAME.database.windows.net"
+        } >> "$env_file"
+
+        # The service principal tests get a client secret on the test app
+        # that expires in two hours and is removed again during teardown.
+        # Created first so it has time to propagate.
+        if [[ "$AUTH_CONFIG" == "azure-ad-sp-secret" || "$AUTH_CONFIG" == "token-credential" ]]; then
+          body=$(jq -n --arg name "$SERVER_NAME" --arg end "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)" \
+            '{passwordCredential: {displayName: $name, endDateTime: $end}}')
+          response=$(az rest --method POST \
+            --uri "https://graph.microsoft.com/v1.0/applications(appId='$TEST_APP_CLIENT_ID')/addPassword" \
+            --body "$body")
+          client_secret=$(jq -r .secretText <<< "$response")
+          echo "::add-mask::$client_secret"
+          jq -r .keyId <<< "$response" > "$RUNNER_TEMP/test-app-key-id"
+          {
+            echo "AZURE_AD_SP_TENANT_ID=$AZURE_TENANT_ID"
+            echo "AZURE_AD_SP_CLIENT_ID=$TEST_APP_CLIENT_ID"
+            echo "AZURE_AD_SP_CLIENT_SECRET=$client_secret"
+          } >> "$env_file"
+        fi
+
+        if [[ "$AUTH_CONFIG" == "azure-ad-password" ]]; then
+          {
+            echo "AZURE_AD_SP_TENANT_ID=$AZURE_TENANT_ID"
+            echo "AZURE_AD_SP_CLIENT_ID=$TEST_APP_CLIENT_ID"
+            echo "AZURE_AD_USERNAME=$AZURE_AD_USERNAME"
+            echo "AZURE_AD_PASSWORD=$AZURE_AD_PASSWORD"
+          } >> "$env_file"
+        fi
+
+        # The SQL admin password only exists for this server.
+        admin_password="Tds-$(openssl rand -hex 24)"
+        echo "::add-mask::$admin_password"
+        {
+          echo "AZURE_USERNAME=tedious"
+          echo "AZURE_PASSWORD=$admin_password"
+        } >> "$env_file"
+
+        az sql server create \
+          --resource-group "$AZURE_RESOURCE_GROUP" \
+          --name "$SERVER_NAME" \
+          --location "$AZURE_LOCATION" \
+          --admin-user tedious \
+          --admin-password "$admin_password" \
+          --external-admin-principal-type Group \
+          --external-admin-name "$AZURE_SQL_ADMIN_GROUP_NAME" \
+          --external-admin-sid "$AZURE_SQL_ADMIN_GROUP_ID" \
+          --minimal-tls-version 1.2 \
+          --soft-delete-retention-days 0 \
+          --tags tedious-ci=true "created-at=$(date -u +%s)" "run=$RUN_URL" \
+          --output none
+
+        # Only this runner may connect.
+        runner_ip=$(curl -sSf --retry 3 https://api.ipify.org)
+        az sql server firewall-rule create \
+          --resource-group "$AZURE_RESOURCE_GROUP" \
+          --server "$SERVER_NAME" \
+          --name github-runner \
+          --start-ip-address "$runner_ip" \
+          --end-ip-address "$runner_ip" \
+          --output none
+
+        az sql db create \
+          --resource-group "$AZURE_RESOURCE_GROUP" \
+          --server "$SERVER_NAME" \
+          --name tedious \
+          --service-objective "$AZURE_SQL_SERVICE_OBJECTIVE" \
+          --backup-storage-redundancy Local \
+          --output none
+
+        az logout
+
+    # Runs the pull request's code. The container gets only the variables in
+    # the env file: not the OIDC request token, the Actions runtime token
+    # (cache access), the Azure CLI login or the Docker socket.
+    - name: Run integration tests
+      id: tests
+      timeout-minutes: 25
+      run: |
+        docker run --rm \
+          --user "$(id -u):$(id -g)" \
+          --cap-drop ALL \
+          --security-opt no-new-privileges \
+          --env-file "$RUNNER_TEMP/azure-sql.env" \
+          --env HOME=/tmp \
+          --env CI=true \
+          --volume "$GITHUB_WORKSPACE/work:$GITHUB_WORKSPACE/work" \
+          --workdir "$GITHUB_WORKSPACE/work" \
+          "$NODE_IMAGE" \
+          sh -ec 'cp -f "test/config.$AUTH_CONFIG.ts" test/config.ts
+                  npm ci
+                  npx nyc --reporter=lcov npm run test-integration'
+
+    # Runs on failure and cancellation too. If this does not run (or
+    # fails), `azure-sql-cleanup.yml` deletes the server later.
+    - name: Tear down Azure SQL server
+      if: always()
+      run: |
+        set -euo pipefail
+        rm -f "$RUNNER_TEMP/azure-sql.env"
+
+        token=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+        echo "::add-mask::$token"
+        az login --service-principal --username "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID" \
+          --federated-token "$token" --output none
+        az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+        status=0
+
+        if [[ -s "$RUNNER_TEMP/test-app-key-id" ]]; then
+          az rest --method POST \
+            --uri "https://graph.microsoft.com/v1.0/applications(appId='$TEST_APP_CLIENT_ID')/removePassword" \
+            --body "$(jq -n --arg keyId "$(cat "$RUNNER_TEMP/test-app-key-id")" '{keyId: $keyId}')" \
+            || status=1
+        fi
+
+        if az sql server show --resource-group "$AZURE_RESOURCE_GROUP" --name "$SERVER_NAME" --output none 2>/dev/null; then
+          az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$SERVER_NAME" --yes || status=1
+        fi
+
+        az logout
+        exit "$status"
+
+    # Not for untrusted pull requests: the coverage file was written by the
+    # pull request's code, and uploading needs the Codecov token.
+    - uses: codecov/codecov-action@v7.1.1
+      if: ${{ steps.tests.outcome == 'success' && env.UNTRUSTED != 'true' }}
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./work/coverage/lcov.info
+        disable_search: true
