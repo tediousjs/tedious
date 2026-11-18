@@ -19,12 +19,12 @@ const config = {
 };
 
 describe('Datatypes in results test', function() {
-  function testDataType(expectedType: typeof TYPES[keyof typeof TYPES], cases: { [key: string]: [string, any] | [string, any, string] }) {
+  function testDataType(expectedType: typeof TYPES[keyof typeof TYPES], cases: { [key: string]: [string, any] | [string, any, string] }, options: Partial<typeof config.options> = {}) {
     describe(expectedType.name, function() {
       let connection: Connection;
 
       beforeEach(function(done) {
-        connection = new Connection(config);
+        connection = new Connection({ ...config, options: { ...config.options, ...options } });
 
         connection.on('errorMessage', function(error) {
           console.log(`${error.number} : ${error.message}`);
@@ -83,62 +83,39 @@ describe('Datatypes in results test', function() {
   }
 
   describe('with `decimalAsString`', function() {
-    let connection: Connection;
+    const options = { decimalAsString: true };
 
-    beforeEach(function(done) {
-      connection = new Connection({ ...config, options: { ...config.options, decimalAsString: true } });
-      connection.connect(done);
-    });
+    testDataType(TYPES.Decimal, {
+      'should return a value beyond the precision of a number exactly': ["select cast('12345678901234567.123456789' as decimal(38, 9))", '12345678901234567.123456789'],
+      'should return a value of scale 28 exactly': ["select cast('0.9999999999999999999999999999' as decimal(28, 28))", '0.9999999999999999999999999999'],
+      'should return an integer above 2^53 exactly': ['select cast(9007199254740993 as decimal(19, 0))', '9007199254740993'],
+      'should keep trailing zeros of the scale': ['select cast(0.5 as decimal(10, 2))', '0.50'],
+      'should return negative zero as zero': ['select cast(-0.0 as decimal(5, 2))', '0.00'],
+      'should return a value rounded by the server to scale 0': ['select cast(1.5 as decimal(9, 0))', '2'],
+      'should return null': ['select cast(null as decimal(10, 2))', null]
+    }, options);
 
-    afterEach(function(done) {
-      if (!connection.closed) {
-        connection.on('end', done);
-        connection.close();
-      } else {
-        done();
-      }
-    });
+    testDataType(TYPES.Numeric, {
+      'should return the smallest value of precision 38 exactly': ["select cast('-99999999999999999999999999999999999999' as numeric(38, 0))", '-99999999999999999999999999999999999999'],
+      'should return null': ['select cast(null as numeric(10, 2))', null]
+    }, options);
 
-    it('should return `decimal`, `numeric`, `money` and `smallmoney` values as exact strings', function(done) {
-      const request = new Request(`select
-        cast('12345678901234567.123456789' as decimal(38, 9)),
-        cast('-99999999999999999999999999999999999999' as numeric(38, 0)),
-        cast('0.9999999999999999999999999999' as decimal(28, 28)),
-        cast(9007199254740993 as decimal(19, 0)),
-        cast(0.5 as decimal(10, 2)),
-        cast(-0.0 as decimal(5, 2)),
-        cast(1.5 as decimal(9, 0)),
-        cast('922337203685477.5807' as money),
-        cast('-922337203685477.5808' as money),
-        cast(-0.0001 as money),
-        cast('-214748.3648' as smallmoney),
-        cast(cast('-1234.5678' as decimal(20, 4)) as sql_variant),
-        cast(cast(12.5 as money) as sql_variant),
-        cast(null as decimal(10, 2)),
-        cast(null as money)`, done);
+    testDataType(TYPES.Money, {
+      'should return the largest value exactly': ["select cast('922337203685477.5807' as money)", '922337203685477.5807'],
+      'should return the smallest value exactly': ["select cast('-922337203685477.5808' as money)", '-922337203685477.5808'],
+      'should return a negative value below one': ['select cast(-0.0001 as money)', '-0.0001'],
+      'should return null': ['select cast(null as money)', null]
+    }, options);
 
-      request.on('row', function(columns) {
-        assert.deepEqual(columns.map((column: { value: unknown }) => column.value), [
-          '12345678901234567.123456789',
-          '-99999999999999999999999999999999999999',
-          '0.9999999999999999999999999999',
-          '9007199254740993',
-          '0.50',
-          '0.00',
-          '2',
-          '922337203685477.5807',
-          '-922337203685477.5808',
-          '-0.0001',
-          '-214748.3648',
-          '-1234.5678',
-          '12.5000',
-          null,
-          null
-        ]);
-      });
+    testDataType(TYPES.SmallMoney, {
+      'should return the smallest value exactly': ["select cast('-214748.3648' as smallmoney)", '-214748.3648'],
+      'should return null': ['select cast(null as smallmoney)', null]
+    }, options);
 
-      connection.execSqlBatch(request);
-    });
+    testDataType(TYPES.Variant, {
+      'should return a decimal inside a variant exactly': ["select cast(cast('-1234.5678' as decimal(20, 4)) as sql_variant)", '-1234.5678'],
+      'should return money inside a variant exactly': ['select cast(cast(12.5 as money) as sql_variant)', '12.5000']
+    }, options);
   });
 
   testDataType(TYPES.TinyInt, {
