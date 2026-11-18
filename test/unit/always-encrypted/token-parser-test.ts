@@ -17,7 +17,7 @@ import { type ColumnEncryptionKeyInfo } from '../../../src/always-encrypted/type
 import { type Column } from '../../../src/token/row-token-parser';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
 import { isPLPStream } from '../../../src/value-parser';
-import { COLLATED, COLUMN_ENCRYPTION_KEY, JDBC_VECTORS } from './jdbc-vectors';
+import { COLLATED, COLUMN_ENCRYPTION_KEY, JDBC_VECTORS, SQLCLIENT_VECTORS } from './driver-vectors';
 
 const FLAG_NULLABLE = 0x0001;
 const FLAG_ENCRYPTED = 0x0800;
@@ -532,13 +532,13 @@ describe('parsing tokens with column encryption', function() {
       });
     });
 
-    it('reads the values that the Microsoft JDBC driver encrypted', function() {
-      const jdbcCipher = new ColumnEncryptionCipher(Buffer.from(COLUMN_ENCRYPTION_KEY, 'hex'));
+    it('reads the values that Microsoft\'s drivers encrypted', function() {
+      const driverCipher = new ColumnEncryptionCipher(Buffer.from(COLUMN_ENCRYPTION_KEY, 'hex'));
 
-      for (const vector of JDBC_VECTORS) {
-        const actual = decrypt(vector.typeInfo.replace(COLLATED, COLLATION), Buffer.from(vector.cell, 'hex'), options, jdbcCipher);
+      for (const [driver, vector] of [...JDBC_VECTORS.map((vector) => ['JDBC', vector] as const), ...SQLCLIENT_VECTORS.map((vector) => ['SqlClient', vector] as const)]) {
+        const actual = decrypt(vector.typeInfo.replace(COLLATED, COLLATION), Buffer.from(vector.cell, 'hex'), options, driverCipher);
         const expected = vector.read ?? vector.value;
-        const message = `${vector.sqlType} ${JSON.stringify(vector.value)}`;
+        const message = `${driver}: ${vector.sqlType} ${JSON.stringify(vector.value)}`;
 
         if (expected instanceof Date) {
           assert.instanceOf(actual, Date, message);

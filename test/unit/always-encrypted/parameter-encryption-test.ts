@@ -13,7 +13,7 @@ import {
   type ParameterEncryptionMetadata
 } from '../../../src/always-encrypted/parameter-encryption';
 import { type ColumnEncryptionKeyInfo } from '../../../src/always-encrypted/types';
-import { COLUMN_ENCRYPTION_KEY, JDBC_VECTORS, TIME_ZONE_DEPENDENT } from './jdbc-vectors';
+import { COLUMN_ENCRYPTION_KEY, JDBC_VECTORS, SQLCLIENT_VECTORS, TIME_ZONE_DEPENDENT } from './driver-vectors';
 import { Collation } from '../../../src/collation';
 import { type InternalConnectionOptions } from '../../../src/connection';
 import { typeByName as TYPES, resolveParameter, type DataType, type Parameter } from '../../../src/data-type';
@@ -317,14 +317,14 @@ describe('encryptParameters', function() {
     });
   });
 
-  it('encrypts values to the same cells as the Microsoft JDBC driver', function() {
-    const jdbcCipher = new ColumnEncryptionCipher(Buffer.from(COLUMN_ENCRYPTION_KEY, 'hex'));
+  it('encrypts values to the same cells as Microsoft\'s drivers', function() {
+    const driverCipher = new ColumnEncryptionCipher(Buffer.from(COLUMN_ENCRYPTION_KEY, 'hex'));
 
-    for (const vector of JDBC_VECTORS) {
-      const message = `${vector.sqlType} ${JSON.stringify(vector.value)}`;
+    for (const [driver, vector] of [...JDBC_VECTORS.map((vector) => ['JDBC', vector] as const), ...SQLCLIENT_VECTORS.map((vector) => ['SqlClient', vector] as const)]) {
+      const message = `${driver}: ${vector.sqlType} ${JSON.stringify(vector.value)}`;
 
       // The offset of a `datetimeoffset` is that of the local time zone,
-      // and the JDBC driver wrote its values in UTC.
+      // and the drivers wrote their values in UTC.
       if (vector.differs === TIME_ZONE_DEPENDENT && (vector.value as Date).getTimezoneOffset() !== 0) {
         continue;
       }
@@ -332,7 +332,7 @@ describe('encryptParameters', function() {
       // With deterministic encryption, the cell of a value only depends on
       // what the value is normalized to.
       const type = TYPES[vector.type as keyof typeof TYPES];
-      const cell = jdbcCipher.encrypt(Buffer.from(normalized(type, vector.value, vector.options), 'hex'), true).toString('hex');
+      const cell = driverCipher.encrypt(Buffer.from(normalized(type, vector.value, vector.options), 'hex'), true).toString('hex');
 
       if (vector.differs === undefined || vector.differs === TIME_ZONE_DEPENDENT) {
         assert.strictEqual(cell, vector.cell, message);

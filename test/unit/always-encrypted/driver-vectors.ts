@@ -1,14 +1,15 @@
 import { type ParameterOptions } from '../../../src/request';
 
-// Values that the Microsoft JDBC driver (mssql-jdbc 12.8.1) wrote to columns
-// with deterministic encryption, as they are stored by a SQL Server 2025:
-// with a database collation of `SQL_Latin1_General_CP1_CI_AS`, and a JVM
-// whose time zone is UTC and whose default charset is that of the database
-// (which is what the driver encodes `char` and `varchar` values with).
+// Values that Microsoft's drivers wrote to columns with deterministic
+// encryption, as they are stored by a SQL Server 2025: by the JDBC driver
+// (mssql-jdbc 12.8.1) and by SqlClient (Microsoft.Data.SqlClient 7.1.2), with
+// a database collation of `SQL_Latin1_General_CP1_CI_AS`, in UTC. The default
+// charset of the JVM was that of the database, which is what the JDBC driver
+// encodes `char` and `varchar` values with.
 //
 // Deterministic encryption encrypts equal values to equal cells, so a
 // driver that reads these values, and encrypts them to the very same cells,
-// normalizes values the way the JDBC driver does.
+// normalizes values the way these drivers do.
 
 /**
  * The column encryption key that the cells are encrypted with.
@@ -20,7 +21,7 @@ export const COLUMN_ENCRYPTION_KEY = 'ad010a1798d07ec12264fdaf2f1411f97b9549ad02
  */
 export const COLLATED = 'COLLATED';
 
-export interface JdbcVector {
+export interface DriverVector {
   /** The type of the column. */
   sqlType: string;
 
@@ -35,7 +36,7 @@ export interface JdbcVector {
   /** The value as it is read, if that is not the value that was written. */
   read?: unknown;
 
-  /** The cell that the JDBC driver wrote. */
+  /** The cell that the driver wrote. */
   cell: string;
 
   /** Why tedious encrypts the value to another cell, if it does. */
@@ -65,7 +66,12 @@ const OFFSET = 'the value has an offset of +05:30';
 
 export const TIME_ZONE_DEPENDENT = TIME_ZONE;
 
-export const JDBC_VECTORS: JdbcVector[] = [
+// SqlClient truncates a value that has more precision than its column.
+// The server rounds such a value (of a column that is not encrypted), and
+// so does the JDBC driver.
+const SQLCLIENT_TRUNCATES = 'SqlClient truncates the value to the scale of its column, instead of rounding it';
+
+export const JDBC_VECTORS: DriverVector[] = [
   {
     sqlType: 'bit', typeInfo: '6801', type: 'Bit', value: true,
     cell: '01ee016dc3f93928873750db6d2233a6ae39089426c8bcba9b00a5e603335c9d07023f6943e90e8eb3b6342f482fe572d33a18f03d22a2fd5eddb1187c2c4a7ffa'
@@ -225,5 +231,92 @@ export const JDBC_VECTORS: JdbcVector[] = [
   {
     sqlType: 'datetime2(2)', typeInfo: '2a02', type: 'DateTime2', options: { scale: 2 }, value: date('2024-02-28T12:34:56.123Z', 0.0004567), read: date('2024-02-28T12:34:56.120Z'),
     cell: '016146b277eab91bbface81fbcd47c9e9c6bd5b7a5d6be4061933ccb752768d370b919b10d2d77c6c30bfab3bd8cd1709b0b3068e960e8f53d36feb2504c91dc7b'
+  }
+];
+
+export const SQLCLIENT_VECTORS: DriverVector[] = [
+  {
+    sqlType: 'int', typeInfo: '2604', type: 'Int', value: 42,
+    cell: '01f94c229843408caeeabb2dfa1c3f2ff65f84c4a7325fa7eaefb27a16aac267c04dc51146361b9cc43130ca3a07bf429d5afac9ce108e4fdff582901c74293939'
+  },
+  {
+    sqlType: 'decimal(10,2)', typeInfo: '6a090a02', type: 'Decimal', options: { precision: 10, scale: 2 }, value: 12345678.91,
+    cell: '01a095c25a4dee8ee887734ec2a17ded06cc0c52c9522812cdc822616e528c7bd29e193fd078dec6e36638a9858e6bfaadacfe96c5ab218b647155c7a785e49a2d01e4a9f2fdc2690b97c7a71142a54f35'
+  },
+  {
+    sqlType: 'decimal(10,2)', typeInfo: '6a090a02', type: 'Decimal', options: { precision: 10, scale: 2 }, value: -0.05,
+    cell: '01db608070b5e207fe6a649a9d7ffc7daa803f9ca98514e14a5b5fbb4373e9302f1385cd92514e6d2a90498a709c25f8b5b4a9ebef7c7718de8a1cd1e4dae1fc455a6fb907527b84338fde893ea8f63373'
+  },
+  {
+    sqlType: 'decimal(38,10)', typeInfo: '6a11260a', type: 'Decimal', options: { precision: 38, scale: 10 }, value: 12345.0000000001,
+    cell: '0146450caa4750f19dc136bd05213366934cf730530ade9b2ef538ea0dfe5a7ecb89c6c7ef3fc4b71c51234e8d06b24b380aaa994bc84969d0293b26a0ffd946788a2cc6418f55e20edeaa09138fd99da5'
+  },
+  {
+    sqlType: 'numeric(18,0)', typeInfo: '6c091200', type: 'Numeric', options: { precision: 18, scale: 0 }, value: -1,
+    cell: '01056e77aaf9095220ea3e032edcc4c2bfdc9666af249c8d64072b92a2e93e2d3f5f9093ad4f94e8fbb7bc9d48709b9eda2567dd51ee31f425726667b79c3f6a1fcbee1ae9bfdfb158c5e159a48f7edb33'
+  },
+  {
+    sqlType: 'money', typeInfo: '6e08', type: 'Money', value: -0.0001,
+    cell: '016c7494096b205e60906195e64e4d0834a13d6204620445d77ee84bd8af8ad12eb059c6faed1c9117fecce8b29c892eb4b1bb85a0c9e2d96973b1af578372f977'
+  },
+  {
+    sqlType: 'char(10)', typeInfo: 'af0a00' + COLLATED, type: 'Char', options: { length: 10 }, value: 'abc', read: 'abc       ',
+    cell: '01dad6784e41040514b5cfb1db55c9fc969218a73b72323d475ddb2488d5ba5e5568fa6688ff72a1fe4803a6bef17eb76139b9c04e845f63a83be44cff2d61ca9b'
+  },
+  {
+    sqlType: 'varchar(50)', typeInfo: 'a73200' + COLLATED, type: 'VarChar', options: { length: 50 }, value: 'Ünïcödé €',
+    cell: '01245549a5e71e31d45fc0cf8555955563cfc0d068e3b87e5227d1d7475718e95526b662905aec12a2cfe2145388dc44005f3cef9cc8050670f2eac0a98bd290db'
+  },
+  {
+    sqlType: 'nvarchar(50)', typeInfo: 'e76400' + COLLATED, type: 'NVarChar', options: { length: 50 }, value: 'hello wörld ☃',
+    cell: '015e9bb5aa3ad372b06c06c40ff1a9cdf59be19e97ecc086c6340433931fd76bcdf279b14171ee68c3ba68335a4fe60da88b712cf4b3209e02bc8cbacd2d0aaa7ae6e845a70976b6955f4c7311d57d2d01'
+  },
+  {
+    sqlType: 'binary(10)', typeInfo: 'ad0a00', type: 'Binary', options: { length: 10 }, value: Buffer.from('abcd', 'hex'), read: Buffer.from('abcd0000000000000000', 'hex'),
+    cell: '0139f118ab4621b9fdfe8a7f175c7693275cec05b1aab3953b789f6a49808e5d83432132dae7f4ad9ec480140d16d717611515d758f60dcb9fca2174266fad6b67'
+  },
+  {
+    sqlType: 'date', typeInfo: '28', type: 'Date', value: date('2024-02-29T00:00:00Z'),
+    cell: '01d29f8fa4af183a662f7ed887c0e3a9f3a975b024811eb9584fe484cf77420b1922ad44f365d5776d983bcd0bc696a5bf507626f565a986658697a2575f708667'
+  },
+  {
+    sqlType: 'time(3)', typeInfo: '2903', type: 'Time', options: { scale: 3 }, value: date('1970-01-01T12:34:56.789Z'),
+    cell: '01c4f8d44ebe2f69c9f0a02644887380b4a2ecd3dadd6d1b36018f4f5cd7fa78411e232ceb638b720a2e320b74cc0959cf5ac60e1f82eb0beffe13fbf59cbd90a8'
+  },
+  {
+    sqlType: 'datetime2(7)', typeInfo: '2a07', type: 'DateTime2', options: { scale: 7 }, value: date('2024-02-29T12:34:56.123Z', 0.0004567),
+    cell: '0105729e73f4dd3cb01b7a19dcc1f8225d7f36fdf4d69c984e847d643d795483f46d9ab57cabd0f530456d72ebdae4a7ef0841968315aff2151daa756bb3094f48'
+  },
+  {
+    sqlType: 'datetimeoffset(7)', typeInfo: '2b07', type: 'DateTimeOffset', options: { scale: 7 }, value: date('2024-02-29T12:34:56.123Z', 0.0004567), differs: TIME_ZONE,
+    cell: '0160344e2420f829b979ac67a86aeb78a9020b904223b7f908dad953dd3312d28694fe6f4dc59a3be984f0aa6e5e9fa96f70b07561a1cf348105230dd858f582c3'
+  },
+  {
+    sqlType: 'datetimeoffset(7)', typeInfo: '2b07', type: 'DateTimeOffset', options: { scale: 7 }, value: date('2024-02-29T07:04:56.123Z', 0.0004567), differs: OFFSET,
+    cell: '015355a57d06d6cb3354494403ec4cf033827d659b58b0b42fd4ee523f951fe50b2ef19f57466acd1a7e487df49f7c5d320f70de8420d43c0005edf00f2c490f50'
+  },
+  {
+    sqlType: 'datetime', typeInfo: '6f08', type: 'DateTime', value: date('2024-02-29T12:34:56.123Z'),
+    cell: '010a2c23a7cff633430e756ed51a5a9397b7b2958d25bf1ea6a94542492685d1bba666ee46300e4d9cdde0aaa6586d640a12de33e40c924665961df17fc5151ce8'
+  },
+  {
+    sqlType: 'uniqueidentifier', typeInfo: '2410', type: 'UniqueIdentifier', value: '01234567-89AB-CDEF-0123-456789ABCDEF',
+    cell: '018a19456c4cef7473b0950bf6cf2faa411d76ab2256712ce68dd708b82579f51d0d4c456fcf8b924285afcd2e38ede39e91b8c7745a5d52a53af68926e6d800cddec16d27d52988d0ca02aad68f6c9ecf'
+  },
+  {
+    sqlType: 'time(2)', typeInfo: '2902', type: 'Time', options: { scale: 2 }, value: date('1970-01-01T12:34:56.994Z'), read: date('1970-01-01T12:34:56.990Z'),
+    cell: '01e227978f1a1c16462fe5503b45d4e08f6075faa313e26eec2a600315b1a91201af56d6ce3c033397c544016529f7b6de0fe855811a01db0e3b5f6db44971271b'
+  },
+  {
+    sqlType: 'time(2)', typeInfo: '2902', type: 'Time', options: { scale: 2 }, value: date('1970-01-01T12:34:56.995Z'), read: date('1970-01-01T12:34:56.990Z'), differs: SQLCLIENT_TRUNCATES,
+    cell: '01e227978f1a1c16462fe5503b45d4e08f6075faa313e26eec2a600315b1a91201af56d6ce3c033397c544016529f7b6de0fe855811a01db0e3b5f6db44971271b'
+  },
+  {
+    sqlType: 'datetime2(2)', typeInfo: '2a02', type: 'DateTime2', options: { scale: 2 }, value: date('2024-02-28T12:34:56.123Z', 0.0004567), read: date('2024-02-28T12:34:56.120Z'),
+    cell: '016146b277eab91bbface81fbcd47c9e9c6bd5b7a5d6be4061933ccb752768d370b919b10d2d77c6c30bfab3bd8cd1709b0b3068e960e8f53d36feb2504c91dc7b'
+  },
+  {
+    sqlType: 'datetime2(2)', typeInfo: '2a02', type: 'DateTime2', options: { scale: 2 }, value: date('2024-12-31T23:59:59.996Z'), read: date('2024-12-31T23:59:59.990Z'), differs: SQLCLIENT_TRUNCATES,
+    cell: '018cbbea1dfd27d176c5c9ce80e866dbe125dcc03e80331051d39da2369615cfa6566e4f050b77723b54041ce99c5ea11538686ff1246e913e6f46f06daeff0512'
   }
 ];
