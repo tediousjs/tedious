@@ -1,0 +1,118 @@
+name: Azure SQL provisioning
+
+# Creates and deletes the Azure SQL servers for `azure-sql.yml` runs,
+# including runs from forks. See that file and `.github/AZURE_SQL_CI.md`.
+#
+# This workflow runs from the default branch and only runs code from it
+# (the checkout below has no `ref`). It never checks out or runs code from
+# the pull request. What it reads from the test run (request artifacts, job
+# names) is validated as untrusted input by `provision.sh`.
+
+on:
+  # Started when a test run starts (`in_progress`) and again when it
+  # completes, whatever its conclusion.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [ "Azure SQL" ]
+    types: [ in_progress, completed ]
+
+concurrency:
+  # The teardown for a test run attempt waits for its provisioning to finish.
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  TEST_RUN_ID: ${{ github.event.workflow_run.id }}
+  TEST_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+  AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  AZURE_RESOURCE_GROUP: ${{ vars.AZURE_SQL_RESOURCE_GROUP }}
+  TEST_APP_CLIENT_ID: ${{ vars.AZURE_TEST_APP_CLIENT_ID }}
+
+jobs:
+  provision:
+    name: Provision (${{ matrix.config }})
+    if: github.event.action == 'in_progress' && github.event.workflow_run.path == '.github/workflows/azure-sql.yml'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: azure-sql
+
+    permissions:
+      actions: read # to read the test run's request artifacts and jobs
+      id-token: write # to log in to Azure via OIDC
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Fixed here rather than read from the test run: at most one server
+        # per config per test run attempt.
+        config: [ "azure-default", "azure-ad-password", "azure-ad-sp-secret", "token-credential" ]
+
+    env:
+      CONFIG: ${{ matrix.config }}
+      SERVER_NAME: tedious-ci-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ matrix.config }}
+      TEST_RUN_URL: ${{ github.event.workflow_run.html_url }}
+      AZURE_LOCATION: ${{ vars.AZURE_SQL_LOCATION || 'eastus2' }}
+      AZURE_SQL_SERVICE_OBJECTIVE: ${{ vars.AZURE_SQL_SERVICE_OBJECTIVE || 'S0' }}
+      AZURE_SQL_ADMIN_GROUP_NAME: ${{ vars.AZURE_SQL_ADMIN_GROUP_NAME }}
+      AZURE_SQL_ADMIN_GROUP_ID: ${{ vars.AZURE_SQL_ADMIN_GROUP_ID }}
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Provision Azure SQL server
+      id: provision
+      env:
+        GH_TOKEN: ${{ github.token }}
+        OUT_DIR: ${{ runner.temp }}/azure-sql-credentials
+      run: .github/scripts/azure-sql/provision.sh
+
+    - name: Publish the credentials
+      id: publish
+      if: steps.provision.outputs.found == 'true'
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: azure-sql-credentials-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ matrix.config }}
+        path: ${{ runner.temp }}/azure-sql-credentials/credentials.json
+        retention-days: 1
+        if-no-files-found: error
+
+    # Lets the test job fail right away instead of waiting until it times out.
+    - name: Report the failure to the test job
+      if: failure() && steps.provision.outputs.found == 'true' && steps.publish.outcome != 'success'
+      env:
+        OUT_DIR: ${{ runner.temp }}/azure-sql-credentials
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        mkdir -p "$OUT_DIR"
+        jq -n --arg url "$RUN_URL" '{error: "Provisioning the Azure SQL server failed, see \($url)"}' > "$OUT_DIR/credentials.json"
+
+    - name: Publish the failure
+      if: failure() && steps.provision.outputs.found == 'true' && steps.publish.outcome != 'success'
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: azure-sql-credentials-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ matrix.config }}
+        path: ${{ runner.temp }}/azure-sql-credentials/credentials.json
+        retention-days: 1
+
+  teardown:
+    name: Tear down
+    if: github.event.action == 'completed' && github.event.workflow_run.path == '.github/workflows/azure-sql.yml'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: azure-sql
+
+    permissions:
+      id-token: write # to log in to Azure via OIDC
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Delete the test run's servers and client secrets
+      run: .github/scripts/azure-sql/teardown.sh

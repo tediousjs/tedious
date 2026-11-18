@@ -3,8 +3,13 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
+    '.github/workflows/azure-sql-provision.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'actions/upload-artifact@v7.0.1'
     '.github/workflows/azure-sql.yml':
         - 'actions/checkout@v7.0.1'
+        - 'actions/setup-node@v7.1.0'
+        - 'actions/upload-artifact@v7.0.1'
         - 'codecov/codecov-action@v7.1.1'
     '.github/workflows/claude-code-review.yml':
         - 'actions/checkout@v7.0.1'

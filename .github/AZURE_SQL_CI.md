@@ -1,67 +1,78 @@
 # Azure SQL CI
 
-`workflows/azure-sql.yml` runs the integration tests against Azure SQL with
-four authentication configs (`test/config.*.ts`). Each job creates its own
-Azure SQL server and deletes it when it finishes. `workflows/azure-sql-cleanup.yml`
-runs every hour and deletes anything a job left behind.
+The integration tests run against Azure SQL with four authentication configs
+(`test/config.*.ts`). Each test job gets its own Azure SQL server, which is
+deleted when the test run finishes. Three workflows are involved:
 
-## How a job works
+| Workflow | Trigger | Azure access | Runs pull request code |
+| --- | --- | --- | --- |
+| `workflows/azure-sql.yml` | `push`, `pull_request` | None | Yes |
+| `workflows/azure-sql-provision.yml` | `workflow_run` (start and end of each test run) | Yes, via OIDC | Never |
+| `workflows/azure-sql-cleanup.yml` | Hourly | Yes, via OIDC | Never |
 
-1. Checks out the commit under test (for pull requests, the PR head SHA) into
-   `pr/`, then exports it without `.git` into `work/`.
-2. **Provision** (runs on the runner, uses only code from this workflow file):
-   logs in to Azure with GitHub OIDC (no stored Azure secret), creates the server
-   `tedious-ci-<run>-<attempt>-<config>` with
-   - a random SQL admin password that only exists for this server,
-   - the `AZURE_SQL_ADMIN_GROUP` Entra group as Entra admin,
-   - a firewall rule for this runner's IP only,
+## How a test run works
+
+1. **Request.** Each test job (`request-server.sh`) creates a one-time RSA
+   key pair and uploads a request artifact with this runner's IP and the
+   public key.
+2. **Provision.** When the test run starts, `azure-sql-provision.yml` runs
+   one job per config (`provision.sh`). Each job waits for its request,
+   validates it (a single IPv4 address, an RSA key of 3072 to 8192 bits, size
+   limits), then logs in to Azure and creates the server
+   `tedious-ci-<run>-<attempt>-<config>` with:
+   - a random SQL admin password that only exists for this server;
+   - the `tedious-ci-sql-admins` Entra group as Entra admin;
+   - a firewall rule for the requesting runner's IP only;
    - a `tedious` database, and tags `tedious-ci=true` and `created-at=<epoch>`.
 
-   For the service principal configs, it also adds a client secret to the test
-   app that expires after two hours.
-3. **Test**: runs `npm ci` and the integration tests in a `node:22` container
-   (pinned by digest). The container runs as a non-root user with no
-   capabilities and `no-new-privileges`. It only gets the variables written for
-   this job: the server name and that server's credentials.
-4. **Teardown** (`if: always()`, so it also runs on failure and cancellation):
-   removes the client secret and deletes the server.
-5. Uploads coverage to Codecov, for trusted runs only.
+   For the service principal configs, it also adds a client secret that expires
+   after two hours to the test app. The passwords are encrypted to the test
+   job's public key (RSA-OAEP, SHA-256) and uploaded as a credentials artifact.
+3. **Test.** The test job (`wait-for-server.sh`) waits for its credentials
+   artifact and accepts it only if it was uploaded by `azure-sql-provision.yml`
+   running from the default branch. It decrypts the credentials, deletes the
+   private key and runs the integration tests.
+4. **Teardown.** When the test run completes (passed, failed or cancelled),
+   `azure-sql-provision.yml` runs again (`teardown.sh`) and deletes all
+   servers and client secrets for that run attempt. A concurrency group makes
+   the teardown wait for any provisioning still in progress.
+5. **Fallback.** `azure-sql-cleanup.yml` deletes tagged servers and test app
+   client secrets more than two hours old.
 
 ## Pull requests from forks
 
-Pull requests run via `pull_request_target`, so they get the base branch's
-workflow and can use OIDC. Runs are **untrusted** when the PR comes from a fork
-or is opened by a bot (Dependabot included: a bumped dependency is the most
-likely way for malicious code to get in). An untrusted run:
+Fork pull requests run `azure-sql.yml` like any other `pull_request`
+workflow: from the pull request's own code, with a read-only `GITHUB_TOKEN`
+and no secrets. Nothing that can reach Azure ever runs on the same machine as
+pull request code. The provisioning workflow runs from the default branch
+and treats the request artifacts and job list as untrusted input.
 
-- uses the `azure-sql-external` environment, which should require approval
-  from a maintainer before the job starts;
-- skips `azure-ad-password`, because that config needs the password of a
-  long-lived Entra user;
-- skips the Codecov upload.
+This uses neither `pull_request_target` nor `allow-unsafe-pr-checkout`.
 
-What the PR's code can get hold of, and what it can do with it:
+What pull request code can get hold of:
 
 | Credential | Exposed to PR code? | Scope / lifetime |
 | --- | --- | --- |
-| Azure OIDC / provisioner identity | No (stays on the host; never passed to the container) | — |
-| Actions runtime token (cache) | No | — |
-| `GITHUB_TOKEN` | No (`persist-credentials: false`; never passed in) | `contents: read` |
+| Azure OIDC / provisioner identity | No (only in `azure-sql-provision.yml`) | — |
+| `GITHUB_TOKEN` | Read-only | `contents: read`, `actions: read` |
 | SQL admin password | Yes | That server only; gone when the server is deleted |
 | Test app client secret | Yes (SP configs) | Expires after 2h, removed at teardown; only grants access to CI servers |
-| Entra test user password | **Never** for untrusted runs | Long-lived |
+| Entra test user password | Never for forks or Dependabot | Long-lived repository secret |
 
-Remaining risks, which are why the approval gate is recommended:
+Remaining risks:
 
-- **Container escape.** If the PR's code breaks out of the container (it would
-  need a kernel exploit), it can use the job's OIDC token. That gives it
-  `Contributor` on the CI resource group, plus control over the test app's
-  credentials, until the job ends.
 - **Other CI servers.** A leaked test app secret gives admin access to every CI
   server that exists until the secret expires. Those servers are throwaway
   and hold no data.
-- **Compute use.** The PR's code can use its own server (S0 by default) until
-  teardown or the job timeout (45 min).
+- **Compute use.** A pull request controls its own copy of `azure-sql.yml`. It
+  can get at most four servers (S0 by default) per run attempt, for as long as
+  its run lasts. The cleanup workflow deletes them after two hours at most.
+  That's why approval for outside contributors' runs is recommended
+  (see "GitHub settings" below).
+- **Spoofed requests.** Anyone whose run is approved can trigger provisioning,
+  including from a workflow they add that is also named "Azure SQL". It still
+  gets at most four servers per run attempt, each reachable only from the IP
+  in its request.
 
 ## One-time setup
 
@@ -94,20 +105,19 @@ az group create --name "$RG" --location "$LOCATION"
 ### 1. The provisioner (what GitHub Actions logs in as)
 
 An app registration with no secret. GitHub Actions logs in with OIDC
-through federated credentials, one per environment.
+through a federated credential for the `azure-sql` environment, which only
+the provisioning and cleanup workflows use.
 
 ```sh
 PROVISIONER_APP_ID=$(az ad app create --display-name tedious-ci-provisioner --query appId -o tsv)
 PROVISIONER_SP_ID=$(az ad sp create --id "$PROVISIONER_APP_ID" --query id -o tsv)
 
-for env in azure-sql azure-sql-external; do
-  az ad app federated-credential create --id "$PROVISIONER_APP_ID" --parameters "{
-    \"name\": \"github-tediousjs-tedious-$env\",
-    \"issuer\": \"https://token.actions.githubusercontent.com\",
-    \"subject\": \"repo:tediousjs/tedious:environment:$env\",
-    \"audiences\": [\"api://AzureADTokenExchange\"]
-  }"
-done
+az ad app federated-credential create --id "$PROVISIONER_APP_ID" --parameters '{
+  "name": "github-tediousjs-tedious-azure-sql",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:tediousjs/tedious:environment:azure-sql",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
 
 # Contributor on the CI resource group only.
 az role assignment create --assignee-object-id "$PROVISIONER_SP_ID" \
@@ -167,7 +177,7 @@ user must:
   requires MFA (exclude it explicitly);
 - have no Azure role assignments.
 
-These tests never run for untrusted pull requests.
+These tests never run for pull requests from forks or Dependabot.
 
 ### 4. The admin group
 
@@ -239,28 +249,36 @@ Variables). None of these are secret:
 | `AZURE_SQL_LOCATION` | optional, defaults to `eastus2` |
 | `AZURE_SQL_SERVICE_OBJECTIVE` | optional, defaults to `S0` |
 
-**Environments** (Settings → Environments):
+**Repository secrets:** `AZURE_AD_USERNAME` and `AZURE_AD_PASSWORD` (the
+Entra test user). GitHub does not pass repository secrets to runs from forks
+or Dependabot. Keep `CODECOV_TOKEN` as it is.
 
-- `azure-sql`
-  - Deployment branches: `master`, `alpha`, `beta`, `*.x`. Only reviewed
-    workflow code can then log in to Azure. Workflow edits in a PR branch
-    cannot.
-  - Secrets: `AZURE_AD_USERNAME`, `AZURE_AD_PASSWORD` (the Entra test user).
-- `azure-sql-external`
-  - Deployment branches: same as above.
-  - Required reviewers: the maintainers. Turn on "Prevent self-review" if
-    you like.
-  - No secrets.
+**Environment** (Settings → Environments): `azure-sql`, with deployment
+branches limited to the default branch (`master`). Both workflows that use it
+always run from there. No secrets, and no required reviewers needed.
+
+**Fork pull request approval** (Settings → Actions → General → "Approval for
+running fork pull request workflows from contributors"): "Require approval for
+all external contributors" is recommended. A maintainer then approves each
+fork run before it starts, and provisioning only starts once it does.
+
+**Lockfile:** run `gh actions-lock` and commit `.github/workflows/actions.lock`.
+It needs an entry for `actions/upload-artifact`, which was added by hand
+without one.
 
 Then delete the old repository secrets `AZURE_SERVER`, `AZURE_USERNAME`,
-`AZURE_PASSWORD`, `AZURE_AD_SP_CLIENT_ID`, `AZURE_AD_SP_TENANT_ID`,
-`AZURE_AD_SP_CLIENT_SECRET`, `AZURE_AD_USERNAME` and `AZURE_AD_PASSWORD`, and
-the old long-lived server.
+`AZURE_PASSWORD`, `AZURE_AD_SP_CLIENT_ID`, `AZURE_AD_SP_TENANT_ID` and
+`AZURE_AD_SP_CLIENT_SECRET`, and the old long-lived server.
 
 ## Notes
 
-- Because of `pull_request_target`, a PR that changes `azure-sql.yml` runs
-  the base branch's version. The change takes effect once it is merged.
+- `azure-sql-provision.yml` runs from the default branch, so changes to it,
+  or to `provision.sh`, `teardown.sh` or `common.sh`, take effect once
+  merged. Changes to `azure-sql.yml`, `request-server.sh` and
+  `wait-for-server.sh` run in the pull request itself.
+- The provisioning workflow finds the test workflow by its name ("Azure SQL")
+  and its jobs by the `(<config>)` part of their names. Keep both when
+  editing `azure-sql.yml`.
 - GitHub disables scheduled workflows in public repositories after 60 days
   without activity. Re-enable `Azure SQL cleanup` if that happens.
 - `azure-sql-cleanup.yml` can also be started by hand (`workflow_dispatch`).
