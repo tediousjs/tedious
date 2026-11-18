@@ -224,5 +224,53 @@ describe('ColumnEncryptionCipher', function() {
         other.decrypt(deterministic.cell);
       }, 'The encrypted value has an invalid authentication tag.');
     });
+
+    it('rejects authentic cells with a malformed padding', function() {
+      const derive = (purpose: string) => {
+        return crypto.createHmac('sha256', columnEncryptionKey)
+          .update(`Microsoft SQL Server cell ${purpose} key with encryption algorithm:AEAD_AES_256_CBC_HMAC_SHA256 and key length:256`, 'utf16le')
+          .digest();
+      };
+
+      // A cell whose plaintext blocks are given as they are, padding
+      // included, with a valid authentication tag.
+      const cellOf = (blocks: Buffer) => {
+        const iv = crypto.randomBytes(16);
+        const encrypt = crypto.createCipheriv('aes-256-cbc', derive('encryption'), iv).setAutoPadding(false);
+        const ciphertext = Buffer.concat([encrypt.update(blocks), encrypt.final()]);
+
+        const mac = crypto.createHmac('sha256', derive('MAC')).update(Buffer.from([0x01])).update(iv).update(ciphertext).update(Buffer.from([0x01])).digest();
+        return Buffer.concat([Buffer.from([0x01]), mac, iv, ciphertext]);
+      };
+
+      const padded = (value: string, padding: number[]) => Buffer.concat([Buffer.from(value), Buffer.from(padding)]);
+
+      // Padded the way it has to be: with as many bytes as each of them says
+      assert.deepEqual(cipher.decrypt(cellOf(padded('0123456789abc', [3, 3, 3]))), Buffer.from('0123456789abc'));
+      assert.deepEqual(cipher.decrypt(cellOf(padded('0123456789abcde', [1]))), Buffer.from('0123456789abcde'));
+      assert.deepEqual(cipher.decrypt(cellOf(Buffer.alloc(16, 16))), Buffer.alloc(0));
+
+      const malformed = [
+        // Only the last byte is a valid padding length
+        padded('0123456789abc', [1, 3, 2]),
+        padded('0123456789abc', [3, 2, 3]),
+        padded('0123456789abc', [2, 3, 3]),
+        Buffer.concat([Buffer.alloc(15, 0), Buffer.from([16])]),
+
+        // The last byte is not a padding length
+        padded('0123456789abcde', [0]),
+        padded('0123456789abcde', [17]),
+        Buffer.alloc(16, 17)
+      ];
+
+      for (const blocks of malformed) {
+        assert.throws(() => {
+          cipher.decrypt(cellOf(blocks));
+        }, 'The encrypted value has an invalid padding.', blocks.toString('hex'));
+      }
+
+      // The cipher is of use afterwards.
+      assert.deepEqual(cipher.decrypt(deterministic.cell), deterministic.plaintext);
+    });
   });
 });

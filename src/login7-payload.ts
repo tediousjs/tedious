@@ -1,3 +1,4 @@
+import { COLUMN_ENCRYPTION_VERSION } from './always-encrypted/types';
 import { formatHex } from './format-hex';
 import { versions } from './tds-versions';
 
@@ -439,15 +440,13 @@ class Login7Payload {
       }
     }
 
-    // Signal support for column encryption, without the use of secure
-    // enclaves (which would be version 2 and above).
+    // Signal support for column encryption.
     if (this.columnEncryption) {
       const COLUMNENCRYPTION_FEATURE_ID = 0x04;
-      const COLUMNENCRYPTION_VERSION = 0x01;
       const buf = Buffer.alloc(6);
       buf.writeUInt8(COLUMNENCRYPTION_FEATURE_ID, 0);
       buf.writeUInt32LE(1, 1);
-      buf.writeUInt8(COLUMNENCRYPTION_VERSION, 5);
+      buf.writeUInt8(COLUMN_ENCRYPTION_VERSION, 5);
       buffers.push(buf);
     }
 

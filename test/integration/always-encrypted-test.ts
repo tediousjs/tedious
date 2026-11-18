@@ -2,6 +2,7 @@ import { ClientSecretCredential, DefaultAzureCredential } from '@azure/identity'
 import { CryptographyClient } from '@azure/keyvault-keys';
 import { assert } from 'chai';
 import { generateKeyPairSync, randomBytes, type KeyObject } from 'crypto';
+import { inspect } from 'util';
 
 import Connection, { type ConnectionOptions } from '../../src/connection';
 import Request, { type ParameterOptions, type RequestOptions } from '../../src/request';
@@ -402,6 +403,12 @@ describe('Always Encrypted', function() {
       assert.strictEqual(columns[2].cryptoMetadata!.key!.values[0].algorithm, 'RSA_OAEP');
 
       assert.strictEqual(columns[3].cryptoMetadata!.encryptionType, 'randomized');
+
+      // What describes a column does not give away what decrypts it: the
+      // description holds nothing but what the server sent.
+      assert.deepEqual(Object.keys(columns[2].cryptoMetadata!), ['key', 'encryptionType', 'algorithmId', 'algorithmName', 'normalizationRuleVersion']);
+      assert.deepEqual(Reflect.ownKeys(columns[2].cryptoMetadata!.key!), ['databaseId', 'keyId', 'keyVersion', 'metadataVersion', 'values']);
+      assert.notInclude(inspect(columns, { depth: null, showHidden: true }), 'Cipher');
     });
 
     it('returns encrypted values as they are stored on a connection without column encryption', async function() {
@@ -544,6 +551,63 @@ describe('Always Encrypted', function() {
   });
 
   describe('parameters', function() {
+    it('rounds times to the scale of their column like the server does', async function() {
+      const table = `${names.table}_times`;
+
+      // Columns of a scale that values are rounded to, each next to a
+      // column that is not encrypted: the server rounds its values.
+      await execSqlBatch(setupConnection!, `
+        CREATE TABLE ${table} (
+          id int NOT NULL,
+          time_e time(0) ${encrypted(names.cek, 'RANDOMIZED')} NULL, time_p time(0) NULL,
+          datetime2_e datetime2(1) ${encrypted(names.cek, 'RANDOMIZED')} NULL, datetime2_p datetime2(1) NULL,
+          offset_e datetimeoffset(2) ${encrypted(names.cek, 'RANDOMIZED')} NULL, offset_p datetimeoffset(2) NULL
+        )
+      `);
+      cleanup.unshift(`DROP TABLE ${table}`);
+
+      const values = [
+        // Rounded down, and up
+        new Date('2020-02-28T12:34:56.004Z'),
+        new Date('2020-02-28T12:34:56.996Z'),
+
+        // The last moments of a day are rounded up to the next day, of
+        // which a time has none.
+        new Date('2020-02-28T23:59:59.994Z'),
+        new Date('2020-02-28T23:59:59.999Z'),
+        new Date('2020-12-31T23:59:59.999Z')
+      ];
+
+      for (const [id, value] of values.entries()) {
+        await execSql(connection, `INSERT INTO ${table} VALUES (@id, @time_e, @time_p, @datetime2_e, @datetime2_p, @offset_e, @offset_p)`, [
+          ['id', TYPES.Int, id],
+          ['time_e', TYPES.Time, value, { scale: 0 }],
+          ['time_p', TYPES.Time, value, { scale: 7 }],
+          ['datetime2_e', TYPES.DateTime2, value, { scale: 1 }],
+          ['datetime2_p', TYPES.DateTime2, value, { scale: 7 }],
+          ['offset_e', TYPES.DateTimeOffset, value, { scale: 2 }],
+          ['offset_p', TYPES.DateTimeOffset, value, { scale: 7 }]
+        ]);
+      }
+
+      const { rows } = await execSqlBatch(connection, `SELECT time_e, time_p, datetime2_e, datetime2_p, offset_e, offset_p FROM ${table} ORDER BY id`);
+      const timestamps = rows.map((row) => row.map((value) => (value as Date).toISOString()));
+
+      for (const [id, [time, plainTime, datetime2, plainDatetime2, offset, plainOffset]] of timestamps.entries()) {
+        assert.strictEqual(time, plainTime, `time(0) of ${values[id].toISOString()}`);
+        assert.strictEqual(datetime2, plainDatetime2, `datetime2(1) of ${values[id].toISOString()}`);
+        assert.strictEqual(offset, plainOffset, `datetimeoffset(2) of ${values[id].toISOString()}`);
+      }
+
+      assert.deepEqual(timestamps.map(([time, , datetime2]) => [time, datetime2]), [
+        ['1970-01-01T12:34:56.000Z', '2020-02-28T12:34:56.000Z'],
+        ['1970-01-01T12:34:57.000Z', '2020-02-28T12:34:57.000Z'],
+        ['1970-01-01T23:59:59.000Z', '2020-02-29T00:00:00.000Z'],
+        ['1970-01-01T23:59:59.000Z', '2020-02-29T00:00:00.000Z'],
+        ['1970-01-01T23:59:59.000Z', '2021-01-01T00:00:00.000Z']
+      ]);
+    });
+
     it('encrypts the parameters that target encrypted columns', async function() {
       const { rowCount } = await execSql(connection, `INSERT INTO ${names.table} (id, plain, deterministic, randomized) VALUES (@id, @plain, @deterministic, @randomized)`, [
         ['id', TYPES.Int, 1],
@@ -752,6 +816,41 @@ describe('Always Encrypted', function() {
 
       assert.deepEqual(rows, []);
       assert.deepEqual(outputs, { randomized: null, echo: null });
+    });
+
+    it('calls procedures whose names need to be quoted in a statement', async function() {
+      // The name of a procedure that is called does not have to be quoted,
+      // the statement that the server is asked about does.
+      const name = `${names.procedure} with spaces-and.dots`;
+
+      await execSqlBatch(setupConnection!, `
+        CREATE PROCEDURE [${name}] @deterministic nvarchar(50), @id int OUTPUT
+        AS SELECT @id = id FROM ${names.table} WHERE deterministic = @deterministic
+      `);
+      cleanup.unshift(`DROP PROCEDURE [${name}]`);
+
+      for (const procedure of [`[${name}]`, `${schema}.[${name}]`, `[${schema}].[${name}];1`]) {
+        const { outputs } = await callProcedure(connection, procedure, [
+          ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }],
+          ['id', TYPES.Int, null, { output: true }]
+        ]);
+
+        assert.deepEqual(outputs, { id: 1 }, procedure);
+      }
+
+      // A name without dots does not have to be quoted to be called.
+      const unquoted = `${names.procedure} select-from`;
+      await execSqlBatch(setupConnection!, `CREATE PROCEDURE [${unquoted}] @deterministic nvarchar(50), @id int OUTPUT AS SELECT @id = id FROM ${names.table} WHERE deterministic = @deterministic`);
+      cleanup.unshift(`DROP PROCEDURE [${unquoted}]`);
+
+      for (const procedure of [unquoted, `${schema}.${unquoted}`]) {
+        const { outputs } = await callProcedure(connection, procedure, [
+          ['deterministic', TYPES.NVarChar, 'secret', { length: 50 }],
+          ['id', TYPES.Int, null, { output: true }]
+        ]);
+
+        assert.deepEqual(outputs, { id: 1 }, procedure);
+      }
     });
 
     it('returns large values for encrypted output parameters', async function() {

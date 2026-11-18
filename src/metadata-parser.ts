@@ -1,6 +1,7 @@
 import { Collation } from './collation';
 import { type ParserOptions } from './token/stream-parser';
 import { TYPE, type DataType } from './data-type';
+import { markAsPLP } from './always-encrypted/column-decryption';
 import { type ColumnEncryptionKeyInfo, type CryptoMetadata, encryptionTypeFromId } from './always-encrypted/types';
 
 import { formatHex } from './format-hex';
@@ -208,9 +209,12 @@ function readCryptoMetadata(buf: Buffer, offset: number, encrypted: Metadata, op
     encryptionType: encryptionTypeFromId(encryptionType),
     algorithmId,
     algorithmName,
-    normalizationRuleVersion,
-    isPLP: encrypted.type.name === 'VarBinary' && encrypted.dataLength === MAX
+    normalizationRuleVersion
   };
+
+  if (encrypted.type.name === 'VarBinary' && encrypted.dataLength === MAX) {
+    markAsPLP(metadata.cryptoMetadata);
+  }
 
   return new Result(metadata, offset);
 }

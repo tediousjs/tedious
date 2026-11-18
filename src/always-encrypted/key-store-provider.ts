@@ -35,6 +35,31 @@ export interface ColumnEncryptionKeyStoreProvider {
    *   The plaintext column encryption key.
    */
   decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Uint8Array | Promise<Uint8Array>;
+
+  /**
+   * Encrypts a column encryption key with a column master key.
+   *
+   * This is what creates the `ENCRYPTED_VALUE` of a new column encryption
+   * key (`CREATE COLUMN ENCRYPTION KEY`), or of an existing one for another
+   * column master key (`ALTER COLUMN ENCRYPTION KEY`). It is for the tools
+   * that set up and rotate keys: `tedious` itself never calls it, and a
+   * provider that is only used to read and write encrypted values does not
+   * have to implement it.
+   *
+   * @param masterKeyPath
+   *   The path of the column master key (`KEY_PATH`).
+   *
+   * @param encryptionAlgorithm
+   *   The algorithm to encrypt the column encryption key with, e.g.
+   *   `RSA_OAEP`.
+   *
+   * @param columnEncryptionKey
+   *   The plaintext column encryption key.
+   *
+   * @returns
+   *   The encrypted column encryption key.
+   */
+  encryptColumnEncryptionKey?(masterKeyPath: string, encryptionAlgorithm: string, columnEncryptionKey: Uint8Array): Uint8Array | Promise<Uint8Array>;
 }
 
 // All of Microsoft's key store providers (`MSSQL_CERTIFICATE_STORE`,
@@ -108,6 +133,27 @@ function buildSignedData(masterKeyPath: string, ciphertext: Uint8Array): Buffer 
   return Buffer.concat([header, keyPath, ciphertext]);
 }
 
+/**
+ * The ciphertext and the signature of an encrypted column encryption key
+ * are both as long as the RSA key they were made with. Checked before the
+ * key store is asked to make use of them.
+ *
+ * @param keyLength
+ *   The length of the column master key in bytes, if it is known.
+ */
+function assertKeyLengths({ ciphertext, signature }: KeyEnvelope, masterKeyPath: string, keyLength?: number) {
+  const expected = keyLength ?? signature.length;
+  const expectation = keyLength !== undefined ? `the column master key "${masterKeyPath}" is ${keyLength} bytes long` : `its signature is ${signature.length} bytes long`;
+
+  if (ciphertext.length !== expected) {
+    throw new Error(`The encrypted column encryption key is malformed: its ciphertext is ${ciphertext.length} bytes long, but ${expectation}.`);
+  }
+
+  if (signature.length !== expected) {
+    throw new Error(`The encrypted column encryption key is malformed: its signature is ${signature.length} bytes long, but ${expectation}.`);
+  }
+}
+
 function invalidSignatureMessage(masterKeyPath: string) {
   return `The signature of the encrypted column encryption key does not match the column master key "${masterKeyPath}". The encrypted column encryption key may be corrupt, or the column master key may be the wrong one.`;
 }
@@ -138,13 +184,20 @@ export type RsaPrivateKey = Parameters<typeof createPrivateKey>[0] | KeyObject;
  */
 export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
   declare private readonly lookup: (masterKeyPath: string) => RsaPrivateKey | undefined | Promise<RsaPrivateKey | undefined>;
-  declare private readonly keys: Map<string, KeyObject>;
 
   /**
    * @param keys
    *   The private keys of the column master keys by key path, or a function
-   *   that looks up the private key of a key path. Key paths in an object
-   *   are matched case-insensitively. The result of a lookup is cached.
+   *   that looks up the private key of a key path.
+   *
+   *   Key paths in an object are matched case-insensitively. The keys of
+   *   an object are held on to for as long as the provider is.
+   *
+   *   A function is called each time a column encryption key is decrypted
+   *   (which {@link ColumnEncryptionOptions.keyCacheTTL} limits), and what
+   *   it returns is not held on to. That leaves it to the function how
+   *   long a private key is kept in memory, and lets it return another key
+   *   once the key of a path changed.
    */
   constructor(keys: { [masterKeyPath: string]: RsaPrivateKey } | ((masterKeyPath: string) => RsaPrivateKey | undefined | Promise<RsaPrivateKey | undefined>)) {
     if (typeof keys === 'function') {
@@ -155,15 +208,16 @@ export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
     } else {
       throw new TypeError('The "keys" argument must be of type object or function.');
     }
-
-    this.keys = new Map();
   }
 
   async decryptColumnEncryptionKey(masterKeyPath: string, encryptionAlgorithm: string, encryptedColumnEncryptionKey: Buffer): Promise<Buffer> {
     assertKeyEncryptionAlgorithm(encryptionAlgorithm);
 
     const privateKey = await this.getPrivateKey(masterKeyPath);
-    const { ciphertext, signature, signedData } = parseKeyEnvelope(encryptedColumnEncryptionKey);
+    const envelope = parseKeyEnvelope(encryptedColumnEncryptionKey);
+    assertKeyLengths(envelope, masterKeyPath, privateKey.asymmetricKeyDetails!.modulusLength! / 8);
+
+    const { ciphertext, signature, signedData } = envelope;
 
     // The public key is derived from the private key.
     if (!verify('sha256', signedData, privateKey, signature)) {
@@ -189,20 +243,14 @@ export class RsaKeyStoreProvider implements ColumnEncryptionKeyStoreProvider {
   }
 
   private async getPrivateKey(masterKeyPath: string): Promise<KeyObject> {
-    let privateKey = this.keys.get(masterKeyPath);
+    const key = await this.lookup(masterKeyPath);
+    if (key == null) {
+      throw new Error(`No private key is available for the column master key "${masterKeyPath}".`);
+    }
 
-    if (privateKey === undefined) {
-      const key = await this.lookup(masterKeyPath);
-      if (key == null) {
-        throw new Error(`No private key is available for the column master key "${masterKeyPath}".`);
-      }
-
-      privateKey = key instanceof KeyObject ? key : createPrivateKey(key);
-      if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'rsa') {
-        throw new Error(`The key of the column master key "${masterKeyPath}" is not a private RSA key.`);
-      }
-
-      this.keys.set(masterKeyPath, privateKey);
+    const privateKey = key instanceof KeyObject ? key : createPrivateKey(key);
+    if (privateKey.type !== 'private' || privateKey.asymmetricKeyType !== 'rsa') {
+      throw new Error(`The key of the column master key "${masterKeyPath}" is not a private RSA key.`);
     }
 
     return privateKey;
@@ -326,7 +374,13 @@ export class AzureKeyVaultKeyStoreProvider implements ColumnEncryptionKeyStorePr
     assertKeyEncryptionAlgorithm(encryptionAlgorithm);
 
     const client = this.getClient(masterKeyPath);
-    const { ciphertext, signature, signedData } = parseKeyEnvelope(encryptedColumnEncryptionKey);
+    const envelope = parseKeyEnvelope(encryptedColumnEncryptionKey);
+
+    // The size of the key is only known to the key vault, but the two
+    // parts that were made with it have to be of the same length.
+    assertKeyLengths(envelope, masterKeyPath);
+
+    const { ciphertext, signature, signedData } = envelope;
 
     const digest = createHash('sha256').update(signedData).digest();
     if (!(await client.verify('RS256', digest, signature)).result) {

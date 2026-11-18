@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import sinon from 'sinon';
 
 import { ColumnEncryptionCipher } from '../../../src/always-encrypted/cipher';
-import { assertSupportedEncryption, loadColumnEncryptionKeys } from '../../../src/always-encrypted/key-cache';
+import { assertSupportedEncryption, loadColumnEncryptionKeys, type ColumnEncryptionCiphers } from '../../../src/always-encrypted/key-cache';
 import { validateColumnEncryptionOptions } from '../../../src/always-encrypted/options';
 import { type ColumnEncryptionKeyStoreProvider } from '../../../src/always-encrypted/key-store-provider';
 import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type EncryptedColumnEncryptionKey } from '../../../src/always-encrypted/types';
@@ -34,10 +34,10 @@ function keyValue(overrides: Partial<EncryptedColumnEncryptionKey> = {}): Encryp
 }
 
 function keyInfo(...values: EncryptedColumnEncryptionKey[]): ColumnEncryptionKeyInfo {
-  return { databaseId: 5, keyId: 1, keyVersion: 1, metadataVersion: Buffer.alloc(8), values, cipher: undefined };
+  return { databaseId: 5, keyId: 1, keyVersion: 1, metadataVersion: Buffer.alloc(8), values };
 }
 
-async function rejection(promise: void | Promise<unknown>): Promise<Error> {
+async function rejection(promise: unknown): Promise<Error> {
   try {
     await promise;
   } catch (error: any) {
@@ -48,10 +48,20 @@ async function rejection(promise: void | Promise<unknown>): Promise<Error> {
 }
 
 describe('loadColumnEncryptionKeys', function() {
+  const serverName = 'server.example.com:1433';
+
   let provider: FakeKeyStoreProvider;
 
   function optionsWith(options: Partial<ColumnEncryptionOptions> = {}) {
-    return validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: provider }, ...options });
+    return validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: provider }, ...options }, serverName);
+  }
+
+  // The cipher of a key that is loaded without a key store being accessed.
+  function cachedCipher(key: ColumnEncryptionKeyInfo, options = optionsWith()) {
+    const ciphers = loadColumnEncryptionKeys([key], options);
+    assert.instanceOf(ciphers, Map);
+
+    return (ciphers as ColumnEncryptionCiphers).get(key);
   }
 
   beforeEach(function() {
@@ -62,8 +72,8 @@ describe('loadColumnEncryptionKeys', function() {
     sinon.restore();
   });
 
-  it('does nothing if there are no keys to load', function() {
-    assert.isUndefined(loadColumnEncryptionKeys([], optionsWith()));
+  it('returns no ciphers if there are no keys to load', function() {
+    assert.deepEqual(loadColumnEncryptionKeys([], optionsWith()), new Map());
   });
 
   it('decrypts keys via the key store provider of their column master key', async function() {
@@ -72,16 +82,29 @@ describe('loadColumnEncryptionKeys', function() {
 
     const loading = loadColumnEncryptionKeys([key], optionsWith());
     assert.instanceOf(loading, Promise);
-    assert.strictEqual(key.cipher, undefined);
 
-    await loading;
+    const ciphers = await loading;
+    const cipher = ciphers.get(key);
 
-    assert.instanceOf(key.cipher, ColumnEncryptionCipher);
+    assert.instanceOf(cipher, ColumnEncryptionCipher);
     assert.deepEqual(provider.calls, [{ masterKeyPath: 'key/1', encryptionAlgorithm: 'RSA_OAEP', encryptedColumnEncryptionKey: value.encryptedKey }]);
 
     // The cipher is the one of the column encryption key.
     const plaintext = Buffer.from('plaintext');
-    assert.deepEqual(new ColumnEncryptionCipher(value.encryptedKey).decrypt(key.cipher!.encrypt(plaintext, true)), plaintext);
+    assert.deepEqual(new ColumnEncryptionCipher(value.encryptedKey).decrypt(cipher!.encrypt(plaintext, true)), plaintext);
+  });
+
+  it('does not attach the ciphers to the keys', async function() {
+    // The description of a key is handed out to applications, a cipher
+    // holds what is derived from the key.
+    const key = keyInfo(keyValue());
+    const description = JSON.stringify(key);
+
+    await loadColumnEncryptionKeys([key], optionsWith());
+    cachedCipher(key);
+
+    assert.deepEqual(Reflect.ownKeys(key), ['databaseId', 'keyId', 'keyVersion', 'metadataVersion', 'values']);
+    assert.strictEqual(JSON.stringify(key), description);
   });
 
   it('accepts keys that are returned as a `Uint8Array`, or without a promise', async function() {
@@ -89,12 +112,12 @@ describe('loadColumnEncryptionKeys', function() {
 
     for (const result of [new Uint8Array(value.encryptedKey), Promise.resolve(new Uint8Array(value.encryptedKey)), value.encryptedKey]) {
       const key = keyInfo(value);
-      await loadColumnEncryptionKeys([key], validateColumnEncryptionOptions({
+      const ciphers = await loadColumnEncryptionKeys([key], validateColumnEncryptionOptions({
         keyStoreProviders: { FAKE: { decryptColumnEncryptionKey: () => result } }
-      }));
+      }, serverName));
 
       const plaintext = Buffer.from('plaintext');
-      assert.deepEqual(new ColumnEncryptionCipher(value.encryptedKey).decrypt(key.cipher!.encrypt(plaintext, true)), plaintext);
+      assert.deepEqual(new ColumnEncryptionCipher(value.encryptedKey).decrypt(ciphers.get(key)!.encrypt(plaintext, true)), plaintext);
     }
   });
 
@@ -103,13 +126,12 @@ describe('loadColumnEncryptionKeys', function() {
     const options = optionsWith();
 
     const first = keyInfo(value);
-    await loadColumnEncryptionKeys([first], options);
+    const ciphers = await loadColumnEncryptionKeys([first], options);
 
     // The same key, as it is described by another response.
     const second = keyInfo({ ...value, encryptedKey: Buffer.from(value.encryptedKey) });
-    assert.isUndefined(loadColumnEncryptionKeys([second], options));
 
-    assert.strictEqual(second.cipher, first.cipher);
+    assert.strictEqual(cachedCipher(second, options), ciphers.get(first));
     assert.lengthOf(provider.calls, 1);
   });
 
@@ -117,20 +139,42 @@ describe('loadColumnEncryptionKeys', function() {
     const value = keyValue();
 
     const first = keyInfo(value);
-    await loadColumnEncryptionKeys([first], optionsWith());
+    const cipher = (await loadColumnEncryptionKeys([first], optionsWith())).get(first);
 
-    const second = keyInfo(value);
-    assert.isUndefined(loadColumnEncryptionKeys([second], optionsWith()));
-    assert.strictEqual(second.cipher, first.cipher);
+    assert.strictEqual(cachedCipher(keyInfo(value), optionsWith()), cipher);
 
     // Another instance of the key store provider is a different key store.
     const otherProvider = new FakeKeyStoreProvider();
     const third = keyInfo(value);
-    await loadColumnEncryptionKeys([third], validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: otherProvider } }));
+    const otherCiphers = await loadColumnEncryptionKeys([third], validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: otherProvider } }, serverName));
 
-    assert.notStrictEqual(third.cipher, first.cipher);
+    assert.notStrictEqual(otherCiphers.get(third), cipher);
     assert.lengthOf(provider.calls, 1);
     assert.lengthOf(otherProvider.calls, 1);
+  });
+
+  it('does not share cached keys between servers', async function() {
+    const value = keyValue();
+
+    const key = keyInfo(value);
+    const cipher = (await loadColumnEncryptionKeys([key], optionsWith())).get(key);
+
+    // The same encrypted key, sent by another server (or by another
+    // instance, or on another port, of the same server).
+    for (const otherServer of ['other.example.com:1433', 'server.example.com:1434', 'server.example.com\\instance']) {
+      const options = validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: provider } }, otherServer);
+
+      const other = keyInfo(value);
+      const loading = loadColumnEncryptionKeys([other], options);
+      assert.instanceOf(loading, Promise, otherServer);
+      assert.notStrictEqual((await loading).get(other), cipher, otherServer);
+    }
+
+    assert.lengthOf(provider.calls, 4);
+
+    // The name of a server is not case sensitive.
+    const sameServer = validateColumnEncryptionOptions({ keyStoreProviders: { FAKE: provider } }, 'SERVER.example.com:1433');
+    assert.strictEqual(cachedCipher(keyInfo(value), sameServer), cipher);
   });
 
   it('decrypts a key only once while it is being decrypted', async function() {
@@ -138,15 +182,15 @@ describe('loadColumnEncryptionKeys', function() {
     const options = optionsWith();
 
     const keys = [keyInfo(value), keyInfo(value), keyInfo(value)];
-    await Promise.all([
+    const [first, others] = await Promise.all([
       loadColumnEncryptionKeys([keys[0]], options),
       loadColumnEncryptionKeys([keys[1], keys[2]], options)
     ]);
 
     assert.lengthOf(provider.calls, 1);
-    assert.instanceOf(keys[0].cipher, ColumnEncryptionCipher);
-    assert.strictEqual(keys[1].cipher, keys[0].cipher);
-    assert.strictEqual(keys[2].cipher, keys[0].cipher);
+    assert.instanceOf(first.get(keys[0]), ColumnEncryptionCipher);
+    assert.strictEqual(others.get(keys[1]), first.get(keys[0]));
+    assert.strictEqual(others.get(keys[2]), first.get(keys[0]));
   });
 
   it('distinguishes keys by their encrypted value, key path and algorithm', async function() {
@@ -171,33 +215,31 @@ describe('loadColumnEncryptionKeys', function() {
     await loadColumnEncryptionKeys([keyInfo(value)], options);
 
     clock.tick(999);
-    assert.isUndefined(loadColumnEncryptionKeys([keyInfo(value)], options));
+    assert.instanceOf(cachedCipher(keyInfo(value), options), ColumnEncryptionCipher);
     assert.lengthOf(provider.calls, 1);
 
     clock.tick(1);
     const key = keyInfo(value);
-    await loadColumnEncryptionKeys([key], options);
+    const ciphers = await loadColumnEncryptionKeys([key], options);
 
-    assert.instanceOf(key.cipher, ColumnEncryptionCipher);
+    assert.instanceOf(ciphers.get(key), ColumnEncryptionCipher);
     assert.lengthOf(provider.calls, 2);
   });
 
-  it('applies the lifetime of the cache to keys that already have a cipher', async function() {
+  it('applies the lifetime of the cache to keys that were loaded before', async function() {
     const clock = sinon.useFakeTimers({ toFake: ['Date'] });
     const options = optionsWith({ keyCacheTTL: 1000 });
 
     // Like the keys of cached parameter encryption metadata
     const key = keyInfo(keyValue());
-    await loadColumnEncryptionKeys([key], options);
-    const cipher = key.cipher;
+    const cipher = (await loadColumnEncryptionKeys([key], options)).get(key);
 
-    assert.isUndefined(loadColumnEncryptionKeys([key], options));
-    assert.strictEqual(key.cipher, cipher);
+    assert.strictEqual(cachedCipher(key, options), cipher);
 
     clock.tick(1000);
-    await loadColumnEncryptionKeys([key], options);
+    const ciphers = await loadColumnEncryptionKeys([key], options);
 
-    assert.notStrictEqual(key.cipher, cipher);
+    assert.notStrictEqual(ciphers.get(key), cipher);
     assert.lengthOf(provider.calls, 2);
   });
 
@@ -216,7 +258,7 @@ describe('loadColumnEncryptionKeys', function() {
     // and neither does one that keeps keys for a shorter time, once that
     // time has passed.
     clock.tick(1000);
-    assert.isUndefined(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 2000 })));
+    assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 2000 })), Map);
     assert.lengthOf(provider.calls, 2);
 
     clock.tick(1000);
@@ -224,7 +266,7 @@ describe('loadColumnEncryptionKeys', function() {
     assert.lengthOf(provider.calls, 3);
 
     // The key is cached anew for all of them.
-    assert.isUndefined(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 60000 })));
+    assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheTTL: 60000 })), Map);
     assert.lengthOf(provider.calls, 3);
   });
 
@@ -249,9 +291,9 @@ describe('loadColumnEncryptionKeys', function() {
 
     provider.unavailable.clear();
     const key = keyInfo(value);
-    await loadColumnEncryptionKeys([key], options);
+    const ciphers = await loadColumnEncryptionKeys([key], options);
 
-    assert.instanceOf(key.cipher, ColumnEncryptionCipher);
+    assert.instanceOf(ciphers.get(key), ColumnEncryptionCipher);
     assert.lengthOf(provider.calls, 2);
   });
 
@@ -268,12 +310,12 @@ describe('loadColumnEncryptionKeys', function() {
     provider.unavailable.add('key/unavailable');
     const options = optionsWith();
 
-    await loadColumnEncryptionKeys([key], options);
-    assert.instanceOf(key.cipher, ColumnEncryptionCipher);
+    const ciphers = await loadColumnEncryptionKeys([key], options);
+    assert.instanceOf(ciphers.get(key), ColumnEncryptionCipher);
     assert.deepEqual(provider.calls.map((call) => call.masterKeyPath), ['key/unavailable', 'key/available']);
 
     // The value that could be decrypted is found in the cache.
-    assert.isUndefined(loadColumnEncryptionKeys([keyInfo(...key.values)], options));
+    assert.strictEqual(cachedCipher(keyInfo(...key.values), options), ciphers.get(key));
     assert.lengthOf(provider.calls, 2);
   });
 
@@ -295,7 +337,7 @@ describe('loadColumnEncryptionKeys', function() {
     let error = await rejection(loadColumnEncryptionKeys([key], optionsWith()));
     assert.strictEqual(error.message, 'No key store provider is registered for the key store "AZURE_KEY_VAULT" of the column master key "https://tedious.vault.azure.net/keys/cmk/1". Registered key store providers: "FAKE".');
 
-    error = await rejection(loadColumnEncryptionKeys([key], validateColumnEncryptionOptions({ keyStoreProviders: {} })));
+    error = await rejection(loadColumnEncryptionKeys([key], validateColumnEncryptionOptions({ keyStoreProviders: {} }, serverName)));
     assert.match(error.message, /Registered key store providers: none\.$/);
 
     // Key store names are not looked up on the prototype of the providers.
@@ -307,7 +349,7 @@ describe('loadColumnEncryptionKeys', function() {
     for (const result of [undefined, null, 'key', [1, 2, 3]]) {
       const error = await rejection(loadColumnEncryptionKeys([keyInfo(keyValue())], validateColumnEncryptionOptions({
         keyStoreProviders: { FAKE: { decryptColumnEncryptionKey: () => result as any } }
-      })));
+      }, serverName)));
 
       assert.strictEqual(error.message, 'The key store provider "FAKE" did not return the decrypted column encryption key as a Buffer or Uint8Array.');
     }
@@ -332,8 +374,8 @@ describe('loadColumnEncryptionKeys', function() {
       const options = optionsWith({ trustedKeyPaths: ['Key/Trusted'] });
 
       const trusted = keyInfo(keyValue({ keyPath: 'key/trusted' }));
-      await loadColumnEncryptionKeys([trusted], options);
-      assert.instanceOf(trusted.cipher, ColumnEncryptionCipher);
+      const ciphers = await loadColumnEncryptionKeys([trusted], options);
+      assert.instanceOf(ciphers.get(trusted), ColumnEncryptionCipher);
 
       const error = await rejection(loadColumnEncryptionKeys([keyInfo(keyValue({ keyPath: 'key/other' }))], options));
       assert.strictEqual(error.message, 'The column master key path "key/other" is not one of the trusted key paths.');

@@ -1,6 +1,7 @@
 const { createBenchmark } = require('../common');
 
 const { ColumnEncryptionCipher } = require('tedious/lib/always-encrypted/cipher');
+const { useCipher } = require('tedious/lib/always-encrypted/column-decryption');
 const StreamParser = require('tedious/lib/token/stream-parser');
 const WritableTrackingBuffer = require('tedious/lib/tracking-buffer/writable-tracking-buffer');
 
@@ -95,7 +96,7 @@ function main({ n, rowCount, encrypted }) {
     parser.write(metadataData);
     const token = parser.read();
     if (encrypted) {
-      token.columnEncryptionKeys[0].cipher = cipher;
+      useCipher(token.columnEncryptionKeys[0], cipher);
     }
 
     parser.write(rows);

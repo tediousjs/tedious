@@ -35,6 +35,17 @@ describe('Request', function() {
       assert.deepEqual(request.parameters.map((parameter) => parameter.forceEncrypt), [true, undefined, true]);
       assert.isTrue(request.parameters[2].output);
     });
+
+    it('lets go of the ciphers of its output parameters once it completed', function() {
+      for (const error of [null, new Error('failed')]) {
+        const request = new Request('SELECT @a', () => {});
+        request.parameterEncryption = { cacheKey: 'SELECT @a', ciphers: new Map() };
+
+        request.callback(error);
+
+        assert.isUndefined(request.parameterEncryption);
+      }
+    });
   });
 
   describe('#cancel', function() {

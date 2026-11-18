@@ -127,7 +127,7 @@ function readColumnEncryptionKey(buf: Buffer, offset: number): Result<ColumnEncr
     values.push({ encryptedKey, keyStoreName, keyPath, algorithm });
   }
 
-  return new Result({ databaseId, keyId, keyVersion, metadataVersion, values, cipher: undefined }, offset);
+  return new Result({ databaseId, keyId, keyVersion, metadataVersion, values }, offset);
 }
 
 /**

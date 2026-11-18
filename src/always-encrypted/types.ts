@@ -1,4 +1,3 @@
-import { type ColumnEncryptionCipher } from './cipher';
 import { type ColumnEncryptionKeyStoreProvider } from './key-store-provider';
 
 /**
@@ -22,9 +21,9 @@ export interface ColumnEncryptionOptions {
    * memory, so the key store is not accessed for every request that uses
    * the key. `0` disables the cache.
    *
-   * Keys are cached per key store provider instance: connections that
-   * share a provider instance share its decrypted keys, each for as long
-   * as its own option allows.
+   * Keys are cached per key store provider instance and server: connections
+   * to the same server that share a provider instance share its decrypted
+   * keys, each for as long as its own option allows.
    *
    * (default: `7200000`, 2 hours)
    */
@@ -66,6 +65,10 @@ export interface InternalColumnEncryptionOptions {
   // Lower cased
   trustedKeyPaths: Set<string> | undefined;
   parameterMetadataCacheSize: number;
+
+  // Identifies the server that the connection is made to: decrypted column
+  // encryption keys are cached per server. Lower cased.
+  serverName: string;
 }
 
 /**
@@ -101,6 +104,15 @@ export interface EncryptedColumnEncryptionKey {
 }
 
 /**
+ * The version of the column encryption feature that is asked for when
+ * logging in: column encryption without the use of secure enclaves (which
+ * would be version 2 and above).
+ *
+ * @private
+ */
+export const COLUMN_ENCRYPTION_VERSION = 1;
+
+/**
  * Describes a column encryption key.
  */
 export interface ColumnEncryptionKeyInfo {
@@ -132,22 +144,6 @@ export interface ColumnEncryptionKeyInfo {
    * rotated.
    */
   values: EncryptedColumnEncryptionKey[];
-
-  /**
-   * The cipher for the values encrypted with this key, once the key was
-   * decrypted.
-   *
-   * @private
-   */
-  cipher: ColumnEncryptionCipher | undefined;
-
-  /**
-   * Set if a value could not be decrypted with the key. The cipher is
-   * removed then, and values are left encrypted from there on.
-   *
-   * @private
-   */
-  error?: Error | undefined;
 }
 
 /**
@@ -190,13 +186,6 @@ export interface CryptoMetadata {
    * that is encrypted. `1` is the only version there is.
    */
   normalizationRuleVersion: number;
-
-  /**
-   * Whether the encrypted values are sent as PLP values (`varbinary(max)`).
-   *
-   * @private
-   */
-  isPLP: boolean;
 }
 
 export function encryptionTypeFromId(id: number): EncryptionType {

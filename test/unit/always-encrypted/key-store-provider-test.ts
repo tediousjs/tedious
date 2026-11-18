@@ -31,6 +31,20 @@ function parseEnvelope(encryptedKey: Buffer) {
   };
 }
 
+/**
+ * Puts the parts of an encrypted column encryption key into its envelope.
+ */
+function envelope(keyPath: string, ciphertext: Buffer, signature: Buffer) {
+  const path = Buffer.from(keyPath.toLowerCase(), 'utf16le');
+
+  const header = Buffer.alloc(5);
+  header.writeUInt8(0x01, 0);
+  header.writeUInt16LE(path.length, 1);
+  header.writeUInt16LE(ciphertext.length, 3);
+
+  return Buffer.concat([header, path, ciphertext, signature]);
+}
+
 describe('key store providers', function() {
   const columnEncryptionKey = randomBytes(32);
 
@@ -112,18 +126,27 @@ describe('key store providers', function() {
       assert.deepEqual(await provider.decryptColumnEncryptionKey(keyPath.toLowerCase(), 'rsa_oaep', encryptedKey), columnEncryptionKey);
     });
 
-    it('looks up keys with a function, once per key path', async function() {
+    it('looks up keys with a function, each time one is needed', async function() {
       const lookups: string[] = [];
+      let current = privateKey;
+
       const provider = new RsaKeyStoreProvider(async (masterKeyPath) => {
         lookups.push(masterKeyPath);
-        return masterKeyPath === keyPath ? privateKey.export({ type: 'pkcs8', format: 'pem' }) : undefined;
+        return masterKeyPath === keyPath ? current.export({ type: 'pkcs8', format: 'pem' }) : undefined;
       });
 
       const encryptedKey = await provider.encryptColumnEncryptionKey(keyPath, 'RSA_OAEP', columnEncryptionKey);
       assert.deepEqual(await provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', encryptedKey), columnEncryptionKey);
       assert.deepEqual(await provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', encryptedKey), columnEncryptionKey);
 
-      assert.deepEqual(lookups, [keyPath]);
+      // The function decides how long a private key is held on to.
+      assert.deepEqual(lookups, [keyPath, keyPath, keyPath]);
+
+      // A key that was replaced is not used anymore.
+      current = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+
+      const error = await rejection(provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', encryptedKey));
+      assert.match(error.message, /^The signature of the encrypted column encryption key does not match the column master key/);
     });
 
     it('fails for a column master key it has no key for', async function() {
@@ -190,6 +213,29 @@ describe('key store providers', function() {
         [encryptedKey.subarray(0, encryptedKey.length - 256), 'The encrypted column encryption key is malformed.']
       ] as const) {
         assert.strictEqual((await rejection(provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', value))).message, message);
+      }
+    });
+
+    it('fails for encrypted column encryption keys whose parts are not as long as the column master key', async function() {
+      const provider = new RsaKeyStoreProvider({ [keyPath]: privateKey });
+      const { ciphertext, signature } = parseEnvelope(await provider.encryptColumnEncryptionKey(keyPath, 'RSA_OAEP', columnEncryptionKey));
+
+      // What a 2048 bit key encrypts and signs is 256 bytes long.
+      assert.lengthOf(ciphertext, 256);
+      assert.lengthOf(signature, 256);
+
+      // Encrypted with a column master key of another size
+      const { privateKey: largerKey } = generateKeyPairSync('rsa', { modulusLength: 4096 });
+      const larger = await new RsaKeyStoreProvider({ [keyPath]: largerKey }).encryptColumnEncryptionKey(keyPath, 'RSA_OAEP', columnEncryptionKey);
+
+      for (const [value, message] of [
+        [envelope(keyPath, ciphertext.subarray(1), signature), `its ciphertext is 255 bytes long, but the column master key "${keyPath}" is 256 bytes long.`],
+        [envelope(keyPath, Buffer.concat([ciphertext, Buffer.alloc(1)]), signature), `its ciphertext is 257 bytes long, but the column master key "${keyPath}" is 256 bytes long.`],
+        [envelope(keyPath, ciphertext, signature.subarray(1)), `its signature is 255 bytes long, but the column master key "${keyPath}" is 256 bytes long.`],
+        [envelope(keyPath, ciphertext, Buffer.concat([signature, Buffer.alloc(1)])), `its signature is 257 bytes long, but the column master key "${keyPath}" is 256 bytes long.`],
+        [larger, `its ciphertext is 512 bytes long, but the column master key "${keyPath}" is 256 bytes long.`]
+      ] as const) {
+        assert.strictEqual((await rejection(provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', value))).message, `The encrypted column encryption key is malformed: ${message}`);
       }
     });
   });
@@ -328,6 +374,25 @@ describe('key store providers', function() {
       const error = await rejection(provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', encryptedKey));
       assert.match(error.message, /^The signature of the encrypted column encryption key does not match the column master key/);
       assert.deepEqual(client.calls, ['verify RS256']);
+    });
+
+    it('fails for encrypted column encryption keys whose parts differ in length, without accessing the key vault', async function() {
+      const client = new FakeCryptographyClient(keyPath);
+      const provider = new AzureKeyVaultKeyStoreProvider(() => client);
+
+      const { ciphertext, signature } = parseEnvelope(await provider.encryptColumnEncryptionKey(keyPath, 'RSA_OAEP', columnEncryptionKey));
+      client.calls.length = 0;
+
+      // Both were made with the same key, which is how long each of them is.
+      for (const [value, message] of [
+        [envelope(keyPath, ciphertext.subarray(1), signature), 'its ciphertext is 255 bytes long, but its signature is 256 bytes long.'],
+        [envelope(keyPath, ciphertext, signature.subarray(1)), 'its ciphertext is 256 bytes long, but its signature is 255 bytes long.'],
+        [envelope(keyPath, ciphertext, Buffer.concat([signature, signature])), 'its ciphertext is 256 bytes long, but its signature is 512 bytes long.']
+      ] as const) {
+        assert.strictEqual((await rejection(provider.decryptColumnEncryptionKey(keyPath, 'RSA_OAEP', value))).message, `The encrypted column encryption key is malformed: ${message}`);
+      }
+
+      assert.deepEqual(client.calls, []);
     });
 
     it('fails for unsupported key encryption algorithms', async function() {

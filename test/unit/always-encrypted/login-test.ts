@@ -30,10 +30,11 @@ function buildLoginAckToken(): Buffer {
   return buffer;
 }
 
-function buildFeatureExtAckToken(features: number[]): Buffer {
+function buildFeatureExtAckToken(features: number[], columnEncryptionVersion: number): Buffer {
   return Buffer.from([
     0xAE, // Type
-    ...features.flatMap((featureId) => [featureId, 0x01, 0x00, 0x00, 0x00, 0x01]), // each with a single byte of data
+    // Each with a single byte of data
+    ...features.flatMap((featureId) => [featureId, 0x01, 0x00, 0x00, 0x00, featureId === COLUMNENCRYPTION ? columnEncryptionVersion : 0x01]),
     0xFF // Terminator
   ]);
 }
@@ -60,9 +61,13 @@ describe('Negotiating column encryption', function() {
   let requested: number[] | undefined;
   let acknowledged: number[];
 
+  // The version of column encryption that the server acknowledges.
+  let columnEncryptionVersion: number;
+
   beforeEach(function(done) {
     requested = undefined;
     acknowledged = [];
+    columnEncryptionVersion = 1;
 
     server = net.createServer(async (socket) => {
       const debug = new Debug();
@@ -101,7 +106,7 @@ describe('Negotiating column encryption', function() {
         {
           const responseMessage = new Message({ type: 0x04 });
           responseMessage.write(buildLoginAckToken());
-          responseMessage.end(buildFeatureExtAckToken(acknowledged));
+          responseMessage.end(buildFeatureExtAckToken(acknowledged, columnEncryptionVersion));
           outgoingMessageStream.write(responseMessage);
         }
 
@@ -192,6 +197,26 @@ describe('Negotiating column encryption', function() {
     assert.strictEqual((error as ConnectionError).code, 'ECOLUMNENCRYPTION');
     assert.strictEqual((error as ConnectionError).message, 'The server does not support Always Encrypted, which the "columnEncryption" option asks for.');
     assert.deepEqual(requested, [COLUMNENCRYPTION, UTF8_SUPPORT]);
+  });
+
+  it('fails to connect if the server acknowledges a version of column encryption that was not asked for', async function() {
+    acknowledged = [COLUMNENCRYPTION, UTF8_SUPPORT];
+
+    // No version at all, and the versions that make use of secure enclaves
+    for (const version of [0, 2, 3]) {
+      columnEncryptionVersion = version;
+
+      let error: unknown;
+      try {
+        await close(await connect(true));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, ConnectionError, `version ${version}`);
+      assert.strictEqual((error as ConnectionError).code, 'ECOLUMNENCRYPTION');
+      assert.strictEqual((error as ConnectionError).message, `The server acknowledged version ${version} of column encryption, but version 1 was asked for.`);
+    }
   });
 
   it('does not ask for column encryption without the `columnEncryption` option', async function() {

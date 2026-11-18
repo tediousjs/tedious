@@ -1,5 +1,5 @@
 import { ColumnEncryptionCipher } from './cipher';
-import { assertSupportedEncryption } from './key-cache';
+import { assertSupportedEncryption, type ColumnEncryptionCiphers } from './key-cache';
 import { type ColumnEncryptionKeyInfo } from './types';
 import { type InternalConnectionOptions } from '../connection';
 import { typeByName as TYPES, type DataType, type Parameter, type ParameterData, type ResolvedParameter } from '../data-type';
@@ -13,6 +13,12 @@ const MAX = (1 << 16) - 1;
 
 const ENCRYPTION_TYPE_PLAINTEXT = 0;
 const ENCRYPTION_TYPE_DETERMINISTIC = 1;
+
+// The number of 100ns units in a day, the unit that times are normalized to.
+const UNITS_PER_DAY = 24 * 60 * 60 * 1e7;
+
+// The last day that a date can be (9999-12-31), in days since 0001-01-01.
+const LAST_DAY = 3652058;
 
 /**
  * How the server expects a parameter to be encrypted.
@@ -86,6 +92,53 @@ export interface DescribedStatement {
  *   the id of the procedure (like `sp_executesql`) that executes the
  *   statement of the request.
  */
+/**
+ * Quotes the name of a stored procedure for use in a statement.
+ *
+ * The name of a procedure that is called is not parsed like a statement
+ * is: the parts of a name like `dbo.my proc` do not have to be quoted for
+ * the server to make them out. In a statement, they have to be.
+ */
+export function quoteProcedureName(name: string): string {
+  let quoted = '';
+  let position = 0;
+
+  while (true) {
+    const start = position;
+    const delimiter = name[position] === '[' ? ']' : name[position] === '"' ? '"' : undefined;
+
+    if (delimiter !== undefined) {
+      // A part that is quoted already ends at its closing delimiter. A
+      // delimiter that is part of the name is doubled.
+      position += 1;
+      while (position < name.length && (name[position] !== delimiter || name[++position] === delimiter)) {
+        position += 1;
+      }
+    }
+
+    // What follows a quoted part (like the number of a numbered procedure),
+    // or an unquoted part, ends at the next separator.
+    const end = name.indexOf('.', position);
+    position = end === -1 ? name.length : end;
+
+    const part = name.slice(start, position);
+    if (delimiter !== undefined || part === '') {
+      quoted += part;
+    } else {
+      // The number of a numbered procedure (`name;1`) is not part of its name.
+      const [, identifier, number = ''] = /^(.*?)(;\d+)?$/s.exec(part)!;
+      quoted += `[${identifier.replaceAll(']', ']]')}]${number}`;
+    }
+
+    if (position === name.length) {
+      return quoted;
+    }
+
+    quoted += '.';
+    position += 1;
+  }
+}
+
 export function describeStatement(request: Request, procedure: string | number): DescribedStatement | undefined {
   if (typeof procedure === 'number') {
     if (request.parameters.length === 0) {
@@ -107,7 +160,7 @@ export function describeStatement(request: Request, procedure: string | number):
     return `@${parameter.name}=@${parameter.name}${parameter.output ? ' OUTPUT' : ''}`;
   });
 
-  return describedStatement(request, `EXEC ${procedure} ${args.join(', ')}`, parameters);
+  return describedStatement(request, `EXEC ${quoteProcedureName(procedure)} ${args.join(', ')}`, parameters);
 }
 
 function describedStatement(request: Request, statement: string, parameters: Parameter[]): DescribedStatement {
@@ -178,7 +231,7 @@ export function readParameterEncryptionMetadata(resultSets: Row[][]): ParameterE
 
     let key = keysByOrdinal.get(ordinal);
     if (key === undefined) {
-      key = { databaseId, keyId, keyVersion, metadataVersion, values: [], cipher: undefined };
+      key = { databaseId, keyId, keyVersion, metadataVersion, values: [] };
       keysByOrdinal.set(ordinal, key);
     }
 
@@ -267,9 +320,12 @@ export class ParameterEncryptionMetadataCache {
 
 /**
  * Encrypts the parameters of a statement that the server expects to be
- * encrypted. The column encryption keys of `metadata` have to be loaded.
+ * encrypted.
  *
  * @param ciphers
+ *   The ciphers of the column encryption keys of `metadata`.
+ *
+ * @param outputCiphers
  *   Receives the cipher of each encrypted output parameter by name, which
  *   is what decrypts the value that is returned for it.
  */
@@ -277,7 +333,8 @@ export function encryptParameters(
   parameters: Parameter[],
   resolvedParameters: ResolvedParameter[],
   metadata: ParameterEncryptionMetadata,
-  ciphers: Map<string, ColumnEncryptionCipher>,
+  ciphers: ColumnEncryptionCiphers,
+  outputCiphers: Map<string, ColumnEncryptionCipher>,
   options: InternalConnectionOptions
 ): ResolvedParameter[] {
   return resolvedParameters.map((resolved, index) => {
@@ -294,9 +351,13 @@ export function encryptParameters(
     try {
       assertSupportedEncryption(cryptoMetadata);
 
-      const cipher = cryptoMetadata.key.cipher!;
+      const cipher = ciphers.get(cryptoMetadata.key);
+      if (cipher === undefined) {
+        throw new Error('Its column encryption key is not available.');
+      }
+
       if (resolved.output) {
-        ciphers.set(resolved.name, cipher);
+        outputCiphers.set(resolved.name, cipher);
       }
 
       return encryptParameter(withDeclaredLength(resolved, parameters[index]), cryptoMetadata, cipher, options);
@@ -452,9 +513,31 @@ function normalize(parameter: ResolvedParameter, options: InternalConnectionOpti
       const value = writeValue(parameter, options);
       const length = timeLength(data.scale);
 
+      // The number of 100ns units that the times of this scale are apart.
+      const step = Math.pow(10, 7 - data.scale!);
+      let time = value.readUIntLE(0, length) * step;
+
       const normalized = Buffer.alloc(5 + value.length - length);
-      normalized.writeUIntLE(value.readUIntLE(0, length) * Math.pow(10, 7 - data.scale!), 0, 5);
       value.copy(normalized, 5, length);
+
+      // Rounding the last moments of a day ends up at midnight, which is
+      // not a time of that day. The server is not able to tell for an
+      // encrypted value, so this does what the server does when it rounds a
+      // value itself: the value becomes the first moment of the next day,
+      // or stays the last moment of its day where there is no next day - in
+      // a `time`, and on the last day that a date can be.
+      if (time >= UNITS_PER_DAY) {
+        const days = type.name === 'Time' ? LAST_DAY : normalized.readUIntLE(5, 3);
+
+        if (days < LAST_DAY) {
+          time = 0;
+          normalized.writeUIntLE(days + 1, 5, 3);
+        } else {
+          time = UNITS_PER_DAY - step;
+        }
+      }
+
+      normalized.writeUIntLE(time, 0, 5);
       return normalized;
     }
 

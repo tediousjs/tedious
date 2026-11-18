@@ -2,11 +2,13 @@ import { assert } from 'chai';
 import { Readable } from 'stream';
 
 import { ColumnEncryptionCipher } from '../../../src/always-encrypted/cipher';
+import { type ColumnEncryptionCiphers } from '../../../src/always-encrypted/key-cache';
 import {
   describeStatement,
   encryptParameters,
   createDescribeRequest,
   ParameterEncryptionMetadataCache,
+  quoteProcedureName,
   readParameterEncryptionMetadata,
   type ParameterEncryptionMetadata
 } from '../../../src/always-encrypted/parameter-encryption';
@@ -32,9 +34,15 @@ function createKey(): ColumnEncryptionKeyInfo {
     keyId: 0x01020304,
     keyVersion: 2,
     metadataVersion: Buffer.from('1122334455667788', 'hex'),
-    values: [],
-    cipher
+    values: []
   };
+}
+
+/**
+ * The cipher of each of the keys that the parameters are encrypted with.
+ */
+function ciphersOf(metadata: ParameterEncryptionMetadata): ColumnEncryptionCiphers {
+  return new Map(Array.from(metadata.parameters.values(), ({ key }) => [key, cipher]));
 }
 
 function parameter(name: string, type: DataType, value: unknown, parameterOptions: ParameterOptions = {}): Parameter {
@@ -53,7 +61,7 @@ function encrypt(type: DataType, value: unknown, parameterOptions?: ParameterOpt
     parameters: new Map([['value', { key: createKey(), algorithmId: 2, encryptionType: 1, normalizationRuleVersion: 1 }]])
   };
 
-  const [encrypted] = encryptParameters(parameters, resolved, metadata, new Map(), connectionOptions);
+  const [encrypted] = encryptParameters(parameters, resolved, metadata, ciphersOf(metadata), new Map(), connectionOptions);
   return encrypted;
 }
 
@@ -157,8 +165,9 @@ describe('encryptParameters', function() {
     });
 
     it('of type `date`', function() {
-      // The number of days since 0001-01-01
-      assert.strictEqual(normalized(TYPES.Date, new Date('0001-01-01T00:00:00Z')), '000000');
+      // The number of days since 0001-01-01. Whether a date is in range is
+      // checked in local time, so the first date is not that day itself.
+      assert.strictEqual(normalized(TYPES.Date, new Date('0001-01-03T00:00:00Z')), '020000');
       assert.strictEqual(normalized(TYPES.Date, new Date('2020-02-29T00:00:00Z')), littleEndian(737483, 3));
     });
 
@@ -209,6 +218,42 @@ describe('encryptParameters', function() {
       for (const scale of [3, 5, 7]) {
         assert.strictEqual(normalized(TYPES.DateTimeOffset, value, { scale }), expected, `scale ${scale}`);
       }
+    });
+
+    it('of the time types that are rounded to the next day, the way the server rounds them', function() {
+      const midnight = littleEndian(0, 5);
+      const lastMoment = (scale: number) => littleEndian(864_000_000_000n - 10n ** BigInt(7 - scale), 5);
+
+      // The last millisecond of a day rounds to midnight at a lower scale.
+      const time = new Date('1970-01-01T23:59:59.999Z');
+      const value = new Date('2020-02-28T23:59:59.999Z');
+
+      for (const scale of [0, 1, 2]) {
+        // A time stays the last one of its scale: there is no next day.
+        assert.strictEqual(normalized(TYPES.Time, time, { scale }), lastMoment(scale), `time(${scale})`);
+
+        // A date becomes the next day.
+        assert.strictEqual(normalized(TYPES.DateTime2, value, { scale }), midnight + littleEndian(737483, 3), `datetime2(${scale})`);
+        assert.strictEqual(normalized(TYPES.DateTimeOffset, value, { scale }).slice(0, 16), midnight + littleEndian(737483, 3), `datetimeoffset(${scale})`);
+      }
+
+      // Nothing is rounded at the scale of the value, or below half a unit.
+      assert.strictEqual(normalized(TYPES.Time, time, { scale: 3 }), lastMoment(3));
+      assert.strictEqual(normalized(TYPES.DateTime2, value, { scale: 3 }), lastMoment(3) + littleEndian(737482, 3));
+      assert.strictEqual(normalized(TYPES.Time, new Date('1970-01-01T23:59:59.400Z'), { scale: 0 }), lastMoment(0));
+
+      // The sub-millisecond part of a value rounds as well.
+      const precise: Date & { nanosecondDelta?: number } = new Date('2020-02-28T23:59:59.999Z');
+      precise.nanosecondDelta = 0.0009999;
+      assert.strictEqual(normalized(TYPES.DateTime2, precise, { scale: 6 }), midnight + littleEndian(737483, 3));
+      assert.strictEqual(normalized(TYPES.DateTime2, precise, { scale: 7 }), littleEndian(864_000_000_000n - 1n, 5) + littleEndian(737482, 3));
+
+      // The last day that there is has no next day either. (In local time,
+      // which is what the range of a date is checked in.)
+      const local = { ...options, useUTC: false };
+      const lastDay = 3652058;
+      assert.strictEqual(normalized(TYPES.DateTime2, new Date(9999, 11, 31, 23, 59, 59, 999), { scale: 0 }, local), lastMoment(0) + littleEndian(lastDay, 3));
+      assert.strictEqual(normalized(TYPES.DateTime2, new Date(9999, 11, 30, 23, 59, 59, 999), { scale: 0 }, local), midnight + littleEndian(lastDay, 3));
     });
 
     it('of type `datetime` and `smalldatetime`', function() {
@@ -291,8 +336,8 @@ describe('encryptParameters', function() {
       ])
     };
 
-    const first = encryptParameters(parameters, resolved, metadata, new Map(), options);
-    const second = encryptParameters(parameters, resolved, metadata, new Map(), options);
+    const first = encryptParameters(parameters, resolved, metadata, ciphersOf(metadata), new Map(), options);
+    const second = encryptParameters(parameters, resolved, metadata, ciphersOf(metadata), new Map(), options);
 
     assert.deepEqual(first[0].data.value, second[0].data.value);
     assert.notDeepEqual(first[1].data.value, second[1].data.value);
@@ -309,7 +354,7 @@ describe('encryptParameters', function() {
       parameters: new Map([['secret', { key: createKey(), algorithmId: 2, encryptionType: 2, normalizationRuleVersion: 1 }]])
     };
 
-    const encrypted = encryptParameters(parameters, resolved, metadata, new Map(), options);
+    const encrypted = encryptParameters(parameters, resolved, metadata, ciphersOf(metadata), new Map(), options);
 
     assert.strictEqual(encrypted[0], resolved[0]);
     assert.strictEqual(encrypted[2], resolved[2]);
@@ -336,11 +381,24 @@ describe('encryptParameters', function() {
       ])
     };
 
-    const ciphers = new Map();
-    const encrypted = encryptParameters(parameters, resolved, metadata, ciphers, options);
+    const outputCiphers = new Map();
+    const encrypted = encryptParameters(parameters, resolved, metadata, ciphersOf(metadata), outputCiphers, options);
 
     assert.isTrue(encrypted[1].output);
-    assert.deepEqual(Array.from(ciphers), [['out', cipher]]);
+    assert.deepEqual(Array.from(outputCiphers), [['out', cipher]]);
+  });
+
+  it('fails for a parameter whose column encryption key is not available', function() {
+    const parameters = [parameter('value', TYPES.Int, 1)];
+    const resolved = parameters.map((parameter) => resolveParameter(parameter, collation, options));
+    const metadata: ParameterEncryptionMetadata = {
+      keys: [],
+      parameters: new Map([['value', { key: createKey(), algorithmId: 2, encryptionType: 1, normalizationRuleVersion: 1 }]])
+    };
+
+    assert.throws(() => {
+      encryptParameters(parameters, resolved, metadata, new Map(), new Map(), options);
+    }, 'Failed to encrypt the parameter "value": Its column encryption key is not available.');
   });
 
   describe('fails', function() {
@@ -352,7 +410,7 @@ describe('encryptParameters', function() {
     }
 
     function encryptWith(parameters: Parameter[], metadata: ParameterEncryptionMetadata) {
-      return encryptParameters(parameters, parameters.map((parameter) => resolveParameter(parameter, collation, options)), metadata, new Map(), options);
+      return encryptParameters(parameters, parameters.map((parameter) => resolveParameter(parameter, collation, options)), metadata, ciphersOf(metadata), new Map(), options);
     }
 
     it('for parameters that are required to be encrypted, but not expected to be by the server', function() {
@@ -470,7 +528,7 @@ describe('encryptParameters', function() {
       expected.writeUInt8(0x09); // fByRefValue | fEncrypted
       expected.writeBuffer(Buffer.from(VARBINARY_MAX + PLP_NULL + cipherInfo('2604', '02'), 'hex'));
 
-      assert.strictEqual((await payload(encryptParameters(parameters, resolved, metadata, new Map(), options))).toString('hex'), expected.data.toString('hex'));
+      assert.strictEqual((await payload(encryptParameters(parameters, resolved, metadata, ciphersOf(metadata), new Map(), options))).toString('hex'), expected.data.toString('hex'));
     });
 
     it('sends large encrypted values', async function() {
@@ -600,10 +658,18 @@ describe('describeStatement', function() {
     });
 
     assert.deepEqual(describeStatement(request, 'dbo.proc'), {
-      statement: 'EXEC dbo.proc @id=@id, @name=@name, @result=@result OUTPUT',
+      statement: 'EXEC [dbo].[proc] @id=@id, @name=@name, @result=@result OUTPUT',
       declarations: '@id int, @name nvarchar(4), @result int OUTPUT',
       parameterNames: '@id, @name, @result'
     });
+  });
+
+  it('quotes the name of a stored procedure', function() {
+    const request = requestWith('reports.monthly sales', (request) => {
+      request.addParameter('id', TYPES.Int, 1);
+    });
+
+    assert.strictEqual(describeStatement(request, 'reports.monthly sales')!.statement, 'EXEC [reports].[monthly sales] @id=@id');
   });
 
   it('leaves table-valued parameters out of the call of a stored procedure', function() {
@@ -615,7 +681,7 @@ describe('describeStatement', function() {
     });
 
     assert.deepEqual(describeStatement(request, 'dbo.proc'), {
-      statement: 'EXEC dbo.proc @id=@id',
+      statement: 'EXEC [dbo].[proc] @id=@id',
       declarations: '@id int',
       parameterNames: '@id'
     });
@@ -642,6 +708,60 @@ describe('describeStatement', function() {
       request.addParameter('rows', TYPES.TVP, { columns: [{ name: 'a', type: TYPES.Int }], rows: [[1]] });
     });
     assert.isUndefined(describeStatement(request, 'dbo.proc'));
+  });
+});
+
+describe('quoteProcedureName', function() {
+  it('quotes the parts of a name that are not quoted', function() {
+    const names = {
+      // The name of a procedure that is called is not parsed like a
+      // statement, so anything but a `.` is part of a name.
+      'proc': '[proc]',
+      'dbo.proc': '[dbo].[proc]',
+      'db.dbo.proc': '[db].[dbo].[proc]',
+      'server.db.dbo.proc': '[server].[db].[dbo].[proc]',
+      'my proc': '[my proc]',
+      'dbo.my proc': '[dbo].[my proc]',
+      'my-proc': '[my-proc]',
+      'select': '[select]',
+      "it's": "[it's]",
+      'a]b': '[a]]b]',
+      'a[b': '[a[b]',
+      'a"b': '[a"b]',
+
+      // A part that is left out stays left out.
+      'db..proc': '[db]..[proc]',
+      '.proc': '.[proc]',
+      '': '',
+
+      // Quoted parts are left as they are, ...
+      '[proc]': '[proc]',
+      '[dbo].[my proc]': '[dbo].[my proc]',
+      'dbo.[my proc]': '[dbo].[my proc]',
+      '[my.proc]': '[my.proc]',
+      '[a]]b]': '[a]]b]',
+      '[a]].b].c': '[a]].b].[c]',
+      '"my proc"': '"my proc"',
+      '"my.proc"': '"my.proc"',
+      '"a""b".c': '"a""b".[c]',
+      'dbo."my proc"': '[dbo]."my proc"',
+
+      // ... even those that never end.
+      '[proc': '[proc',
+      '"my.proc': '"my.proc',
+
+      // The number of a numbered procedure is not part of its name.
+      'proc;1': '[proc];1',
+      'dbo.proc;12': '[dbo].[proc];12',
+      '[proc];1': '[proc];1',
+      'proc;': '[proc;]',
+      'a;b': '[a;b]',
+      'multi\nline;2': '[multi\nline];2'
+    };
+
+    for (const [name, quoted] of Object.entries(names)) {
+      assert.strictEqual(quoteProcedureName(name), quoted, JSON.stringify(name));
+    }
   });
 });
 
@@ -680,16 +800,14 @@ describe('readParameterEncryptionMetadata', function() {
         values: [
           { encryptedKey, keyStoreName: 'AZURE_KEY_VAULT', keyPath: 'https://tedious.vault.azure.net/keys/cmk/1', algorithm: 'RSA_OAEP' },
           { encryptedKey: rotatedEncryptedKey, keyStoreName: 'AZURE_KEY_VAULT', keyPath: 'https://tedious.vault.azure.net/keys/cmk/2', algorithm: 'RSA_OAEP' }
-        ],
-        cipher: undefined
+        ]
       },
       {
         databaseId: 5,
         keyId: 8,
         keyVersion: 1,
         metadataVersion,
-        values: [{ encryptedKey, keyStoreName: 'CUSTOM', keyPath: 'key/1', algorithm: 'RSA_OAEP' }],
-        cipher: undefined
+        values: [{ encryptedKey, keyStoreName: 'CUSTOM', keyPath: 'key/1', algorithm: 'RSA_OAEP' }]
       }
     ]);
 

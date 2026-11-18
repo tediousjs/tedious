@@ -466,6 +466,9 @@ class Request extends EventEmitter {
       // are started from the callback or event listeners below.
       this.canceled = false;
 
+      // The ciphers of encrypted output parameters are of no use anymore.
+      this.parameterEncryption = undefined;
+
       if (this.preparing) {
         this.preparing = false;
         if (err) {

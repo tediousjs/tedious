@@ -7,8 +7,12 @@ const DEFAULT_PARAMETER_METADATA_CACHE_SIZE = 1000;
 /**
  * Validates the `columnEncryption` option of a connection, and applies its
  * defaults.
+ *
+ * @param serverName
+ *   The server that the connection is made to, including its instance name
+ *   or port.
  */
-export function validateColumnEncryptionOptions(options: ColumnEncryptionOptions): InternalColumnEncryptionOptions {
+export function validateColumnEncryptionOptions(options: ColumnEncryptionOptions, serverName: string): InternalColumnEncryptionOptions {
   if (typeof options !== 'object' || options === null) {
     throw new TypeError('The "config.options.columnEncryption" property must be of type object.');
   }
@@ -44,7 +48,8 @@ export function validateColumnEncryptionOptions(options: ColumnEncryptionOptions
     keyStoreProviders: providers,
     keyCacheTTL,
     trustedKeyPaths: trustedKeyPaths && new Set(trustedKeyPaths.map((keyPath: string) => keyPath.toLowerCase())),
-    parameterMetadataCacheSize
+    parameterMetadataCacheSize,
+    serverName: serverName.toLowerCase()
   };
 }
 

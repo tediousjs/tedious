@@ -9,12 +9,15 @@ describe('validateColumnEncryptionOptions', function() {
   };
 
   it('applies defaults', function() {
-    const options = validateColumnEncryptionOptions({ keyStoreProviders: { AZURE_KEY_VAULT: provider } });
+    const options = validateColumnEncryptionOptions({ keyStoreProviders: { AZURE_KEY_VAULT: provider } }, 'Server.example.com\\Instance');
 
     assert.deepEqual(Array.from(options.keyStoreProviders), [['AZURE_KEY_VAULT', provider]]);
     assert.strictEqual(options.keyCacheTTL, 2 * 60 * 60 * 1000);
     assert.isUndefined(options.trustedKeyPaths);
     assert.strictEqual(options.parameterMetadataCacheSize, 1000);
+
+    // The name of a server is not case sensitive.
+    assert.strictEqual(options.serverName, 'server.example.com\\instance');
   });
 
   it('accepts all options', function() {
@@ -23,7 +26,7 @@ describe('validateColumnEncryptionOptions', function() {
       keyCacheTTL: 0,
       trustedKeyPaths: ['https://Tedious.vault.azure.net/keys/CMK'],
       parameterMetadataCacheSize: 0
-    });
+    }, 'server');
 
     assert.deepEqual(Array.from(options.keyStoreProviders.keys()), ['AZURE_KEY_VAULT', 'CUSTOM']);
     assert.strictEqual(options.keyCacheTTL, 0);
@@ -34,7 +37,7 @@ describe('validateColumnEncryptionOptions', function() {
   it('requires an object', function() {
     for (const options of [null, true, 'enabled']) {
       assert.throws(() => {
-        validateColumnEncryptionOptions(options as any);
+        validateColumnEncryptionOptions(options as any, 'server');
       }, TypeError, 'The "config.options.columnEncryption" property must be of type object.');
     }
   });
@@ -42,13 +45,13 @@ describe('validateColumnEncryptionOptions', function() {
   it('requires key store providers', function() {
     for (const keyStoreProviders of [undefined, null, 'AZURE_KEY_VAULT']) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: keyStoreProviders as any });
+        validateColumnEncryptionOptions({ keyStoreProviders: keyStoreProviders as any }, 'server');
       }, TypeError, 'The "config.options.columnEncryption.keyStoreProviders" property must be of type object.');
     }
 
     for (const invalid of [undefined, null, {}, { decryptColumnEncryptionKey: 'key' }, () => {}]) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: { CUSTOM: invalid as any } });
+        validateColumnEncryptionOptions({ keyStoreProviders: { CUSTOM: invalid as any } }, 'server');
       }, TypeError, 'The "config.options.columnEncryption.keyStoreProviders.CUSTOM" property must be a key store provider: an object with a "decryptColumnEncryptionKey" method.');
     }
   });
@@ -56,7 +59,7 @@ describe('validateColumnEncryptionOptions', function() {
   it('requires a valid lifetime of the key cache', function() {
     for (const keyCacheTTL of [-1, NaN, '1000', null]) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: {}, keyCacheTTL: keyCacheTTL as any });
+        validateColumnEncryptionOptions({ keyStoreProviders: {}, keyCacheTTL: keyCacheTTL as any }, 'server');
       }, TypeError, 'The "config.options.columnEncryption.keyCacheTTL" property must be a non-negative number.');
     }
   });
@@ -64,7 +67,7 @@ describe('validateColumnEncryptionOptions', function() {
   it('requires trusted key paths to be strings', function() {
     for (const trustedKeyPaths of ['key', [1], [undefined], null]) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: {}, trustedKeyPaths: trustedKeyPaths as any });
+        validateColumnEncryptionOptions({ keyStoreProviders: {}, trustedKeyPaths: trustedKeyPaths as any }, 'server');
       }, TypeError, 'The "config.options.columnEncryption.trustedKeyPaths" property must be an array of strings.');
     }
   });
@@ -72,7 +75,7 @@ describe('validateColumnEncryptionOptions', function() {
   it('requires a valid size of the parameter metadata cache', function() {
     for (const parameterMetadataCacheSize of [-1, 1.5, NaN, '10', null]) {
       assert.throws(() => {
-        validateColumnEncryptionOptions({ keyStoreProviders: {}, parameterMetadataCacheSize: parameterMetadataCacheSize as any });
+        validateColumnEncryptionOptions({ keyStoreProviders: {}, parameterMetadataCacheSize: parameterMetadataCacheSize as any }, 'server');
       }, TypeError, 'The "config.options.columnEncryption.parameterMetadataCacheSize" property must be a non-negative integer.');
     }
   });

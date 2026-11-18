@@ -18,33 +18,41 @@ interface CacheEntry {
 const caches = new WeakMap<ColumnEncryptionKeyStoreProvider, Map<string, CacheEntry>>();
 
 /**
- * Makes sure that the `cipher` of each of the given column encryption keys
- * is available, decrypting the keys via their key store providers as
- * needed.
+ * The ciphers of column encryption keys.
+ */
+export type ColumnEncryptionCiphers = Map<ColumnEncryptionKeyInfo, ColumnEncryptionCipher>;
+
+/**
+ * Gets the cipher of each of the given column encryption keys, decrypting
+ * the keys via their key store providers as needed.
  *
  * Only returns a promise if a key store actually has to be accessed, so no
  * time is lost waiting when all keys are cached.
+ *
+ * The ciphers are for whoever asked for them, for as long as they are
+ * needed: the key cache is what decides how long a decrypted key is kept,
+ * so they are not held on to along with the keys.
  */
-export function loadColumnEncryptionKeys(keys: ColumnEncryptionKeyInfo[], options: InternalColumnEncryptionOptions): void | Promise<void> {
+export function loadColumnEncryptionKeys(keys: ColumnEncryptionKeyInfo[], options: InternalColumnEncryptionOptions): ColumnEncryptionCiphers | Promise<ColumnEncryptionCiphers> {
+  const ciphers: ColumnEncryptionCiphers = new Map();
   let pending: Promise<void>[] | undefined;
 
   for (const key of keys) {
-    // Looked up again even if the key already has a cipher (as the keys of
-    // cached parameter metadata do), so that the lifetime of the key cache
-    // applies to them, too.
     const cipher = getCipher(key, options);
     if (cipher instanceof ColumnEncryptionCipher) {
-      key.cipher = cipher;
+      ciphers.set(key, cipher);
     } else {
       (pending ??= []).push(cipher.then((cipher) => {
-        key.cipher = cipher;
+        ciphers.set(key, cipher);
       }));
     }
   }
 
   if (pending !== undefined) {
-    return Promise.all(pending).then(() => {});
+    return Promise.all(pending).then(() => ciphers);
   }
+
+  return ciphers;
 }
 
 // The only version of the rules that values are normalized by before they
@@ -75,7 +83,7 @@ function getCipher(key: ColumnEncryptionKeyInfo, options: InternalColumnEncrypti
   for (const value of key.values) {
     const provider = options.keyStoreProviders.get(value.keyStoreName);
     if (provider !== undefined && isTrustedKeyPath(value.keyPath, options)) {
-      const entry = caches.get(provider)?.get(cacheKey(value));
+      const entry = caches.get(provider)?.get(cacheKey(value, options));
       if (entry !== undefined && entry.cipher !== undefined && now - entry.time < options.keyCacheTTL) {
         return entry.cipher;
       }
@@ -125,7 +133,7 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
   }
 
   const now = Date.now();
-  const key = cacheKey(value);
+  const key = cacheKey(value, options);
 
   const cached = cache.get(key);
   if (cached !== undefined && now - cached.time < options.keyCacheTTL) {
@@ -175,6 +183,9 @@ function isTrustedKeyPath(keyPath: string, options: InternalColumnEncryptionOpti
   return options.trustedKeyPaths === undefined || options.trustedKeyPaths.has(keyPath.toLowerCase());
 }
 
-function cacheKey(value: EncryptedColumnEncryptionKey): string {
-  return `${value.keyPath}\n${value.algorithm}\n${value.encryptedKey.toString('base64')}`;
+// A decrypted key is cached for the server that it was decrypted for, like
+// Microsoft's drivers do: what one server gets a connection to do with a key
+// is of no use to another one.
+function cacheKey(value: EncryptedColumnEncryptionKey, options: InternalColumnEncryptionOptions): string {
+  return `${options.serverName}\n${value.keyPath}\n${value.algorithm}\n${value.encryptedKey.toString('base64')}`;
 }

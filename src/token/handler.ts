@@ -34,8 +34,9 @@ import {
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
-import { assertSupportedEncryption, loadColumnEncryptionKeys } from '../always-encrypted/key-cache';
-import { type ColumnEncryptionKeyInfo } from '../always-encrypted/types';
+import { keyStateOf, releaseCipher, useCipher } from '../always-encrypted/column-decryption';
+import { assertSupportedEncryption, loadColumnEncryptionKeys, type ColumnEncryptionCiphers } from '../always-encrypted/key-cache';
+import { COLUMN_ENCRYPTION_VERSION, type ColumnEncryptionKeyInfo } from '../always-encrypted/types';
 import { decryptValue } from '../value-parser';
 
 export class UnexpectedTokenError extends Error {
@@ -357,10 +358,18 @@ export class Login7TokenHandler extends TokenHandler {
       this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');
     }
 
-    // From here on, the server sends encryption metadata along with the
-    // metadata of columns and return values.
-    if (token.columnEncryptionVersion !== undefined && token.columnEncryptionVersion >= 1 && this.connection.config.options.columnEncryption !== undefined) {
-      this.connection.config.options.serverSupportsColumnEncryption = true;
+    if (token.columnEncryptionVersion !== undefined && this.connection.config.options.columnEncryption !== undefined) {
+      // The server acknowledges the version it is going to use: the one
+      // that was asked for, or an earlier one. There is no earlier one, and
+      // a later one would come with data that is not known how to read, so
+      // the connection is only made use of for the version asked for.
+      this.connection.serverColumnEncryptionVersion = token.columnEncryptionVersion;
+
+      // From here on, the server sends encryption metadata along with the
+      // metadata of columns and return values.
+      if (token.columnEncryptionVersion === COLUMN_ENCRYPTION_VERSION) {
+        this.connection.config.options.serverSupportsColumnEncryption = true;
+      }
     }
   }
 
@@ -530,6 +539,8 @@ export class RequestTokenHandler extends TokenHandler {
       }
     }
 
+    this.releaseColumnEncryptionCiphers();
+
     this.columnEncryptionKeys = token.columnEncryptionKeys;
     this.decryptionFailed = false;
 
@@ -554,8 +565,8 @@ export class RequestTokenHandler extends TokenHandler {
       return this.onDecryptionError(error);
     }
 
-    if (loading === undefined) {
-      return;
+    if (loading instanceof Map) {
+      return this.useColumnEncryptionCiphers(loading);
     }
 
     // A key store is being accessed, which takes time - during which the
@@ -572,7 +583,7 @@ export class RequestTokenHandler extends TokenHandler {
       };
       request.once('cancel', onCancel);
 
-      const onLoaded = (error?: Error) => {
+      const onLoaded = (error: Error | undefined, ciphers?: ColumnEncryptionCiphers) => {
         if (canceled) {
           return;
         }
@@ -587,13 +598,39 @@ export class RequestTokenHandler extends TokenHandler {
 
         if (error !== undefined) {
           this.onDecryptionError(error);
+        } else {
+          this.useColumnEncryptionCiphers(ciphers!);
         }
 
         resolve();
       };
 
-      loading.then(() => onLoaded(), onLoaded);
+      loading.then((ciphers) => onLoaded(undefined, ciphers), onLoaded);
     });
+  }
+
+  /**
+   * Makes the ciphers available that the values of the current result set
+   * are decrypted with as its rows are parsed.
+   */
+  useColumnEncryptionCiphers(ciphers: ColumnEncryptionCiphers) {
+    for (const [key, cipher] of ciphers) {
+      useCipher(key, cipher);
+    }
+  }
+
+  /**
+   * Lets go of the ciphers of the current result set, whose rows were all
+   * read.
+   */
+  releaseColumnEncryptionCiphers() {
+    if (this.columnEncryptionKeys !== undefined) {
+      for (const key of this.columnEncryptionKeys) {
+        releaseCipher(key);
+      }
+
+      this.columnEncryptionKeys = undefined;
+    }
   }
 
   /**
@@ -634,8 +671,9 @@ export class RequestTokenHandler extends TokenHandler {
   rowsDecrypted(): boolean {
     if (this.columnEncryptionKeys !== undefined && !this.decryptionFailed) {
       for (const key of this.columnEncryptionKeys) {
-        if (key.error !== undefined) {
-          this.onDecryptionError(key.error);
+        const error = keyStateOf(key)?.error;
+        if (error !== undefined) {
+          this.onDecryptionError(error);
           break;
         }
       }
@@ -701,6 +739,8 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onDoneProc(token: DoneProcToken) {
+    this.releaseColumnEncryptionCiphers();
+
     if (!this.request.canceled) {
       if (token.sqlError && !this.request.error) {
         // check if the DONE_ERROR flags was set, but an ERROR token was not sent.
@@ -722,6 +762,8 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onDoneInProc(token: DoneInProcToken) {
+    this.releaseColumnEncryptionCiphers();
+
     if (!this.request.canceled) {
       this.request.emit('doneInProc', token.rowCount, token.more, this.request.rst);
 
@@ -736,6 +778,8 @@ export class RequestTokenHandler extends TokenHandler {
   }
 
   onDone(token: DoneToken) {
+    this.releaseColumnEncryptionCiphers();
+
     if (!this.request.canceled) {
       if (token.sqlError && !this.request.error) {
         // check if the DONE_ERROR flags was set, but an ERROR token was not sent.

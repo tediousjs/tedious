@@ -5,6 +5,7 @@ import { TYPE } from './data-type';
 import iconv from 'iconv-lite';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { type ColumnEncryptionCipher } from './always-encrypted/cipher';
+import { isPLP, keyStateOf } from './always-encrypted/column-decryption';
 import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
 const NULL = (1 << 16) - 1;
@@ -403,7 +404,7 @@ function isPLPStream(metadata: Metadata) {
   // Encrypted values are sent as `varbinary` values, whatever the type of
   // the decrypted values is.
   if (metadata.cryptoMetadata !== undefined) {
-    return metadata.cryptoMetadata.isPLP;
+    return isPLP(metadata.cryptoMetadata);
   }
 
   switch (metadata.type.name) {
@@ -464,15 +465,16 @@ function readEncryptedValue(buf: Buffer, offset: number, metadata: Metadata, opt
  */
 function decryptColumnValue(encryptedValue: Buffer, metadata: Metadata, options: ParserOptions): unknown {
   const key = metadata.cryptoMetadata!.key;
-  if (key === undefined || key.cipher === undefined) {
+  const state = key !== undefined ? keyStateOf(key) : undefined;
+  if (state === undefined || state.cipher === undefined) {
     return encryptedValue;
   }
 
   try {
-    return decryptValue(encryptedValue, metadata, key.cipher, options);
+    return decryptValue(encryptedValue, metadata, state.cipher, options);
   } catch (error: any) {
-    key.cipher = undefined;
-    key.error = error;
+    state.cipher = undefined;
+    state.error = error;
 
     return encryptedValue;
   }

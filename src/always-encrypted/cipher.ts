@@ -186,13 +186,21 @@ export class ColumnEncryptionCipher {
     // to is of no use.
     const blocks = this.decipher.update(cell.subarray(IV_OFFSET));
 
-    // The cipher is never finalized, so the padding is removed here.
+    // The cipher is never finalized, so the padding is checked and removed
+    // here: PKCS#7 pads with as many bytes as each of them says.
     const paddingLength = blocks[blocks.length - 1];
+    const end = blocks.length - paddingLength;
     if (paddingLength < 1 || paddingLength > BLOCK_LENGTH) {
       throw new Error('The encrypted value has an invalid padding.');
     }
 
-    return blocks.subarray(BLOCK_LENGTH, blocks.length - paddingLength);
+    for (let i = end; i < blocks.length - 1; i++) {
+      if (blocks[i] !== paddingLength) {
+        throw new Error('The encrypted value has an invalid padding.');
+      }
+    }
+
+    return blocks.subarray(BLOCK_LENGTH, end);
   }
 
   /**

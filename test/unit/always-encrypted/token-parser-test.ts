@@ -2,6 +2,7 @@ import { assert } from 'chai';
 import { randomBytes } from 'crypto';
 
 import { ColumnEncryptionCipher } from '../../../src/always-encrypted/cipher';
+import { keyStateOf, useCipher } from '../../../src/always-encrypted/column-decryption';
 import { validateColumnEncryptionOptions } from '../../../src/always-encrypted/options';
 import Connection from '../../../src/connection';
 import Debug from '../../../src/debug';
@@ -11,8 +12,11 @@ import { RequestTokenHandler, TokenHandler } from '../../../src/token/handler';
 import StreamParser, { type ParserOptions } from '../../../src/token/stream-parser';
 import { Parser as TokenStreamParser } from '../../../src/token/token-stream-parser';
 import { ColMetadataToken, NBCRowToken, ReturnValueToken, RowToken, type DoneToken, type Token } from '../../../src/token/token';
+import { type ColumnMetadata } from '../../../src/token/colmetadata-token-parser';
+import { type ColumnEncryptionKeyInfo } from '../../../src/always-encrypted/types';
 import { type Column } from '../../../src/token/row-token-parser';
 import WritableTrackingBuffer from '../../../src/tracking-buffer/writable-tracking-buffer';
+import { isPLPStream } from '../../../src/value-parser';
 
 const FLAG_NULLABLE = 0x0001;
 const FLAG_ENCRYPTED = 0x0800;
@@ -27,7 +31,7 @@ const columnEncryption = validateColumnEncryptionOptions({
     TEST: { decryptColumnEncryptionKey: (masterKeyPath, encryptionAlgorithm, encryptedKey) => encryptedKey }
   },
   keyCacheTTL: 0
-});
+}, 'server');
 
 const options: ParserOptions = {
   tdsVersion: '7_4',
@@ -244,8 +248,8 @@ describe('parsing tokens with column encryption', function() {
       const { columns, columnEncryptionKeys } = token as ColMetadataToken;
 
       assert.deepEqual(columnEncryptionKeys, [
-        { databaseId: 5, keyId: 100, keyVersion: 1, metadataVersion: Buffer.from('1122334455667788', 'hex'), values: [key, rotatedKey], cipher: undefined },
-        { databaseId: 5, keyId: 101, keyVersion: 1, metadataVersion: Buffer.from('1122334455667788', 'hex'), values: [rotatedKey], cipher: undefined }
+        { databaseId: 5, keyId: 100, keyVersion: 1, metadataVersion: Buffer.from('1122334455667788', 'hex'), values: [key, rotatedKey] },
+        { databaseId: 5, keyId: 101, keyVersion: 1, metadataVersion: Buffer.from('1122334455667788', 'hex'), values: [rotatedKey] }
       ]);
 
       assert.deepEqual(columns.map((column) => column.colName), ['id', 'ssn', 'salary', 'notes']);
@@ -257,11 +261,15 @@ describe('parsing tokens with column encryption', function() {
       assert.deepEqual(columns.map((column) => column.flags & FLAG_ENCRYPTED), [0, FLAG_ENCRYPTED, FLAG_ENCRYPTED, FLAG_ENCRYPTED]);
 
       assert.isUndefined(columns[0].cryptoMetadata);
-      assert.deepEqual(columns[1].cryptoMetadata, { key: columnEncryptionKeys![0], encryptionType: 'deterministic', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1, isPLP: false });
-      assert.deepEqual(columns[2].cryptoMetadata, { key: columnEncryptionKeys![1], encryptionType: 'randomized', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1, isPLP: false });
-      assert.deepEqual(columns[3].cryptoMetadata, { key: columnEncryptionKeys![0], encryptionType: 'randomized', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1, isPLP: true });
+      assert.deepEqual(columns[1].cryptoMetadata, { key: columnEncryptionKeys![0], encryptionType: 'deterministic', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1 });
+      assert.deepEqual(columns[2].cryptoMetadata, { key: columnEncryptionKeys![1], encryptionType: 'randomized', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1 });
+      assert.deepEqual(columns[3].cryptoMetadata, { key: columnEncryptionKeys![0], encryptionType: 'randomized', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1 });
 
-      // The keys refer to the very objects that the keys are loaded into.
+      // Whether the encrypted values are sent as PLP values is not part of
+      // what describes a column.
+      assert.deepEqual(columns.map(isPLPStream), [undefined, false, false, true]);
+
+      // The keys refer to the very objects that ciphers are made available for.
       assert.strictEqual(columns[1].cryptoMetadata!.key, columnEncryptionKeys![0]);
     }
 
@@ -365,11 +373,11 @@ describe('parsing tokens with column encryption', function() {
      */
     function decrypt(typeInfo: string, value: Buffer | null, parserOptions = options): unknown {
       const { parser, tokens: [metadata] } = parse(colMetadata([[key]], [{ name: 'value', typeInfo, encrypted: {} }]), parserOptions);
-      (metadata as ColMetadataToken).columnEncryptionKeys![0].cipher = cipher;
+      useCipher((metadata as ColMetadataToken).columnEncryptionKeys![0], cipher);
 
       const [token] = parseMore(parser, row(varbinary(value)));
 
-      const { error } = (metadata as ColMetadataToken).columnEncryptionKeys![0];
+      const { error } = keyStateOf((metadata as ColMetadataToken).columnEncryptionKeys![0])!;
       if (error !== undefined) {
         throw error;
       }
@@ -554,8 +562,9 @@ describe('parsing tokens with column encryption', function() {
       ]));
 
       const [first, second] = (metadata as ColMetadataToken).columnEncryptionKeys!;
-      first.cipher = cipher;
-      second.cipher = new ColumnEncryptionCipher(Buffer.alloc(32, 0x02));
+      const secondCipher = new ColumnEncryptionCipher(Buffer.alloc(32, 0x02));
+      useCipher(first, cipher);
+      useCipher(second, secondCipher);
 
       const name = Buffer.from('Jane', 'ucs2');
       const data = Buffer.concat([
@@ -563,7 +572,7 @@ describe('parsing tokens with column encryption', function() {
           Buffer.from('01000000', 'hex'),
           varbinary(cipher.encrypt(Buffer.from('795-73-9838'), true)),
           varbinary(name),
-          varbinary(second.cipher.encrypt(Buffer.from('2a00000000000000', 'hex'), false))
+          varbinary(secondCipher.encrypt(Buffer.from('2a00000000000000', 'hex'), false))
         ),
         row(Buffer.from('02000000', 'hex'), varbinary(null), varbinary(null), varbinary(null))
       ]);
@@ -586,7 +595,7 @@ describe('parsing tokens with column encryption', function() {
         { name: 'c', typeInfo: 'e7ffff' + COLLATION, encrypted: { typeInfo: VARBINARY_MAX } },
         { name: 'd', typeInfo: '2604', encrypted: {} }
       ]));
-      (metadata as ColMetadataToken).columnEncryptionKeys![0].cipher = cipher;
+      useCipher((metadata as ColMetadataToken).columnEncryptionKeys![0], cipher);
 
       // The first and third column are `null`.
       const data = Buffer.concat([Buffer.from([0xD2, 0b0101]), varbinary(encrypt('0200000000000000')), varbinary(encrypt('0400000000000000'))]);
@@ -610,7 +619,7 @@ describe('parsing tokens with column encryption', function() {
         { name: 'd', typeInfo: '2604', encrypted: { typeInfo: VARBINARY_MAX } },
         { name: 'e', typeInfo: 'e7ffff' + COLLATION, encrypted: { typeInfo: VARBINARY_MAX } }
       ]));
-      (metadata as ColMetadataToken).columnEncryptionKeys![0].cipher = cipher;
+      useCipher((metadata as ColMetadataToken).columnEncryptionKeys![0], cipher);
 
       const text = 'hello wörld ☃ '.repeat(1000);
       const binary = randomBytes(20000);
@@ -666,8 +675,8 @@ describe('parsing tokens with column encryption', function() {
       ]));
 
       const [first, second] = (metadata as ColMetadataToken).columnEncryptionKeys!;
-      first.cipher = cipher;
-      second.cipher = cipher;
+      useCipher(first, cipher);
+      useCipher(second, cipher);
 
       const valid = encrypt('2a00000000000000');
       const text = cipher.encrypt(Buffer.from('secret', 'ucs2'), false);
@@ -687,11 +696,11 @@ describe('parsing tokens with column encryption', function() {
       assert.deepEqual(values(tokens[1]), [tampered, 42, text]);
       assert.deepEqual(values(tokens[2]), [valid, 42, text]);
 
-      assert.strictEqual(first.error!.message, 'The encrypted value has an invalid authentication tag.');
-      assert.isUndefined(first.cipher);
+      assert.strictEqual(keyStateOf(first)!.error!.message, 'The encrypted value has an invalid authentication tag.');
+      assert.isUndefined(keyStateOf(first)!.cipher);
 
-      assert.isUndefined(second.error);
-      assert.strictEqual(second.cipher, cipher);
+      assert.isUndefined(keyStateOf(second)!.error);
+      assert.strictEqual(keyStateOf(second)!.cipher, cipher);
 
       parser.end();
     });
@@ -728,7 +737,7 @@ describe('parsing tokens with column encryption', function() {
         assert.strictEqual(token.paramName, 'salary');
         assert.strictEqual(token.paramOrdinal, 3);
         assert.strictEqual(token.metadata.type.name, 'IntN');
-        assert.deepEqual(token.metadata.cryptoMetadata, { key: undefined, encryptionType: 'randomized', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1, isPLP: false });
+        assert.deepEqual(token.metadata.cryptoMetadata, { key: undefined, encryptionType: 'randomized', algorithmId: 2, algorithmName: undefined, normalizationRuleVersion: 1 });
         assert.deepEqual(token.value, encrypted);
 
         parser.end();
@@ -743,7 +752,7 @@ describe('parsing tokens with column encryption', function() {
         const { tokens: [token] } = parse(chunks);
 
         assert.strictEqual((token as ReturnValueToken).metadata.type.name, 'NVarChar');
-        assert.isTrue((token as ReturnValueToken).metadata.cryptoMetadata!.isPLP);
+        assert.isTrue(isPLPStream((token as ReturnValueToken).metadata));
         assert.deepEqual((token as ReturnValueToken).value, encrypted);
       }
     });
@@ -821,7 +830,7 @@ describe('handling tokens with column encryption', function() {
             }
           }
         }
-      })
+      }, 'server')
     };
 
     const result = handle(Buffer.concat([metadata, rows, done]), parserOptions);
@@ -835,6 +844,38 @@ describe('handling tokens with column encryption', function() {
     assert.deepEqual(decrypted, [[1, 42], [2, 43]]);
   });
 
+  it('lets go of the ciphers of a result set once its rows were read', async function() {
+    const keys: (ColumnEncryptionKeyInfo | undefined)[] = [];
+    const ciphers: (ColumnEncryptionCipher | undefined)[] = [];
+
+    // Two result sets, with the description of their columns being kept.
+    const { rows: decrypted } = await handle(Buffer.concat([metadata, rows, done, metadata, rows, done]), options, (request) => {
+      request.on('columnMetadata', (columns) => {
+        keys.push((columns as ColumnMetadata[])[1].cryptoMetadata!.key);
+      });
+
+      request.on('row', () => {
+        ciphers.push(keyStateOf(keys[keys.length - 1]!)?.cipher);
+      });
+    });
+
+    assert.deepEqual(decrypted, [[1, 42], [2, 43], [1, 42], [2, 43]]);
+
+    // Each result set has keys of its own, which had a cipher while its
+    // rows were read ...
+    assert.lengthOf(keys, 2);
+    assert.notStrictEqual(keys[0], keys[1]);
+
+    assert.lengthOf(ciphers, 4);
+    for (const cipher of ciphers) {
+      assert.instanceOf(cipher, ColumnEncryptionCipher);
+    }
+
+    // ... but not anymore.
+    assert.isUndefined(keyStateOf(keys[0]!));
+    assert.isUndefined(keyStateOf(keys[1]!));
+  });
+
   it('fails the request if a column encryption key can not be loaded, and skips the rows of its result set', async function() {
     const parserOptions = {
       ...options,
@@ -846,7 +887,7 @@ describe('handling tokens with column encryption', function() {
             }
           }
         }
-      })
+      }, 'server')
     };
 
     // The result set is followed by one without encrypted columns.
@@ -904,7 +945,7 @@ describe('handling tokens with column encryption', function() {
           }
         },
         keyCacheTTL: 0
-      })
+      }, 'server')
     };
 
     const { rows: emitted } = await handle(Buffer.concat([metadata, rows, done]), parserOptions, (request) => {

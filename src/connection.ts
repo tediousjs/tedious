@@ -40,10 +40,10 @@ import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
-import { loadColumnEncryptionKeys } from './always-encrypted/key-cache';
+import { loadColumnEncryptionKeys, type ColumnEncryptionCiphers } from './always-encrypted/key-cache';
 import { validateColumnEncryptionOptions } from './always-encrypted/options';
 import { createDescribeRequest, describeStatement, encryptParameters, ParameterEncryptionMetadataCache, type ParameterEncryptionMetadata } from './always-encrypted/parameter-encryption';
-import { type ColumnEncryptionOptions, type InternalColumnEncryptionOptions } from './always-encrypted/types';
+import { COLUMN_ENCRYPTION_VERSION, type ColumnEncryptionOptions, type InternalColumnEncryptionOptions } from './always-encrypted/types';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
@@ -1077,6 +1077,14 @@ class Connection extends EventEmitter {
   declare pendingRequest: undefined | { request: Request, describeRequest: Request | undefined, abort: (error: Error) => void };
 
   /**
+   * The version of column encryption that the server acknowledged when
+   * logging in, if it was asked for.
+   *
+   * @private
+   */
+  declare serverColumnEncryptionVersion: undefined | number;
+
+  /**
    * How the parameters of the statements that were executed need to be
    * encrypted, if Always Encrypted is enabled.
    *
@@ -1084,10 +1092,6 @@ class Connection extends EventEmitter {
    */
   declare parameterEncryptionCache: undefined | ParameterEncryptionMetadataCache;
 
-  /**
-   * @private
-   */
-  declare encryptedValuesParserOptions: undefined | ParserOptions;
   /**
    * @private
    */
@@ -1452,10 +1456,6 @@ class Connection extends EventEmitter {
         this.config.options.cancelTimeout = config.options.cancelTimeout;
       }
 
-      if (config.options.columnEncryption !== undefined) {
-        this.config.options.columnEncryption = validateColumnEncryptionOptions(config.options.columnEncryption);
-      }
-
       if (config.options.columnNameReplacer) {
         if (typeof config.options.columnNameReplacer !== 'function') {
           throw new TypeError('The "config.options.cancelTimeout" property must be of type function.');
@@ -1777,10 +1777,6 @@ class Connection extends EventEmitter {
         this.config.options.tdsVersion = config.options.tdsVersion;
       }
 
-      if (this.config.options.columnEncryption !== undefined && this.config.options.tdsVersion < '7_4') {
-        throw new TypeError('The "config.options.columnEncryption" property requires "config.options.tdsVersion" to be "7_4".');
-      }
-
       if (config.options.textsize !== undefined) {
         if (typeof config.options.textsize !== 'number' && config.options.textsize !== null) {
           throw new TypeError('The "config.options.textsize" property must be of type number or null.');
@@ -1843,6 +1839,19 @@ class Connection extends EventEmitter {
       }
     }
 
+    if (config.options?.columnEncryption !== undefined) {
+      // Validated last, as it takes the server that the connection is made
+      // to, which the other options are part of.
+      const { instanceName, port, tdsVersion } = this.config.options;
+      const serverName = `${this.config.server}${instanceName ? '\\' + instanceName : ''}${port ? ':' + port : ''}`;
+
+      this.config.options.columnEncryption = validateColumnEncryptionOptions(config.options.columnEncryption, serverName);
+
+      if (tdsVersion < '7_4') {
+        throw new TypeError('The "config.options.columnEncryption" property requires "config.options.tdsVersion" to be "7_4".');
+      }
+    }
+
     this.secureContextOptions = this.config.options.cryptoCredentialsDetails;
     if (this.secureContextOptions.secureOptions === undefined) {
       // If the caller has not specified their own `secureOptions`,
@@ -1870,7 +1879,6 @@ class Connection extends EventEmitter {
     this.isSqlBatch = false;
     this.pendingRequest = undefined;
     this.parameterEncryptionCache = undefined;
-    this.encryptedValuesParserOptions = undefined;
     this.closed = false;
     this.messageBuffer = Buffer.alloc(0);
 
@@ -2229,6 +2237,11 @@ class Connection extends EventEmitter {
           // Without the server's support, values would silently be sent and
           // returned as they are.
           if (this.config.options.columnEncryption !== undefined && !this.config.options.serverSupportsColumnEncryption) {
+            const version = this.serverColumnEncryptionVersion;
+            if (version !== undefined) {
+              throw new ConnectionError(`The server acknowledged version ${version} of column encryption, but version ${COLUMN_ENCRYPTION_VERSION} was asked for.`, 'ECOLUMNENCRYPTION');
+            }
+
             throw new ConnectionError('The server does not support Always Encrypted, which the "columnEncryption" option asks for.', 'ECOLUMNENCRYPTION');
           }
 
@@ -2312,7 +2325,7 @@ class Connection extends EventEmitter {
     // The encrypted values in the response of a request that opted out of
     // column encryption are left as they are.
     if (this.config.options.columnEncryption !== undefined && request instanceof Request && request.columnEncryption === 'disabled') {
-      return this.encryptedValuesParserOptions ??= { ...this.config.options, columnEncryption: undefined };
+      return { ...this.config.options, columnEncryption: undefined };
     }
 
     return this.config.options;
@@ -2958,7 +2971,7 @@ class Connection extends EventEmitter {
 
     // The last step: encrypts the parameters and sends the request, or
     // fails the request if it did not get this far.
-    const encryptAndSend = (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata) => {
+    const encryptAndSend = (error: Error | null | undefined, metadata?: ParameterEncryptionMetadata, ciphers?: ColumnEncryptionCiphers) => {
       if (settled) {
         return;
       }
@@ -2972,19 +2985,20 @@ class Connection extends EventEmitter {
         return fail(error);
       }
 
-      const ciphers = new Map();
+      // The ciphers that decrypt the values of encrypted output parameters.
+      const outputCiphers = new Map();
 
       // The parameters of the request follow those of the procedure.
       const offset = parameters.length - request.parameters.length;
 
       let encryptedParameters;
       try {
-        encryptedParameters = encryptParameters(request.parameters, parameters.slice(offset), metadata!, ciphers, this.config.options);
+        encryptedParameters = encryptParameters(request.parameters, parameters.slice(offset), metadata!, ciphers!, outputCiphers, this.config.options);
       } catch (error: any) {
         return fail(new RequestError(error.message, 'ECOLUMNENCRYPTION', { cause: error }));
       }
 
-      request.parameterEncryption = { cacheKey, ciphers };
+      request.parameterEncryption = { cacheKey, ciphers: outputCiphers };
       send([...parameters.slice(0, offset), ...encryptedParameters]);
     };
 
@@ -3052,8 +3066,8 @@ class Connection extends EventEmitter {
         return failed(error);
       }
 
-      if (loading === undefined) {
-        return encryptAndSend(null, metadata);
+      if (loading instanceof Map) {
+        return encryptAndSend(null, metadata, loading);
       }
 
       // The time a key store takes counts towards the request's timeout.
@@ -3066,8 +3080,8 @@ class Connection extends EventEmitter {
 
       // Continued outside of the promise, so that an exception thrown by a
       // callback of the request is not turned into a rejection.
-      loading.then(() => {
-        process.nextTick(encryptAndSend, null, metadata);
+      loading.then((ciphers) => {
+        process.nextTick(encryptAndSend, null, metadata, ciphers);
       }, (error) => {
         process.nextTick(failed, error);
       });
