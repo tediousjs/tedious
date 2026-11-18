@@ -1,3 +1,5 @@
+import { endianness } from 'os';
+
 import { type DataType, type Parameter, type ParameterData } from '../data-type';
 
 // SQL Server `vector` data type (VECTORTYPE, 0xF5).
@@ -13,9 +15,8 @@ import { type DataType, type Parameter, type ParameterData } from '../data-type'
 // VECTORSUPPORT feature extension was negotiated at login; without it,
 // `vector` values are exchanged as JSON array text in `varchar(max)`.
 //
-// There is a single `TYPES.Vector` data type. Its base type (`float32` or
-// `float16`), selected with the `baseType` option, determines the dimension
-// type byte, the element encoding and the maximum number of dimensions.
+// Values are typed arrays: a `Float32Array` for `vector(n)` and a
+// `Float16Array` for `vector(n, float16)`.
 
 const VECTOR_TYPE_ID = 0xF5;
 
@@ -33,6 +34,8 @@ const NULL_LENGTH = Buffer.from([0xFF, 0xFF]);
  * The largest value (header and elements) a `vector` can hold.
  */
 const MAX_VECTOR_LENGTH = 8000;
+
+const IS_LITTLE_ENDIAN = endianness() === 'LE';
 
 /**
  * Versions of the VECTORSUPPORT feature extension.
@@ -52,11 +55,26 @@ const VECTOR_DIMENSION_TYPE = {
   FLOAT16: 0x01
 } as const;
 
+// TypeScript's ES2024 library has no `Float16Array`, and Node.js 22 does not
+// provide it at runtime.
+interface Float16ArrayValue extends ArrayBufferView, ArrayLike<number> {}
+
+interface Float16ArrayConstructorLike {
+  new(buffer: ArrayBufferLike): Float16ArrayValue;
+}
+
+const Float16ArrayConstructor = (globalThis as typeof globalThis & { Float16Array?: Float16ArrayConstructorLike }).Float16Array;
+
 /**
- * A `vector` parameter, column or cell value: an array of numbers, or a
- * `Float32Array`. One element per dimension.
+ * Whether this version of Node.js has `Float16Array`, which is required for
+ * `float16` vectors.
  */
-type VectorValue = number[] | Float32Array;
+export const FLOAT16_ARRAY_SUPPORTED = typeof Float16ArrayConstructor === 'function';
+
+/**
+ * A `vector` value: one element per dimension.
+ */
+type VectorValue = Float32Array | Float16ArrayValue;
 
 /**
  * The base type of a `vector`'s elements, as in `vector(n, float16)`.
@@ -72,93 +90,9 @@ interface ElementType {
   minVersion: number;
   // The T-SQL base type, as used in a declaration.
   baseType: VectorBaseType;
-  // Rounds a number to the element type's precision.
-  round(value: number): number;
-  write(buffer: Buffer, value: number, offset: number): void;
-  read(buffer: Buffer, offset: number): number;
-}
-
-const FLOAT16_MIN_NORMAL = 2 ** -14;
-const FLOAT16_MIN_SUBNORMAL = 2 ** -24;
-// Values of this magnitude or above round to infinity (65504 is the largest
-// finite float16, 65536 the next power of two; 65520 is halfway between).
-const FLOAT16_OVERFLOW = 65520;
-
-// Rounds to the nearest integer, ties to even, like IEEE 754 does.
-function roundHalfEven(value: number): number {
-  const floor = Math.floor(value);
-  const fraction = value - floor;
-  if (fraction > 0.5) {
-    return floor + 1;
-  }
-  if (fraction < 0.5) {
-    return floor;
-  }
-  return floor % 2 === 0 ? floor : floor + 1;
-}
-
-/**
- * Encodes a number as an IEEE 754 half-precision (binary16) float, rounding
- * to nearest, ties to even.
- */
-function toFloat16Bits(value: number): number {
-  if (Number.isNaN(value)) {
-    return 0x7E00;
-  }
-
-  const sign = value < 0 || Object.is(value, -0) ? 0x8000 : 0;
-  const abs = Math.abs(value);
-
-  if (abs >= FLOAT16_OVERFLOW) {
-    return sign | 0x7C00;
-  }
-
-  if (abs < FLOAT16_MIN_NORMAL) {
-    // Subnormal (or zero). Rounding up to 0x400 yields the smallest normal
-    // number, which is the correct encoding.
-    return sign | roundHalfEven(abs / FLOAT16_MIN_SUBNORMAL);
-  }
-
-  let exponent = Math.floor(Math.log2(abs));
-  // `Math.log2` may be off by one close to powers of two.
-  if (2 ** exponent > abs) {
-    exponent--;
-  } else if (2 ** (exponent + 1) <= abs) {
-    exponent++;
-  }
-
-  // Exact: dividing by a power of two, subtracting 1 from a value in [1, 2)
-  // and multiplying by a power of two do not round.
-  let mantissa = roundHalfEven((abs / 2 ** exponent - 1) * 1024);
-  if (mantissa === 1024) {
-    mantissa = 0;
-    exponent++;
-  }
-
-  if (exponent > 15) {
-    return sign | 0x7C00;
-  }
-
-  return sign | ((exponent + 15) << 10) | mantissa;
-}
-
-/**
- * Decodes an IEEE 754 half-precision (binary16) float.
- */
-function fromFloat16Bits(bits: number): number {
-  const sign = bits & 0x8000 ? -1 : 1;
-  const exponent = (bits >> 10) & 0x1F;
-  const mantissa = bits & 0x3FF;
-
-  if (exponent === 0) {
-    return sign * mantissa * FLOAT16_MIN_SUBNORMAL;
-  }
-
-  if (exponent === 0x1F) {
-    return mantissa === 0 ? sign * Infinity : NaN;
-  }
-
-  return sign * (1 + mantissa / 1024) * 2 ** (exponent - 15);
+  isValue(value: unknown): value is VectorValue;
+  createValue(buffer: ArrayBuffer): VectorValue;
+  swapBytes(buffer: Buffer): void;
 }
 
 const FLOAT32: ElementType = {
@@ -167,12 +101,14 @@ const FLOAT32: ElementType = {
   maxDimensions: (MAX_VECTOR_LENGTH - VECTOR_HEADER_LENGTH) / 4,
   minVersion: VECTOR_SUPPORT_VERSION.V1,
   baseType: 'float32',
-  round: Math.fround,
-  write(buffer, value, offset) {
-    buffer.writeFloatLE(value, offset);
+  isValue(value): value is Float32Array {
+    return value instanceof Float32Array;
   },
-  read(buffer, offset) {
-    return buffer.readFloatLE(offset);
+  createValue(buffer) {
+    return new Float32Array(buffer);
+  },
+  swapBytes(buffer) {
+    buffer.swap32();
   }
 };
 
@@ -182,14 +118,18 @@ const FLOAT16: ElementType = {
   maxDimensions: (MAX_VECTOR_LENGTH - VECTOR_HEADER_LENGTH) / 2,
   minVersion: VECTOR_SUPPORT_VERSION.V2,
   baseType: 'float16',
-  round(value) {
-    return fromFloat16Bits(toFloat16Bits(value));
+  isValue(value): value is Float16ArrayValue {
+    return Float16ArrayConstructor !== undefined && value instanceof Float16ArrayConstructor;
   },
-  write(buffer, value, offset) {
-    buffer.writeUInt16LE(toFloat16Bits(value), offset);
+  createValue(buffer) {
+    if (Float16ArrayConstructor === undefined) {
+      throw new Error('Cannot decode a float16 vector because Float16Array is not available in this version of Node.js.');
+    }
+
+    return new Float16ArrayConstructor(buffer);
   },
-  read(buffer, offset) {
-    return fromFloat16Bits(buffer.readUInt16LE(offset));
+  swapBytes(buffer) {
+    buffer.swap16();
   }
 };
 
@@ -207,6 +147,31 @@ function elementTypeForBaseType(baseType: unknown): ElementType {
   }
 }
 
+function elementTypeForValue(value: unknown): ElementType | undefined {
+  if (FLOAT32.isValue(value)) {
+    return FLOAT32;
+  }
+
+  if (FLOAT16.isValue(value)) {
+    return FLOAT16;
+  }
+
+  return undefined;
+}
+
+// A typed array value determines its own base type. An explicit `baseType`
+// is only needed when there is no value, and must match a value if given.
+function elementTypeForParameter(baseType: unknown, value: unknown): ElementType {
+  const explicit = baseType == null ? undefined : elementTypeForBaseType(baseType);
+  const fromValue = elementTypeForValue(value);
+
+  if (explicit !== undefined && fromValue !== undefined && explicit !== fromValue) {
+    throw new TypeError(`Invalid vector: a ${fromValue.baseType} value does not match the ${explicit.baseType} base type.`);
+  }
+
+  return fromValue ?? explicit ?? FLOAT32;
+}
+
 /**
  * Validates a `baseType` option and returns the base type it selects:
  * `float32` if it is not given.
@@ -215,49 +180,29 @@ export function validateVectorBaseType(baseType: unknown): VectorBaseType {
   return elementTypeForBaseType(baseType).baseType;
 }
 
-// Checks that a value is a vector: an array of finite numbers or a
-// `Float32Array`, with at least one element. Whether it fits a base type is
-// checked by `validateForBaseType` once the base type is known: by `resolve`
-// for parameters, and by `writeValue` for bulk load and TVP cells.
 function validateVector(value: unknown): VectorValue | null {
   if (value == null) {
     return null;
   }
 
-  if (!Array.isArray(value) && !(value instanceof Float32Array)) {
-    throw new TypeError('Invalid vector: the value must be an array of numbers or a Float32Array.');
+  if (elementTypeForValue(value) === undefined) {
+    throw new TypeError('Invalid vector: the value must be a Float32Array or a Float16Array.');
   }
 
-  if (value.length === 0) {
+  const vector = value as VectorValue;
+  if (vector.length === 0) {
     throw new TypeError('Invalid vector: a vector must have at least one dimension.');
   }
 
   // Error messages name the offending index, but do not quote the value:
   // they end up in the `EPARAM` error and the debug log.
-  for (let i = 0, len = value.length; i < len; i++) {
-    const element: unknown = value[i];
-    if (typeof element !== 'number') {
-      throw new TypeError(`Invalid vector: the element at index ${i} is not a number.`);
-    }
-
-    if (!Number.isFinite(element)) {
+  for (let i = 0, len = vector.length; i < len; i++) {
+    if (!Number.isFinite(vector[i])) {
       throw new TypeError(`Invalid vector: the element at index ${i} is not a finite number.`);
     }
   }
 
-  return value;
-}
-
-// Checks a vector against a base type: its number of dimensions, and that
-// no element rounds to infinity.
-function validateForBaseType(value: VectorValue, elementType: ElementType) {
-  validateDimensions(value.length, elementType);
-
-  for (let i = 0, len = value.length; i < len; i++) {
-    if (!Number.isFinite(elementType.round(value[i]))) {
-      throw new TypeError(`Invalid vector: the element at index ${i} is out of range for ${elementType.baseType}.`);
-    }
-  }
+  return vector;
 }
 
 function validateDimensions(dimensions: number, elementType: ElementType) {
@@ -286,6 +231,7 @@ function resolveDimensions(parameter: Pick<ParameterData, 'length' | 'value'>, e
   }
 
   if (value != null) {
+    validateDimensions(value.length, elementType);
     return value.length;
   }
 
@@ -293,18 +239,17 @@ function resolveDimensions(parameter: Pick<ParameterData, 'length' | 'value'>, e
 }
 
 function encodeVector(value: VectorValue, elementType: ElementType): Buffer {
-  const dimensions = value.length;
-  const buffer = Buffer.alloc(VECTOR_HEADER_LENGTH + dimensions * elementType.bytesPerElement);
+  const buffer = Buffer.alloc(VECTOR_HEADER_LENGTH + value.byteLength);
   buffer.writeUInt8(LAYOUT_FORMAT, 0);
   buffer.writeUInt8(LAYOUT_VERSION, 1);
-  buffer.writeUInt16LE(dimensions, 2);
+  buffer.writeUInt16LE(value.length, 2);
   buffer.writeUInt8(elementType.dimensionType, 4);
   // Bytes 5 - 7 are reserved and zero.
 
-  let offset = VECTOR_HEADER_LENGTH;
-  for (let i = 0; i < dimensions; i++) {
-    elementType.write(buffer, value[i], offset);
-    offset += elementType.bytesPerElement;
+  const elements = buffer.subarray(VECTOR_HEADER_LENGTH);
+  elements.set(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+  if (!IS_LITTLE_ENDIAN) {
+    elementType.swapBytes(elements);
   }
 
   return buffer;
@@ -325,7 +270,7 @@ function elementTypeForDimensionType(dimensionType: number): ElementType {
  * Decodes a `vector` value received from the server. `baseType` is the base
  * type from the column's TYPE_INFO, which the value's header must match.
  */
-export function decodeVector(data: Buffer, baseType: VectorBaseType): number[] {
+export function decodeVector(data: Buffer, baseType: VectorBaseType): VectorValue {
   const elementType = elementTypeForBaseType(baseType);
   const dimensionType = elementType.dimensionType;
 
@@ -347,13 +292,16 @@ export function decodeVector(data: Buffer, baseType: VectorBaseType): number[] {
     throw new Error(`Invalid vector value: ${dimensions} ${elementType.baseType} dimension(s) require ${expectedLength} bytes, but got ${data.length}`);
   }
 
-  const result = new Array<number>(dimensions);
-  let offset = VECTOR_HEADER_LENGTH;
-  for (let i = 0; i < dimensions; i++) {
-    result[i] = elementType.read(data, offset);
-    offset += elementType.bytesPerElement;
+  // Copy the elements so the typed array is aligned and independent of the
+  // network buffer.
+  const elements = new ArrayBuffer(expectedLength - VECTOR_HEADER_LENGTH);
+  const bytes = Buffer.from(elements);
+  data.copy(bytes, 0, VECTOR_HEADER_LENGTH);
+  if (!IS_LITTLE_ENDIAN) {
+    elementType.swapBytes(bytes);
   }
-  return result;
+
+  return elementType.createValue(elements);
 }
 
 /**
@@ -378,9 +326,8 @@ export function vectorBaseTypeFromDimensionType(dimensionType: number): VectorBa
 }
 
 /**
- * `vector(n)` or `vector(n, float16)`. The number of dimensions is given with
- * the `length` option (inferred from a non-null parameter value), and the base
- * type with the `baseType` option (`float32` by default).
+ * `vector(n)` or `vector(n, float16)`. A typed array value determines the
+ * base type; the `baseType` option is needed when there is no value.
  */
 export const Vector: DataType = {
   id: VECTOR_TYPE_ID,
@@ -388,21 +335,18 @@ export const Vector: DataType = {
   name: 'Vector',
 
   declaration(parameter: Parameter) {
-    const elementType = elementTypeForBaseType(parameter.baseType);
+    const elementType = elementTypeForParameter(parameter.baseType, parameter.value);
     const dimensions = resolveDimensions(parameter, elementType);
     return elementType === FLOAT32 ? `vector(${dimensions})` : `vector(${dimensions}, ${elementType.baseType})`;
   },
 
   resolveLength(parameter: Parameter) {
-    return resolveDimensions(parameter, elementTypeForBaseType(parameter.baseType));
+    return resolveDimensions(parameter, elementTypeForParameter(parameter.baseType, parameter.value));
   },
 
   resolve(parameter) {
-    const elementType = elementTypeForBaseType(parameter.baseType);
     const value = validateVector(parameter.value);
-    if (value !== null) {
-      validateForBaseType(value, elementType);
-    }
+    const elementType = elementTypeForParameter(parameter.baseType, value);
 
     return {
       value: value,
@@ -427,11 +371,12 @@ export const Vector: DataType = {
     }
 
     const elementType = elementTypeForBaseType(parameter.baseType);
+    if (!elementType.isValue(value)) {
+      throw new TypeError(`Invalid vector: the value does not match the ${elementType.baseType} base type.`);
+    }
 
-    // Bulk load and TVP cells are only checked by `validate`: their
-    // dimensions must match the column's, and fit its base type.
+    // Bulk load and TVP cells must match the column's dimension count.
     resolveDimensions({ length: parameter.length, value }, elementType);
-    validateForBaseType(value, elementType);
 
     const data = encodeVector(value, elementType);
     buffer.writeUInt16LE(data.length);

@@ -75,10 +75,10 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
     tableName: tableName
   };
 
-  // Only vector columns have a base type, which their values are decoded
-  // with.
+  // Only vector columns have a base type and dimensions.
   if (metadata.baseType !== undefined) {
     column.baseType = metadata.baseType;
+    column.dimensions = metadata.dimensions;
   }
 
   return new Result(column, offset);

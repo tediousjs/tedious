@@ -521,7 +521,8 @@ describe('Prepare Execute Statement', function() {
   });
 
   it('should prepare execute with vector parameters', async function() {
-    const connection = new Connection(getConfig());
+    const config = getConfig();
+    const connection = new Connection({ ...config, options: { ...config.options, vectorTypeSupport: 'v2' } });
     await new Promise<void>((resolve, reject) => connection.connect((err) => (err ? reject(err) : resolve())));
 
     try {
@@ -549,11 +550,35 @@ describe('Prepare Execute Statement', function() {
         request.addParameter('param', TYPES.Vector, undefined, { length: 3 });
         request.on('row', (columns) => values.push(columns[0].value));
         request.on('error', reject);
-        request.on('prepared', () => connection.execute(request, { param: [1, 2.5, -3] }));
+        request.on('prepared', () => connection.execute(request, { param: new Float32Array([1, 2.5, -3]) }));
         connection.prepare(request);
       });
 
-      assert.deepEqual(values, [[1, 2.5, -3], null]);
+      assert.instanceOf(values[0], Float32Array);
+      assert.deepEqual([Array.from(values[0] as Float32Array), values[1]], [[1, 2.5, -3], null]);
+    } finally {
+      await new Promise<void>((resolve) => {
+        connection.on('end', () => resolve());
+        connection.close();
+      });
+    }
+  });
+
+  it('reports a vector declaration error from prepare through the callback', async function() {
+    const connection = new Connection(getConfig());
+    await new Promise<void>((resolve, reject) => connection.connect((err) => (err ? reject(err) : resolve())));
+
+    try {
+      let request!: Request;
+      const callbackError = new Promise<Error | null | undefined>((resolve) => {
+        request = new Request('select @param', resolve);
+      });
+      request.addParameter('param', TYPES.Vector);
+
+      assert.doesNotThrow(() => connection.prepare(request));
+      const error = await callbackError;
+      assert.instanceOf(error, TypeError);
+      assert.include(error!.message, 'must be specified with the `length` option');
     } finally {
       await new Promise<void>((resolve) => {
         connection.on('end', () => resolve());

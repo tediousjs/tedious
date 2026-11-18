@@ -1,5 +1,6 @@
 import { TYPES } from '../../src/tedious';
 
+import { rejects } from 'node:assert/strict';
 import { assert } from 'chai';
 
 import Connection from '../../src/connection';
@@ -406,17 +407,34 @@ describe('calling a procedure that takes and returns a TVP', function() {
       });
     }
 
-    function callProcedure(tvp: object) {
+    function callProcedure(tvp: object, targetConnection = connection) {
       return new Promise<unknown[][]>((resolve, reject) => {
         const rows: unknown[][] = [];
         const request = new Request('__tediousTvpTest', (err) => (err ? reject(err) : resolve(rows)));
         request.on('row', (columns) => rows.push(columns.map((column: { value: unknown }) => column.value)));
         request.addParameter('tvp', TYPES.TVP, tvp);
-        connection.callProcedure(request);
+        targetConnection.callProcedure(request);
       });
     }
 
-    beforeEach(function() {
+    function connect(vectorTypeSupport: 'v1' | 'v2') {
+      return new Promise<Connection>((resolve, reject) => {
+        const vectorConnection = new Connection({ ...config, options: { ...config.options, vectorTypeSupport } });
+        vectorConnection.connect((err) => (err ? reject(err) : resolve(vectorConnection)));
+      });
+    }
+
+    function close(targetConnection: Connection) {
+      return new Promise<void>((resolve) => {
+        targetConnection.on('end', () => resolve());
+        targetConnection.close();
+      });
+    }
+
+    beforeEach(async function() {
+      await close(connection);
+      connection = await connect('v2');
+
       // Requires a server with the `vector` data type, and TDS 7.4.
       if (connection.vectorSupportVersion < 1) {
         this.skip();
@@ -432,15 +450,17 @@ describe('calling a procedure that takes and returns a TVP', function() {
           // A vector column needs its number of dimensions.
           { name: 'v', type: TYPES.Vector, length: 3 }
         ],
-        rows: [[1, [1, 2.5, -3]], [2, new Float32Array([4, 5, 6])], [3, null]]
+        rows: [[1, new Float32Array([1, 2.5, -3])], [2, new Float32Array([4, 5, 6])], [3, null]]
       });
 
-      assert.deepEqual(rows, [[1, [1, 2.5, -3]], [2, [4, 5, 6]], [3, null]]);
+      assert.instanceOf(rows[0][1], Float32Array);
+      assert.deepEqual(rows.map(([id, value]) => [id, value === null ? null : Array.from(value as Float32Array)]), [[1, [1, 2.5, -3]], [2, [4, 5, 6]], [3, null]]);
     });
 
     it('sends float16 vector values', async function() {
-      // `float16` vectors require vector support version 2.
-      if (connection.vectorSupportVersion < 2) {
+      const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
+      // `float16` vectors require vector support version 2 and `Float16Array`.
+      if (connection.vectorSupportVersion < 2 || !Float16Array) {
         this.skip();
       }
 
@@ -451,10 +471,30 @@ describe('calling a procedure that takes and returns a TVP', function() {
           { name: 'id', type: TYPES.Int },
           { name: 'h', type: TYPES.Vector, length: 3, baseType: 'float16' }
         ],
-        rows: [[1, [1, 2.5, -3]], [2, null]]
+        rows: [[1, new Float16Array([1, 2.5, -3])], [2, null]]
       });
 
-      assert.deepEqual(rows, [[1, [1, 2.5, -3]], [2, null]]);
+      assert.instanceOf(rows[0][1], Float16Array);
+      assert.deepEqual(rows.map(([id, value]) => [id, value === null ? null : Array.from(value as ArrayLike<number>)]), [[1, [1, 2.5, -3]], [2, null]]);
+    });
+
+    it('rejects float16 vector columns in a TVP when only version 1 is negotiated', async function() {
+      const v1 = await connect('v1');
+      try {
+        if (v1.vectorSupportVersion !== 1) {
+          this.skip();
+        }
+
+        await rejects(callProcedure({
+          columns: [
+            { name: 'id', type: TYPES.Int },
+            { name: 'h', type: TYPES.Vector, length: 3, baseType: 'float16' }
+          ],
+          rows: [[1, null]]
+        }, v1), { code: 'EVECTORNOTSUPPORTED' });
+      } finally {
+        await close(v1);
+      }
     });
   });
 });

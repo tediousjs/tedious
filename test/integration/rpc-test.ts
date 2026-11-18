@@ -407,7 +407,18 @@ set @paramOut = @paramIn\
       });
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
+      await new Promise<void>((resolve) => {
+        connection.on('end', () => resolve());
+        connection.close();
+      });
+
+      const config = getConfig();
+      connection = await new Promise<Connection>((resolve, reject) => {
+        const vectorConnection = new Connection({ ...config, options: { ...config.options, vectorTypeSupport: 'v2' } });
+        vectorConnection.connect((err) => (err ? reject(err) : resolve(vectorConnection)));
+      });
+
       // Requires a server with the `vector` data type, and TDS 7.4.
       if (connection.vectorSupportVersion < 1) {
         this.skip();
@@ -426,20 +437,25 @@ set @paramOut = @paramIn\
       `, 'execSqlBatch');
 
       const { rows, outputs } = await run('#test_vector_proc', 'callProcedure', (request) => {
-        request.addParameter('in', TYPES.Vector, [1, -2, 3]);
+        request.addParameter('in', TYPES.Vector, new Float32Array([1, -2, 3]));
         request.addOutputParameter('out', TYPES.Vector, null, { length: 3 });
         request.addOutputParameter('nullOut', TYPES.Vector, null, { length: 2 });
       });
 
-      assert.deepEqual(rows, [[[1, -2, 3], 6]]);
-      assert.deepEqual(outputs.out.value, [1, -2, 3]);
+      assert.instanceOf(rows[0][0], Float32Array);
+      assert.deepEqual(Array.from(rows[0][0] as Float32Array), [1, -2, 3]);
+      assert.strictEqual(rows[0][1], 6);
+      assert.instanceOf(outputs.out.value, Float32Array);
+      assert.deepEqual(Array.from(outputs.out.value as Float32Array), [1, -2, 3]);
       assert.strictEqual(outputs.out.metadata.baseType, 'float32');
+      assert.strictEqual(outputs.out.metadata.dimensions, 3);
       assert.isNull(outputs.nullOut.value);
     });
 
     it('should call a procedure with float16 vector input and output parameters', async function() {
-      // `float16` vectors require vector support version 2.
-      if (connection.vectorSupportVersion < 2) {
+      const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
+      // `float16` vectors require vector support version 2 and `Float16Array`.
+      if (connection.vectorSupportVersion < 2 || !Float16Array) {
         this.skip();
       }
 
@@ -450,11 +466,12 @@ set @paramOut = @paramIn\
       `, 'execSqlBatch');
 
       const { outputs } = await run('#test_vector16_proc', 'callProcedure', (request) => {
-        request.addParameter('in', TYPES.Vector, [1, 2.5, -3], { baseType: 'float16' });
+        request.addParameter('in', TYPES.Vector, new Float16Array([1, 2.5, -3]));
         request.addOutputParameter('out', TYPES.Vector, null, { length: 3, baseType: 'float16' });
       });
 
-      assert.deepEqual(outputs.out.value, [1, 2.5, -3]);
+      assert.instanceOf(outputs.out.value, Float16Array);
+      assert.deepEqual(Array.from(outputs.out.value as ArrayLike<number>), [1, 2.5, -3]);
       assert.strictEqual(outputs.out.metadata.baseType, 'float16');
     });
   });

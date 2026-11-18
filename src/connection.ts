@@ -42,7 +42,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, type ResolvedParameter, type DataType, TYPES, resolveParameter } from './data-type';
-import { VECTOR_SUPPORT_VERSION, requiredVectorSupportVersion, type VectorBaseType } from './data-types/vector';
+import { FLOAT16_ARRAY_SUPPORTED, VECTOR_SUPPORT_VERSION, requiredVectorSupportVersion, type VectorBaseType } from './data-types/vector';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -918,12 +918,13 @@ export interface ConnectionOptions {
    *   `varchar(max)`, and `TYPES.Vector` parameters and bulk load columns are rejected.
    * * `'v1'`: `vector` values with `float32` elements are exchanged in the native binary format.
    * * `'v2'`: `vector` values with `float32` or `float16` elements are exchanged in the native binary format.
-   *   `TYPES.Vector` parameters and columns with `baseType: 'float16'` require it.
+   *   `float16` parameters, bulk load columns and TVP columns require it, along with `Float16Array`
+   *   (Node.js 24 or later). On Node.js versions without `Float16Array`, version 1 is requested instead.
    *
    * The server acknowledges the highest version both sides support. Servers without the `vector` data type ignore
    * the request.
    *
-   * (default: `'v2'`)
+   * (default: `'off'`)
    */
   vectorTypeSupport?: VectorTypeSupport;
 
@@ -1421,7 +1422,7 @@ class Connection extends EventEmitter {
         trustServerCertificate: false,
         useColumnNames: false,
         useUTC: true,
-        vectorTypeSupport: 'v2',
+        vectorTypeSupport: 'off',
         workstationId: undefined,
         lowerCaseGuids: false
       }
@@ -2815,7 +2816,8 @@ class Connection extends EventEmitter {
   /**
    * The VECTORSUPPORT version requested at login: the version selected with
    * `vectorTypeSupport`, or `0` if vector support is not requested.
-   * Feature extensions require TDS 7.4.
+   * Feature extensions require TDS 7.4, and `float16` vectors require
+   * `Float16Array`.
    *
    * @private
    */
@@ -2824,7 +2826,8 @@ class Connection extends EventEmitter {
       return 0;
     }
 
-    return VECTOR_TYPE_SUPPORT_VERSIONS[this.config.options.vectorTypeSupport];
+    const version = VECTOR_TYPE_SUPPORT_VERSIONS[this.config.options.vectorTypeSupport];
+    return FLOAT16_ARRAY_SUPPORTED ? version : Math.min(version, VECTOR_SUPPORT_VERSION.V1);
   }
 
   /**
@@ -2848,13 +2851,15 @@ class Connection extends EventEmitter {
     let message;
     if (versions[this.config.options.tdsVersion] < versions['7_4']) {
       message = 'Vector support was not negotiated with the server because the TDS version in use (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.Vector` requires TDS version `7_4`.';
-    } else if (this.requestedVectorSupportVersion() < required) {
+    } else if (VECTOR_TYPE_SUPPORT_VERSIONS[this.config.options.vectorTypeSupport] < required) {
       message = 'Vector support version ' + required + ' is required, but the `vectorTypeSupport` option (`' + this.config.options.vectorTypeSupport + '`) ' +
-        (this.config.options.vectorTypeSupport === 'off' ? 'disables vector support.' : 'requests only version ' + this.requestedVectorSupportVersion() + '. Vectors with `baseType: \'float16\'` require `\'v2\'`.');
+        (this.config.options.vectorTypeSupport === 'off' ? 'disables vector support.' : 'requests only version ' + this.requestedVectorSupportVersion() + '. `float16` vectors require `\'v2\'`.');
+    } else if (this.requestedVectorSupportVersion() < required) {
+      message = '`float16` vectors require Float16Array, which is not available in this version of Node.js. Use Node.js 24 or later.';
     } else if (this.vectorSupportVersion === 0) {
       message = 'The server does not support the `vector` data type. `TYPES.Vector` requires SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in Microsoft Fabric.';
     } else {
-      message = 'The server only supports vector support version ' + this.vectorSupportVersion + ', which does not include `float16` vectors. Vectors with `baseType: \'float16\'` require version ' + required + '.';
+      message = 'The server only supports vector support version ' + this.vectorSupportVersion + ', which does not include `float16` vectors. `float16` vectors require version ' + required + '.';
     }
 
     return new RequestError(message, 'EVECTORNOTSUPPORTED');
@@ -3083,10 +3088,24 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
+    let params;
+    try {
+      params = request.parameters.length ? request.makeParamsParameter(request.parameters) : null;
+    } catch (error: any) {
+      request.error = error;
+
+      process.nextTick(() => {
+        this.debug.log(error.message);
+        request.callback(error);
+      });
+
+      return;
+    }
+
     parameters.push(this.resolveRequestParameter({
       type: TYPES.NVarChar,
       name: 'params',
-      value: request.parameters.length ? request.makeParamsParameter(request.parameters) : null,
+      value: params,
       output: false,
       length: undefined,
       precision: undefined,

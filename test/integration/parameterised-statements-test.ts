@@ -1274,12 +1274,13 @@ end')\
 });
 
 describe('`vector` parameters', function() {
+  const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
   let connection: Connection;
 
   function connect(options = {}): Promise<Connection> {
     return new Promise((resolve, reject) => {
       const config = getConfig();
-      const newConnection = new Connection({ ...config, options: { ...config.options, ...options } });
+      const newConnection = new Connection({ ...config, options: { ...config.options, vectorTypeSupport: 'v2', ...options } });
       newConnection.connect((err) => (err ? reject(err) : resolve(newConnection)));
     });
   }
@@ -1321,42 +1322,48 @@ describe('`vector` parameters', function() {
   });
 
   it('sends float32 vectors', async function() {
-    const { row } = await execSqlRequest(connection, 'SELECT @v, @f, @n', (request) => {
-      request.addParameter('v', TYPES.Vector, [0.1, 2.5, -3]);
-      request.addParameter('f', TYPES.Vector, new Float32Array([1, 2]));
+    const { row } = await execSqlRequest(connection, 'SELECT @v, @n', (request) => {
+      request.addParameter('v', TYPES.Vector, new Float32Array([0.1, 2.5, -3]));
       // A `null` vector needs its number of dimensions.
       request.addParameter('n', TYPES.Vector, null, { length: 3 });
     });
 
-    assert.deepEqual(row.map((column) => column.value), [[Math.fround(0.1), 2.5, -3], [1, 2], null]);
+    assert.instanceOf(row[0].value, Float32Array);
+    assert.deepEqual(Array.from(row[0].value), [Math.fround(0.1), 2.5, -3]);
+    assert.isNull(row[1].value);
     assert.strictEqual(row[0].metadata.baseType, 'float32');
-    assert.strictEqual(row[0].metadata.precision, 3);
+    assert.strictEqual(row[0].metadata.dimensions, 3);
+    assert.isUndefined(row[0].metadata.precision);
   });
 
   it('returns vector output parameters', async function() {
     const { outputs } = await execSqlRequest(connection, 'SET @out = @in', (request) => {
-      request.addParameter('in', TYPES.Vector, [1, 2.5, -3]);
+      request.addParameter('in', TYPES.Vector, new Float32Array([1, 2.5, -3]));
       request.addOutputParameter('out', TYPES.Vector, null, { length: 3 });
     });
 
-    assert.deepEqual(outputs.out.value, [1, 2.5, -3]);
+    assert.instanceOf(outputs.out.value, Float32Array);
+    assert.deepEqual(Array.from(outputs.out.value), [1, 2.5, -3]);
     assert.strictEqual(outputs.out.metadata.baseType, 'float32');
+    assert.strictEqual(outputs.out.metadata.dimensions, 3);
   });
 
   it('sends float16 vectors', async function() {
-    // `float16` vectors require vector support version 2.
-    if (connection.vectorSupportVersion < 2) {
+    // `float16` vectors require vector support version 2 and `Float16Array`.
+    if (connection.vectorSupportVersion < 2 || !Float16Array) {
       this.skip();
     }
 
     const { row, outputs } = await execSqlRequest(connection, 'SELECT @v; SET @out = @v', (request) => {
-      request.addParameter('v', TYPES.Vector, [1, 2.5, -3], { baseType: 'float16' });
+      request.addParameter('v', TYPES.Vector, new Float16Array([1, 2.5, -3]));
       request.addOutputParameter('out', TYPES.Vector, null, { length: 3, baseType: 'float16' });
     });
 
-    assert.deepEqual(row[0].value, [1, 2.5, -3]);
+    assert.instanceOf(row[0].value, Float16Array);
+    assert.deepEqual(Array.from(row[0].value), [1, 2.5, -3]);
     assert.strictEqual(row[0].metadata.baseType, 'float16');
-    assert.deepEqual(outputs.out.value, [1, 2.5, -3]);
+    assert.instanceOf(outputs.out.value, Float16Array);
+    assert.deepEqual(Array.from(outputs.out.value), [1, 2.5, -3]);
     assert.strictEqual(outputs.out.metadata.baseType, 'float16');
   });
 
@@ -1365,7 +1372,7 @@ describe('`vector` parameters', function() {
     try {
       let error: any;
       try {
-        await execSqlRequest(off, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, [1, 2, 3]));
+        await execSqlRequest(off, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, new Float32Array([1, 2, 3])));
       } catch (err) {
         error = err;
       }
@@ -1379,9 +1386,10 @@ describe('`vector` parameters', function() {
   it('rejects float16 vector parameters with `vectorTypeSupport: \'v1\'`', async function() {
     const v1 = await connect({ vectorTypeSupport: 'v1' });
     try {
+      assert.strictEqual(v1.vectorSupportVersion, 1);
       let error: any;
       try {
-        await execSqlRequest(v1, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, [1, 2, 3], { baseType: 'float16' }));
+        await execSqlRequest(v1, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, null, { length: 3, baseType: 'float16' }));
       } catch (err) {
         error = err;
       }
@@ -1394,9 +1402,9 @@ describe('`vector` parameters', function() {
 
   it('rejects invalid vector parameters without sending them', async function() {
     for (const [value, options, message] of [
-      [[1, NaN, 3], undefined, 'the element at index 1 is not a finite number'],
+      [new Float32Array([1, NaN, 3]), undefined, 'the element at index 1 is not a finite number'],
       [null, undefined, 'must be specified with the `length` option'],
-      [[70000], { baseType: 'float16' }, 'out of range for float16']
+      [[1, 2, 3], undefined, 'must be a Float32Array or a Float16Array']
     ] as const) {
       let error: any;
       try {
@@ -1410,7 +1418,7 @@ describe('`vector` parameters', function() {
     }
 
     // The connection is still usable.
-    const { row } = await execSqlRequest(connection, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, [1]));
-    assert.deepEqual(row[0].value, [1]);
+    const { row } = await execSqlRequest(connection, 'SELECT @v', (request) => request.addParameter('v', TYPES.Vector, new Float32Array([1])));
+    assert.deepEqual(Array.from(row[0].value), [1]);
   });
 });

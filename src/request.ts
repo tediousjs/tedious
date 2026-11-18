@@ -40,8 +40,8 @@ export interface ParameterOptions {
   precision?: number;
 
   /**
-   * For Vector, the base type of the elements: `'float32'` (the default) or
-   * `'float16'`.
+   * For Vector, the base type when there is no value to infer it from:
+   * `'float32'` (the default) or `'float16'`.
    */
   baseType?: VectorBaseType;
 
@@ -483,11 +483,11 @@ class Request extends EventEmitter {
    *   sends the value with three fractional-second digits. For DateTime2
    *   parameters, the default is 7 for non-null values and 0 for `null` values.
    *
-   *   For `TYPES.Vector`, `length` is the number of dimensions. It is
-   *   inferred from the value, and required when the value is `null` or
-   *   `undefined`, e.g. for an output parameter. `baseType` is the base type
-   *   of the elements: `'float32'` (the default) or `'float16'`:
-   *   `request.addParameter('embedding', TYPES.Vector, values, { baseType: 'float16' })`.
+   *   For `TYPES.Vector`, the value must be a `Float32Array` or
+   *   `Float16Array`, which determines the base type. `length` is the number
+   *   of dimensions. It is inferred from the value, and required when the
+   *   value is `null` or `undefined`, e.g. for an output parameter. Set
+   *   `baseType` to `'float16'` when there is no value.
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {

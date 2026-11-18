@@ -133,7 +133,7 @@ describe('Connection configuration validation', function() {
 
   it('vectorTypeSupport', function() {
     const connection = new Connection(config);
-    assert.strictEqual(connection.config.options.vectorTypeSupport, 'v2');
+    assert.strictEqual(connection.config.options.vectorTypeSupport, 'off');
     ensureConnectionIsClosed(connection, () => {});
 
     for (const value of ['off', 'v1', 'v2']) {

@@ -552,14 +552,14 @@ export const TYPE = {
  *   <tr>
  *     <td><code>vector(n)</code></td>
  *     <td><code>{@link TYPES.Vector}</code></td>
- *     <td><code>number[]</code></td>
+ *     <td><code>Float32Array</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
  *   <tr>
  *     <td><code>vector(n, float16)</code></td>
- *     <td><code>{@link TYPES.Vector}</code> with <code>baseType: 'float16'</code></td>
- *     <td><code>number[]</code></td>
+ *     <td><code>{@link TYPES.Vector}</code></td>
+ *     <td><code>Float16Array</code></td>
  *     <td>✓</td>
  *     <td>✓</td>
  *   </tr>
@@ -604,21 +604,22 @@ export const TYPE = {
  *       Microsoft Fabric, and TDS 7.4. Vectors are sent and received in SQL Server's native binary format once the
  *       server has acknowledged the vector support feature extension at login, see
  *       {@link ConnectionOptions.vectorTypeSupport}. <code>float16</code> vectors require <code>vectorTypeSupport</code>
- *       <code>'v2'</code> (the default) and a server that supports them.
+ *       <code>'v2'</code>, a server that supports them, and a Node.js version with <code>Float16Array</code>.
  *     </p>
  *     <p>
- *       Values are returned as an array of numbers, one per dimension. <code>float16</code> elements are widened
- *       losslessly. The column's metadata holds the dimension count as <code>precision</code> and the base type
- *       (<code>'float32'</code> or <code>'float16'</code>) as <code>baseType</code>.
+ *       Values are returned as a <code>Float32Array</code> for <code>vector(n)</code> and as a
+ *       <code>Float16Array</code> for <code>vector(n, float16)</code>. The column's metadata holds the dimension count
+ *       as <code>dimensions</code> and the base type (<code>'float32'</code> or <code>'float16'</code>) as
+ *       <code>baseType</code>.
  *     </p>
  *     <p>
- *       A parameter, bulk load or table-valued parameter value is an array of finite numbers or a
- *       <code>Float32Array</code>. The base type is given with the <code>baseType</code> option of the parameter, bulk
- *       load column or table-valued parameter column: <code>'float32'</code> (the default) or <code>'float16'</code>.
- *       Elements are rounded to the base type (to nearest, ties to even); a value that rounds to infinity is
- *       rejected. The number of dimensions is given with the <code>length</code> option. It is required for bulk load
- *       and table-valued parameter columns and for <code>null</code> parameter values, and otherwise inferred from
- *       the value. A vector has between 1 and 1998 (<code>float32</code>) or 3996 (<code>float16</code>) dimensions.
+ *       A parameter, bulk load or table-valued parameter value must be a <code>Float32Array</code> or
+ *       <code>Float16Array</code> with finite elements. A parameter value determines its base type. The
+ *       <code>baseType</code> option is needed for <code>null</code> and output parameters, bulk load columns and
+ *       table-valued parameter columns, and must match a value when both are given. The number of dimensions is given
+ *       with the <code>length</code> option. It is required for bulk load and table-valued parameter columns and for
+ *       <code>null</code> parameter values, and otherwise inferred from the value. A vector has between 1 and 1998
+ *       (<code>float32</code>) or 3996 (<code>float16</code>) dimensions.
  *     </p>
  *   </li>
  * </ol>

@@ -33,7 +33,7 @@ export type BaseMetadata = {
 
   collation: Collation | undefined;
   /**
-   * The precision. Only applicable to numeric and decimal, and the number of dimensions of vector.
+   * The precision. Only applicable to numeric and decimal.
    */
   precision: number | undefined;
 
@@ -56,6 +56,12 @@ export type BaseMetadata = {
    * `'float16'`. Only present for vector columns.
    */
   baseType?: VectorBaseType | undefined;
+
+  /**
+   * The number of dimensions of a vector column. Only present for vector
+   * columns.
+   */
+  dimensions?: number | undefined;
 }
 
 export type Metadata = {
@@ -368,13 +374,13 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         flags: flags,
         type: type,
         collation: undefined,
-        // The number of dimensions.
-        precision: vectorDimensionsFromTypeInfo(dataLength, dimensionType),
+        precision: undefined,
         scale: undefined,
         dataLength: dataLength,
         schema: undefined,
         udtInfo: undefined,
-        baseType: vectorBaseTypeFromDimensionType(dimensionType)
+        baseType: vectorBaseTypeFromDimensionType(dimensionType),
+        dimensions: vectorDimensionsFromTypeInfo(dataLength, dimensionType)
       }, offset);
     }
 
