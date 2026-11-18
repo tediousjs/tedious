@@ -270,6 +270,125 @@ describe('loadColumnEncryptionKeys', function() {
     assert.lengthOf(provider.calls, 3);
   });
 
+  describe('idle timeout', function() {
+    // A connection that does not let go of keys on its own: it finds a key
+    // in the cache for as long as nothing removed it.
+    const isCached = (value: EncryptedColumnEncryptionKey) => {
+      return loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 0, keyCacheTTL: Infinity })) instanceof Map;
+    };
+
+    it('removes a key once it was not used for the idle timeout', async function() {
+      const clock = sinon.useFakeTimers();
+      const value = keyValue();
+
+      await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 1000 }));
+
+      await clock.tickAsync(999);
+      assert.lengthOf(provider.calls, 1);
+
+      // Not when the key is asked for the next time, but when the time is up
+      await clock.tickAsync(1);
+      assert.isFalse(isCached(value));
+    });
+
+    it('keeps a key for as long as it is used', async function() {
+      const clock = sinon.useFakeTimers();
+      const value = keyValue();
+      const options = optionsWith({ keyCacheIdleTimeout: 1000 });
+
+      const key = keyInfo(value);
+      const cipher = (await loadColumnEncryptionKeys([key], options)).get(key);
+
+      for (let i = 0; i < 10; i++) {
+        await clock.tickAsync(999);
+        assert.strictEqual(cachedCipher(keyInfo(value), options), cipher);
+      }
+
+      assert.lengthOf(provider.calls, 1);
+
+      await clock.tickAsync(1000);
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Promise);
+      assert.lengthOf(provider.calls, 2);
+    });
+
+    it('does not keep a key that is used for longer than its lifetime', async function() {
+      const clock = sinon.useFakeTimers();
+      const value = keyValue();
+      const options = optionsWith({ keyCacheIdleTimeout: 1000, keyCacheTTL: 2500 });
+
+      await loadColumnEncryptionKeys([keyInfo(value)], options);
+
+      await clock.tickAsync(900);
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
+      await clock.tickAsync(900);
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
+
+      // The key store is asked again, however recently the key was used.
+      await clock.tickAsync(700);
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Promise);
+      assert.lengthOf(provider.calls, 2);
+    });
+
+    it('does not use a key that was not used for the idle timeout, even if it was not removed yet', async function() {
+      const clock = sinon.useFakeTimers({ toFake: ['Date'] });
+      const value = keyValue();
+      const options = optionsWith({ keyCacheIdleTimeout: 1000 });
+
+      await loadColumnEncryptionKeys([keyInfo(value)], options);
+
+      // The time has passed, without the timer having had its turn.
+      clock.tick(1000);
+
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Promise);
+      assert.lengthOf(provider.calls, 2);
+    });
+
+    it('applies the shortest idle timeout of the connections that share a key', async function() {
+      const clock = sinon.useFakeTimers();
+      const value = keyValue();
+
+      await loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 5000 }));
+      assert.isTrue(isCached(value));
+
+      // Another connection lets go of keys sooner ...
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 1000 })), Map);
+
+      // ... which holds, whichever connection uses the key afterwards.
+      await clock.tickAsync(500);
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], optionsWith({ keyCacheIdleTimeout: 5000 })), Map);
+
+      await clock.tickAsync(999);
+      assert.isTrue(isCached(value));
+
+      await clock.tickAsync(1001);
+      assert.isFalse(isCached(value));
+    });
+
+    it('keeps keys that are not used if there is no idle timeout', async function() {
+      const clock = sinon.useFakeTimers();
+      const value = keyValue();
+      const options = optionsWith({ keyCacheIdleTimeout: 0, keyCacheTTL: 10 * 60 * 60 * 1000 });
+
+      await loadColumnEncryptionKeys([keyInfo(value)], options);
+
+      await clock.tickAsync(9 * 60 * 60 * 1000);
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
+      assert.lengthOf(provider.calls, 1);
+    });
+
+    it('does not keep the process running for a key that is to be removed', async function() {
+      const setTimeoutSpy = sinon.spy(global, 'setTimeout');
+
+      await loadColumnEncryptionKeys([keyInfo(keyValue())], optionsWith({ keyCacheIdleTimeout: 60000 }));
+
+      const timers = setTimeoutSpy.returnValues.filter((timer, index) => setTimeoutSpy.args[index][1] === 60000);
+      assert.lengthOf(timers, 1);
+      assert.isFalse(timers[0].hasRef());
+
+      clearTimeout(timers[0]);
+    });
+  });
+
   it('does not cache keys if the cache is disabled', async function() {
     const value = keyValue();
     const options = optionsWith({ keyCacheTTL: 0 });

@@ -10,12 +10,66 @@ interface CacheEntry {
   // When the key store was asked for the key. How long the entry is of use
   // from then on is up to each of the connections that share the cache.
   time: number;
+
+  // When the key was last made use of.
+  used: number;
+
+  // Removes the entry once it was not used for `idleTimeout` milliseconds:
+  // the shortest idle timeout of the connections that made use of it.
+  idleTimeout: number;
+  timer: NodeJS.Timeout | undefined;
 }
+
+type Cache = Map<string, CacheEntry>;
 
 // Decrypted column encryption keys are cached per key store provider: what a
 // provider decrypted once can be used by every connection that trusts the
 // same provider instance, and is released together with the provider.
-const caches = new WeakMap<ColumnEncryptionKeyStoreProvider, Map<string, CacheEntry>>();
+const caches = new WeakMap<ColumnEncryptionKeyStoreProvider, Cache>();
+
+/**
+ * Whether a connection with the given options can make use of an entry:
+ * the key was decrypted recently enough, and did not go unused for too long.
+ */
+function isUsable(entry: CacheEntry, now: number, options: InternalColumnEncryptionOptions): boolean {
+  return now - entry.time < options.keyCacheTTL && (options.keyCacheIdleTimeout === 0 || now - entry.used < options.keyCacheIdleTimeout);
+}
+
+/**
+ * Notes that an entry is made use of, which gives it another idle timeout
+ * to live.
+ *
+ * A lookup only finds out that a key was not used for too long when the key
+ * is asked for again - which is not going to happen for a key that is not
+ * used anymore. A timer is what actually lets go of it.
+ */
+function use(cache: Cache, key: string, entry: CacheEntry, now: number, options: InternalColumnEncryptionOptions) {
+  entry.used = now;
+
+  const idleTimeout = options.keyCacheIdleTimeout;
+  if (entry.timer !== undefined && (idleTimeout === 0 || idleTimeout >= entry.idleTimeout)) {
+    entry.timer.refresh();
+  } else if (idleTimeout !== 0) {
+    clearTimeout(entry.timer);
+
+    entry.idleTimeout = idleTimeout;
+    entry.timer = setTimeout(() => {
+      remove(cache, key, entry);
+    }, idleTimeout);
+
+    // Letting go of a key is no reason to keep the process running.
+    entry.timer.unref();
+  }
+}
+
+function remove(cache: Cache, key: string, entry: CacheEntry) {
+  clearTimeout(entry.timer);
+  entry.timer = undefined;
+
+  if (cache.get(key) === entry) {
+    cache.delete(key);
+  }
+}
 
 /**
  * The ciphers of column encryption keys.
@@ -83,8 +137,12 @@ function getCipher(key: ColumnEncryptionKeyInfo, options: InternalColumnEncrypti
   for (const value of key.values) {
     const provider = options.keyStoreProviders.get(value.keyStoreName);
     if (provider !== undefined && isTrustedKeyPath(value.keyPath, options)) {
-      const entry = caches.get(provider)?.get(cacheKey(value, options));
-      if (entry !== undefined && entry.cipher !== undefined && now - entry.time < options.keyCacheTTL) {
+      const cache = caches.get(provider);
+      const key = cacheKey(value, options);
+
+      const entry = cache?.get(key);
+      if (entry !== undefined && entry.cipher !== undefined && isUsable(entry, now, options)) {
+        use(cache!, key, entry, now, options);
         return entry.cipher;
       }
     }
@@ -136,29 +194,29 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
   const key = cacheKey(value, options);
 
   const cached = cache.get(key);
-  if (cached !== undefined && now - cached.time < options.keyCacheTTL) {
+  if (cached !== undefined && isUsable(cached, now, options)) {
     // Requests that need the key while it is being decrypted wait for the
     // same result, instead of each accessing the key store.
+    use(cache, key, cached, now, options);
     return cached.promise;
   }
 
   // Entries that are of no use to this connection anymore are dropped, to
   // not keep keys around that are not used any longer.
   for (const [key, entry] of cache) {
-    if (now - entry.time >= options.keyCacheTTL) {
-      cache.delete(key);
+    if (!isUsable(entry, now, options)) {
+      remove(cache, key, entry);
     }
   }
 
-  const entry: CacheEntry = { cipher: undefined, promise: decryptWithProvider(provider, value), time: now };
+  const entry: CacheEntry = { cipher: undefined, promise: decryptWithProvider(provider, value), time: now, used: now, idleTimeout: 0, timer: undefined };
   cache.set(key, entry);
+  use(cache, key, entry, now, options);
 
   entry.promise.then((cipher) => {
     entry.cipher = cipher;
   }, () => {
-    if (cache.get(key) === entry) {
-      cache.delete(key);
-    }
+    remove(cache, key, entry);
   });
 
   return entry.promise;

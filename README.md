@@ -84,6 +84,8 @@ Things to know:
   Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
 - The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make
   a request fail instead of sending such a value as it is.
+- Decrypted column encryption keys are kept in memory, so that a key store is not accessed for every request: for up to 2 hours
+  (`keyCacheTTL`), and for no longer than 15 minutes without being used (`keyCacheIdleTimeout`).
 - The request timeout covers a key store that is accessed to encrypt the parameters of a request. It does not cover one that is
   accessed to decrypt a result set: like for every request, it ends once the first part of the response arrived. Give the client of
   a key store a timeout of its own, or cancel the request (`request.cancel()`), to not wait for a key store indefinitely.

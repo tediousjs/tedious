@@ -1268,6 +1268,24 @@ describe('Always Encrypted', function() {
       }
     });
 
+    it('decrypts a column encryption key again once it was not used for the idle timeout', async function() {
+      const provider = new CountingKeyStoreProvider(new RsaKeyStoreProvider({ [keyPath]: privateKey }));
+      const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: provider }, keyCacheIdleTimeout: 1000 } });
+
+      try {
+        await insertAndSelect(connection, 1);
+        assert.strictEqual(provider.calls, 1);
+
+        // The key is let go of while it is not used.
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        await insertAndSelect(connection, 2);
+        assert.strictEqual(provider.calls, 2);
+      } finally {
+        await close(connection);
+      }
+    });
+
     it('decrypts a column encryption key each time if the cache is disabled', async function() {
       const provider = new CountingKeyStoreProvider(new RsaKeyStoreProvider({ [keyPath]: privateKey }));
       const connection = await connect({ columnEncryption: { keyStoreProviders: { TEDIOUS_TEST: provider }, keyCacheTTL: 0 } });
