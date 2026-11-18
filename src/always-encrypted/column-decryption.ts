@@ -1,4 +1,5 @@
 import { type ColumnEncryptionCipher } from './cipher';
+import { type ColumnEncryptionCiphers } from './key-cache';
 import { type ColumnEncryptionKeyInfo, type CryptoMetadata } from './types';
 
 // What it takes to decrypt the values of a result set, beyond the
@@ -27,6 +28,13 @@ export interface ColumnEncryptionKeyState {
 }
 
 const keyStates = new WeakMap<ColumnEncryptionKeyInfo, ColumnEncryptionKeyState>();
+
+// The keys whose ciphers a request made available, until it lets go of them.
+const keysInUse = new WeakMap<object, ColumnEncryptionKeyInfo[]>();
+
+// Keyed by the very object that the metadata parser created for a column:
+// a copy of it (as an application might make of the metadata it is handed)
+// is not known to be sent as PLP values.
 const plpColumns = new WeakSet<CryptoMetadata>();
 
 /**
@@ -48,6 +56,38 @@ export function releaseCipher(key: ColumnEncryptionKeyInfo) {
 }
 
 /**
+ * Makes the ciphers of the column encryption keys of a result set available
+ * to decrypt its values, until `releaseCiphers` is called for the same
+ * request.
+ */
+export function useCiphers(request: object, ciphers: ColumnEncryptionCiphers) {
+  releaseCiphers(request);
+
+  for (const [key, cipher] of ciphers) {
+    useCipher(key, cipher);
+  }
+
+  keysInUse.set(request, Array.from(ciphers.keys()));
+}
+
+/**
+ * Lets go of the ciphers that a request made available: once the values of
+ * its result set were decrypted, and when the request completes - however
+ * it does, as an application may hold on to the descriptions of the keys
+ * of a result set that was not read to its end.
+ */
+export function releaseCiphers(request: object) {
+  const keys = keysInUse.get(request);
+  if (keys !== undefined) {
+    keysInUse.delete(request);
+
+    for (const key of keys) {
+      releaseCipher(key);
+    }
+  }
+}
+
+/**
  * The state of a column encryption key of a result set, if its cipher was
  * made available.
  */
@@ -58,6 +98,10 @@ export function keyStateOf(key: ColumnEncryptionKeyInfo): ColumnEncryptionKeySta
 /**
  * Notes that the encrypted values of a column are sent as PLP values
  * (`varbinary(max)`).
+ *
+ * This is noted for the `cryptoMetadata` object of the column, so the
+ * metadata of a column has to be passed on to the value parser as it was
+ * parsed, not as a copy.
  */
 export function markAsPLP(cryptoMetadata: CryptoMetadata) {
   plpColumns.add(cryptoMetadata);

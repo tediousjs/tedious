@@ -22,10 +22,10 @@ c_binary	binary(10)	binary	10	-	all	00112233445566778899	abcd
 c_varbinary	varbinary(50)	varbinary	50	-	all	deadbeef	00
 c_varbinary_max	varbinary(max)	varbinarymax	-	-	all	cafe	repeat:ab:9000
 c_date	date	date	-	-	all	2024-02-29	1753-01-01	9999-12-30
-c_time0	time(0)	time	0	-	tedious,jdbc	12:34:56	23:59:59
+c_time0	time(0)	time	0	-	all	12:34:56	23:59:59
 c_time3	time(3)	time	3	-	all	12:34:56.789	00:00:00.001
 c_time7	time(7)	time	7	-	all	12:34:56.789	23:59:59.999
-c_datetime2_0	datetime2(0)	datetime2	0	-	tedious,jdbc	2024-02-29 12:34:56
+c_datetime2_0	datetime2(0)	datetime2	0	-	all	2024-02-29 12:34:56
 c_datetime2_3	datetime2(3)	datetime2	3	-	all	2024-02-29 12:34:56.789
 c_datetime2_7	datetime2(7)	datetime2	7	-	all	2024-02-29 12:34:56.1234567	1900-01-01 00:00:00.0000001
 c_dto3	datetimeoffset(3)	datetimeoffset	3,0	-	all	2024-02-29 12:34:56.789
@@ -34,8 +34,8 @@ c_dto_offset	datetimeoffset(7)	datetimeoffset	7,330	-	jdbc,sqlclient	2024-02-29 
 c_datetime	datetime	datetime	-	-	all	2024-02-29 12:34:56.123	1900-01-01 00:00:00.000
 c_smalldatetime	smalldatetime	smalldatetime	-	-	all	2024-02-29 12:34:00
 c_guid	uniqueidentifier	guid	-	-	all	01234567-89AB-CDEF-0123-456789ABCDEF
-c_round_time0	time(0)	time	0	-	tedious,jdbc	12:34:56.499=>12:34:56	12:34:56.500=>12:34:57	23:59:59.999=>23:59:59
+c_round_time0	time(0)	time	0	-	all	12:34:56.499=>12:34:56	12:34:56.500=>12:34:57	23:59:59.999=>23:59:59
 c_round_time2	time(2)	time	2	-	all	12:34:56.994=>12:34:56.99	12:34:56.995=>12:34:57.00	23:59:59.999=>23:59:59.99
-c_round_dt2_0	datetime2(0)	datetime2	0	-	tedious,jdbc	2024-02-28 12:34:56.499=>2024-02-28 12:34:56	2024-02-28 12:34:56.500=>2024-02-28 12:34:57	2024-02-28 23:59:59.999=>2024-02-29 00:00:00
+c_round_dt2_0	datetime2(0)	datetime2	0	-	all	2024-02-28 12:34:56.499=>2024-02-28 12:34:56	2024-02-28 12:34:56.500=>2024-02-28 12:34:57	2024-02-28 23:59:59.999=>2024-02-29 00:00:00
 c_round_dt2_2	datetime2(2)	datetime2	2	-	all	2024-12-31 23:59:59.996=>2025-01-01 00:00:00	2024-02-28 12:34:56.1234567=>2024-02-28 12:34:56.12
 c_round_dto1	datetimeoffset(1)	datetimeoffset	1,0	-	all	2024-02-28 23:59:59.960=>2024-02-29 00:00:00	2024-02-28 12:34:56.949=>2024-02-28 12:34:56.9

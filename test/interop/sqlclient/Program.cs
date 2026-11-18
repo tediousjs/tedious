@@ -250,6 +250,12 @@ static class Interop
 
     static int Main(string[] args)
     {
+        // Without it, SqlClient sends a `time`, `datetime2` or
+        // `datetimeoffset` parameter of scale 0 with scale 7, which the server
+        // does not accept for an encrypted column of scale 0
+        // (https://github.com/dotnet/SqlClient/issues/1380).
+        AppContext.SetSwitch("Switch.Microsoft.Data.SqlClient.LegacyVarTimeZeroScaleBehaviour", false);
+
         string mode = args[0];
         List<Column> columns = LoadSpec(Env("INTEROP_SPEC"));
 

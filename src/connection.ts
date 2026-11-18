@@ -567,7 +567,10 @@ export interface ConnectionOptions {
    * column is rounded to the scale of the column before it is encrypted,
    * the way the server rounds it for a column that is not encrypted.
    * (Microsoft's JDBC driver does the same, SqlClient truncates such a
-   * value.)
+   * value.) A `datetime2` or `datetimeoffset` value that rounds up to
+   * midnight is midnight of the next day. A `time` value can not be
+   * midnight of the next day: it is clamped to the last value of its scale
+   * instead, like `23:59:59` for `time(0)`.
    *
    * The time that a key store takes to encrypt the parameters of a request
    * counts towards the request timeout. The time that one takes to decrypt

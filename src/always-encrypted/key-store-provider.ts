@@ -18,6 +18,11 @@ const MAX_TIMEOUT = 2 ** 31 - 1;
 /**
  * How long the column encryption keys that a key store provider decrypted
  * are kept in memory.
+ *
+ * Both are read each time a key is looked up, so changing them applies from
+ * the next lookup on. They are checked when a connection is created, and
+ * again on each lookup: a key that is looked up while one of them is not
+ * valid fails to load, and with it the request that needs the key.
  */
 export interface KeyCacheOptions {
   /**

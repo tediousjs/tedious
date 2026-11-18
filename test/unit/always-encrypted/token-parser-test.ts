@@ -906,6 +906,24 @@ describe('handling tokens with column encryption', function() {
     assert.isUndefined(keyStateOf(keys[1]!));
   });
 
+  it('lets go of the ciphers of a result set when the request completes before the result set ends', async function() {
+    let key: ColumnEncryptionKeyInfo | undefined;
+
+    // The response ends (as the connection was closed, say) before the
+    // result set does: no DONE token.
+    const { request } = await handle(Buffer.concat([metadata, rows]), options, (request) => {
+      request.on('columnMetadata', (columns) => {
+        key = (columns as ColumnMetadata[])[1].cryptoMetadata!.key;
+      });
+    });
+
+    assert.instanceOf(keyStateOf(key!)!.cipher, ColumnEncryptionCipher);
+
+    request.callback(new Error('Connection lost'));
+
+    assert.isUndefined(keyStateOf(key!));
+  });
+
   it('fails the request if a column encryption key can not be loaded, and skips the rows of its result set', async function() {
     const parserOptions = {
       ...options,

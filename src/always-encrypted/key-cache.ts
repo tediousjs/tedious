@@ -1,5 +1,5 @@
 import { ALGORITHM_ID, ALGORITHM_NAME, ColumnEncryptionCipher } from './cipher';
-import { DEFAULT_KEY_CACHE_IDLE_TIMEOUT, DEFAULT_KEY_CACHE_TTL, type ColumnEncryptionKeyStoreProvider } from './key-store-provider';
+import { DEFAULT_KEY_CACHE_IDLE_TIMEOUT, DEFAULT_KEY_CACHE_TTL, validateKeyCacheOptions, type ColumnEncryptionKeyStoreProvider } from './key-store-provider';
 import { type ColumnEncryptionKeyInfo, type EncryptedColumnEncryptionKey, type InternalColumnEncryptionOptions } from './types';
 
 interface CacheEntry {
@@ -14,6 +14,7 @@ interface CacheEntry {
   used: number;
 
   // Removes the entry once it was not used for `idleTimeout` milliseconds.
+  // Only runs once the key was decrypted: a key store may take its time.
   idleTimeout: number;
   timer: NodeJS.Timeout | undefined;
 }
@@ -26,6 +27,15 @@ type Cache = Map<string, CacheEntry>;
 // how long a key is kept is up to the provider as well.
 const caches = new WeakMap<ColumnEncryptionKeyStoreProvider, Cache>();
 
+/**
+ * Throws if the key cache options of a provider are not valid. They were
+ * checked when the connection was created, but a provider's properties can
+ * change, and are read each time a key is looked up.
+ */
+function assertKeyCacheOptions(provider: ColumnEncryptionKeyStoreProvider, value: EncryptedColumnEncryptionKey) {
+  validateKeyCacheOptions(provider, `config.options.columnEncryption.keyStoreProviders.${value.keyStoreName}`);
+}
+
 function keyCacheTTL(provider: ColumnEncryptionKeyStoreProvider): number {
   return provider.keyCacheTTL ?? DEFAULT_KEY_CACHE_TTL;
 }
@@ -36,12 +46,13 @@ function keyCacheIdleTimeout(provider: ColumnEncryptionKeyStoreProvider): number
 
 /**
  * Whether an entry of the cache of a provider is of use: the key was
- * decrypted recently enough, and did not go unused for too long.
+ * decrypted recently enough, and did not go unused for too long. A key that
+ * is still being decrypted is not idle.
  */
 function isUsable(entry: CacheEntry, now: number, provider: ColumnEncryptionKeyStoreProvider): boolean {
   const idleTimeout = keyCacheIdleTimeout(provider);
 
-  return now - entry.time < keyCacheTTL(provider) && (idleTimeout === 0 || now - entry.used < idleTimeout);
+  return now - entry.time < keyCacheTTL(provider) && (entry.cipher === undefined || idleTimeout === 0 || now - entry.used < idleTimeout);
 }
 
 /**
@@ -54,6 +65,11 @@ function isUsable(entry: CacheEntry, now: number, provider: ColumnEncryptionKeyS
  */
 function use(cache: Cache, key: string, entry: CacheEntry, now: number, provider: ColumnEncryptionKeyStoreProvider) {
   entry.used = now;
+
+  // The timer starts once the key was decrypted.
+  if (entry.cipher === undefined) {
+    return;
+  }
 
   const idleTimeout = keyCacheIdleTimeout(provider);
   if (entry.timer !== undefined && idleTimeout === entry.idleTimeout) {
@@ -151,6 +167,8 @@ function getCipher(key: ColumnEncryptionKeyInfo, options: InternalColumnEncrypti
   for (const value of key.values) {
     const provider = options.keyStoreProviders.get(value.keyStoreName);
     if (provider !== undefined && isTrustedKeyPath(value.keyPath, options)) {
+      assertKeyCacheOptions(provider, value);
+
       const cache = caches.get(provider);
       const key = cacheKey(value, options);
 
@@ -194,6 +212,8 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
     throw new Error(`The column master key path "${value.keyPath}" is not one of the trusted key paths.`);
   }
 
+  assertKeyCacheOptions(provider, value);
+
   if (!(keyCacheTTL(provider) > 0)) {
     return decryptWithProvider(provider, value);
   }
@@ -229,6 +249,11 @@ function decryptValue(value: EncryptedColumnEncryptionKey, options: InternalColu
 
   entry.promise.then((cipher) => {
     entry.cipher = cipher;
+
+    // From now on, the key can go unused.
+    if (cache.get(key) === entry) {
+      use(cache, key, entry, Date.now(), provider);
+    }
   }, () => {
     remove(cache, key, entry);
   });

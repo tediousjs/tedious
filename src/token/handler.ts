@@ -34,7 +34,7 @@ import {
   Token
 } from './token';
 import BulkLoad from '../bulk-load';
-import { keyStateOf, releaseCipher, useCipher } from '../always-encrypted/column-decryption';
+import { keyStateOf, releaseCiphers, useCiphers } from '../always-encrypted/column-decryption';
 import { assertSupportedEncryption, loadColumnEncryptionKeys, type ColumnEncryptionCiphers } from '../always-encrypted/key-cache';
 import { COLUMN_ENCRYPTION_VERSION, type ColumnEncryptionKeyInfo } from '../always-encrypted/types';
 import { decryptValue } from '../value-parser';
@@ -621,9 +621,7 @@ export class RequestTokenHandler extends TokenHandler {
    * are decrypted with as its rows are parsed.
    */
   useColumnEncryptionCiphers(ciphers: ColumnEncryptionCiphers) {
-    for (const [key, cipher] of ciphers) {
-      useCipher(key, cipher);
-    }
+    useCiphers(this.request, ciphers);
   }
 
   /**
@@ -631,13 +629,8 @@ export class RequestTokenHandler extends TokenHandler {
    * read.
    */
   releaseColumnEncryptionCiphers() {
-    if (this.columnEncryptionKeys !== undefined) {
-      for (const key of this.columnEncryptionKeys) {
-        releaseCipher(key);
-      }
-
-      this.columnEncryptionKeys = undefined;
-    }
+    releaseCiphers(this.request);
+    this.columnEncryptionKeys = undefined;
   }
 
   /**

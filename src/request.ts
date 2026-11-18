@@ -6,6 +6,7 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { type Metadata } from './metadata-parser';
 import { type ColumnEncryptionCipher } from './always-encrypted/cipher';
 import { validateRequestColumnEncryption } from './always-encrypted/options';
+import { releaseCiphers } from './always-encrypted/column-decryption';
 import { type RequestColumnEncryption } from './always-encrypted/types';
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { type ColumnInfo } from './token/token';
@@ -476,8 +477,11 @@ class Request extends EventEmitter {
       // are started from the callback or event listeners below.
       this.canceled = false;
 
-      // The ciphers of encrypted output parameters are of no use anymore.
+      // The ciphers of encrypted output parameters and result sets are of no
+      // use anymore - also if the request was canceled, failed or its
+      // connection was closed before a result set was read to its end.
       this.parameterEncryption = undefined;
+      releaseCiphers(this);
 
       if (this.preparing) {
         this.preparing = false;

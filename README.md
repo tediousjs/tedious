@@ -80,6 +80,8 @@ Things to know:
 - A `time`, `datetime2` or `datetimeoffset` value that has more precision than its column is rounded to the scale of the column, the
   way the server rounds it for a column that is not encrypted. Microsoft's JDBC driver does the same, SqlClient truncates such a
   value instead: a lookup by a value that rounds differently than it truncates does not find what SqlClient wrote, and vice versa.
+  A `datetime2` or `datetimeoffset` value that rounds up to midnight is midnight of the next day. A `time` value that would round
+  up to midnight is clamped to the last value of its scale instead, like `23:59:59` for `time(0)`.
 - Before a request with parameters is executed for the first time, the server is asked which of its parameters need to be encrypted.
   Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
 - The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make

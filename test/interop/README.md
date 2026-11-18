@@ -54,13 +54,14 @@ Dependabot proposes updates of the drivers. When the checks of such an update
 fail, the list of the driver is to be updated in the same pull request.
 
 A column that one of the drivers is not able to write at all names the drivers
-that do write it in the `written by` field of the spec:
+that do write it in the `written by` field of the spec: tedious sends a
+`datetimeoffset` in UTC, so it does not write the column that holds another
+offset. It does read it.
 
-- SqlClient sends a `time` or `datetime2` parameter of scale 0 with scale 7,
-  which the server does not accept for an encrypted `time(0)` or
-  `datetime2(0)` column.
-- tedious sends a `datetimeoffset` in UTC, so it does not write the column
-  that holds another offset. It does read it.
+SqlClient is run with the `Switch.Microsoft.Data.SqlClient.LegacyVarTimeZeroScaleBehaviour`
+switch turned off. Otherwise it sends a `time`, `datetime2` or `datetimeoffset`
+parameter of scale 0 with scale 7, which the server does not accept for an
+encrypted column of scale 0.
 
 ## Running the checks
 

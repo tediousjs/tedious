@@ -434,6 +434,54 @@ describe('loadColumnEncryptionKeys', function() {
 
       clearTimeout(timers[0]);
     });
+
+    it('does not remove a key while the key store is decrypting it', async function() {
+      const clock = sinon.useFakeTimers();
+      const value = keyValue();
+      const options = optionsWith({ keyCacheIdleTimeout: 1000 });
+
+      let resolveKey!: (key: Buffer) => void;
+      provider.decryptColumnEncryptionKey = (masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey) => {
+        provider.calls.push({ masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey });
+        return new Promise<Buffer>((resolve) => {
+          resolveKey = resolve;
+        });
+      };
+
+      const first = loadColumnEncryptionKeys([keyInfo(value)], options);
+      await clock.tickAsync(0);
+
+      // The key store takes longer than the idle timeout.
+      await clock.tickAsync(5000);
+
+      // A request that needs the key meanwhile waits for the same result.
+      const second = loadColumnEncryptionKeys([keyInfo(value)], options);
+      assert.instanceOf(second, Promise);
+      assert.lengthOf(provider.calls, 1);
+
+      resolveKey(value.encryptedKey);
+      await Promise.all([first, second]);
+
+      // The key was kept, and its idle timeout starts once it is available.
+      assert.instanceOf(loadColumnEncryptionKeys([keyInfo(value)], options), Map);
+      assert.lengthOf(provider.calls, 1);
+
+      await clock.tickAsync(1000);
+      assert.isFalse(isCached(value));
+    });
+  });
+
+  it('checks the key cache options of a provider each time a key is looked up', async function() {
+    const value = keyValue();
+    const options = optionsWith();
+
+    await loadColumnEncryptionKeys([keyInfo(value)], options);
+
+    // The options were valid when the connection was created.
+    provider.keyCacheTTL = -1;
+
+    assert.throws(() => loadColumnEncryptionKeys([keyInfo(value)], options), TypeError, 'The "config.options.columnEncryption.keyStoreProviders.FAKE.keyCacheTTL" property must be a non-negative number.');
+    assert.throws(() => loadColumnEncryptionKeys([keyInfo(keyValue())], options), TypeError, 'keyCacheTTL');
   });
 
   it('does not cache keys if the cache is disabled', async function() {
