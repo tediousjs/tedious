@@ -65,60 +65,164 @@ Remaining risks, which are why the approval gate is recommended:
 
 ## One-time setup
 
-The commands below use these example names. Any names work, as long as the
-repository variables match.
+You need:
+
+- **Azure:** Owner (or User Access Administrator) on the subscription, to
+  create the resource group and assign a role on it.
+- **Entra ID:** Privileged Role Administrator or Global Administrator, to grant
+  the provisioner its Microsoft Graph permission. Everything else only needs
+  the right to create apps and groups.
+
+Run these with your own `az login`. They use these example names; any names
+work, as long as the repository variables match.
 
 ```sh
 SUB=<subscription id>
+TENANT=<tenant id>
 RG=tedious-ci
 LOCATION=eastus2
+az account set --subscription "$SUB"
 
+# 0. The resource group holds only CI servers: anything in it older than
+#    two hours with the `tedious-ci` tag gets deleted. The provisioner can't
+#    register resource providers, so register Microsoft.Sql now (no-op if
+#    already registered).
+az provider register --namespace Microsoft.Sql --wait
 az group create --name "$RG" --location "$LOCATION"
+```
 
-# 1. Identity that GitHub Actions logs in as (provisions and deletes servers).
+### 1. The provisioner (what GitHub Actions logs in as)
+
+An app registration with no secret. GitHub Actions logs in with OIDC
+through federated credentials, one per environment.
+
+```sh
 PROVISIONER_APP_ID=$(az ad app create --display-name tedious-ci-provisioner --query appId -o tsv)
 PROVISIONER_SP_ID=$(az ad sp create --id "$PROVISIONER_APP_ID" --query id -o tsv)
 
 for env in azure-sql azure-sql-external; do
   az ad app federated-credential create --id "$PROVISIONER_APP_ID" --parameters "{
-    \"name\": \"github-$env\",
+    \"name\": \"github-tediousjs-tedious-$env\",
     \"issuer\": \"https://token.actions.githubusercontent.com\",
     \"subject\": \"repo:tediousjs/tedious:environment:$env\",
     \"audiences\": [\"api://AzureADTokenExchange\"]
   }"
 done
 
-# Only on the CI resource group, which should hold nothing else.
+# Contributor on the CI resource group only.
 az role assignment create --assignee-object-id "$PROVISIONER_SP_ID" \
   --assignee-principal-type ServicePrincipal --role Contributor \
   --scope "/subscriptions/$SUB/resourceGroups/$RG"
 
-# Microsoft Graph Application.ReadWrite.OwnedBy (lets it add and remove
-# client secrets on apps it owns, i.e. the test app below).
-az ad app permission add --id "$PROVISIONER_APP_ID" \
-  --api 00000003-0000-0000-c000-000000000000 \
-  --api-permissions 18a4783c-866b-4cc7-a460-3d5e5662c884=Role
-az ad app permission admin-consent --id "$PROVISIONER_APP_ID"
+# Microsoft Graph Application.ReadWrite.OwnedBy, granted directly as an app
+# role assignment (the same thing admin consent does). It lets the
+# provisioner add and remove client secrets on apps it owns.
+GRAPH_SP_ID=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
+az rest --method POST \
+  --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$PROVISIONER_SP_ID/appRoleAssignments" \
+  --body "{
+    \"principalId\": \"$PROVISIONER_SP_ID\",
+    \"resourceId\": \"$GRAPH_SP_ID\",
+    \"appRoleId\": \"18a4783c-866b-4cc7-a460-3d5e5662c884\"
+  }"
+```
 
-# 2. App the tests authenticate as. Public client flows are enabled for the
-#    Entra password (ROPC) tests.
+Do **not** make the provisioner an owner of its own app registration. With
+`Application.ReadWrite.OwnedBy`, that would let it add credentials to itself,
+for example a federated credential for some other repository.
+
+Use an app registration here, not a user-assigned managed identity in the
+CI resource group: `Contributor` on that group would let the provisioner add
+federated credentials to such an identity.
+
+### 2. The test app (what the tests authenticate as)
+
+If the current CI setup's app (the old `AZURE_AD_SP_CLIENT_ID` secret) already
+has public client flows enabled, you can reuse it instead of creating one.
+Just make the provisioner an owner and delete its old long-lived client secret.
+
+```sh
 TEST_APP_ID=$(az ad app create --display-name tedious-ci-test \
   --is-fallback-public-client true --query appId -o tsv)
 TEST_SP_ID=$(az ad sp create --id "$TEST_APP_ID" --query id -o tsv)
-az ad app owner add --id "$TEST_APP_ID" --owner-object-id "$PROVISIONER_SP_ID"
 
-# 3. Group that becomes Entra admin of every CI server.
+# Lets the provisioner mint and remove the short-lived client secrets.
+az ad app owner add --id "$TEST_APP_ID" --owner-object-id "$PROVISIONER_SP_ID"
+```
+
+Give the test app **no** Azure role assignments and no Graph permissions. Its
+only access is via the group below.
+
+If your tenant has an app management policy that blocks or limits password
+credentials, it must allow client secrets on this app with a lifetime of at
+least two hours.
+
+### 3. The Entra test user (for `azure-ad-password` only)
+
+The existing test user can stay. The Entra password tests use ROPC, so the
+user must:
+
+- be a cloud-only account, not federated or synced, with no MFA;
+- not be covered by security defaults or any Conditional Access policy that
+  requires MFA (exclude it explicitly);
+- have no Azure role assignments.
+
+These tests never run for untrusted pull requests.
+
+### 4. The admin group
+
+Every CI server gets this group as its Entra admin, which gives its members
+`dbo` on the `tedious` database. Service principals can log in to Azure SQL
+through group membership. No server identity or Directory Readers role is
+needed, because nothing runs `CREATE USER ... FROM EXTERNAL PROVIDER`.
+
+```sh
 GROUP_ID=$(az ad group create --display-name tedious-ci-sql-admins \
   --mail-nickname tedious-ci-sql-admins --query id -o tsv)
 az ad group member add --group "$GROUP_ID" --member-id "$TEST_SP_ID"
-az ad group member add --group "$GROUP_ID" --member-id <object id of the Entra test user>
+az ad group member add --group "$GROUP_ID" --member-id "$(az ad user show --id <test user UPN> --query id -o tsv)"
 ```
 
-Give the test app and the test user **no** other role assignments.
+The group must contain only the test app and the test user.
 
-Recommended: add a budget with an alert on the resource group.
+### 5. Budget alert (recommended)
 
-### GitHub settings
+In the portal: Cost Management → Budgets → add a monthly budget scoped to
+the `tedious-ci` resource group, with an email alert. That catches
+leftover servers even if both teardown and the cleanup workflow fail.
+
+### 6. Dry run (optional, before merging)
+
+The workflows can only run once they're on `master`. To check the Azure side
+first, run what a job does, logged in as yourself:
+
+```sh
+NAME=tedious-ci-dryrun-$(date +%s)
+PW="Tds-$(openssl rand -hex 24)"
+az sql server create -g "$RG" -n "$NAME" -l "$LOCATION" -u tedious -p "$PW" \
+  --external-admin-principal-type Group --external-admin-name tedious-ci-sql-admins \
+  --external-admin-sid "$GROUP_ID" --minimal-tls-version 1.2 \
+  --soft-delete-retention-days 0 --tags tedious-ci=true "created-at=$(date -u +%s)"
+az sql server firewall-rule create -g "$RG" -s "$NAME" -n me \
+  --start-ip-address "$(curl -s https://api.ipify.org)" --end-ip-address "$(curl -s https://api.ipify.org)"
+az sql db create -g "$RG" -s "$NAME" -n tedious --service-objective S0 --backup-storage-redundancy Local
+
+# Then, from a tedious checkout:
+#   cp test/config.azure-default.ts test/config.ts
+#   AZURE_SERVER=$NAME.database.windows.net AZURE_USERNAME=tedious AZURE_PASSWORD=$PW \
+#     npm run test-integration
+# and the same with a temporary client secret on the test app for
+# test/config.azure-ad-sp-secret.ts.
+
+az sql server delete -g "$RG" -n "$NAME" --yes
+```
+
+If you skip this, the first push to `master` after merging is the first
+real run. If its teardown fails, the cleanup workflow deletes the server
+within the next hour.
+
+
+### 7. GitHub settings
 
 **Repository variables** (Settings → Secrets and variables → Actions →
 Variables). None of these are secret:
