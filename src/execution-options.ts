@@ -14,11 +14,16 @@ export interface ExecutionOptions {
    *
    * If the signal is aborted already, the request is not sent at all.
    *
-   * If the execution failed or was canceled otherwise before the signal was
-   * aborted, e.g. via `cancel()` or by a request timeout, it completes with
-   * that error instead. If the server does not acknowledge the cancellation
-   * within {@link ConnectionOptions.cancelTimeout}, the connection is closed
-   * and the execution fails with that connection error.
+   * If the execution was canceled otherwise before the signal was aborted,
+   * via `cancel()` or by a request timeout, it completes with that
+   * cancellation's error instead. If the server does not acknowledge the
+   * cancellation within {@link ConnectionOptions.cancelTimeout}, the
+   * connection is closed and the execution fails with that connection error.
+   *
+   * As with `cancel()`, an error that the execution ran into before it was
+   * canceled, e.g. an error returned by the server or a parameter value that
+   * failed to stream, is either reported or replaced by the abort error,
+   * depending on how far the execution got.
    */
   signal?: AbortSignal | undefined;
 }

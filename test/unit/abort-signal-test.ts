@@ -223,7 +223,7 @@ describe('Executing a request with an abort signal', function() {
     });
   });
 
-  describe('when the request times out after the signal was aborted', function() {
+  describe('against a mock TDS server', function() {
     let server: net.Server;
     let sockets: net.Socket[];
 
@@ -281,11 +281,16 @@ describe('Executing a request with an abort signal', function() {
       }
     }
 
-    it('fails with the abort error, not with a timeout error', function(done) {
-      const requestTimeout = 200;
-      const controller = new AbortController();
-      const reason = new Error('no longer needed');
+    interface MockSession {
+      // Wait for the next message from the client, which must be of the
+      // given type.
+      expectMessage(type: number): Promise<void>;
+      // Send a response message with the given tokens.
+      respond(data?: Buffer): void;
+    }
 
+    // Accept a connection, log it in, and then hand the session to the test.
+    function serve(handler: (session: MockSession) => Promise<void>, done: (err?: any) => void) {
       server.on('connection', async (socket) => {
         const debug = new Debug();
         const incomingMessageStream = new IncomingMessageStream(debug);
@@ -327,33 +332,47 @@ describe('Executing a request with an abort signal', function() {
           await expectMessage(0x01);
           respond();
 
-          // SQL Batch (`select 1`). The request message was received in full,
-          // so aborting now sends an attention message.
-          await expectMessage(0x01);
-          controller.abort(reason);
-
-          // ATTENTION
-          await expectMessage(0x06);
-
-          // Let the request time out before the server responds to the
-          // canceled request and acknowledges the attention message.
-          setTimeout(() => {
-            respond(buildDoneToken(0x0000));
-            respond(buildDoneToken(0x0020)); // DONE_ATTN
-          }, requestTimeout * 2);
+          await handler({ expectMessage, respond });
         } catch (err: any) {
           done(err);
         }
       });
+    }
 
-      const connection = new Connection({
+    function connect(options: { requestTimeout?: number } = {}) {
+      return new Connection({
         server: (server.address() as net.AddressInfo).address,
         options: {
           port: (server.address() as net.AddressInfo).port,
           encrypt: false,
-          requestTimeout: requestTimeout
+          ...options
         }
       });
+    }
+
+    it('fails with the abort error, not with a timeout error, when the request times out after the signal was aborted', function(done) {
+      const requestTimeout = 200;
+      const controller = new AbortController();
+      const reason = new Error('no longer needed');
+
+      serve(async ({ expectMessage, respond }) => {
+        // SQL Batch (`select 1`). The request message was received in full,
+        // so aborting now sends an attention message.
+        await expectMessage(0x01);
+        controller.abort(reason);
+
+        // ATTENTION
+        await expectMessage(0x06);
+
+        // Let the request time out before the server responds to the
+        // canceled request and acknowledges the attention message.
+        setTimeout(() => {
+          respond(buildDoneToken(0x0000));
+          respond(buildDoneToken(0x0020)); // DONE_ATTN
+        }, requestTimeout * 2);
+      }, done);
+
+      const connection = connect({ requestTimeout });
 
       connection.connect((err) => {
         if (err) {
@@ -378,5 +397,151 @@ describe('Executing a request with an abort signal', function() {
         done(failure);
       });
     });
+
+    it('fails a canceled request with the cancellation error, not with a timeout error, when it times out before the cancellation is acknowledged', function(done) {
+      const requestTimeout = 200;
+      let request!: Request;
+
+      serve(async ({ expectMessage, respond }) => {
+        await expectMessage(0x01);
+        request.cancel();
+
+        // ATTENTION
+        await expectMessage(0x06);
+
+        setTimeout(() => {
+          respond(buildDoneToken(0x0000));
+          respond(buildDoneToken(0x0020)); // DONE_ATTN
+        }, requestTimeout * 2);
+      }, done);
+
+      const connection = connect({ requestTimeout });
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        request = new Request('select 1', (error) => {
+          try {
+            assert.instanceOf(error, RequestError);
+            assert.strictEqual((error as RequestError).code, 'ECANCEL');
+          } catch (assertionError) {
+            failure = assertionError as Error;
+          }
+
+          connection.close();
+        });
+
+        connection.execSqlBatch(request);
+      });
+
+      let failure: Error | undefined;
+      connection.on('end', () => {
+        done(failure);
+      });
+    });
+
+    // Execute the request again while it is in progress, in a way that is
+    // rejected, and check that the execution in progress is still canceled
+    // by its own signal, and still fails with the abort error.
+    const rejections: Array<{ title: string, sql: string, execute: (connection: Connection, request: Request) => void, rejectedWith: (error: unknown) => void }> = [
+      {
+        title: 'because another execution is in progress',
+        sql: 'select 1',
+        execute: (connection, request) => {
+          connection.execSqlBatch(request, { signal: AbortSignal.abort(new Error('second execution')) });
+        },
+        rejectedWith: (error) => {
+          assert.instanceOf(error, RequestError);
+          assert.strictEqual((error as RequestError).code, 'EINVALIDSTATE');
+        }
+      },
+      {
+        title: 'because its parameters fail validation',
+        sql: 'select @a',
+        execute: (connection, request) => {
+          request.parameters[0].value = 'not a number';
+          connection.execSql(request, { signal: AbortSignal.abort(new Error('second execution')) });
+        },
+        rejectedWith: (error) => {
+          assert.instanceOf(error, Error);
+          assert.match((error as Error).message, /^Validation failed for parameter 'a'/);
+        }
+      }
+    ];
+
+    for (const rejection of rejections) {
+      it(`keeps listening to the signal of an execution in progress if executing the request again is rejected ${rejection.title}`, function(done) {
+        const controller = new AbortController();
+        const reason = new Error('no longer needed');
+        const errors: Array<Error | null | undefined> = [];
+        let connection!: Connection;
+        let request!: Request;
+
+        serve(async ({ expectMessage, respond }) => {
+          // The first execution: a SQL batch, or an RPC request for
+          // `execSql`.
+          await expectMessage(rejection.sql === 'select 1' ? 0x01 : 0x03);
+
+          rejection.execute(connection, request);
+
+          // Rejections because of the parameters are reported on the next
+          // tick.
+          await new Promise((resolve) => setImmediate(resolve));
+
+          try {
+            assert.lengthOf(errors, 1);
+            rejection.rejectedWith(errors[0]);
+            assert.isFalse(request.canceled, 'the rejected execution canceled the one in progress');
+            assert.lengthOf(getEventListeners(controller.signal, 'abort'), 1, 'the rejected execution removed the signal listener of the one in progress');
+          } catch (err) {
+            return done(err);
+          }
+
+          controller.abort(reason);
+
+          // ATTENTION
+          await expectMessage(0x06);
+          respond(buildDoneToken(0x0000));
+          respond(buildDoneToken(0x0020)); // DONE_ATTN
+        }, done);
+
+        connection = connect();
+
+        connection.connect((err) => {
+          if (err) {
+            return done(err);
+          }
+
+          request = new Request(rejection.sql, (error) => {
+            errors.push(error);
+
+            if (errors.length === 2) {
+              try {
+                assertAbortError(errors[1], reason);
+                assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+              } catch (assertionError) {
+                failure = assertionError as Error;
+              }
+
+              connection.close();
+            }
+          });
+
+          if (rejection.sql === 'select 1') {
+            connection.execSqlBatch(request, { signal: controller.signal });
+          } else {
+            request.addParameter('a', TYPES.Int, 1);
+            connection.execSql(request, { signal: controller.signal });
+          }
+        });
+
+        let failure: Error | undefined;
+        connection.on('end', () => {
+          done(failure);
+        });
+      });
+    }
   });
 });

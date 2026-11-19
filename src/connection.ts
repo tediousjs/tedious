@@ -2777,7 +2777,9 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        // The request was never started, so it must not complete another
+        // execution of it that is in progress (see `originalCallback`).
+        originalCallback(request).call(request, error);
       });
 
       return;
@@ -3109,7 +3111,9 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        // The request was never started, so it must not complete another
+        // execution of it that is in progress (see `originalCallback`).
+        originalCallback(request).call(request, error);
       });
 
       return;
@@ -3144,7 +3148,9 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        // The request was never started, so it must not complete another
+        // execution of it that is in progress (see `originalCallback`).
+        originalCallback(request).call(request, error);
       });
 
       return;
@@ -3352,7 +3358,9 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      request.callback(new RequestError(message, 'EINVALIDSTATE'));
+      // The request is rejected, e.g. because another execution of it is in
+      // progress, which this must not complete (see `originalCallback`).
+      originalCallback(request).call(request, new RequestError(message, 'EINVALIDSTATE'));
       return;
     }
 
