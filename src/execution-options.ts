@@ -47,10 +47,10 @@ export function abortError(signal: AbortSignal) {
  *
  * Every execution is canceled through an abort signal, {@link signal}, whose
  * reason is the error the canceled execution completes with. Whatever cancels
- * an execution, be it `cancel()`, a request timeout or the abort signal given
- * in the {@link ExecutionOptions}, aborts this signal, and the first one to do
- * so determines the execution's error. The connection only needs to react to
- * this one signal.
+ * an execution, be it `cancel()`, its request timeout or the abort signal
+ * given in the {@link ExecutionOptions}, aborts this signal, and the first one
+ * to do so determines the execution's error. The connection only needs to
+ * react to this one signal.
  *
  * A cancellation applies to the current execution, or to the next one if none
  * is in progress. It is reset once the execution completed (see
@@ -77,6 +77,11 @@ export class Cancellation {
   declare private removers: Array<() => void>;
 
   /**
+   * Cancels the current execution once its request timeout expired.
+   */
+  declare private timer: NodeJS.Timeout | undefined;
+
+  /**
    * Whether an execution was accepted and has not completed yet.
    */
   declare executing: boolean;
@@ -85,6 +90,7 @@ export class Cancellation {
     this.controller = new AbortController();
     this.onCancel = onCancel;
     this.removers = [];
+    this.timer = undefined;
     this.executing = false;
   }
 
@@ -124,25 +130,44 @@ export class Cancellation {
   }
 
   /**
-   * Start an execution, which was accepted, and cancel it with an abort
-   * error once the given signal is aborted, or right away if it is aborted
-   * already.
+   * Start an execution, which was accepted.
+   *
+   * It is canceled with an abort error once the given signal is aborted, or
+   * right away if it is aborted already. Unless it is canceled already, it is
+   * canceled with a timeout error once the given request timeout expired,
+   * unless that is stopped first (see {@link stopTimeout}). A timeout of `0`
+   * means no timeout.
    */
-  start(signal: AbortSignal | undefined) {
+  start(signal: AbortSignal | undefined, timeout: number) {
     this.executing = true;
 
-    if (signal === undefined) {
-      return;
+    if (signal !== undefined) {
+      if (signal.aborted) {
+        this.cancel(abortError(signal));
+      } else {
+        this.listen(signal, () => {
+          this.cancel(abortError(signal));
+        });
+      }
     }
 
-    if (signal.aborted) {
-      this.cancel(abortError(signal));
-      return;
+    if (timeout && !this.canceled) {
+      this.timer = setTimeout(() => {
+        this.timer = undefined;
+        this.cancel(new RequestError('Timeout: Request failed to complete in ' + timeout + 'ms', 'ETIMEOUT'));
+      }, timeout);
     }
+  }
 
-    this.listen(signal, () => {
-      this.cancel(abortError(signal));
-    });
+  /**
+   * Stop the request timeout of the current execution, e.g. because the
+   * server started to respond.
+   */
+  stopTimeout() {
+    if (this.timer !== undefined) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
   }
 
   /**
@@ -154,11 +179,13 @@ export class Cancellation {
   }
 
   /**
-   * Complete the current execution: remove the listeners that belong to it,
-   * and reset the cancellation for the next execution.
+   * Complete the current execution: stop its request timeout, remove the
+   * listeners that belong to it, and reset the cancellation for the next
+   * execution.
    */
   complete() {
     this.executing = false;
+    this.stopTimeout();
 
     for (const remove of this.removers) {
       remove();

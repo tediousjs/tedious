@@ -1040,10 +1040,6 @@ class Connection extends EventEmitter {
    * @private
    */
   declare cancelTimer: undefined | NodeJS.Timeout;
-  /**
-   * @private
-   */
-  declare requestTimer: undefined | NodeJS.Timeout;
 
   /**
    * Controller used to abort the connection establishment process
@@ -2170,7 +2166,6 @@ class Connection extends EventEmitter {
    */
   cleanupConnection() {
     if (!this.closed) {
-      this.clearRequestTimer();
       this.clearCancelTimer();
       this.closeConnection();
 
@@ -2367,20 +2362,6 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createRequestTimer() {
-    this.clearRequestTimer(); // release old timer, just to be safe
-    const request = this.request as Request;
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    if (timeout) {
-      this.requestTimer = setTimeout(() => {
-        this.requestTimeout();
-      }, timeout);
-    }
-  }
-
-  /**
-   * @private
-   */
   cancelTimeout() {
     const message = `Failed to cancel request in ${this.config.options.cancelTimeout}ms`;
     this.debug.log(message);
@@ -2390,35 +2371,10 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  requestTimeout() {
-    this.requestTimer = undefined;
-    const request = this.request!;
-
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-
-    // A request that was canceled already, e.g. via `cancel()` or an abort
-    // signal, keeps the error of that cancellation.
-    request.cancellation.cancel(new RequestError(message, 'ETIMEOUT'));
-  }
-
-  /**
-   * @private
-   */
   clearCancelTimer() {
     if (this.cancelTimer) {
       clearTimeout(this.cancelTimer);
       this.cancelTimer = undefined;
-    }
-  }
-
-  /**
-   * @private
-   */
-  clearRequestTimer() {
-    if (this.requestTimer) {
-      clearTimeout(this.requestTimer);
-      this.requestTimer = undefined;
     }
   }
 
@@ -3411,8 +3367,11 @@ class Connection extends EventEmitter {
     // rejected (above), or if preparing its payload throws, the signal must
     // not affect the request, which might still be executing another time
     // (or will be executed again later).
+    //
+    // The request timeout runs until the server starts to respond.
     const { cancellation } = request;
-    cancellation.start(signal);
+    const timeout = request.timeout !== undefined ? request.timeout : this.config.options.requestTimeout;
+    cancellation.start(signal, timeout);
 
     if (cancellation.canceled) {
       // A request that was canceled before it was sent is not sent at all.
@@ -3476,8 +3435,6 @@ class Connection extends EventEmitter {
         request.resume();
       }
     });
-
-    this.createRequestTimer();
 
     const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
     this.messageIo.outgoingMessageStream.write(message);
@@ -3978,8 +3935,8 @@ Connection.prototype.STATE = {
           this._onSocketError(err);
           return;
         }
-        // request timer is stopped on first data package
-        this.clearRequestTimer();
+        // The request timeout is stopped once the server started to respond.
+        this.request?.cancellation.stopTimeout();
 
         const tokenStreamParser = this.createTokenStreamParser(message, new RequestTokenHandler(this, this.request!));
 
@@ -4083,9 +4040,6 @@ Connection.prototype.STATE = {
         this.request?.cancellation.onAbort(onAbort);
       })();
 
-    },
-    exit: function(nextState) {
-      this.clearRequestTimer();
     },
     events: {
       socketError: function(err) {

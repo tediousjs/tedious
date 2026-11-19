@@ -66,7 +66,7 @@ describe('Cancellation', function() {
       const state = cancellation();
       const controller = new AbortController();
 
-      state.cancellation.start(controller.signal);
+      state.cancellation.start(controller.signal, 0);
       assert.isFalse(state.cancellation.canceled);
 
       controller.abort(reason);
@@ -88,7 +88,7 @@ describe('Cancellation', function() {
     const state = cancellation();
     const reason = new Error('aborted before');
 
-    state.cancellation.start(AbortSignal.abort(reason));
+    state.cancellation.start(AbortSignal.abort(reason), 0);
 
     assert.strictEqual(state.cancelCalls, 1);
     assertAbortError(state.cancellation.error, reason);
@@ -99,7 +99,7 @@ describe('Cancellation', function() {
     const controller = new AbortController();
     const error = new RequestError('Canceled.', 'ECANCEL');
 
-    state.cancellation.start(controller.signal);
+    state.cancellation.start(controller.signal, 0);
     state.cancellation.cancel(error);
     controller.abort(new Error('too late'));
 
@@ -111,7 +111,7 @@ describe('Cancellation', function() {
     const state = cancellation();
     const controller = new AbortController();
 
-    state.cancellation.start(controller.signal);
+    state.cancellation.start(controller.signal, 0);
     assert.lengthOf(getEventListeners(controller.signal, 'abort'), 1);
 
     state.cancellation.complete();
@@ -125,7 +125,7 @@ describe('Cancellation', function() {
   it('resets a canceled execution once it completed', function() {
     const state = cancellation();
 
-    state.cancellation.start(undefined);
+    state.cancellation.start(undefined, 0);
     state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
     const signal = state.cancellation.signal;
 
@@ -141,7 +141,7 @@ describe('Cancellation', function() {
     const state = cancellation();
 
     let calls = 0;
-    state.cancellation.start(undefined);
+    state.cancellation.start(undefined, 0);
     state.cancellation.onAbort(() => {
       calls += 1;
     });
@@ -157,12 +157,64 @@ describe('Cancellation', function() {
     const state = cancellation();
     const calls: string[] = [];
 
-    state.cancellation.start(undefined);
+    state.cancellation.start(undefined, 0);
     state.cancellation.onAbort(() => calls.push('first'));
     state.cancellation.onAbort(() => calls.push('second'));
     state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
 
     assert.deepEqual(calls, ['first', 'second']);
+  });
+
+  it('is canceled with a timeout error once the request timeout expired', async function() {
+    const state = cancellation();
+
+    state.cancellation.start(undefined, 10);
+    assert.isFalse(state.cancellation.canceled);
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.instanceOf(state.cancellation.error, RequestError);
+    assert.strictEqual((state.cancellation.error as RequestError).code, 'ETIMEOUT');
+    assert.strictEqual(state.cancellation.error!.message, 'Timeout: Request failed to complete in 10ms');
+    assert.strictEqual(state.cancelCalls, 1);
+  });
+
+  it('keeps the error of an earlier cancellation once the request timeout expired', async function() {
+    const state = cancellation();
+    const controller = new AbortController();
+    const reason = new Error('no longer needed');
+
+    state.cancellation.start(controller.signal, 10);
+    controller.abort(reason);
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assertAbortError(state.cancellation.error, reason);
+    assert.strictEqual(state.cancelCalls, 1);
+  });
+
+  it('does not time out once the request timeout was stopped, or the execution completed', async function() {
+    const stopped = cancellation();
+    stopped.cancellation.start(undefined, 10);
+    stopped.cancellation.stopTimeout();
+
+    const completed = cancellation();
+    completed.cancellation.start(undefined, 10);
+    completed.cancellation.complete();
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    assert.isFalse(stopped.cancellation.canceled);
+    assert.isFalse(completed.cancellation.canceled);
+  });
+
+  it('does not start the request timeout of an execution that is canceled already', function() {
+    const state = cancellation();
+
+    state.cancellation.start(AbortSignal.abort(), 10);
+
+    // There is no timer left to keep the execution, or the process, waiting.
+    assert.isUndefined((state.cancellation as any).timer);
   });
 
   it('resets a cancellation once an execution was rejected while none is in progress', function() {
@@ -178,7 +230,7 @@ describe('Cancellation', function() {
     const state = cancellation();
     const error = new RequestError('Canceled.', 'ECANCEL');
 
-    state.cancellation.start(undefined);
+    state.cancellation.start(undefined, 0);
     state.cancellation.cancel(error);
     state.cancellation.rejected();
 
