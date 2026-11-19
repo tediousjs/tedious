@@ -29,17 +29,6 @@ export interface ExecutionOptions {
 }
 
 /**
- * A request or bulk load, as far as its cancellation is concerned.
- *
- * @private
- */
-interface Execution {
-  canceled: boolean;
-  callback: (error: Error | null | undefined, ...rest: any[]) => void;
-  cancel(): void;
-}
-
-/**
  * Create the error an execution that was canceled by an abort signal
  * completes with. It follows Node.js' own `AbortError`, so it can be told
  * apart from a request timeout (`ETIMEOUT`) and from `cancel()` (`ECANCEL`),
@@ -47,85 +36,123 @@ interface Execution {
  *
  * @private
  */
-function abortError(signal: AbortSignal) {
+export function abortError(signal: AbortSignal) {
   const error = new RequestError('The operation was aborted', 'ABORT_ERR', { cause: signal.reason });
   error.name = 'AbortError';
   return error;
 }
 
 /**
- * The callbacks that {@link abortOnSignal} replaced, by the callback it
- * replaced them with.
+ * The cancellation of the executions of a {@link Request} or {@link BulkLoad}.
+ *
+ * Every execution is canceled through an abort signal, {@link signal}, whose
+ * reason is the error the canceled execution completes with. Whatever cancels
+ * an execution, be it `cancel()`, a request timeout or the abort signal given
+ * in the {@link ExecutionOptions}, aborts this signal, and the first one to do
+ * so determines the execution's error. The connection only needs to react to
+ * this one signal.
+ *
+ * A cancellation applies to the current execution, or to the next one if none
+ * is in progress. Once an execution completed, the cancellation is reset with
+ * {@link complete}, so that it does not affect later executions.
  *
  * @private
  */
-const replacedCallbacks = new WeakMap<Execution['callback'], Execution['callback']>();
+export class Cancellation {
+  /**
+   * Aborted to cancel the current execution.
+   */
+  declare private controller: AbortController;
 
-/**
- * The given request's or bulk load's callback, without the replacements
- * {@link abortOnSignal} made for the executions that are in progress.
- *
- * An execution that is rejected while another execution of the same request
- * or bulk load is in progress must call back with this callback. Otherwise,
- * its completion would be taken for the completion of the execution in
- * progress, whose signal would no longer be listened to.
- *
- * @private
- */
-export function originalCallback(execution: Execution): Execution['callback'] {
-  let callback = execution.callback;
-  for (let replaced = replacedCallbacks.get(callback); replaced !== undefined; replaced = replacedCallbacks.get(callback)) {
-    callback = replaced;
-  }
-  return callback;
-}
+  /**
+   * Aborted once the current execution completed.
+   */
+  declare private completedController: AbortController;
 
-/**
- * Cancel the current execution of the given request or bulk load once the
- * signal is aborted, and let it complete with an abort error instead of the
- * cancellation error.
- *
- * The execution's `callback` is replaced until the execution completed, so
- * this must only be called once the execution is certain to call back.
- *
- * @private
- */
-export function abortOnSignal(execution: Execution, signal: AbortSignal | undefined) {
-  if (signal === undefined) {
-    return;
+  /**
+   * Called whenever an execution is canceled.
+   */
+  declare private onCancel: () => void;
+
+  constructor(onCancel: () => void) {
+    this.onCancel = onCancel;
+    this.reset();
   }
 
-  const callback = execution.callback;
+  /**
+   * Aborted once the current execution is canceled, with the error that it
+   * completes with as the reason.
+   */
+  get signal(): AbortSignal {
+    return this.controller.signal;
+  }
 
-  // Whether this signal canceled the execution. If the execution was
-  // canceled otherwise first, e.g. via `cancel()` or by a request timeout,
-  // its error is kept.
-  let canceledBySignal = false;
+  /**
+   * Aborted once the current execution completed.
+   *
+   * Listeners that belong to the current execution are registered with this
+   * signal (as the `signal` option of `addEventListener`), so that they are
+   * removed once it completed, however it completed.
+   */
+  get completed(): AbortSignal {
+    return this.completedController.signal;
+  }
 
-  const onAbort = () => {
-    if (!execution.canceled) {
-      canceledBySignal = true;
-      execution.cancel();
+  /**
+   * Whether the current execution was canceled.
+   */
+  get canceled(): boolean {
+    return this.signal.aborted;
+  }
+
+  /**
+   * The error the current execution completes with, if it was canceled.
+   */
+  get error(): Error | undefined {
+    return this.signal.aborted ? this.signal.reason : undefined;
+  }
+
+  /**
+   * Cancel the current execution, which then completes with the given error,
+   * unless it was canceled already.
+   */
+  cancel(error: Error) {
+    if (this.canceled) {
+      return;
     }
-  };
 
-  execution.callback = function(error, ...rest) {
-    execution.callback = callback;
-    signal.removeEventListener('abort', onAbort);
+    this.controller.abort(error);
+    this.onCancel();
+  }
 
-    if (canceledBySignal && error instanceof RequestError && error.code === 'ECANCEL') {
-      error = abortError(signal);
+  /**
+   * Cancel the current execution with an abort error once the given signal
+   * is aborted, or right away if it is aborted already.
+   *
+   * The signal is only listened to until the current execution completed.
+   */
+  follow(signal: AbortSignal) {
+    if (signal.aborted) {
+      this.cancel(abortError(signal));
+      return;
     }
 
-    callback.call(execution, error, ...rest);
-  };
+    signal.addEventListener('abort', () => {
+      this.cancel(abortError(signal));
+    }, { once: true, signal: this.completed });
+  }
 
-  replacedCallbacks.set(execution.callback, callback);
+  /**
+   * Complete the current execution: remove the listeners that belong to it,
+   * and reset the cancellation for the next execution.
+   */
+  complete() {
+    this.completedController.abort();
+    this.reset();
+  }
 
-  if (signal.aborted) {
-    // A canceled request is not sent, and completes asynchronously.
-    onAbort();
-  } else {
-    signal.addEventListener('abort', onAbort, { once: true });
+  private reset() {
+    this.controller = new AbortController();
+    this.completedController = new AbortController();
   }
 }

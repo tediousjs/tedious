@@ -336,6 +336,8 @@ describe('abort signals', function() {
         secondExecution = r;
       });
 
+      let canceledBySignal = false;
+
       async function* rows() {
         yield { id: 1 };
 
@@ -346,6 +348,7 @@ describe('abort signals', function() {
 
         // The first execution's signal must still cancel it.
         controller.abort(reason);
+        canceledBySignal = bulkLoad.canceled;
         await delay(100);
         yield { id: 2 };
       }
@@ -380,7 +383,9 @@ describe('abort signals', function() {
       // load that is canceled while its rows are sent keeps. This happens
       // for `cancel()` without a signal, too.)
       await completed;
-      assert.isTrue(bulkLoad.canceled);
+      assert.isTrue(canceledBySignal, 'the signal did not cancel the execution in progress');
+      // The cancellation only applied to that execution.
+      assert.isFalse(bulkLoad.canceled);
 
       assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 0);
     });

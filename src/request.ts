@@ -8,6 +8,7 @@ import { SQLServerStatementColumnEncryptionSetting } from './always-encrypted/ty
 import { type ColumnMetadata } from './token/colmetadata-token-parser';
 import { type ColumnInfo } from './token/token';
 import { Collation } from './collation';
+import { Cancellation } from './execution-options';
 
 /**
  * The callback is called when the request has completed, either successfully or with an error.
@@ -87,9 +88,11 @@ class Request extends EventEmitter {
    */
   declare preparing: boolean;
   /**
+   * The cancellation of this request's executions.
+   *
    * @private
    */
-  declare canceled: boolean;
+  declare cancellation: Cancellation;
   /**
    * @private
    */
@@ -416,7 +419,9 @@ class Request extends EventEmitter {
     this.parametersByName = {};
     this.preparing = false;
     this.handle = undefined;
-    this.canceled = false;
+    this.cancellation = new Cancellation(() => {
+      this.emit('cancel');
+    });
     this.paused = false;
     this.error = undefined;
     this.connection = undefined;
@@ -425,11 +430,6 @@ class Request extends EventEmitter {
     this.statementColumnEncryptionSetting = (options && options.statementColumnEncryptionSetting) || SQLServerStatementColumnEncryptionSetting.UseConnectionSetting;
     this.cryptoMetadataLoaded = false;
     this.callback = function(err: Error | undefined | null, rowCount?: number, rows?: any) {
-      // A cancellation only applies to the execution it was made for, so it
-      // must not fail later executions of the request - including ones that
-      // are started from the callback or event listeners below.
-      this.canceled = false;
-
       if (this.preparing) {
         this.preparing = false;
         if (err) {
@@ -583,12 +583,17 @@ class Request extends EventEmitter {
    * Cancels a request while waiting for a server response.
    */
   cancel() {
-    if (this.canceled) {
-      return;
-    }
+    this.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
+  }
 
-    this.canceled = true;
-    this.emit('cancel');
+  /**
+   * Whether the current execution of this request was canceled, or, if none
+   * is in progress, whether the next one will be.
+   *
+   * @private
+   */
+  get canceled(): boolean {
+    return this.cancellation.canceled;
   }
 
   /**
