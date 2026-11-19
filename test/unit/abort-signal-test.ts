@@ -185,6 +185,34 @@ describe('Executing a request with an abort signal', function() {
       assert.isFalse(request.canceled);
     });
 
+    it('fails a bulk load that is rejected with the rejection, and neither cancels it nor listens to its signal', function() {
+      const errors: Array<Error | null | undefined> = [];
+      const bulkLoad = connection.newBulkLoad('#bulk', (error) => {
+        errors.push(error);
+      });
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      const callback = bulkLoad.callback;
+      const signal = AbortSignal.abort(new Error('aborted before'));
+
+      connection.execBulkLoad(bulkLoad, [{ id: 1 }], { signal });
+
+      assert.lengthOf(errors, 1);
+      assert.instanceOf(errors[0], RequestError);
+      assert.strictEqual((errors[0] as RequestError).code, 'EINVALIDSTATE');
+      assert.isFalse(bulkLoad.canceled);
+      assert.strictEqual(bulkLoad.callback, callback);
+    });
+
+    it('does not listen to the signal of a bulk load that is rejected', function() {
+      const bulkLoad = connection.newBulkLoad('#bulk', () => {});
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      const controller = new AbortController();
+
+      connection.execBulkLoad(bulkLoad, [{ id: 1 }], { signal: controller.signal });
+
+      assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+    });
+
     it('does not listen to the signal of a request that is rejected', function() {
       const request = new Request('SELECT 1', () => {});
       const controller = new AbortController();

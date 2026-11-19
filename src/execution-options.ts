@@ -13,6 +13,12 @@ export interface ExecutionOptions {
    * cancellation error.
    *
    * If the signal is aborted already, the request is not sent at all.
+   *
+   * If the execution failed or was canceled otherwise before the signal was
+   * aborted, e.g. via `cancel()` or by a request timeout, it completes with
+   * that error instead. If the server does not acknowledge the cancellation
+   * within {@link ConnectionOptions.cancelTimeout}, the connection is closed
+   * and the execution fails with that connection error.
    */
   signal?: AbortSignal | undefined;
 }
@@ -40,6 +46,33 @@ function abortError(signal: AbortSignal) {
   const error = new RequestError('The operation was aborted', 'ABORT_ERR', { cause: signal.reason });
   error.name = 'AbortError';
   return error;
+}
+
+/**
+ * The callbacks that {@link abortOnSignal} replaced, by the callback it
+ * replaced them with.
+ *
+ * @private
+ */
+const replacedCallbacks = new WeakMap<Execution['callback'], Execution['callback']>();
+
+/**
+ * The given request's or bulk load's callback, without the replacements
+ * {@link abortOnSignal} made for the executions that are in progress.
+ *
+ * An execution that is rejected while another execution of the same request
+ * or bulk load is in progress must call back with this callback. Otherwise,
+ * its completion would be taken for the completion of the execution in
+ * progress, whose signal would no longer be listened to.
+ *
+ * @private
+ */
+export function originalCallback(execution: Execution): Execution['callback'] {
+  let callback = execution.callback;
+  for (let replaced = replacedCallbacks.get(callback); replaced !== undefined; replaced = replacedCallbacks.get(callback)) {
+    callback = replaced;
+  }
+  return callback;
 }
 
 /**
@@ -81,6 +114,8 @@ export function abortOnSignal(execution: Execution, signal: AbortSignal | undefi
 
     callback.call(execution, error, ...rest);
   };
+
+  replacedCallbacks.set(execution.callback, callback);
 
   if (signal.aborted) {
     // A canceled request is not sent, and completes asynchronously.

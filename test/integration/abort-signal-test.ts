@@ -1,4 +1,5 @@
 import { assert } from 'chai';
+import { getEventListeners } from 'events';
 import { setTimeout as delay } from 'timers/promises';
 
 import { typeByName as TYPES } from '../../src/data-type';
@@ -305,6 +306,81 @@ describe('abort signals', function() {
       const { error } = await completed;
       assertAbortError(error, reason);
       assert.isTrue(closed);
+
+      assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 0);
+    });
+
+    it('does not let an execution that is rejected while the bulk load is in progress affect its signal', async function() {
+      const errors: Array<Error | null | undefined> = [];
+      let resolve!: () => void;
+      const completed = new Promise<void>((r) => {
+        resolve = r;
+      });
+
+      // Both executions call back to the same callback: the rejected one
+      // first, then the one in progress.
+      const bulkLoad = connection.newBulkLoad('#bulk', (error) => {
+        errors.push(error);
+        if (errors.length === 2) {
+          resolve();
+        }
+      });
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      await querySingleValue(bulkLoad.getTableCreationSql());
+
+      const controller = new AbortController();
+      const reason = new Error('no longer needed');
+
+      let secondExecution!: () => void;
+      const secondExecuted = new Promise<void>((r) => {
+        secondExecution = r;
+      });
+
+      async function* rows() {
+        yield { id: 1 };
+
+        // Wait until the bulk load was executed a second time, with a signal
+        // that is aborted already, while this execution is in progress.
+        await secondExecuted;
+        await delay(100);
+
+        // The first execution's signal must still cancel it.
+        controller.abort(reason);
+        await delay(100);
+        yield { id: 2 };
+      }
+
+      connection.execBulkLoad(bulkLoad, rows(), { signal: controller.signal });
+
+      // Wait for the `INSERT BULK` statement to complete, i.e. until the
+      // rows are being sent.
+      await new Promise<void>((r) => {
+        const check = () => {
+          if (connection.request === bulkLoad) {
+            r();
+          } else {
+            setImmediate(check);
+          }
+        };
+        check();
+      });
+
+      connection.execBulkLoad(bulkLoad, [{ id: 3 }], { signal: AbortSignal.abort(new Error('second execution')) });
+
+      assert.lengthOf(errors, 1);
+      assert.instanceOf(errors[0], RequestError);
+      assert.strictEqual((errors[0] as RequestError).code, 'EINVALIDSTATE');
+      assert.isFalse(bulkLoad.canceled, 'the rejected execution canceled the one in progress');
+      assert.lengthOf(getEventListeners(controller.signal, 'abort'), 1, 'the rejected execution removed the signal listener of the one in progress');
+      secondExecution();
+
+      // The execution in progress completes once its own signal canceled it.
+      // (It does not fail with the abort error, but with the rejection's
+      // error: the rejected execution sets `bulkLoad.error`, which a bulk
+      // load that is canceled while its rows are sent keeps. This happens
+      // for `cancel()` without a signal, too.)
+      await completed;
+      assert.isTrue(bulkLoad.canceled);
 
       assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 0);
     });

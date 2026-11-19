@@ -27,7 +27,7 @@ import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
-import { abortOnSignal, type ExecutionOptions } from './execution-options';
+import { abortOnSignal, originalCallback, type ExecutionOptions } from './execution-options';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
@@ -2917,6 +2917,8 @@ class Connection extends EventEmitter {
   execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>, options?: ExecutionOptions) {
     bulkLoad.executionStarted = true;
 
+    const signal = options?.signal;
+
     // Owns the row source from here on: the first row is requested now,
     // the rest are read once the server has accepted the `INSERT BULK`
     // statement, and the source is closed if that never happens.
@@ -2935,7 +2937,13 @@ class Connection extends EventEmitter {
         }
         payload.close();
         bulkLoad.error = error;
-        bulkLoad.callback(error);
+
+        // The `INSERT BULK` statement of this execution failed, so the
+        // signal was not listened to for the bulk load itself yet. If its
+        // callback is replaced, the replacement belongs to another execution
+        // of the bulk load that is in progress, e.g. if this execution was
+        // rejected because of it, and must not be called.
+        originalCallback(bulkLoad).call(bulkLoad, error);
         return;
       }
 
@@ -2946,16 +2954,19 @@ class Connection extends EventEmitter {
         payload.close();
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload, signal);
     });
 
     bulkLoad.once('cancel', onCancel);
 
-    // Registered after `onCancel`, so a signal that is aborted already also
-    // cancels the `INSERT BULK` statement, which is then not sent at all.
-    abortOnSignal(bulkLoad, options?.signal);
-
-    this.execSqlBatch(request);
+    // The signal is passed on to both requests a bulk load consists of, the
+    // `INSERT BULK` statement and the rows, so that, as for any other
+    // request, it is only listened to once `makeRequest` accepted the
+    // request. A bulk load that is rejected, e.g. because it is executed
+    // again while it is still in progress, is then not affected by its
+    // signal. If the signal is aborted already, the `INSERT BULK` statement
+    // is not sent, and its abort error completes the bulk load above.
+    this.execSqlBatch(request, { signal });
   }
 
   /**
