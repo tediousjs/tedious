@@ -1,0 +1,86 @@
+name: Azure SQL cleanup
+
+# Fallback for `azure-sql.yml`: deletes CI servers and test app client
+# secrets that a job failed to clean up (runner lost, teardown failed, ...).
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  cleanup:
+    name: Delete leftover Azure SQL resources
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: azure-sql
+
+    permissions:
+      id-token: write # to log in to Azure via OIDC
+
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_RESOURCE_GROUP: ${{ vars.AZURE_SQL_RESOURCE_GROUP }}
+      TEST_APP_CLIENT_ID: ${{ vars.AZURE_TEST_APP_CLIENT_ID }}
+      # CI jobs time out after 45 minutes, so anything older is left over.
+      MAX_AGE_SECONDS: 7200
+
+    steps:
+    - name: Log in to Azure
+      run: |
+        set -euo pipefail
+        token=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | jq -r .value)
+        echo "::add-mask::$token"
+        az login --service-principal --username "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID" \
+          --federated-token "$token" --output none
+        az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+
+    - name: Delete leftover servers
+      run: |
+        set -euo pipefail
+        cutoff=$(( $(date -u +%s) - MAX_AGE_SECONDS ))
+        status=0
+
+        servers=$(az sql server list --resource-group "$AZURE_RESOURCE_GROUP" --output json \
+          | jq -r --argjson cutoff "$cutoff" \
+            '.[] | select(.tags["tedious-ci"] == "true" and ((.tags["created-at"] // "0") | tonumber) < $cutoff) | .name')
+
+        for name in $servers; do
+          echo "Deleting $name"
+          az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes || status=1
+        done
+
+        exit "$status"
+
+    - name: Delete leftover test app client secrets
+      if: always()
+      run: |
+        set -euo pipefail
+        cutoff=$(date -u -d "-$MAX_AGE_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)
+        app="https://graph.microsoft.com/v1.0/applications(appId='$TEST_APP_CLIENT_ID')"
+        status=0
+
+        key_ids=$(az rest --method GET --uri "$app?\$select=passwordCredentials" \
+          | jq -r --arg cutoff "$cutoff" \
+            '.passwordCredentials[] | select((.displayName // "") | startswith("tedious-ci-")) | select(.startDateTime < $cutoff) | .keyId')
+
+        for key_id in $key_ids; do
+          echo "Removing client secret $key_id"
+          az rest --method POST --uri "$app/removePassword" \
+            --body "$(jq -n --arg keyId "$key_id" '{keyId: $keyId}')" || status=1
+        done
+
+        exit "$status"
+
+    - name: Log out of Azure
+      if: always()
+      run: az logout || true
