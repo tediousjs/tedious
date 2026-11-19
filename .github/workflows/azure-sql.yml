@@ -41,7 +41,7 @@ jobs:
   test:
     name: Azure SQL (${{ matrix.config }}) / Node.js 22.x
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     permissions:
       contents: read
@@ -84,10 +84,13 @@ jobs:
     # Runs while the server is being created.
     - run: npm ci
 
+    # The provisioning jobs may still be queued for a runner, so this allows
+    # for more than the few minutes server creation takes.
     - name: Wait for the Azure SQL server
-      timeout-minutes: 25
+      timeout-minutes: 45
       env:
         GH_TOKEN: ${{ github.token }}
+        WAIT_SECONDS: 2400
       run: .github/scripts/azure-sql/wait-for-server.sh
 
     - name: Set up test configuration
