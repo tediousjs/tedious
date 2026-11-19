@@ -90,8 +90,9 @@ Things to know:
   and for no longer than 15 minutes without being used. Both are options of a key store provider (`keyCacheTTL` and
   `keyCacheIdleTimeout`), as the keys of a provider are shared by the connections that use it.
 - The request timeout covers a key store that is accessed to encrypt the parameters of a request. It does not cover one that is
-  accessed to decrypt a result set: like for every request, it ends once the first part of the response arrived. Give the client of
-  a key store a timeout of its own, or cancel the request (`request.cancel()`), to not wait for a key store indefinitely.
+  accessed to decrypt a result set: like for every request, it ends once the first part of the response arrived. To bound a request
+  as a whole, key stores included, execute it with an abort signal (`connection.execSql(request, { signal: AbortSignal.timeout(5000) })`),
+  or give the client of a key store a timeout of its own.
 - Bulk loads, table-valued parameters and values that are read from a stream are not encrypted, and secure enclaves are not supported.
 
 See [`examples/always-encrypted.js`](examples/always-encrypted.js) for a complete example.

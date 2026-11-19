@@ -1239,6 +1239,63 @@ describe('Always Encrypted', function() {
       assert.deepEqual((await execSqlBatch(connection, `SELECT COUNT(*) FROM ${names.table}`)).rows, [[1]]);
     });
 
+    it('aborts requests via their signal while the server is asked how to encrypt their parameters', async function() {
+      const request = new Request(`INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`, () => {});
+      request.addParameter('id', TYPES.Int, 1);
+      request.addParameter('deterministic', TYPES.NVarChar, 'secret', { length: 50 });
+
+      const counter = countDescribeRequests(connection);
+      const controller = new AbortController();
+      const error = await new Promise<any>((resolve) => {
+        request.userCallback = resolve;
+        connection.execSql(request, { signal: controller.signal });
+        controller.abort();
+      });
+
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual(error.code, 'ABORT_ERR');
+      assert.strictEqual(error.name, 'AbortError');
+      assert.strictEqual(counter.count, 1);
+
+      const { rows } = await execSqlBatch(connection, `SELECT COUNT(*) FROM ${names.table}`);
+      assert.deepEqual(rows, [[0]]);
+
+      // The signal only applies to that execution. The server was not done
+      // answering, so it is asked again.
+      await new Promise<void>((resolve, reject) => {
+        request.userCallback = (err) => (err ? reject(err) : resolve());
+        connection.execSql(request);
+      });
+
+      assert.strictEqual(counter.count, 2);
+      assert.deepEqual((await execSqlBatch(connection, `SELECT COUNT(*) FROM ${names.table}`)).rows, [[1]]);
+    });
+
+    it('does not ask the server about the parameters of a request whose signal is aborted already', async function() {
+      const request = new Request(`INSERT INTO ${names.table} (id, deterministic) VALUES (@id, @deterministic)`, () => {});
+      request.addParameter('id', TYPES.Int, 1);
+      request.addParameter('deterministic', TYPES.NVarChar, 'secret', { length: 50 });
+
+      const counter = countDescribeRequests(connection);
+      let calledBack = false;
+      const error = await new Promise<any>((resolve) => {
+        request.userCallback = (err) => {
+          calledBack = true;
+          resolve(err);
+        };
+        connection.execSql(request, { signal: AbortSignal.abort() });
+
+        // It calls back asynchronously, and the connection is free.
+        assert.isFalse(calledBack);
+      });
+
+      assert.strictEqual(error.code, 'ABORT_ERR');
+      assert.strictEqual(counter.count, 0);
+
+      const { rows } = await execSqlBatch(connection, `SELECT COUNT(*) FROM ${names.table}`);
+      assert.deepEqual(rows, [[0]]);
+    });
+
     it('cancels requests via the connection while their parameters are being encrypted', async function() {
       const promise = insert(connection, 1);
       assert.isTrue(connection.cancel());
@@ -1579,7 +1636,7 @@ describe('Always Encrypted', function() {
     });
 
     // Executes a request, and records what it emits and how it completes.
-    function start(sql: string, parameters: Parameter[] = []) {
+    function start(sql: string, parameters: Parameter[] = [], signal?: AbortSignal) {
       const events: string[] = [];
 
       const request = new Request(sql, () => {});
@@ -1598,9 +1655,9 @@ describe('Always Encrypted', function() {
       });
 
       if (parameters.length > 0) {
-        waiting.execSql(request);
+        waiting.execSql(request, { signal });
       } else {
-        waiting.execSqlBatch(request);
+        waiting.execSqlBatch(request, { signal });
       }
 
       return { request, events, completed };
@@ -1617,6 +1674,24 @@ describe('Always Encrypted', function() {
         assert.strictEqual(error.code, 'ECANCEL');
 
         // The connection is in use again by the time the key store answers.
+        const { rows } = await execSqlBatch(waiting, 'SELECT 1');
+        assert.deepEqual(rows, [[1]]);
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        assert.deepEqual(events, ['callback']);
+      });
+
+      it('aborts a request via its signal without waiting for the key store', async function() {
+        const { events, completed } = start(`SELECT id, deterministic FROM ${names.table}`, [], AbortSignal.timeout(100));
+        await waitFor(() => gated.calls === 1);
+
+        // The key store does not answer: the signal is what ends the wait.
+        const error = await completed;
+        assert.strictEqual(error.code, 'ABORT_ERR');
+        assert.strictEqual(error.cause.name, 'TimeoutError');
+
         const { rows } = await execSqlBatch(waiting, 'SELECT 1');
         assert.deepEqual(rows, [[1]]);
 
@@ -1677,6 +1752,26 @@ describe('Always Encrypted', function() {
         assert.strictEqual(error.code, 'ECANCEL');
 
         // Other requests can be made, and the request is not sent later on.
+        const { rows } = await execSqlBatch(waiting, 'SELECT 1');
+        assert.deepEqual(rows, [[1]]);
+
+        gated.release();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        assert.deepEqual(events, ['callback']);
+        await assertNotInserted();
+      });
+
+      it('aborts a request via its signal without waiting for the key store', async function() {
+        const controller = new AbortController();
+        const { events, completed } = start(sql, parameters, controller.signal);
+        await waitFor(() => gated.calls === 1);
+
+        controller.abort();
+
+        const error = await completed;
+        assert.strictEqual(error.code, 'ABORT_ERR');
+
         const { rows } = await execSqlBatch(waiting, 'SELECT 1');
         assert.deepEqual(rows, [[1]]);
 

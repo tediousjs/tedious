@@ -572,12 +572,9 @@ export class RequestTokenHandler extends TokenHandler {
     // A key store is being accessed, which takes time - during which the
     // request might be canceled, or fail along with its connection.
     //
-    // TODO: Nothing bounds that time: the request timeout ended when the
-    // response started to arrive, as it does for any response that stalls.
-    // An abort signal that is passed along with a request (see
-    // https://github.com/tediousjs/tedious/pull/1798) cancels the request,
-    // and with it this wait - it should cover the time a key store takes to
-    // encrypt parameters as well, which is spent before the request is made.
+    // The request timeout ended when the response started to arrive, as it
+    // does for any response that stalls. What bounds this wait is a
+    // cancellation, e.g. via the abort signal the request was executed with.
     const request = this.request;
 
     return new Promise((resolve, reject) => {

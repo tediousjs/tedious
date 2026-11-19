@@ -27,6 +27,7 @@ import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
+import { abortOnSignal, originalCallback, type ExecutionOptions } from './execution-options';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
@@ -575,9 +576,10 @@ export interface ConnectionOptions {
    * The time that a key store takes to encrypt the parameters of a request
    * counts towards the request timeout. The time that one takes to decrypt
    * a result set does not: like for every request, the request timeout
-   * ends once the first part of the response arrived. To not wait for a
-   * key store indefinitely, give its client a timeout of its own, or
-   * cancel the request.
+   * ends once the first part of the response arrived. To bound a request as
+   * a whole, key stores included, execute it with an abort signal (see
+   * {@link ExecutionOptions.signal}), or give the client of a key store a
+   * timeout of its own.
    *
    * A request that fails to encrypt its parameters or to decrypt its
    * results (e.g. because a key store can not be accessed) is completed
@@ -2496,6 +2498,14 @@ class Connection extends EventEmitter {
   requestTimeout() {
     this.requestTimer = undefined;
     const request = this.request!;
+
+    // A request that was canceled already, e.g. via `cancel()` or an abort
+    // signal, completes with the error of that cancellation, once the server
+    // acknowledged it (or the cancel timer expired).
+    if (request.canceled) {
+      return;
+    }
+
     request.cancel();
     const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
     const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
@@ -2841,8 +2851,21 @@ class Connection extends EventEmitter {
    *
    * @param request A {@link Request} object representing the request.
    */
-  execSqlBatch(request: Request) {
-    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options));
+  execSqlBatch(request: Request): void
+
+  /**
+   * Execute the SQL batch represented by {@link Request}, with the given
+   * options for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   * @param options Options of this execution.
+   */
+  execSqlBatch(request: Request, options?: ExecutionOptions): void
+
+  execSqlBatch(request: Request, options?: ExecutionOptions) {
+    this.makeRequest(request, TYPE.SQL_BATCH, new SqlBatchPayload(request.sqlTextOrProcedure!, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -2867,7 +2890,20 @@ class Connection extends EventEmitter {
    *
    * @param request A {@link Request} object representing the request.
    */
-  execSql(request: Request) {
+  execSql(request: Request): void
+
+  /**
+   * Execute the SQL represented by {@link Request}, with the given options
+   * for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   * @param options Options of this execution.
+   */
+  execSql(request: Request, options?: ExecutionOptions): void
+
+  execSql(request: Request, options?: ExecutionOptions) {
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -2875,7 +2911,9 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        // The request was never started, so it must not complete another
+        // execution of it that is in progress (see `originalCallback`).
+        originalCallback(request).call(request, error);
       });
 
       return;
@@ -2907,7 +2945,7 @@ class Connection extends EventEmitter {
       parameters.push(...request.resolvedParameters);
     }
 
-    this.makeRpcRequest(request, Procedures.Sp_ExecuteSql, parameters);
+    this.makeRpcRequest(request, Procedures.Sp_ExecuteSql, parameters, options?.signal);
   }
 
   /**
@@ -2921,11 +2959,15 @@ class Connection extends EventEmitter {
    *   ones, after any parameters of the procedure itself (like the
    *   statement that `sp_executesql` executes).
    *
+   * @param signal
+   *   Cancels the execution when aborted - including while the server is
+   *   asked about the parameters, and while a key store is accessed.
+   *
    * @private
    */
-  makeRpcRequest(request: Request, procedure: string | number, parameters: ResolvedParameter[]) {
-    this.encryptRequestParameters(request, procedure, parameters, (parameters) => {
-      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(procedure, parameters, this.currentTransactionDescriptor(), this.config.options));
+  makeRpcRequest(request: Request, procedure: string | number, parameters: ResolvedParameter[], signal?: AbortSignal) {
+    this.encryptRequestParameters(request, procedure, parameters, signal, (parameters, signal) => {
+      this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(procedure, parameters, this.currentTransactionDescriptor(), this.config.options), signal);
     });
   }
 
@@ -2938,22 +2980,32 @@ class Connection extends EventEmitter {
    * the same statement. `send` is called right away if the server does not
    * have to be asked, and all column encryption keys are available.
    *
+   * The signal is listened to from the moment the server is asked, so that
+   * it covers the whole execution. `send` is then given no signal, as there
+   * is nothing left to listen to. If parameters are not encrypted, the
+   * signal is passed on to `send` instead.
+   *
    * @private
    */
-  encryptRequestParameters(request: Request, procedure: string | number, parameters: ResolvedParameter[], send: (parameters: ResolvedParameter[]) => void) {
+  encryptRequestParameters(request: Request, procedure: string | number, parameters: ResolvedParameter[], signal: AbortSignal | undefined, send: (parameters: ResolvedParameter[], signal: AbortSignal | undefined) => void) {
     // Clear what is left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
     request.parameterEncryption = undefined;
 
-    const fail = (error: Error) => {
+    // Completes an execution that was started (and whose signal is listened
+    // to), or one that never started: that one must not complete another
+    // execution of the request that is in progress (see `originalCallback`).
+    const complete = (error: Error, started: boolean) => {
       request.error = error;
+      const callback = started ? request.callback : originalCallback(request);
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        callback.call(request, error);
       });
     };
+    const fail = (error: Error) => complete(error, true);
 
     // What the server is asked about, if parameters are to be encrypted.
     const { columnEncryption } = this.config.options;
@@ -2970,14 +3022,22 @@ class Connection extends EventEmitter {
           reason = `the "columnEncryption" option of the request is "${request.columnEncryption}"`;
         }
 
-        return fail(new RequestError(`The parameter "${parameter.name}" is required to be encrypted (\`forceEncrypt\`), but ${reason}.`, 'ECOLUMNENCRYPTION'));
+        return complete(new RequestError(`The parameter "${parameter.name}" is required to be encrypted (\`forceEncrypt\`), but ${reason}.`, 'ECOLUMNENCRYPTION'), false);
       }
 
-      return send(parameters);
+      return send(parameters, signal);
     }
 
     if (!this.acceptsRequest(request)) {
       return;
+    }
+
+    // From here on, the request is certain to call back.
+    abortOnSignal(request, signal);
+
+    // The signal was aborted already: the server is not asked.
+    if (request.canceled) {
+      return fail(new RequestError('Canceled.', 'ECANCEL'));
     }
 
     const cache = this.parameterEncryptionCache ??= new ParameterEncryptionMetadataCache(columnEncryption.parameterMetadataCacheSize);
@@ -3016,7 +3076,7 @@ class Connection extends EventEmitter {
       }
 
       request.parameterEncryption = { cacheKey, ciphers: outputCiphers };
-      send([...parameters.slice(0, offset), ...encryptedParameters]);
+      send([...parameters.slice(0, offset), ...encryptedParameters], undefined);
     };
 
     // The connection is busy with the request from here on, even though the
@@ -3147,7 +3207,9 @@ class Connection extends EventEmitter {
     }
 
     this.debug.log(message);
-    request.callback(new RequestError(message, 'EINVALIDSTATE'));
+    // The request is rejected, e.g. because another execution of it is in
+    // progress, which this must not complete (see `originalCallback`).
+    originalCallback(request).call(request, new RequestError(message, 'EINVALIDSTATE'));
     return false;
   }
 
@@ -3241,8 +3303,22 @@ class Connection extends EventEmitter {
    */
   execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>): void
 
-  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>) {
+  /**
+   * Execute a {@link BulkLoad}, with the given options for this execution,
+   * e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param bulkLoad A previously created {@link BulkLoad}.
+   * @param rows A {@link Iterable} or {@link AsyncIterable} that contains the rows that should be bulk loaded.
+   * @param options Options of this execution.
+   */
+  execBulkLoad(bulkLoad: BulkLoad, rows: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>, options?: ExecutionOptions): void
+
+  execBulkLoad(bulkLoad: BulkLoad, rows?: AsyncIterable<BulkLoadRow> | Iterable<BulkLoadRow>, options?: ExecutionOptions) {
     bulkLoad.executionStarted = true;
+
+    const signal = options?.signal;
 
     // Owns the row source from here on: the first row is requested now,
     // the rest are read once the server has accepted the `INSERT BULK`
@@ -3262,7 +3338,13 @@ class Connection extends EventEmitter {
         }
         payload.close();
         bulkLoad.error = error;
-        bulkLoad.callback(error);
+
+        // The `INSERT BULK` statement of this execution failed, so the
+        // signal was not listened to for the bulk load itself yet. If its
+        // callback is replaced, the replacement belongs to another execution
+        // of the bulk load that is in progress, e.g. if this execution was
+        // rejected because of it, and must not be called.
+        originalCallback(bulkLoad).call(bulkLoad, error);
         return;
       }
 
@@ -3273,12 +3355,19 @@ class Connection extends EventEmitter {
         payload.close();
       }
 
-      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload);
+      this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload, signal);
     });
 
     bulkLoad.once('cancel', onCancel);
 
-    this.execSqlBatch(request);
+    // The signal is passed on to both requests a bulk load consists of, the
+    // `INSERT BULK` statement and the rows, so that, as for any other
+    // request, it is only listened to once `makeRequest` accepted the
+    // request. A bulk load that is rejected, e.g. because it is executed
+    // again while it is still in progress, is then not affected by its
+    // signal. If the signal is aborted already, the `INSERT BULK` statement
+    // is not sent, and its abort error completes the bulk load above.
+    this.execSqlBatch(request, { signal });
   }
 
   /**
@@ -3290,7 +3379,21 @@ class Connection extends EventEmitter {
    * @param request A {@link Request} object representing the request.
    *   Parameters only require a name and type. Parameter values are ignored.
    */
-  prepare(request: Request) {
+  prepare(request: Request): void
+
+  /**
+   * Prepare the SQL represented by the request, with the given options for
+   * this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   *   Parameters only require a name and type. Parameter values are ignored.
+   * @param options Options of this execution.
+   */
+  prepare(request: Request, options?: ExecutionOptions): void
+
+  prepare(request: Request, options?: ExecutionOptions) {
     const parameters: ResolvedParameter[] = [];
 
     parameters.push(this.resolveRequestParameter({
@@ -3326,7 +3429,7 @@ class Connection extends EventEmitter {
     request.preparing = true;
 
     // The prepared statement's handle is stored by the `RequestTokenHandler`.
-    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options));
+    this.makeRequest(request, TYPE.RPC_REQUEST, new RpcRequestPayload(Procedures.Sp_Prepare, parameters, this.currentTransactionDescriptor(), this.config.options), options?.signal);
   }
 
   /**
@@ -3362,7 +3465,24 @@ class Connection extends EventEmitter {
    *   The object's values are passed as the parameters' values when the
    *   request is executed.
    */
-  execute(request: Request, parameters?: { [key: string]: unknown }) {
+  execute(request: Request, parameters?: { [key: string]: unknown }): void
+
+  /**
+   * Execute previously prepared SQL, using the supplied parameters, with the
+   * given options for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A previously prepared {@link Request}.
+   * @param parameters  An object whose names correspond to the names of
+   *   parameters that were added to the {@link Request} before it was prepared.
+   *   The object's values are passed as the parameters' values when the
+   *   request is executed.
+   * @param options Options of this execution.
+   */
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions): void
+
+  execute(request: Request, parameters?: { [key: string]: unknown }, options?: ExecutionOptions) {
     const executeParameters: ResolvedParameter[] = [];
 
     executeParameters.push(this.resolveRequestParameter({
@@ -3390,13 +3510,15 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        // The request was never started, so it must not complete another
+        // execution of it that is in progress (see `originalCallback`).
+        originalCallback(request).call(request, error);
       });
 
       return;
     }
 
-    this.makeRpcRequest(request, Procedures.Sp_Execute, executeParameters);
+    this.makeRpcRequest(request, Procedures.Sp_Execute, executeParameters, options?.signal);
   }
 
   /**
@@ -3404,7 +3526,20 @@ class Connection extends EventEmitter {
    *
    * @param request A {@link Request} object representing the request.
    */
-  callProcedure(request: Request) {
+  callProcedure(request: Request): void
+
+  /**
+   * Call a stored procedure represented by {@link Request}, with the given
+   * options for this execution, e.g. an abort signal to cancel it with.
+   *
+   * @experimental
+   *
+   * @param request A {@link Request} object representing the request.
+   * @param options Options of this execution.
+   */
+  callProcedure(request: Request, options?: ExecutionOptions): void
+
+  callProcedure(request: Request, options?: ExecutionOptions) {
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
@@ -3412,13 +3547,15 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        // The request was never started, so it must not complete another
+        // execution of it that is in progress (see `originalCallback`).
+        originalCallback(request).call(request, error);
       });
 
       return;
     }
 
-    this.makeRpcRequest(request, request.sqlTextOrProcedure!, request.resolvedParameters);
+    this.makeRpcRequest(request, request.sqlTextOrProcedure!, request.resolvedParameters, options?.signal);
   }
 
   /**
@@ -3612,14 +3749,23 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }) {
+  makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, signal?: AbortSignal) {
     // Clear any error left over from a previous execution of this request,
     // even if the request is rejected before being sent.
     request.error = undefined;
 
     if (!this.acceptsRequest(request)) {
       // The request was completed with an error.
-    } else if (request.canceled) {
+      return;
+    }
+
+    // Only listen to the signal once the request is certain to be executed
+    // and to call back. If the request is rejected (above), or if preparing
+    // its payload throws, the signal must not affect the request, which might
+    // still be executing another time (or will be executed again later).
+    abortOnSignal(request, signal);
+
+    if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });

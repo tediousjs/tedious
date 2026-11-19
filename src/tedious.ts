@@ -3,6 +3,7 @@ import Connection, { type ConnectionAuthentication, type ConnectionConfiguration
 import Request, { type ParameterOptions, type RequestOptions } from './request';
 import { AzureKeyVaultKeyStoreProvider, RsaKeyStoreProvider, type AzureKeyVaultCryptographyClient, type AzureKeyVaultKeyStoreProviderOptions, type ColumnEncryptionKeyStoreProvider, type KeyCacheOptions, type RsaPrivateKey } from './always-encrypted/key-store-provider';
 import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type CryptoMetadata, type EncryptedColumnEncryptionKey, type EncryptionType } from './always-encrypted/types';
+import { type ExecutionOptions } from './execution-options';
 import { name } from './library';
 
 import { ConnectionError, InputError, RequestError } from './errors';
@@ -38,6 +39,7 @@ export type {
   ConnectionAuthentication,
   ConnectionConfiguration,
   ConnectionOptions,
+  ExecutionOptions,
   ParameterOptions,
   RequestOptions,
   AzureKeyVaultCryptographyClient,
