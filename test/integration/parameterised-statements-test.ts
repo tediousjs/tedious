@@ -42,8 +42,11 @@ function execSql(
     return;
   }
 
+  let rows = 0;
+
   const request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
     assert.ifError(err);
+    assert.strictEqual(rows, 1);
 
     connection.close();
   });
@@ -56,6 +59,8 @@ function execSql(
   });
 
   request.on('row', function(columns) {
+    rows++;
+
     assert.strictEqual(columns.length, 1);
 
     if (!expectedValue) {
@@ -108,8 +113,11 @@ function execSqlOutput(
 ): void {
   const config = getConfig();
 
+  let returnValues = 0;
+
   const request = new Request('set @paramOut = @paramIn', function(err) {
     assert.ifError(err);
+    assert.strictEqual(returnValues, 1);
 
     connection.close();
   });
@@ -123,6 +131,8 @@ function execSqlOutput(
   });
 
   request.on('returnValue', function(name, returnValue, metadata) {
+    returnValues++;
+
     assert.strictEqual(name, 'paramOut');
 
     if (!expectedValue) {
@@ -309,6 +319,10 @@ describe('Parameterised Statements Test', function() {
 
     it('should read a decimal output parameter as a string with `decimalAsString`', function(done) {
       execSqlOutput(done, TYPES.Decimal, '12345678901234567.123456789', '12345678901234567.123456789', decimalAsString, { precision: 38, scale: 9 });
+    });
+
+    it('should read a null decimal parameter back as null with `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, null, null, { precision: 38, scale: 9 }, null, false, decimalAsString);
     });
 
     it('should read a money output parameter as a string with `decimalAsString`', function(done) {

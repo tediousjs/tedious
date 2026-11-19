@@ -153,6 +153,53 @@ describe('Prepare Execute Statement', function() {
     });
   });
 
+  it('executes exact decimal strings and nulls with `decimalAsString`', function(done) {
+    const config = getConfig();
+
+    const connection = new Connection({ ...config, options: { ...config.options, decimalAsString: true } });
+    if (process.env.TEDIOUS_DEBUG) {
+      connection.on('debug', console.log);
+    }
+
+    const values = ['12345678901234567.123456789', '-0.000000001', null];
+    const rows: unknown[] = [];
+    let executions = 0;
+
+    const request = new Request('select @param', function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      if (++executions < values.length) {
+        connection.execute(request, { param: values[executions] });
+      } else {
+        assert.deepEqual(rows, values);
+        connection.close();
+      }
+    });
+    request.addParameter('param', TYPES.Decimal, undefined, { precision: 38, scale: 9 });
+
+    request.on('row', function(columns) {
+      rows.push(columns[0].value);
+    });
+
+    request.on('prepared', function() {
+      connection.execute(request, { param: values[0] });
+    });
+
+    connection.connect(function(err) {
+      if (err) {
+        return done(err);
+      }
+
+      connection.prepare(request);
+    });
+
+    connection.on('end', function() {
+      done();
+    });
+  });
+
   it('does not add `returnValue` listeners when preparing a request', function(done) {
     const config = getConfig();
 
