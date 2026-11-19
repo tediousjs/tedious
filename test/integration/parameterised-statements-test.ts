@@ -70,7 +70,7 @@ function execSql(
       assert.strictEqual(columns[0].value.getTime(), expectedValue.getTime());
     } else if (type === TYPES.BigInt) {
       assert.strictEqual(columns[0].value, String(expectedValue));
-    } else if (type === TYPES.UniqueIdentifier) {
+    } else if (type === TYPES.UniqueIdentifier || Buffer.isBuffer(expectedValue)) {
       assert.deepEqual(columns[0].value, expectedValue);
     } else {
       assert.strictEqual(columns[0].value, expectedValue);
@@ -1249,4 +1249,26 @@ end')\
     }
   });
 
+  describe('`binary`', function() {
+    // https://github.com/tediousjs/tedious/issues/1812
+    it('infers the length from the value when the length is 0', function(done) {
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: 0 });
+    });
+
+    it('infers the length from the value when the length is NaN', function(done) {
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: NaN });
+    });
+
+    it('pads a value shorter than the declared length', function(done) {
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: 4 }, Buffer.from('4a500000', 'hex'));
+    });
+
+    it('truncates a value longer than the declared length', function(done) {
+      execSql(done, TYPES.Binary, Buffer.from('JP'), undefined, { length: 1 }, Buffer.from('J'));
+    });
+
+    it('sends an empty value', function(done) {
+      execSql(done, TYPES.Binary, Buffer.alloc(0), undefined, undefined, Buffer.from([0x00]));
+    });
+  });
 });

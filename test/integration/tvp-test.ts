@@ -89,6 +89,64 @@ describe('calling a procedure that takes and returns a TVP', function() {
     connection.close();
   });
 
+  describe('Binary columns', function() {
+    beforeEach(function(done) {
+      connection.execSqlBatch(new Request(`
+        DROP PROCEDURE [__tediousTvpTest];
+        DROP TYPE [__tediousTvpType];
+        CREATE TYPE [__tediousTvpType] AS TABLE (
+          id int,
+          c binary(3)
+        )
+      `, done));
+    });
+
+    beforeEach(function(done) {
+      connection.execSqlBatch(new Request(`
+        CREATE PROCEDURE [__tediousTvpTest] @tvp __tediousTvpType readonly AS BEGIN
+          SELECT c FROM @tvp ORDER BY id
+        END
+      `, done));
+    });
+
+    it('pads shorter values and preserves exact-length and null values', function(done) {
+      const rows: unknown[] = [];
+      const request = new Request('__tediousTvpTest', (err) => {
+        assert.ifError(err);
+        assert.deepEqual(rows, [Buffer.from('410000', 'hex'), Buffer.from('ABC'), Buffer.alloc(3), null]);
+        done();
+      });
+      request.on('row', (columns) => rows.push(columns[0].value));
+      request.addParameter('tvp', TYPES.TVP, {
+        columns: [
+          { name: 'id', type: TYPES.Int },
+          { name: 'c', type: TYPES.Binary, length: 3 }
+        ],
+        rows: [[0, Buffer.from('A')], [1, Buffer.from('ABC')], [2, Buffer.alloc(0)], [3, null]]
+      });
+      connection.callProcedure(request);
+    });
+
+    it('rejects a value longer than the declared length instead of silently truncating it', function(done) {
+      const request = new Request('__tediousTvpTest', (err) => {
+        assert.instanceOf(err, InputError);
+        assert.strictEqual(err?.message, 'Input parameter \'tvp\' could not be validated');
+        assert.instanceOf(err?.cause, TypeError);
+        assert.strictEqual((err?.cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
+
+        connection.execSql(new Request('SELECT 1', done));
+      });
+      request.addParameter('tvp', TYPES.TVP, {
+        columns: [
+          { name: 'id', type: TYPES.Int },
+          { name: 'c', type: TYPES.Binary, length: 3 }
+        ],
+        rows: [[0, Buffer.from('ABCDE')]]
+      });
+      connection.callProcedure(request);
+    });
+  });
+
   it('returns the same data', function(done) {
     const request = new Request('__tediousTvpTest', done);
 

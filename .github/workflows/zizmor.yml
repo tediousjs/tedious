@@ -1,0 +1,61 @@
+name: zizmor
+
+on:
+  push:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  pull_request:
+    branches: [ "**" ]
+
+concurrency:
+  # Pull request runs share a group per PR, so a new push cancels the older
+  # run. Push and scheduled runs get a unique group (the run id), so they are
+  # never cancelled or replaced while queued.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  zizmor:
+    name: Analyze GitHub Actions workflows
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      # Findings are uploaded to the repository's code scanning alerts. The
+      # job itself only fails on internal errors, not on findings.
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@v0.8.1
+        with:
+          # `.gitignore` ignores all dotfiles, so collecting from `.` (the
+          # default) finds nothing. Point zizmor at `.github` directly.
+          inputs: .github
+
+  # Fails when .github/workflows/actions.lock is out of sync with the
+  # workflows or a locked pin no longer verifies upstream.
+  lockfile:
+    name: Verify GitHub Actions lockfile
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install gh-actions-lock
+        run: gh extension install github/gh-actions-lock --pin v0.4.1
+
+      - name: Verify lockfile
+        run: gh actions-lock --verify

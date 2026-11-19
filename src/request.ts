@@ -37,6 +37,16 @@ export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
+
+  /**
+   * For Numeric and Decimal, the number of digits after the decimal point.
+   * Defaults to 0.
+   *
+   * For Time, DateTime2, and DateTimeOffset, the number of fractional-second
+   * digits, which SQL Server documentation calls the *fractional seconds
+   * precision* (the `n` in `datetime2(n)`). Defaults to 7 for non-null values
+   * and 0 for `null` values.
+   */
   scale?: number;
 }
 
@@ -460,7 +470,11 @@ class Request extends EventEmitter {
    *   or modify a buffer it has yielded until the request has completed.
    *
    * @param options
-   *   Additional type options. Optional.
+   *   Additional type options. For example, set `scale` to control the
+   *   fractional-second precision of a DateTime2 parameter:
+   *   `request.addParameter('createdAt', TYPES.DateTime2, date, { scale: 3 })`
+   *   sends the value with three fractional-second digits. For DateTime2
+   *   parameters, the default is 7 for non-null values and 0 for `null` values.
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
