@@ -74,7 +74,7 @@ jobs:
       run: .github/scripts/azure-sql/request-server.sh
 
     - name: Publish the request
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: azure-sql-request-${{ github.run_attempt }}-${{ matrix.config }}
         path: ${{ runner.temp }}/azure-sql/request/request.json

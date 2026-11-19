@@ -74,7 +74,7 @@ jobs:
     - name: Publish the credentials
       id: publish
       if: steps.provision.outputs.found == 'true'
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: azure-sql-credentials-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ matrix.config }}
         path: ${{ runner.temp }}/azure-sql-credentials/credentials.json
@@ -93,7 +93,7 @@ jobs:
 
     - name: Publish the failure
       if: failure() && steps.provision.outputs.found == 'true' && steps.publish.outcome != 'success'
-      uses: actions/upload-artifact@v7.0.1
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: azure-sql-credentials-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-${{ matrix.config }}
         path: ${{ runner.temp }}/azure-sql-credentials/credentials.json
