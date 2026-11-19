@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Provisioning workflow (trusted side): deletes every server and test app
-# client secret created for one attempt of a test run.
+# Provisioning workflow (trusted side): deletes every server and per-job app
+# registration created for one attempt of a test run.
 #
 # Requires: TEST_RUN_ID, TEST_RUN_ATTEMPT and the AZURE_* variables.
 set -euo pipefail
@@ -13,6 +13,18 @@ status=0
 
 azure_login
 
+# Per-job app registrations of the service principal configs. Only apps the
+# provisioner owns can be deleted, and only those have this name prefix.
+app_ids=$(az rest --method GET \
+  --uri "https://graph.microsoft.com/v1.0/applications?\$filter=startswith(displayName,'$prefix')&\$select=id,displayName" \
+  | jq -r --arg prefix "$prefix" '.value[] | select(.displayName | startswith($prefix)) | .id')
+for app_id in $app_ids; do
+  echo "Deleting app registration $app_id"
+  delete_ci_app "$app_id" || status=1
+done
+
+# Client secrets on the shared test app, which earlier versions of
+# provision.sh created.
 app="https://graph.microsoft.com/v1.0/applications(appId='$TEST_APP_CLIENT_ID')"
 key_ids=$(az rest --method GET --uri "$app?\$select=passwordCredentials" \
   | jq -r --arg prefix "$prefix" '.passwordCredentials[] | select((.displayName // "") | startswith($prefix)) | .keyId')

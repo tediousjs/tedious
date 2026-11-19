@@ -44,3 +44,31 @@ find_provisioner_artifact() {
   done
   return 1
 }
+
+# Deletes the app registration with object ID $1 (its service principal goes
+# with it), then purges it from the directory's deleted items so that per-job
+# apps don't pile up there for 30 days. The purge is best effort.
+delete_ci_app() {
+  az rest --method DELETE --uri "https://graph.microsoft.com/v1.0/applications/$1" || return 1
+  az rest --method DELETE --uri "https://graph.microsoft.com/v1.0/directory/deletedItems/$1" \
+    || echo "::warning::Could not purge deleted app $1; Entra removes it after 30 days."
+}
+
+# Waits until app $1 can get an Azure SQL token with client secret $2. A new
+# app registration and its secret can take a while to become usable.
+wait_for_app_token() {
+  local authority="${AZURE_AUTHORITY_HOST:-https://login.microsoftonline.com}" attempt
+  for attempt in $(seq 1 "${TOKEN_ATTEMPTS:-30}"); do
+    if curl -sSf -o /dev/null "$authority/$AZURE_TENANT_ID/oauth2/v2.0/token" \
+        --data-urlencode grant_type=client_credentials \
+        --data-urlencode "client_id=$1" \
+        --data-urlencode "client_secret=$2" \
+        --data-urlencode "scope=https://database.windows.net/.default" 2> /dev/null; then
+      return 0
+    fi
+    echo "The new app can't get a token yet (attempt $attempt), retrying"
+    sleep 10
+  done
+  echo "::error::The new app registration couldn't get a token in time."
+  return 1
+}

@@ -78,20 +78,43 @@ azure_login
 env_json=$(jq -n --arg server "$SERVER_NAME.database.windows.net" '{AZURE_SERVER: $server, AZURE_USERNAME: "tedious"}')
 secrets_json='{}'
 
-# The service principal tests get a client secret on the test app that
-# expires in two hours. Created first so it has time to propagate.
+# The service principal tests authenticate as an app registration created
+# for this job only, with a client secret that expires in two hours. It is
+# this server's Entra admin, so a leaked secret only reaches this server.
+# The teardown deletes it. Every other config's server has the admin group
+# (which holds the Entra test user) as its Entra admin.
+admin_type=Group
+admin_name="$AZURE_SQL_ADMIN_GROUP_NAME"
+admin_sid="$AZURE_SQL_ADMIN_GROUP_ID"
+client_id="$TEST_APP_CLIENT_ID"
+client_secret=
+
 if [[ "$CONFIG" == "azure-ad-sp-secret" || "$CONFIG" == "token-credential" ]]; then
-  body=$(jq -n --arg name "$SERVER_NAME" --arg end "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)" \
-    '{passwordCredential: {displayName: $name, endDateTime: $end}}')
+  app=$(az rest --method POST --uri "https://graph.microsoft.com/v1.0/applications" \
+    --body "$(jq -n --arg name "$SERVER_NAME" --arg url "$TEST_RUN_URL" \
+      '{displayName: $name, signInAudience: "AzureADMyOrg", notes: "Azure SQL CI, created for \($url)"}')")
+  client_id=$(jq -er .appId <<< "$app")
+  app_object_id=$(jq -er .id <<< "$app")
+  echo "Created app registration $client_id"
+
+  az rest --method POST --uri "https://graph.microsoft.com/v1.0/servicePrincipals" \
+    --body "$(jq -n --arg appId "$client_id" '{appId: $appId}')" --output none
+
   client_secret=$(az rest --method POST \
-    --uri "https://graph.microsoft.com/v1.0/applications(appId='$TEST_APP_CLIENT_ID')/addPassword" \
-    --body "$body" | jq -r .secretText)
+    --uri "https://graph.microsoft.com/v1.0/applications/$app_object_id/addPassword" \
+    --body "$(jq -n --arg name "$SERVER_NAME" --arg end "$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)" \
+      '{passwordCredential: {displayName: $name, endDateTime: $end}}')" \
+    | jq -er .secretText)
   echo "::add-mask::$client_secret"
   secrets_json=$(jq --arg v "$client_secret" '. + {AZURE_AD_SP_CLIENT_SECRET: $v}' <<< "$secrets_json")
+
+  admin_type=Application
+  admin_name="$SERVER_NAME"
+  admin_sid="$client_id"
 fi
 
 if [[ "$CONFIG" != "azure-default" ]]; then
-  env_json=$(jq --arg tenant "$AZURE_TENANT_ID" --arg client "$TEST_APP_CLIENT_ID" \
+  env_json=$(jq --arg tenant "$AZURE_TENANT_ID" --arg client "$client_id" \
     '. + {AZURE_AD_SP_TENANT_ID: $tenant, AZURE_AD_SP_CLIENT_ID: $client}' <<< "$env_json")
 fi
 
@@ -99,19 +122,28 @@ admin_password="Tds-$(openssl rand -hex 24)"
 echo "::add-mask::$admin_password"
 secrets_json=$(jq --arg v "$admin_password" '. + {AZURE_PASSWORD: $v}' <<< "$secrets_json")
 
-az sql server create \
-  --resource-group "$AZURE_RESOURCE_GROUP" \
-  --name "$SERVER_NAME" \
-  --location "$AZURE_LOCATION" \
-  --admin-user tedious \
-  --admin-password "$admin_password" \
-  --external-admin-principal-type Group \
-  --external-admin-name "$AZURE_SQL_ADMIN_GROUP_NAME" \
-  --external-admin-sid "$AZURE_SQL_ADMIN_GROUP_ID" \
-  --minimal-tls-version 1.2 \
-  --soft-delete-retention-days 0 \
-  --tags tedious-ci=true "created-at=$(date -u +%s)" "test-run=$TEST_RUN_URL" \
-  --output none
+# Retried, because a just-created app can take a moment to be visible to
+# Azure SQL as an Entra admin. Creating an existing server again updates it.
+for attempt in 1 2 3 4; do
+  if az sql server create \
+    --resource-group "$AZURE_RESOURCE_GROUP" \
+    --name "$SERVER_NAME" \
+    --location "$AZURE_LOCATION" \
+    --admin-user tedious \
+    --admin-password "$admin_password" \
+    --external-admin-principal-type "$admin_type" \
+    --external-admin-name "$admin_name" \
+    --external-admin-sid "$admin_sid" \
+    --minimal-tls-version 1.2 \
+    --soft-delete-retention-days 0 \
+    --tags tedious-ci=true "created-at=$(date -u +%s)" "test-run=$TEST_RUN_URL" \
+    --output none; then
+    break
+  fi
+  (( attempt < 4 )) || exit 1
+  echo "Creating the server failed (attempt $attempt), retrying"
+  sleep 20
+done
 
 az sql db create \
   --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -122,6 +154,10 @@ az sql db create \
   --output none
 
 az logout
+
+if [[ -n "$client_secret" ]]; then
+  wait_for_app_token "$client_id" "$client_secret"
+fi
 
 # 3. Wait for the request. If the test run finishes first, the teardown
 #    deletes the server.
