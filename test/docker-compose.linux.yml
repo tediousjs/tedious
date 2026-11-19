@@ -2,7 +2,10 @@ version: '3'
 
 services:
   mssql:
-    build: "."
+    build:
+      context: "."
+      args:
+        - "MSSQL_IMAGE=${MSSQL_IMAGE:-mcr.microsoft.com/mssql/server:2025-latest}"
 
     restart: unless-stopped
 
