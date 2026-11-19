@@ -3,7 +3,9 @@ import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { RequestError } from '../../src/errors';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { requireVectorSupport } from '../helpers/vector-support';
 
 import defaultConfig from '../config';
 
@@ -526,10 +528,7 @@ describe('Prepare Execute Statement', function() {
     await new Promise<void>((resolve, reject) => connection.connect((err) => (err ? reject(err) : resolve())));
 
     try {
-      // Requires a server with the `vector` data type, and TDS 7.4.
-      if (connection.vectorSupportVersion < 1) {
-        this.skip();
-      }
+      await requireVectorSupport(this, connection);
 
       const values: unknown[] = [];
       await new Promise<void>((resolve, reject) => {
@@ -577,7 +576,9 @@ describe('Prepare Execute Statement', function() {
 
       assert.doesNotThrow(() => connection.prepare(request));
       const error = await callbackError;
-      assert.instanceOf(error, TypeError);
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual((error as RequestError).code, 'EPARAM');
+      assert.include(error!.message, 'Validation failed for parameter \'param\'.');
       assert.include(error!.message, 'must be specified with the `length` option');
     } finally {
       await new Promise<void>((resolve) => {

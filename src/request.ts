@@ -538,7 +538,11 @@ class Request extends EventEmitter {
         paramsParameter += ', ';
       }
       paramsParameter += '@' + parameter.name + ' ';
-      paramsParameter += parameter.type.declaration(parameter);
+      try {
+        paramsParameter += parameter.type.declaration(parameter);
+      } catch (error: any) {
+        throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
+      }
       if (parameter.output) {
         paramsParameter += ' OUTPUT';
       }

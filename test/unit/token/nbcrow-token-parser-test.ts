@@ -54,4 +54,34 @@ describe('NBCRow Token Parser', function() {
       assert.isTrue((await parser.next()).done);
     });
   });
+
+  it('should parse vector values next to null bitmap nulls', async function() {
+    const vector = (name: string, baseType: 'float32' | 'float16', dataLength: number): ColumnMetadata => ({
+      colName: name,
+      userType: 0,
+      flags: 1,
+      precision: undefined,
+      scale: undefined,
+      dataLength,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Vector,
+      collation: undefined,
+      baseType,
+      dimensions: 3
+    });
+    const colMetadata = [vector('a', 'float32', 20), vector('b', 'float32', 20)];
+
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(0xd2);
+    buffer.writeUInt8(0b00000001); // `a` is null
+    buffer.writeUInt16LE(20);
+    buffer.writeBuffer(Buffer.from('a9010300000000000000803f00002040000040c0', 'hex'));
+
+    const token = (await Parser.parseTokens([buffer.data], options, colMetadata).next()).value;
+    assert.instanceOf(token, NBCRowToken);
+    assert.isNull(token.columns[0].value);
+    assert.instanceOf(token.columns[1].value, Float32Array);
+    assert.deepEqual(Array.from(token.columns[1].value), [1, 2.5, -3]);
+  });
 });

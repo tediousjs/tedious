@@ -4,6 +4,7 @@ import { typeByName as TYPES } from '../../src/data-type';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { requireVectorSupport } from '../helpers/vector-support';
 
 import defaultConfig from '../config';
 
@@ -419,10 +420,7 @@ set @paramOut = @paramIn\
         vectorConnection.connect((err) => (err ? reject(err) : resolve(vectorConnection)));
       });
 
-      // Requires a server with the `vector` data type, and TDS 7.4.
-      if (connection.vectorSupportVersion < 1) {
-        this.skip();
-      }
+      await requireVectorSupport(this, connection);
     });
 
     it('should call a procedure with vector input and output parameters', async function() {

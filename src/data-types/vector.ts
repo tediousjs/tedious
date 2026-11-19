@@ -69,7 +69,9 @@ const Float16ArrayConstructor = (globalThis as typeof globalThis & { Float16Arra
  * Whether this version of Node.js has `Float16Array`, which is required for
  * `float16` vectors.
  */
-export const FLOAT16_ARRAY_SUPPORTED = typeof Float16ArrayConstructor === 'function';
+export function float16ArraySupported(): boolean {
+  return typeof (globalThis as { Float16Array?: unknown }).Float16Array === 'function';
+}
 
 /**
  * A `vector` value: one element per dimension.
@@ -180,6 +182,20 @@ export function validateVectorBaseType(baseType: unknown): VectorBaseType {
   return elementTypeForBaseType(baseType).baseType;
 }
 
+/**
+ * Validates the `baseType` and `length` options of a bulk load or TVP
+ * column, which has no value to infer them from.
+ */
+export function validateVectorColumn(baseType: unknown, length: unknown): { baseType: VectorBaseType, length: number } {
+  const elementType = elementTypeForBaseType(baseType);
+  if (length == null) {
+    throw new TypeError('The number of dimensions of a vector column must be specified with the `length` option.');
+  }
+
+  validateLength(length, elementType);
+  return { baseType: elementType.baseType, length: length as number };
+}
+
 function validateVector(value: unknown): VectorValue | null {
   if (value == null) {
     return null;
@@ -205,13 +221,10 @@ function validateVector(value: unknown): VectorValue | null {
   return vector;
 }
 
-function validateDimensions(dimensions: number, elementType: ElementType) {
-  if (!Number.isInteger(dimensions) || dimensions < 1) {
-    throw new TypeError('Invalid vector: a vector must have at least one dimension.');
-  }
-
-  if (dimensions > elementType.maxDimensions) {
-    throw new TypeError(`Invalid vector: a ${elementType.baseType} vector can have at most ${elementType.maxDimensions} dimensions, but ${dimensions} were given.`);
+// Checks an explicit `length` option.
+function validateLength(length: unknown, elementType: ElementType) {
+  if (typeof length !== 'number' || !Number.isInteger(length) || length < 1 || length > elementType.maxDimensions) {
+    throw new TypeError(`Invalid vector: \`length\` must be an integer between 1 and ${elementType.maxDimensions} for a ${elementType.baseType} vector.`);
   }
 }
 
@@ -221,7 +234,7 @@ function resolveDimensions(parameter: Pick<ParameterData, 'length' | 'value'>, e
   const value = parameter.value as VectorValue | null | undefined;
 
   if (parameter.length != null) {
-    validateDimensions(parameter.length, elementType);
+    validateLength(parameter.length, elementType);
 
     if (value != null && value.length !== parameter.length) {
       throw new TypeError(`Invalid vector: the value has ${value.length} dimension(s), but ${parameter.length} were declared.`);
@@ -231,7 +244,10 @@ function resolveDimensions(parameter: Pick<ParameterData, 'length' | 'value'>, e
   }
 
   if (value != null) {
-    validateDimensions(value.length, elementType);
+    if (value.length > elementType.maxDimensions) {
+      throw new TypeError(`Invalid vector: a ${elementType.baseType} vector can have at most ${elementType.maxDimensions} dimensions, but ${value.length} were given.`);
+    }
+
     return value.length;
   }
 
@@ -372,7 +388,10 @@ export const Vector: DataType = {
 
     const elementType = elementTypeForBaseType(parameter.baseType);
     if (!elementType.isValue(value)) {
-      throw new TypeError(`Invalid vector: the value does not match the ${elementType.baseType} base type.`);
+      const actual = elementTypeForValue(value);
+      throw new TypeError(actual === undefined ?
+        'Invalid vector: the value must be a Float32Array or a Float16Array.' :
+        `Invalid vector: a ${actual.baseType} value does not match the column's ${elementType.baseType} base type. Set \`baseType: '${actual.baseType}'\` on the column to send ${actual.baseType} vectors.`);
     }
 
     // Bulk load and TVP cells must match the column's dimension count.

@@ -343,16 +343,15 @@ export class Login7TokenHandler extends TokenHandler {
     const { authentication } = this.connection.config;
 
     if (token.vectorSupport !== undefined) {
-      const requested = this.connection.requestedVectorSupportVersion();
       const version = token.vectorSupport.length === 1 ? token.vectorSupport[0] : 0;
 
-      if (version >= 1 && version <= requested) {
+      if (version >= 1 && version <= this.connection.loginVectorSupportVersion) {
         this.connection.vectorSupportVersion = version;
       } else {
         // The server acknowledged vector support that was not requested, or
         // a version this client did not offer: values it would send in that
         // version's format can not be parsed safely.
-        this.loginError = new ConnectionError('Received invalid vector support acknowledgement');
+        this.loginError = new ConnectionError('Received invalid vector support acknowledgement', 'EVECTORSUPPORT');
         // FEATUREEXTACK follows LOGINACK, and the login is only failed with
         // `loginError` if no LOGINACK was received.
         this.loginAckReceived = false;

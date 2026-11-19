@@ -53,6 +53,55 @@ describe('Login7Payload', function() {
 
   describe('#toBuffer', function() {
 
+    describe('with vector support', function() {
+      function createPayload(tdsVersion: number) {
+        return new Login7Payload({
+          tdsVersion: tdsVersion,
+          packetSize: 1024,
+          clientProgVer: 0,
+          clientPid: 12345,
+          connectionId: 0,
+          clientTimeZone: 120,
+          clientLcid: 0x00000409
+        });
+      }
+
+      // Follows `ibExtension` (offset 56) and `ibFeatureExtLong` to the
+      // FeatureExt block, and returns its features by id.
+      function featureExt(login7: Buffer) {
+        let offset = login7.readUInt32LE(login7.readUInt16LE(56));
+        const features = new Map<number, Buffer>();
+        for (let id = login7[offset++]; id !== 0xFF; id = login7[offset++]) {
+          const length = login7.readUInt32LE(offset);
+          features.set(id, login7.subarray(offset + 4, offset + 4 + length));
+          offset += 4 + length;
+        }
+        assert.strictEqual(offset, login7.length, 'the FeatureExt block ends the payload');
+        return features;
+      }
+
+      it('requests the given VECTORSUPPORT version', function() {
+        for (const version of [1, 2]) {
+          const payload = createPayload(0x74000004);
+          payload.vectorSupportVersion = version;
+          const features = featureExt(payload.toBuffer());
+
+          assert.deepEqual(features.get(0x0E), Buffer.from([version]));
+          assert.deepEqual(features.get(0x0A), Buffer.from([0x01]), 'UTF8_SUPPORT is still requested');
+        }
+      });
+
+      it('does not request vector support by default', function() {
+        assert.isFalse(featureExt(createPayload(0x74000004).toBuffer()).has(0x0E));
+      });
+
+      it('sends no feature extensions before TDS 7.4', function() {
+        const payload = createPayload(0x730B0003);
+        payload.vectorSupportVersion = 2;
+        assert.deepEqual(payload.toBuffer(), createPayload(0x730B0003).toBuffer());
+      });
+    });
+
     describe('for a login payload with a password', function() {
       it('generates the expected data', function() {
         const payload = new Login7Payload({

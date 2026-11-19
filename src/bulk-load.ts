@@ -7,7 +7,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 import { type DataType, type Parameter } from './data-type';
 import { InputError } from './errors';
 import { Collation } from './collation';
-import { Vector, validateVectorBaseType, type VectorBaseType } from './data-types/vector';
+import { Vector, validateVectorColumn, type VectorBaseType } from './data-types/vector';
 
 /**
  * @private
@@ -324,7 +324,9 @@ class BulkLoad extends EventEmitter {
     };
 
     if (type === Vector) {
-      column.baseType = validateVectorBaseType(baseType);
+      // Validated here, so that a bad option fails `addColumn` instead of
+      // `execBulkLoad` after it has started reading the rows.
+      ({ baseType: column.baseType, length: column.length } = validateVectorColumn(baseType, length));
     }
 
     // Note: this is deliberately not keyed off the legacy variable-length

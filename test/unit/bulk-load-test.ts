@@ -733,6 +733,23 @@ describe('BulkLoad', function() {
       assert.strictEqual(bulkLoad.columns[1].length, 7);
       assert.strictEqual(bulkLoad.columns[2].length, TYPES.VarBinary.maximumLength);
     });
+
+    it('validates the length and base type of vector columns', function() {
+      const bulkLoad = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      bulkLoad.addColumn('v', TYPES.Vector, { nullable: true, length: 3, baseType: 'float16' });
+      assert.strictEqual(bulkLoad.columns[0].length, 3);
+      assert.strictEqual(bulkLoad.columns[0].baseType, 'float16');
+
+      for (const length of [undefined, 0, 1.5, 1999]) {
+        assert.throws(() => {
+          bulkLoad.addColumn('invalid', TYPES.Vector, length === undefined ? { nullable: true } : { nullable: true, length });
+        }, TypeError, length === undefined ? 'must be specified with the `length` option' : '`length` must be an integer between 1 and 1998');
+      }
+      assert.throws(() => {
+        bulkLoad.addColumn('invalid', TYPES.Vector, { nullable: true, length: 3, baseType: 'float64' as 'float16' });
+      }, TypeError, 'Invalid vector base type');
+      assert.lengthOf(bulkLoad.columns, 1);
+    });
   });
 
   describe('#execBulkLoad', function() {

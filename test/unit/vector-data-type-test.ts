@@ -2,7 +2,7 @@ import { assert } from 'chai';
 
 import { type InternalConnectionOptions } from '../../src/connection';
 import { resolveParameter, type Parameter, type ParameterData } from '../../src/data-type';
-import Vector, { decodeVector, vectorBaseTypeFromDimensionType, vectorDimensionsFromTypeInfo } from '../../src/data-types/vector';
+import Vector, { decodeVector, validateVectorColumn, vectorBaseTypeFromDimensionType, vectorDimensionsFromTypeInfo } from '../../src/data-types/vector';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 
 const options = { tdsVersion: '7_4' } as InternalConnectionOptions;
@@ -80,11 +80,14 @@ describe('Vector data type', function() {
     ['empty vector', new Float32Array(), {}, 'must have at least one dimension'],
     ['NaN element', new Float32Array([NaN]), {}, 'not a finite number'],
     ['infinite element', new Float32Array([Infinity]), {}, 'not a finite number'],
-    ['missing dimensions for NULL', null, {}, 'must be specified with the `length` option'],
-    ['non-integer dimension count', null, { length: 1.5 }, 'must have at least one dimension'],
+    ['missing dimensions for NULL', null, {}, 'must be specified with the `length` option when its value is null'],
+    ['non-integer length', null, { length: 1.5 }, '`length` must be an integer between 1 and 1998'],
+    ['NaN length', null, { length: NaN }, '`length` must be an integer between 1 and 1998'],
+    ['infinite length', null, { length: Infinity }, '`length` must be an integer between 1 and 1998'],
+    ['string length', null, { length: '3' as unknown as number }, '`length` must be an integer between 1 and 1998'],
     ['mismatched dimension count', new Float32Array([1, 2]), { length: 3 }, 'the value has 2 dimension(s), but 3 were declared'],
     ['too many float32 dimensions', new Float32Array(1999), {}, 'at most 1998 dimensions'],
-    ['too many float16 dimensions', null, { length: 3997, baseType: 'float16' }, 'at most 3996 dimensions'],
+    ['too large float16 length', null, { length: 3997, baseType: 'float16' }, '`length` must be an integer between 1 and 3996'],
     ['mismatched base type', new Float32Array([1]), { baseType: 'float16' }, 'a float32 value does not match the float16 base type']
   ];
 
@@ -98,11 +101,24 @@ describe('Vector data type', function() {
     assert.throws(() => resolve(new Float32Array([1]), { baseType: 'float64' as Parameter['baseType'] }), TypeError, 'Invalid vector base type');
   });
 
+  it('validates bulk load and TVP column options', function() {
+    assert.deepEqual(validateVectorColumn(undefined, 3), { baseType: 'float32', length: 3 });
+    assert.deepEqual(validateVectorColumn('float16', 3996), { baseType: 'float16', length: 3996 });
+    assert.throws(() => validateVectorColumn(undefined, undefined), TypeError, 'The number of dimensions of a vector column must be specified with the `length` option.');
+    for (const length of [0, 1.5, 1999, '3']) {
+      assert.throws(() => validateVectorColumn(undefined, length), TypeError, '`length` must be an integer between 1 and 1998');
+    }
+    assert.throws(() => validateVectorColumn('float64', 3), TypeError, 'Invalid vector base type');
+  });
+
   it('validates bulk and TVP cells against the column dimensions and base type', function() {
     const buffer = new WritableTrackingBuffer();
 
     assert.throws(() => Vector.writeValue(buffer, { value: new Float32Array([1, 2]), length: 1 }, options), TypeError, 'but 1 were declared');
-    assert.throws(() => Vector.writeValue(buffer, { value: new Float32Array([1]), length: 1, baseType: 'float16' }, options), TypeError, 'does not match the float16 base type');
+    assert.throws(() => Vector.writeValue(buffer, { value: new Float32Array([1]), length: 1, baseType: 'float16' }, options), TypeError, 'a float32 value does not match the column\'s float16 base type');
+    if (Float16Array) {
+      assert.throws(() => Vector.writeValue(buffer, { value: new Float16Array([1]), length: 1 }, options), TypeError, 'Set `baseType: \'float16\'` on the column');
+    }
     assert.lengthOf(buffer.data, 0);
   });
 });

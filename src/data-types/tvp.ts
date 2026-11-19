@@ -4,7 +4,7 @@ import { type Collation } from '../collation';
 import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { isAsyncIterable } from './plp-stream';
-import { Vector, validateVectorBaseType, type VectorBaseType } from './vector';
+import { Vector, validateVectorColumn, type VectorBaseType } from './vector';
 
 const TVP_TYPE_ID = 0xF3;
 
@@ -50,14 +50,14 @@ function validateTable(value: unknown): TvpValue | null {
     throw new TypeError('Invalid table.');
   }
 
-  // A vector column's base type is checked up front, as it determines the
-  // vector support version the request needs.
+  // A vector column's base type and length are checked up front: the base
+  // type determines the vector support version the request needs.
   for (const column of (value as TvpValue).columns) {
     if (column.type === Vector) {
       try {
-        validateVectorBaseType(column.baseType);
-      } catch (error) {
-        throw new TypeError(`Invalid table: TVP column '${column.name}' has an invalid \`baseType\`.`, { cause: error });
+        validateVectorColumn(column.baseType, column.length);
+      } catch (error: any) {
+        throw new TypeError(`Invalid table: TVP column '${column.name}' is invalid. ${error.message}`, { cause: error });
       }
     }
   }
@@ -127,12 +127,11 @@ function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], cells: P
 
     try {
       cell.value = column.type.validate(row[k], collation);
+      // TvpColumnData
+      column.type.writeValue(buffer, cell, options);
     } catch (error) {
       throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
     }
-
-    // TvpColumnData
-    column.type.writeValue(buffer, cell, options);
   }
 }
 

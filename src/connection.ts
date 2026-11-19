@@ -42,7 +42,7 @@ import { createNTLMRequest } from './ntlm';
 import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, type ResolvedParameter, type DataType, TYPES, resolveParameter } from './data-type';
-import { FLOAT16_ARRAY_SUPPORTED, VECTOR_SUPPORT_VERSION, requiredVectorSupportVersion, type VectorBaseType } from './data-types/vector';
+import { VECTOR_SUPPORT_VERSION, float16ArraySupported, requiredVectorSupportVersion, type VectorBaseType } from './data-types/vector';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
 import { Collation } from './collation';
 import Procedures from './special-stored-procedure';
@@ -915,7 +915,9 @@ export interface ConnectionOptions {
    * server at login (requires TDS 7.4).
    *
    * * `'off'`: vector support is not requested. The server sends `vector` values as JSON array text in
-   *   `varchar(max)`, and `TYPES.Vector` parameters and bulk load columns are rejected.
+   *   `varchar(max)`, and `TYPES.Vector` parameters, bulk load columns and TVP columns are rejected. Vectors can
+   *   still be sent manually as JSON array text with `TYPES.NVarChar`, wrapped in `CAST(@v AS vector(n))` where a
+   *   vector function such as `VECTOR_DISTANCE` needs a `vector` argument.
    * * `'v1'`: `vector` values with `float32` elements are exchanged in the native binary format.
    * * `'v2'`: `vector` values with `float32` or `float16` elements are exchanged in the native binary format.
    *   `float16` parameters, bulk load columns and TVP columns require it, along with `Float16Array`
@@ -1144,6 +1146,15 @@ class Connection extends EventEmitter {
    * @private
    */
   declare vectorSupportVersion: number;
+
+  /**
+   * The VECTORSUPPORT version sent in the last LOGIN7 packet, or `0` if
+   * vector support was not requested. The server's acknowledgement is
+   * checked against it.
+   *
+   * @private
+   */
+  declare loginVectorSupportVersion: number;
 
   /**
    * @private
@@ -1891,6 +1902,7 @@ class Connection extends EventEmitter {
 
     this.attentionSent = false;
     this.vectorSupportVersion = 0;
+    this.loginVectorSupportVersion = 0;
 
     this._cancelAfterRequestSent = () => {
       this.messageIo.sendMessage(TYPE.ATTENTION);
@@ -2609,9 +2621,9 @@ class Connection extends EventEmitter {
       clientLcid: 0x00000409
     });
 
-    const requestedVectorSupportVersion = this.requestedVectorSupportVersion();
-    if (requestedVectorSupportVersion > 0) {
-      payload.vectorSupportVersion = requestedVectorSupportVersion;
+    this.loginVectorSupportVersion = this.requestedVectorSupportVersion();
+    if (this.loginVectorSupportVersion > 0) {
+      payload.vectorSupportVersion = this.loginVectorSupportVersion;
     }
 
     const { authentication } = this.config;
@@ -2827,7 +2839,7 @@ class Connection extends EventEmitter {
     }
 
     const version = VECTOR_TYPE_SUPPORT_VERSIONS[this.config.options.vectorTypeSupport];
-    return FLOAT16_ARRAY_SUPPORTED ? version : Math.min(version, VECTOR_SUPPORT_VERSION.V1);
+    return float16ArraySupported() ? version : Math.min(version, VECTOR_SUPPORT_VERSION.V1);
   }
 
   /**
@@ -2849,11 +2861,13 @@ class Connection extends EventEmitter {
     }
 
     let message;
+    const option = this.config.options.vectorTypeSupport;
     if (versions[this.config.options.tdsVersion] < versions['7_4']) {
       message = 'Vector support was not negotiated with the server because the TDS version in use (`' + this.config.options.tdsVersion + '`) is lower than `7_4`. `TYPES.Vector` requires TDS version `7_4`.';
-    } else if (VECTOR_TYPE_SUPPORT_VERSIONS[this.config.options.vectorTypeSupport] < required) {
-      message = 'Vector support version ' + required + ' is required, but the `vectorTypeSupport` option (`' + this.config.options.vectorTypeSupport + '`) ' +
-        (this.config.options.vectorTypeSupport === 'off' ? 'disables vector support.' : 'requests only version ' + this.requestedVectorSupportVersion() + '. `float16` vectors require `\'v2\'`.');
+    } else if (option === 'off') {
+      message = 'Vector support is disabled. Set the `vectorTypeSupport` connection option to `\'v1\'` or `\'v2\'` to use `TYPES.Vector`.';
+    } else if (VECTOR_TYPE_SUPPORT_VERSIONS[option] < required) {
+      message = 'The `vectorTypeSupport` connection option (`\'' + option + '\'`) does not include `float16` vectors. Set it to `\'v2\'` to use `float16` vectors.';
     } else if (this.requestedVectorSupportVersion() < required) {
       message = '`float16` vectors require Float16Array, which is not available in this version of Node.js. Use Node.js 24 or later.';
     } else if (this.vectorSupportVersion === 0) {

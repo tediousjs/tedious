@@ -602,8 +602,9 @@ export const TYPE = {
  *     <p>
  *       Requires SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in
  *       Microsoft Fabric, and TDS 7.4. Vectors are sent and received in SQL Server's native binary format once the
- *       server has acknowledged the vector support feature extension at login, see
- *       {@link ConnectionOptions.vectorTypeSupport}. <code>float16</code> vectors require <code>vectorTypeSupport</code>
+ *       server has acknowledged the vector support feature extension at login. This must be enabled with the
+ *       {@link ConnectionOptions.vectorTypeSupport} connection option (<code>'v1'</code> or <code>'v2'</code>; the
+ *       default is <code>'off'</code>). <code>float16</code> vectors require <code>vectorTypeSupport</code>
  *       <code>'v2'</code>, a server that supports them, and a Node.js version with <code>Float16Array</code>.
  *     </p>
  *     <p>
@@ -620,6 +621,12 @@ export const TYPE = {
  *       with the <code>length</code> option. It is required for bulk load and table-valued parameter columns and for
  *       <code>null</code> parameter values, and otherwise inferred from the value. A vector has between 1 and 1998
  *       (<code>float32</code>) or 3996 (<code>float16</code>) dimensions.
+ *     </p>
+ *     <p>
+ *       Without native vector support, <code>vector</code> columns are returned as JSON array text, and
+ *       <code>TYPES.Vector</code> is rejected. Vectors can still be sent as JSON array text with
+ *       {@link TYPES.NVarChar}, wrapped in <code>CAST(@v AS vector(n))</code> where a vector function such as
+ *       <code>VECTOR_DISTANCE</code> needs a <code>vector</code> argument.
  *     </p>
  *   </li>
  * </ol>

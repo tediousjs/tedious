@@ -6,6 +6,7 @@ import { assert } from 'chai';
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { requireVectorSupport } from '../helpers/vector-support';
 
 import defaultConfig from '../config';
 import { InputError } from '../../src/errors';
@@ -431,70 +432,89 @@ describe('calling a procedure that takes and returns a TVP', function() {
       });
     }
 
-    beforeEach(async function() {
-      await close(connection);
-      connection = await connect('v2');
-
-      // Requires a server with the `vector` data type, and TDS 7.4.
-      if (connection.vectorSupportVersion < 1) {
-        this.skip();
-      }
+    it('rejects vector columns without negotiated vector support', async function() {
+      // `connection` uses the default `vectorTypeSupport: 'off'`.
+      await rejects(callProcedure({
+        columns: [{ name: 'v', type: TYPES.Vector, length: 3 }],
+        rows: [[null]]
+      }), { code: 'EVECTORNOTSUPPORTED' });
     });
 
-    it('sends vector values', async function() {
-      await createTypeAndProcedure('v vector(3) NULL');
-
-      const rows = await callProcedure({
-        columns: [
-          { name: 'id', type: TYPES.Int },
-          // A vector column needs its number of dimensions.
-          { name: 'v', type: TYPES.Vector, length: 3 }
-        ],
-        rows: [[1, new Float32Array([1, 2.5, -3])], [2, new Float32Array([4, 5, 6])], [3, null]]
+    describe('with vector support negotiated', function() {
+      beforeEach(async function() {
+        await close(connection);
+        connection = await connect('v2');
+        await requireVectorSupport(this, connection);
       });
 
-      assert.instanceOf(rows[0][1], Float32Array);
-      assert.deepEqual(rows.map(([id, value]) => [id, value === null ? null : Array.from(value as Float32Array)]), [[1, [1, 2.5, -3]], [2, [4, 5, 6]], [3, null]]);
-    });
-
-    it('sends float16 vector values', async function() {
-      const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
-      // `float16` vectors require vector support version 2 and `Float16Array`.
-      if (connection.vectorSupportVersion < 2 || !Float16Array) {
-        this.skip();
-      }
-
-      await createTypeAndProcedure('h vector(3, float16) NULL');
-
-      const rows = await callProcedure({
-        columns: [
-          { name: 'id', type: TYPES.Int },
-          { name: 'h', type: TYPES.Vector, length: 3, baseType: 'float16' }
-        ],
-        rows: [[1, new Float16Array([1, 2.5, -3])], [2, null]]
-      });
-
-      assert.instanceOf(rows[0][1], Float16Array);
-      assert.deepEqual(rows.map(([id, value]) => [id, value === null ? null : Array.from(value as ArrayLike<number>)]), [[1, [1, 2.5, -3]], [2, null]]);
-    });
-
-    it('rejects float16 vector columns in a TVP when only version 1 is negotiated', async function() {
-      const v1 = await connect('v1');
-      try {
-        if (v1.vectorSupportVersion !== 1) {
-          this.skip();
-        }
+      it('reports the column and row of an invalid vector value', async function() {
+        await createTypeAndProcedure('v vector(3) NULL');
 
         await rejects(callProcedure({
           columns: [
             { name: 'id', type: TYPES.Int },
+            { name: 'v', type: TYPES.Vector, length: 3 }
+          ],
+          rows: [[1, new Float32Array([1, 2, 3])], [2, new Float32Array([1, 2])]]
+        }), (error: Error) => {
+          assert.include((error.cause as Error).message, 'TVP column \'v\' has invalid data at row index 1');
+          return true;
+        });
+      });
+
+      it('sends vector values', async function() {
+        await createTypeAndProcedure('v vector(3) NULL');
+
+        const rows = await callProcedure({
+          columns: [
+            { name: 'id', type: TYPES.Int },
+            // A vector column needs its number of dimensions.
+            { name: 'v', type: TYPES.Vector, length: 3 }
+          ],
+          rows: [[1, new Float32Array([1, 2.5, -3])], [2, new Float32Array([4, 5, 6])], [3, null]]
+        });
+
+        assert.instanceOf(rows[0][1], Float32Array);
+        assert.deepEqual(rows.map(([id, value]) => [id, value === null ? null : Array.from(value as Float32Array)]), [[1, [1, 2.5, -3]], [2, [4, 5, 6]], [3, null]]);
+      });
+
+      it('sends float16 vector values', async function() {
+        const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
+        // `float16` vectors require vector support version 2 and `Float16Array`.
+        if (connection.vectorSupportVersion < 2 || !Float16Array) {
+          this.skip();
+        }
+
+        await createTypeAndProcedure('h vector(3, float16) NULL');
+
+        const rows = await callProcedure({
+          columns: [
+            { name: 'id', type: TYPES.Int },
             { name: 'h', type: TYPES.Vector, length: 3, baseType: 'float16' }
           ],
-          rows: [[1, null]]
-        }, v1), { code: 'EVECTORNOTSUPPORTED' });
-      } finally {
-        await close(v1);
-      }
+          rows: [[1, new Float16Array([1, 2.5, -3])], [2, null]]
+        });
+
+        assert.instanceOf(rows[0][1], Float16Array);
+        assert.deepEqual(rows.map(([id, value]) => [id, value === null ? null : Array.from(value as ArrayLike<number>)]), [[1, [1, 2.5, -3]], [2, null]]);
+      });
+
+      it('rejects float16 vector columns in a TVP when only version 1 is negotiated', async function() {
+        const v1 = await connect('v1');
+        try {
+          await requireVectorSupport(this, v1);
+
+          await rejects(callProcedure({
+            columns: [
+              { name: 'id', type: TYPES.Int },
+              { name: 'h', type: TYPES.Vector, length: 3, baseType: 'float16' }
+            ],
+            rows: [[1, null]]
+          }, v1), { code: 'EVECTORNOTSUPPORTED' });
+        } finally {
+          await close(v1);
+        }
+      });
     });
   });
 });
