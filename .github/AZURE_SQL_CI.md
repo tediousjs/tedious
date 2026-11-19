@@ -7,7 +7,7 @@ deleted when the test run finishes. Three workflows are involved:
 | Workflow | Trigger | Azure access | Runs pull request code |
 | --- | --- | --- | --- |
 | `workflows/azure-sql.yml` | `push`, `pull_request` | None | Yes |
-| `workflows/azure-sql-provision.yml` | `workflow_run` (start and end of each test run) | Yes, via OIDC | Never |
+| `workflows/azure-sql-provision.yml` | `workflow_run` (creation, start and end of each test run) | Yes, via OIDC | Never |
 | `workflows/azure-sql-cleanup.yml` | Hourly | Yes, via OIDC | Never |
 
 ## How a test run works
@@ -15,19 +15,28 @@ deleted when the test run finishes. Three workflows are involved:
 1. **Request.** Each test job (`request-server.sh`) creates a one-time RSA
    key pair and uploads a request artifact with this runner's IP and the
    public key.
-2. **Provision.** When the test run starts, `azure-sql-provision.yml` runs
-   one job per config (`provision.sh`). Each job waits for its request,
-   validates it (a single IPv4 address, an RSA key of 3072 to 8192 bits, size
-   limits), then logs in to Azure and creates the server
-   `tedious-ci-<run>-<attempt>-<config>` with:
-   - a random SQL admin password that only exists for this server;
-   - the `tedious-ci-sql-admins` Entra group as Entra admin;
-   - a firewall rule for the requesting runner's IP only;
-   - a `tedious` database, and tags `tedious-ci=true` and `created-at=<epoch>`.
+2. **Provision.** As soon as the test run is created (its `requested`
+   event, before its jobs have runners), `azure-sql-provision.yml` runs one
+   job per config (`provision.sh`). Each job:
+   - creates the server `tedious-ci-<run>-<attempt>-<config>` right away, with
+     a random SQL admin password that only exists for this server, the
+     `tedious-ci-sql-admins` Entra group as Entra admin, a `tedious` database,
+     and tags `tedious-ci=true` and `created-at=<epoch>`. For the service
+     principal configs, it also adds a client secret that expires after two
+     hours to the test app;
+   - waits for its test job's request and validates it (a single IPv4
+     address, an RSA key of 3072 to 8192 bits, size limits);
+   - opens the server's firewall to the requesting runner's IP only;
+   - uploads the passwords, encrypted to the test job's public key (RSA-OAEP,
+     SHA-256), as a credentials artifact.
 
-   For the service principal configs, it also adds a client secret that expires
-   after two hours to the test app. The passwords are encrypted to the test
-   job's public key (RSA-OAEP, SHA-256) and uploaded as a credentials artifact.
+   Creating the server overlaps with the test job waiting for a runner and
+   running `npm ci`. GitHub doesn't send `requested` for re-runs, and a fork
+   run that is still waiting for approval is skipped on `requested`. Both are
+   provisioned on the later `in_progress` event, which GitHub only sends once
+   all of the run's jobs have started. Runs for the same attempt are
+   serialized, so a second provisioning run finds the credentials already
+   published and skips.
 3. **Test.** The test job (`wait-for-server.sh`) waits for its credentials
    artifact and accepts it only if it was uploaded by `azure-sql-provision.yml`
    running from the default branch. It decrypts the credentials, deletes the
