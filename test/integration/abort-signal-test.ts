@@ -377,17 +377,49 @@ describe('abort signals', function() {
       assert.lengthOf(getEventListeners(controller.signal, 'abort'), 1, 'the rejected execution removed the signal listener of the one in progress');
       secondExecution();
 
-      // The execution in progress completes once its own signal canceled it.
-      // (It does not fail with the abort error, but with the rejection's
-      // error: the rejected execution sets `bulkLoad.error`, which a bulk
-      // load that is canceled while its rows are sent keeps. This happens
-      // for `cancel()` without a signal, too.)
+      // The execution in progress completes once its own signal canceled it,
+      // with the abort error: the rejection does not affect its error.
       await completed;
       assert.isTrue(canceledBySignal, 'the signal did not cancel the execution in progress');
+      assertAbortError(errors[1], reason);
       // The cancellation only applied to that execution.
       assert.isFalse(bulkLoad.canceled);
 
       assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 0);
+    });
+
+    it('can execute a bulk load again after it was canceled while its `INSERT BULK` statement was executed', async function() {
+      const errors: Array<Error | null | undefined> = [];
+      let resolve!: (rowCount: number | undefined) => void;
+      const completed = new Promise<number | undefined>((r) => {
+        resolve = r;
+      });
+
+      const bulkLoad = connection.newBulkLoad('#bulk', (error, rowCount) => {
+        errors.push(error);
+
+        if (errors.length === 1) {
+          // The cancellation only applied to the first execution.
+          connection.execBulkLoad(bulkLoad, [{ id: 1 }, { id: 2 }]);
+          return;
+        }
+
+        resolve(rowCount);
+      });
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      await querySingleValue(bulkLoad.getTableCreationSql());
+
+      connection.execBulkLoad(bulkLoad, [{ id: 3 }]);
+      // The `INSERT BULK` statement is being sent.
+      bulkLoad.cancel();
+
+      const rowCount = await completed;
+      assert.instanceOf(errors[0], RequestError);
+      assert.strictEqual((errors[0] as RequestError).code, 'ECANCEL');
+      assert.ifError(errors[1]);
+      assert.strictEqual(rowCount, 2);
+
+      assert.strictEqual(await querySingleValue('SELECT COUNT(*) FROM #bulk'), 2);
     });
 
     it('ignores a signal that is aborted after the bulk load completed', async function() {

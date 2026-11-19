@@ -53,8 +53,10 @@ export function abortError(signal: AbortSignal) {
  * this one signal.
  *
  * A cancellation applies to the current execution, or to the next one if none
- * is in progress. Once an execution completed, the cancellation is reset with
- * {@link complete}, so that it does not affect later executions.
+ * is in progress. It is reset once the execution completed (see
+ * {@link complete}), or once an execution is rejected while none is in
+ * progress (see {@link rejected}), so that it does not affect later
+ * executions.
  *
  * @private
  */
@@ -65,18 +67,25 @@ export class Cancellation {
   declare private controller: AbortController;
 
   /**
-   * Aborted once the current execution completed.
-   */
-  declare private completedController: AbortController;
-
-  /**
    * Called whenever an execution is canceled.
    */
   declare private onCancel: () => void;
 
+  /**
+   * Remove the listeners that belong to the current execution.
+   */
+  declare private removers: Array<() => void>;
+
+  /**
+   * Whether an execution was accepted and has not completed yet.
+   */
+  declare executing: boolean;
+
   constructor(onCancel: () => void) {
+    this.controller = new AbortController();
     this.onCancel = onCancel;
-    this.reset();
+    this.removers = [];
+    this.executing = false;
   }
 
   /**
@@ -85,17 +94,6 @@ export class Cancellation {
    */
   get signal(): AbortSignal {
     return this.controller.signal;
-  }
-
-  /**
-   * Aborted once the current execution completed.
-   *
-   * Listeners that belong to the current execution are registered with this
-   * signal (as the `signal` option of `addEventListener`), so that they are
-   * removed once it completed, however it completed.
-   */
-  get completed(): AbortSignal {
-    return this.completedController.signal;
   }
 
   /**
@@ -126,20 +124,33 @@ export class Cancellation {
   }
 
   /**
-   * Cancel the current execution with an abort error once the given signal
-   * is aborted, or right away if it is aborted already.
-   *
-   * The signal is only listened to until the current execution completed.
+   * Start an execution, which was accepted, and cancel it with an abort
+   * error once the given signal is aborted, or right away if it is aborted
+   * already.
    */
-  follow(signal: AbortSignal) {
+  start(signal: AbortSignal | undefined) {
+    this.executing = true;
+
+    if (signal === undefined) {
+      return;
+    }
+
     if (signal.aborted) {
       this.cancel(abortError(signal));
       return;
     }
 
-    signal.addEventListener('abort', () => {
+    this.listen(signal, () => {
       this.cancel(abortError(signal));
-    }, { once: true, signal: this.completed });
+    });
+  }
+
+  /**
+   * Call the given listener once the current execution is canceled. It is
+   * removed once the execution completed.
+   */
+  onAbort(listener: () => void) {
+    this.listen(this.signal, listener);
   }
 
   /**
@@ -147,12 +158,39 @@ export class Cancellation {
    * and reset the cancellation for the next execution.
    */
   complete() {
-    this.completedController.abort();
+    this.executing = false;
+
+    for (const remove of this.removers) {
+      remove();
+    }
+    this.removers = [];
+
     this.reset();
   }
 
+  /**
+   * An execution was rejected (or failed before it was accepted). A
+   * cancellation that was made for it no longer applies - unless another
+   * execution is in progress, which it was made for instead.
+   */
+  rejected() {
+    if (!this.executing) {
+      this.reset();
+    }
+  }
+
   private reset() {
-    this.controller = new AbortController();
-    this.completedController = new AbortController();
+    // A signal that was not aborted, and whose listeners were removed, can be
+    // kept for the next execution.
+    if (this.signal.aborted) {
+      this.controller = new AbortController();
+    }
+  }
+
+  private listen(signal: AbortSignal, listener: () => void) {
+    signal.addEventListener('abort', listener, { once: true });
+    this.removers.push(() => {
+      signal.removeEventListener('abort', listener);
+    });
   }
 }

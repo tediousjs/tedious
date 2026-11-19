@@ -62,11 +62,11 @@ describe('Cancellation', function() {
   });
 
   for (const reason of [new Error('no longer needed'), 'no longer needed', null, undefined, 0, false, '']) {
-    it(`is canceled with an abort error caused by the reason of a followed signal, if it is ${reason === '' ? 'an empty string' : String(reason)}`, function() {
+    it(`is canceled with an abort error caused by the reason of the execution signal, if it is ${reason === '' ? 'an empty string' : String(reason)}`, function() {
       const state = cancellation();
       const controller = new AbortController();
 
-      state.cancellation.follow(controller.signal);
+      state.cancellation.start(controller.signal);
       assert.isFalse(state.cancellation.canceled);
 
       controller.abort(reason);
@@ -84,22 +84,22 @@ describe('Cancellation', function() {
     });
   }
 
-  it('is canceled right away if a followed signal is aborted already', function() {
+  it('is canceled right away if the execution signal is aborted already', function() {
     const state = cancellation();
     const reason = new Error('aborted before');
 
-    state.cancellation.follow(AbortSignal.abort(reason));
+    state.cancellation.start(AbortSignal.abort(reason));
 
     assert.strictEqual(state.cancelCalls, 1);
     assertAbortError(state.cancellation.error, reason);
   });
 
-  it('keeps the error of an earlier cancellation if a followed signal is aborted', function() {
+  it('keeps the error of an earlier cancellation if the execution signal is aborted', function() {
     const state = cancellation();
     const controller = new AbortController();
     const error = new RequestError('Canceled.', 'ECANCEL');
 
-    state.cancellation.follow(controller.signal);
+    state.cancellation.start(controller.signal);
     state.cancellation.cancel(error);
     controller.abort(new Error('too late'));
 
@@ -107,11 +107,11 @@ describe('Cancellation', function() {
     assert.strictEqual(state.cancelCalls, 1);
   });
 
-  it('stops following signals and resets once the execution completed', function() {
+  it('stops listening to the execution signal once the execution completed', function() {
     const state = cancellation();
     const controller = new AbortController();
 
-    state.cancellation.follow(controller.signal);
+    state.cancellation.start(controller.signal);
     assert.lengthOf(getEventListeners(controller.signal, 'abort'), 1);
 
     state.cancellation.complete();
@@ -125,6 +125,7 @@ describe('Cancellation', function() {
   it('resets a canceled execution once it completed', function() {
     const state = cancellation();
 
+    state.cancellation.start(undefined);
     state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
     const signal = state.cancellation.signal;
 
@@ -136,22 +137,52 @@ describe('Cancellation', function() {
     assert.isFalse(state.cancellation.signal.aborted);
   });
 
-  it('removes the listeners scoped to an execution once it completed, without calling them', function() {
+  it('removes the listeners of an execution once it completed, without calling them', function() {
     const state = cancellation();
-    const { signal, completed } = state.cancellation;
 
     let calls = 0;
-    signal.addEventListener('abort', () => {
+    state.cancellation.start(undefined);
+    state.cancellation.onAbort(() => {
       calls += 1;
-    }, { signal: completed });
+    });
 
     state.cancellation.complete();
+    assert.lengthOf(getEventListeners(state.cancellation.signal, 'abort'), 0);
 
-    assert.isTrue(completed.aborted);
-    assert.isFalse(signal.aborted);
-    assert.lengthOf(getEventListeners(signal, 'abort'), 0);
+    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
     assert.strictEqual(calls, 0);
-    assert.isFalse(state.cancellation.completed.aborted);
+  });
+
+  it('calls the listeners of an execution in the order they were added, once it is canceled', function() {
+    const state = cancellation();
+    const calls: string[] = [];
+
+    state.cancellation.start(undefined);
+    state.cancellation.onAbort(() => calls.push('first'));
+    state.cancellation.onAbort(() => calls.push('second'));
+    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
+
+    assert.deepEqual(calls, ['first', 'second']);
+  });
+
+  it('resets a cancellation once an execution was rejected while none is in progress', function() {
+    const state = cancellation();
+
+    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
+    state.cancellation.rejected();
+
+    assert.isFalse(state.cancellation.canceled);
+  });
+
+  it('keeps the cancellation of the execution in progress if another execution was rejected', function() {
+    const state = cancellation();
+    const error = new RequestError('Canceled.', 'ECANCEL');
+
+    state.cancellation.start(undefined);
+    state.cancellation.cancel(error);
+    state.cancellation.rejected();
+
+    assert.strictEqual(state.cancellation.error, error);
   });
 });
 
@@ -565,6 +596,152 @@ describe('Executing a request with an abort signal', function() {
         setImmediate(() => {
           done(failure);
         });
+      });
+    });
+
+    it('fails each execution of a request that was canceled before it was executed twice in a row with the cancellation error', function(done) {
+      serve(async () => {}, done);
+
+      const connection = connect();
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const errors: Array<Error | null | undefined> = [];
+        const request = new Request('select 1', (error) => {
+          errors.push(error);
+
+          if (errors.length === 2) {
+            try {
+              for (const error of errors) {
+                assert.instanceOf(error, RequestError);
+                assert.strictEqual((error as RequestError).code, 'ECANCEL');
+              }
+            } catch (assertionError) {
+              failure = assertionError as Error;
+            }
+
+            connection.close();
+          }
+        });
+
+        request.cancel();
+        // Neither execution is sent, so the connection accepts both.
+        connection.execSqlBatch(request);
+        connection.execSqlBatch(request);
+      });
+
+      let failure: Error | undefined;
+      connection.on('end', () => {
+        done(failure);
+      });
+    });
+
+    it('does not cancel the next execution if the execution that a cancellation was made for is rejected', function(done) {
+      serve(async ({ expectMessage, respond }) => {
+        // Only the second execution is sent.
+        await expectMessage(0x01);
+        respond(buildDoneToken(0x0000));
+      }, done);
+
+      const connection = connect();
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const errors: Array<Error | null | undefined> = [];
+        const request = new Request('select @a', (error) => {
+          errors.push(error);
+
+          if (errors.length === 1) {
+            // The canceled execution was rejected because of its parameter.
+            request.parameters[0].value = 1;
+            connection.execSqlBatch(request);
+            return;
+          }
+
+          try {
+            assert.instanceOf(errors[0], Error);
+            assert.match((errors[0] as Error).message, /^Validation failed for parameter 'a'/);
+            assert.isUndefined(errors[1]);
+          } catch (assertionError) {
+            failure = assertionError as Error;
+          }
+
+          connection.close();
+        });
+        request.addParameter('a', TYPES.Int, 'not a number');
+
+        request.cancel();
+        connection.execSql(request);
+      });
+
+      let failure: Error | undefined;
+      connection.on('end', () => {
+        done(failure);
+      });
+    });
+
+    it('does not clear the error of an execution in progress if executing the request again is rejected', function(done) {
+      const cause = new Error('source failed');
+      let connection!: Connection;
+      let request!: Request;
+      const errors: Array<Error | null | undefined> = [];
+
+      serve(async ({ expectMessage, respond }) => {
+        // The RPC request, which was ended with the `IGNORE` bit because its
+        // parameter's source failed.
+        await expectMessage(0x03);
+
+        connection.execSqlBatch(request);
+        try {
+          assert.lengthOf(errors, 1);
+          assert.strictEqual((errors[0] as RequestError).code, 'EINVALIDSTATE');
+        } catch (err) {
+          return done(err);
+        }
+
+        respond(buildDoneToken(0x0000));
+      }, done);
+
+      connection = connect();
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        request = new Request('select @text', (error) => {
+          errors.push(error);
+
+          if (errors.length === 2) {
+            try {
+              assert.instanceOf(errors[1], Error, 'the execution in progress succeeded');
+              assert.strictEqual((errors[1] as Error & { cause?: unknown }).cause, cause);
+            } catch (assertionError) {
+              failure = assertionError as Error;
+            }
+
+            connection.close();
+          }
+        });
+
+        async function* text() {
+          yield 'some text';
+          throw cause;
+        }
+        request.addParameter('text', TYPES.NVarChar, text(), { length: Infinity });
+
+        connection.execSql(request);
+      });
+
+      let failure: Error | undefined;
+      connection.on('end', () => {
+        done(failure);
       });
     });
 

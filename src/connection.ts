@@ -2201,15 +2201,30 @@ class Connection extends EventEmitter {
    * the callback. This also removes all listeners that belong to the
    * execution, e.g. the ones on its abort signals.
    *
-   * Only executions that `makeRequest` accepted are completed this way. A
-   * rejected execution is called back directly, so that it does not affect
-   * another execution of the same request that is in progress.
+   * Only executions that `makeRequest` accepted are completed this way.
+   * Rejected executions are called back through {@link rejectRequest}.
    *
    * @private
    */
   completeRequest(request: Request | BulkLoad, error: Error | null | undefined, ...rest: any[]) {
     request.cancellation.complete();
     request.callback(error, ...rest);
+  }
+
+  /**
+   * Call back an execution of the given request or bulk load that was
+   * rejected, or that failed before `makeRequest` accepted it.
+   *
+   * A pending cancellation of the request no longer applies once it is
+   * called back, as for a completed execution. But if another execution of
+   * the request is in progress, the rejection must not affect that one: its
+   * cancellation, its listeners and its error are left as they are.
+   *
+   * @private
+   */
+  rejectRequest(request: Request | BulkLoad, error: Error) {
+    request.cancellation.rejected();
+    request.callback(error);
   }
 
   /**
@@ -2777,13 +2792,15 @@ class Connection extends EventEmitter {
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
-      request.error = error;
+      // The error belongs to an execution of the request that is in
+      // progress, if there is one, which this must not affect.
+      if (!request.cancellation.executing) {
+        request.error = error;
+      }
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        // The request was never started, so this must not complete another
-        // execution of it that is in progress (see `completeRequest`).
-        request.callback(error);
+        this.rejectRequest(request, error);
       });
 
       return;
@@ -2930,25 +2947,30 @@ class Connection extends EventEmitter {
     // statement, and the source is closed if that never happens.
     const payload = new BulkLoadPayload(bulkLoad, rows ?? []);
 
-    // Aborted once the `INSERT BULK` statement completed, or was rejected.
-    const statementCompleted = new AbortController();
+    // Canceling the bulk load while its `INSERT BULK` statement is executed
+    // cancels the statement, with the same error.
+    const onBulkLoadAbort = () => {
+      request.cancellation.cancel(bulkLoad.cancellation.error!);
+    };
 
     const request = new Request(bulkLoad.getBulkInsertSql(), (error: (Error & { code?: string }) | null | undefined) => {
-      statementCompleted.abort();
+      bulkLoad.cancellation.signal.removeEventListener('abort', onBulkLoadAbort);
 
       if (error) {
         if (error.code === 'UNKNOWN') {
           error.message += ' This is likely because the schema of the BulkLoad does not match the schema of the table you are attempting to insert into.';
         }
         payload.close();
-        bulkLoad.error = error;
 
-        // The `INSERT BULK` statement of this execution failed or was
-        // rejected, so `makeRequest` never accepted the bulk load itself.
-        // Calling back directly does not affect another execution of the
-        // bulk load that is in progress, e.g. if this one was rejected
-        // because of it.
-        bulkLoad.callback(error);
+        if (!bulkLoad.cancellation.executing) {
+          bulkLoad.error = error;
+        }
+
+        // The `INSERT BULK` statement of this execution failed, was canceled
+        // or was rejected, so `makeRequest` never accepted the bulk load
+        // itself. If this execution was rejected because another execution
+        // of the bulk load is in progress, this does not affect that one.
+        this.rejectRequest(bulkLoad, error);
         return;
       }
 
@@ -2962,11 +2984,13 @@ class Connection extends EventEmitter {
       this.makeRequest(bulkLoad, TYPE.BULK_LOAD, payload, signal);
     });
 
-    // Canceling the bulk load while its `INSERT BULK` statement is executed
-    // cancels the statement, with the same error.
-    bulkLoad.cancellation.signal.addEventListener('abort', () => {
-      request.cancellation.cancel(bulkLoad.cancellation.signal.reason);
-    }, { once: true, signal: statementCompleted.signal });
+    if (bulkLoad.canceled) {
+      // A bulk load that was canceled before it was executed does not send
+      // its `INSERT BULK` statement either.
+      onBulkLoadAbort();
+    } else {
+      bulkLoad.cancellation.signal.addEventListener('abort', onBulkLoadAbort, { once: true });
+    }
 
     // The signal is passed on to both requests a bulk load consists of, the
     // `INSERT BULK` statement and the rows, so that, as for any other
@@ -3114,13 +3138,15 @@ class Connection extends EventEmitter {
         }));
       }
     } catch (error: any) {
-      request.error = error;
+      // The error belongs to an execution of the request that is in
+      // progress, if there is one, which this must not affect.
+      if (!request.cancellation.executing) {
+        request.error = error;
+      }
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        // The request was never started, so this must not complete another
-        // execution of it that is in progress (see `completeRequest`).
-        request.callback(error);
+        this.rejectRequest(request, error);
       });
 
       return;
@@ -3151,13 +3177,15 @@ class Connection extends EventEmitter {
     try {
       request.validateParameters(this.databaseCollation, this.config.options);
     } catch (error: any) {
-      request.error = error;
+      // The error belongs to an execution of the request that is in
+      // progress, if there is one, which this must not affect.
+      if (!request.cancellation.executing) {
+        request.error = error;
+      }
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        // The request was never started, so this must not complete another
-        // execution of it that is in progress (see `completeRequest`).
-        request.callback(error);
+        this.rejectRequest(request, error);
       });
 
       return;
@@ -3358,35 +3386,41 @@ class Connection extends EventEmitter {
    * @private
    */
   makeRequest(request: Request | BulkLoad, packetType: number, payload: (Iterable<Buffer> | AsyncIterable<Buffer>) & { toString: (indent?: string) => string }, signal?: AbortSignal) {
-    // Clear any error left over from a previous execution of this request,
-    // even if the request is rejected before being sent.
-    request.error = undefined;
-
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      // The request is rejected, e.g. because another execution of it is in
-      // progress, which this must not complete (see `completeRequest`).
-      request.callback(new RequestError(message, 'EINVALIDSTATE'));
+
+      // Clear any error left over from a previous execution of this request -
+      // unless another execution of it is in progress, e.g. if that is why
+      // this one is rejected, whose error this is.
+      if (!request.cancellation.executing) {
+        request.error = undefined;
+      }
+
+      this.rejectRequest(request, new RequestError(message, 'EINVALIDSTATE'));
       return;
     }
 
     // From here on, the request is certain to be executed, and to complete
     // through `completeRequest`.
-    const { cancellation } = request;
+
+    // Clear any error left over from a previous execution of this request.
+    request.error = undefined;
 
     // Only follow the signal once the request is accepted. If the request is
     // rejected (above), or if preparing its payload throws, the signal must
     // not affect the request, which might still be executing another time
     // (or will be executed again later).
-    if (signal !== undefined) {
-      cancellation.follow(signal);
-    }
+    const { cancellation } = request;
+    cancellation.start(signal);
 
     if (cancellation.canceled) {
       // A request that was canceled before it was sent is not sent at all.
+      // The error is read now: by the next tick, another execution might
+      // have completed and reset the cancellation.
+      const error = cancellation.error;
       process.nextTick(() => {
-        this.completeRequest(request, cancellation.error);
+        this.completeRequest(request, error);
       });
       return;
     }
@@ -3410,7 +3444,7 @@ class Connection extends EventEmitter {
     // This listener is registered before any other listener of the
     // execution's signal (e.g. the `SentClientRequest` state's), and so
     // always runs first. Those rely on `attentionSent` being set already.
-    cancellation.signal.addEventListener('abort', () => {
+    cancellation.onAbort(() => {
       if (messageSent) {
         // The server received the whole request message, so it has to be
         // told to stop processing it with an attention message.
@@ -3441,7 +3475,7 @@ class Connection extends EventEmitter {
         // resume the request if it was paused so we can read the remaining tokens
         request.resume();
       }
-    }, { once: true, signal: cancellation.completed });
+    });
 
     this.createRequestTimer();
 
@@ -4046,8 +4080,7 @@ Connection.prototype.STATE = {
 
         // Registered after the abort listener of `makeRequest`, so it always
         // runs after that one, once the attention message was sent.
-        const cancellation = this.request?.cancellation;
-        cancellation?.signal.addEventListener('abort', onAbort, { once: true, signal: cancellation.completed });
+        this.request?.cancellation.onAbort(onAbort);
       })();
 
     },
