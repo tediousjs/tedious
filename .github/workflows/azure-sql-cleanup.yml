@@ -83,6 +83,8 @@ jobs:
 
     # Per-job app registrations of the service principal configs, then any
     # that were deleted but not purged from the directory's deleted items.
+    # Only names in the per-job format (tedious-ci-<run>-<attempt>-<config>)
+    # match, and never the shared test app, which may have a similar name.
     - name: Delete leftover app registrations
       if: always()
       run: |
@@ -92,9 +94,13 @@ jobs:
         status=0
 
         app_ids=$(az rest --method GET \
-          --uri "$graph/applications?\$filter=startswith(displayName,'tedious-ci-')&\$select=id,displayName,createdDateTime" \
-          | jq -r --arg cutoff "$cutoff" \
-            '.value[] | select(.displayName | startswith("tedious-ci-")) | select(.createdDateTime < $cutoff) | .id')
+          --uri "$graph/applications?\$filter=startswith(displayName,'tedious-ci-')&\$select=id,appId,displayName,createdDateTime" \
+          | jq -r --arg cutoff "$cutoff" --arg shared "$TEST_APP_CLIENT_ID" '
+            .value[]
+            | select(.displayName | test("^tedious-ci-[0-9]+-[0-9]+-"))
+            | select(.appId != $shared)
+            | select(.createdDateTime < $cutoff)
+            | .id')
         for app_id in $app_ids; do
           echo "Deleting app registration $app_id"
           az rest --method DELETE --uri "$graph/applications/$app_id" || { status=1; continue; }
@@ -104,11 +110,15 @@ jobs:
 
         # Best effort: Entra removes deleted apps after 30 days anyway.
         if ! deleted=$(az rest --method GET \
-            --uri "$graph/directory/deletedItems/microsoft.graph.application?\$filter=startswith(displayName,'tedious-ci-')&\$select=id,displayName"); then
+            --uri "$graph/directory/deletedItems/microsoft.graph.application?\$filter=startswith(displayName,'tedious-ci-')&\$select=id,appId,displayName"); then
           echo "::warning::Could not list deleted app registrations."
           deleted='{"value": []}'
         fi
-        deleted_ids=$(jq -r '.value[] | select(.displayName | startswith("tedious-ci-")) | .id' <<< "$deleted")
+        deleted_ids=$(jq -r --arg shared "$TEST_APP_CLIENT_ID" '
+          .value[]
+          | select(.displayName | test("^tedious-ci-[0-9]+-[0-9]+-"))
+          | select(.appId != $shared)
+          | .id' <<< "$deleted")
         for app_id in $deleted_ids; do
           echo "Purging deleted app registration $app_id"
           az rest --method DELETE --uri "$graph/directory/deletedItems/$app_id" \

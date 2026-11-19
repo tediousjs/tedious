@@ -16,8 +16,9 @@ azure_login
 # Per-job app registrations of the service principal configs. Only apps the
 # provisioner owns can be deleted, and only those have this name prefix.
 app_ids=$(az rest --method GET \
-  --uri "https://graph.microsoft.com/v1.0/applications?\$filter=startswith(displayName,'$prefix')&\$select=id,displayName" \
-  | jq -r --arg prefix "$prefix" '.value[] | select(.displayName | startswith($prefix)) | .id')
+  --uri "https://graph.microsoft.com/v1.0/applications?\$filter=startswith(displayName,'$prefix')&\$select=id,appId,displayName" \
+  | jq -r --arg prefix "$prefix" --arg shared "$TEST_APP_CLIENT_ID" \
+    '.value[] | select(.displayName | startswith($prefix)) | select(.appId != $shared) | .id')
 for app_id in $app_ids; do
   echo "Deleting app registration $app_id"
   delete_ci_app "$app_id" || status=1
