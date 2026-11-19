@@ -9,14 +9,20 @@ name: Azure SQL provisioning
 # names) is validated as untrusted input by `provision.sh`.
 
 on:
-  # Started when a test run starts (`in_progress`) and again when it
-  # completes, whatever its conclusion.
+  # `requested`: when a test run is created, before its jobs have runners,
+  # so that the servers are being created while the test jobs queue.
+  # `in_progress`: for the attempts `requested` misses (see the `provision`
+  # job's condition). GitHub only reports a run as in progress once all of
+  # its jobs have started, so this can come late.
+  # `completed`: teardown, whatever the test run's conclusion.
   workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: [ "Azure SQL" ]
-    types: [ in_progress, completed ]
+    types: [ requested, in_progress, completed ]
 
 concurrency:
-  # The teardown for a test run attempt waits for its provisioning to finish.
+  # Runs for the same test run attempt run one at a time: a second
+  # provisioning run sees the first one's credentials and skips, and the
+  # teardown waits for provisioning to finish.
   group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
   cancel-in-progress: false
 
@@ -34,9 +40,20 @@ env:
 jobs:
   provision:
     name: Provision (${{ matrix.config }})
-    if: github.event.action == 'in_progress' && github.event.workflow_run.path == '.github/workflows/azure-sql.yml'
+    # `requested` covers the first attempt of every run. It does not fire for
+    # re-runs, and fork runs that need a maintainer's approval are skipped
+    # on `requested` (provision.sh). `in_progress` covers both.
+    if: >-
+      github.event.workflow_run.path == '.github/workflows/azure-sql.yml' && (
+        github.event.action == 'requested' || (
+          github.event.action == 'in_progress' && (
+            github.event.workflow_run.run_attempt > 1 ||
+            github.event.workflow_run.head_repository.full_name != github.repository
+          )
+        )
+      )
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment: azure-sql
 
     permissions:

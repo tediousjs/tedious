@@ -25,3 +25,22 @@ azure_login() {
     --federated-token "$token" --output none
   az account set --subscription "$AZURE_SUBSCRIPTION_ID"
 }
+
+# Prints the ID of the newest unexpired artifact called $1 that was uploaded
+# by the provisioning workflow, and fails if there is none. Any pull request
+# run can upload an artifact with any name, so only artifacts from
+# azure-sql-provision.yml (which always runs from the default branch) count.
+find_provisioner_artifact() {
+  local candidate
+  for candidate in $(gh_api "$API/actions/artifacts?name=$1&per_page=100" \
+      | jq -r '.artifacts[] | select(.expired | not) | "\(.id),\(.workflow_run.id)"'); do
+    if gh_api "$API/actions/runs/${candidate#*,}" | jq -e --arg repo "$GITHUB_REPOSITORY" '
+        .event == "workflow_run"
+        and .path == ".github/workflows/azure-sql-provision.yml"
+        and .head_repository.full_name == $repo' > /dev/null; then
+      echo "${candidate%,*}"
+      return 0
+    fi
+  done
+  return 1
+}
