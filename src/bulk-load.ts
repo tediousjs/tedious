@@ -5,9 +5,8 @@ import Connection, { type InternalConnectionOptions } from './connection';
 import { TYPE as TOKEN_TYPE } from './token/token';
 
 import { type DataType, type Parameter } from './data-type';
-import { InputError, RequestError } from './errors';
+import { InputError } from './errors';
 import { Collation } from './collation';
-import { Cancellation } from './execution-options';
 
 /**
  * @private
@@ -162,11 +161,9 @@ class BulkLoad extends EventEmitter {
    */
   declare error: Error | undefined;
   /**
-   * The cancellation of this bulk load's execution.
-   *
    * @private
    */
-  declare cancellation: Cancellation;
+  declare canceled: boolean;
   /**
    * @private
    */
@@ -264,9 +261,7 @@ class BulkLoad extends EventEmitter {
     super();
 
     this.error = undefined;
-    this.cancellation = new Cancellation(() => {
-      this.emit('cancel');
-    });
+    this.canceled = false;
     this.executionStarted = false;
 
     this.collation = collation;
@@ -506,17 +501,12 @@ class BulkLoad extends EventEmitter {
    * @private
    */
   cancel() {
-    this.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
-  }
+    if (this.canceled) {
+      return;
+    }
 
-  /**
-   * Whether the execution of this bulk load was canceled, or, if it was not
-   * started yet, whether it will be.
-   *
-   * @private
-   */
-  get canceled(): boolean {
-    return this.cancellation.canceled;
+    this.canceled = true;
+    this.emit('cancel');
   }
 }
 

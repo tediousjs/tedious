@@ -3,7 +3,7 @@ import { getEventListeners } from 'events';
 import * as net from 'net';
 
 import { Connection, Request, RequestError, TYPES } from '../../src/tedious';
-import { Cancellation } from '../../src/execution-options';
+import { abortError } from '../../src/execution-options';
 import IncomingMessageStream from '../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
@@ -20,221 +20,18 @@ function assertAbortError(error: unknown, reason: unknown) {
   assert.strictEqual((error as RequestError).cause, reason);
 }
 
-describe('Cancellation', function() {
-  function cancellation() {
-    const result = { cancellation: undefined as unknown as Cancellation, cancelCalls: 0 };
-    result.cancellation = new Cancellation(() => {
-      result.cancelCalls += 1;
-    });
-    return result;
-  }
-
-  it('starts out as not being canceled', function() {
-    const { cancellation: c, cancelCalls } = cancellation();
-
-    assert.isFalse(c.canceled);
-    assert.isFalse(c.signal.aborted);
-    assert.isUndefined(c.error);
-    assert.strictEqual(cancelCalls, 0);
-  });
-
-  it('aborts its signal with the error it is canceled with', function() {
-    const state = cancellation();
-    const error = new RequestError('Canceled.', 'ECANCEL');
-
-    state.cancellation.cancel(error);
-
-    assert.isTrue(state.cancellation.canceled);
-    assert.strictEqual(state.cancellation.signal.reason, error);
-    assert.strictEqual(state.cancellation.error, error);
-    assert.strictEqual(state.cancelCalls, 1);
-  });
-
-  it('keeps the error of the first cancellation', function() {
-    const state = cancellation();
-    const timeoutError = new RequestError('Timeout: Request failed to complete in 15000ms', 'ETIMEOUT');
-
-    state.cancellation.cancel(timeoutError);
-    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
-
-    assert.strictEqual(state.cancellation.error, timeoutError);
-    assert.strictEqual(state.cancelCalls, 1);
-  });
-
-  for (const reason of [new Error('no longer needed'), 'no longer needed', null, undefined, 0, false, '']) {
-    it(`is canceled with an abort error caused by the reason of the execution signal, if it is ${reason === '' ? 'an empty string' : String(reason)}`, function() {
-      const state = cancellation();
-      const controller = new AbortController();
-
-      state.cancellation.start(controller.signal, 0);
-      assert.isFalse(state.cancellation.canceled);
-
-      controller.abort(reason);
-
-      assert.isTrue(state.cancellation.canceled);
-      assert.strictEqual(state.cancelCalls, 1);
-
-      if (reason === undefined) {
-        // `abort()` without a reason aborts with a `DOMException`.
-        assertAbortError(state.cancellation.error, controller.signal.reason);
-        assert.strictEqual((controller.signal.reason as DOMException).name, 'AbortError');
-      } else {
-        assertAbortError(state.cancellation.error, reason);
-      }
+describe('abortError', function() {
+  for (const reason of [new Error('no longer needed'), 'no longer needed', null, 0, false, '']) {
+    it(`creates an abort error caused by the reason, if it is ${reason === '' ? 'an empty string' : String(reason)}`, function() {
+      assertAbortError(abortError(AbortSignal.abort(reason)), reason);
     });
   }
 
-  it('is canceled right away if the execution signal is aborted already', function() {
-    const state = cancellation();
-    const reason = new Error('aborted before');
+  it('creates an abort error caused by the default reason of a signal aborted without one', function() {
+    const signal = AbortSignal.abort();
 
-    state.cancellation.start(AbortSignal.abort(reason), 0);
-
-    assert.strictEqual(state.cancelCalls, 1);
-    assertAbortError(state.cancellation.error, reason);
-  });
-
-  it('keeps the error of an earlier cancellation if the execution signal is aborted', function() {
-    const state = cancellation();
-    const controller = new AbortController();
-    const error = new RequestError('Canceled.', 'ECANCEL');
-
-    state.cancellation.start(controller.signal, 0);
-    state.cancellation.cancel(error);
-    controller.abort(new Error('too late'));
-
-    assert.strictEqual(state.cancellation.error, error);
-    assert.strictEqual(state.cancelCalls, 1);
-  });
-
-  it('stops listening to the execution signal once the execution completed', function() {
-    const state = cancellation();
-    const controller = new AbortController();
-
-    state.cancellation.start(controller.signal, 0);
-    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 1);
-
-    state.cancellation.complete();
-    assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
-
-    controller.abort();
-    assert.isFalse(state.cancellation.canceled);
-    assert.strictEqual(state.cancelCalls, 0);
-  });
-
-  it('resets a canceled execution once it completed', function() {
-    const state = cancellation();
-
-    state.cancellation.start(undefined, 0);
-    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
-    const signal = state.cancellation.signal;
-
-    state.cancellation.complete();
-
-    assert.isFalse(state.cancellation.canceled);
-    assert.isUndefined(state.cancellation.error);
-    assert.notStrictEqual(state.cancellation.signal, signal);
-    assert.isFalse(state.cancellation.signal.aborted);
-  });
-
-  it('removes the listeners of an execution once it completed, without calling them', function() {
-    const state = cancellation();
-
-    let calls = 0;
-    state.cancellation.start(undefined, 0);
-    state.cancellation.onAbort(() => {
-      calls += 1;
-    });
-
-    state.cancellation.complete();
-    assert.lengthOf(getEventListeners(state.cancellation.signal, 'abort'), 0);
-
-    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
-    assert.strictEqual(calls, 0);
-  });
-
-  it('calls the listeners of an execution in the order they were added, once it is canceled', function() {
-    const state = cancellation();
-    const calls: string[] = [];
-
-    state.cancellation.start(undefined, 0);
-    state.cancellation.onAbort(() => calls.push('first'));
-    state.cancellation.onAbort(() => calls.push('second'));
-    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
-
-    assert.deepEqual(calls, ['first', 'second']);
-  });
-
-  it('is canceled with a timeout error once the request timeout expired', async function() {
-    const state = cancellation();
-
-    state.cancellation.start(undefined, 10);
-    assert.isFalse(state.cancellation.canceled);
-
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    assert.instanceOf(state.cancellation.error, RequestError);
-    assert.strictEqual((state.cancellation.error as RequestError).code, 'ETIMEOUT');
-    assert.strictEqual(state.cancellation.error!.message, 'Timeout: Request failed to complete in 10ms');
-    assert.strictEqual(state.cancelCalls, 1);
-  });
-
-  it('keeps the error of an earlier cancellation once the request timeout expired', async function() {
-    const state = cancellation();
-    const controller = new AbortController();
-    const reason = new Error('no longer needed');
-
-    state.cancellation.start(controller.signal, 10);
-    controller.abort(reason);
-
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    assertAbortError(state.cancellation.error, reason);
-    assert.strictEqual(state.cancelCalls, 1);
-  });
-
-  it('does not time out once the request timeout was stopped, or the execution completed', async function() {
-    const stopped = cancellation();
-    stopped.cancellation.start(undefined, 10);
-    stopped.cancellation.stopTimeout();
-
-    const completed = cancellation();
-    completed.cancellation.start(undefined, 10);
-    completed.cancellation.complete();
-
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    assert.isFalse(stopped.cancellation.canceled);
-    assert.isFalse(completed.cancellation.canceled);
-  });
-
-  it('does not start the request timeout of an execution that is canceled already', function() {
-    const state = cancellation();
-
-    state.cancellation.start(AbortSignal.abort(), 10);
-
-    // There is no timer left to keep the execution, or the process, waiting.
-    assert.isUndefined((state.cancellation as any).timer);
-  });
-
-  it('resets a cancellation once an execution was rejected while none is in progress', function() {
-    const state = cancellation();
-
-    state.cancellation.cancel(new RequestError('Canceled.', 'ECANCEL'));
-    state.cancellation.rejected();
-
-    assert.isFalse(state.cancellation.canceled);
-  });
-
-  it('keeps the cancellation of the execution in progress if another execution was rejected', function() {
-    const state = cancellation();
-    const error = new RequestError('Canceled.', 'ECANCEL');
-
-    state.cancellation.start(undefined, 0);
-    state.cancellation.cancel(error);
-    state.cancellation.rejected();
-
-    assert.strictEqual(state.cancellation.error, error);
+    assertAbortError(abortError(signal), signal.reason);
+    assert.strictEqual((signal.reason as DOMException).name, 'AbortError');
   });
 });
 
@@ -578,17 +375,22 @@ describe('Executing a request with an abort signal', function() {
           return done(err);
         }
 
+        let cancelEvents = 0;
         const request = new Request('select 1', (error) => {
           try {
             assert.instanceOf(error, RequestError);
             assert.strictEqual((error as RequestError).code, 'ETIMEOUT');
             assert.strictEqual((error as RequestError).message, `Timeout: Request failed to complete in ${requestTimeout}ms`);
+            assert.strictEqual(cancelEvents, 1, 'the timeout must cancel the request, as `cancel()` does');
             assert.isFalse(request.canceled, 'the timeout must not cancel the next execution');
           } catch (assertionError) {
             failure = assertionError as Error;
           }
 
           connection.close();
+        });
+        request.on('cancel', () => {
+          cancelEvents += 1;
         });
 
         connection.execSqlBatch(request);
@@ -738,57 +540,122 @@ describe('Executing a request with an abort signal', function() {
       });
     });
 
-    it('does not clear the error of an execution in progress if executing the request again is rejected', function(done) {
-      const cause = new Error('source failed');
-      let connection!: Connection;
-      let request!: Request;
-      const errors: Array<Error | null | undefined> = [];
+    // Cancel an execution in flight twice, in both orders, and check that the
+    // first cancellation determines its error.
+    const orderings: Array<{ title: string, cancel: (request: Request, controller: AbortController, reason: Error) => void, check: (error: unknown, reason: Error) => void }> = [
+      {
+        title: 'with the abort error if the signal was aborted before `cancel()` was called',
+        cancel: (request, controller, reason) => {
+          controller.abort(reason);
+          request.cancel();
+        },
+        check: (error, reason) => {
+          assertAbortError(error, reason);
+        }
+      },
+      {
+        title: 'with the cancellation error if `cancel()` was called before the signal was aborted',
+        cancel: (request, controller, reason) => {
+          request.cancel();
+          controller.abort(reason);
+        },
+        check: (error) => {
+          assert.instanceOf(error, RequestError);
+          assert.strictEqual((error as RequestError).code, 'ECANCEL');
+        }
+      }
+    ];
+
+    for (const ordering of orderings) {
+      it(`fails a request that is canceled twice ${ordering.title}`, function(done) {
+        const controller = new AbortController();
+        const reason = new Error('no longer needed');
+        let request!: Request;
+
+        serve(async ({ expectMessage, respond }) => {
+          await expectMessage(0x01);
+          ordering.cancel(request, controller, reason);
+
+          // ATTENTION
+          await expectMessage(0x06);
+          respond(buildDoneToken(0x0000));
+          respond(buildDoneToken(0x0020)); // DONE_ATTN
+        }, done);
+
+        const connection = connect();
+
+        connection.connect((err) => {
+          if (err) {
+            return done(err);
+          }
+
+          request = new Request('select 1', (error) => {
+            try {
+              ordering.check(error, reason);
+            } catch (assertionError) {
+              failure = assertionError as Error;
+            }
+
+            connection.close();
+          });
+
+          connection.execSqlBatch(request, { signal: controller.signal });
+        });
+
+        let failure: Error | undefined;
+        connection.on('end', () => {
+          done(failure);
+        });
+      });
+    }
+
+    it('stops listening to the signal once the execution completed, so that aborting it later affects no other execution', function(done) {
+      const controller = new AbortController();
 
       serve(async ({ expectMessage, respond }) => {
-        // The RPC request, which was ended with the `IGNORE` bit because its
-        // parameter's source failed.
-        await expectMessage(0x03);
-
-        connection.execSqlBatch(request);
-        try {
-          assert.lengthOf(errors, 1);
-          assert.strictEqual((errors[0] as RequestError).code, 'EINVALIDSTATE');
-        } catch (err) {
-          return done(err);
-        }
-
+        await expectMessage(0x01);
         respond(buildDoneToken(0x0000));
+
+        // The second execution, without a signal.
+        await expectMessage(0x01);
+        controller.abort();
+        setTimeout(() => {
+          respond(buildDoneToken(0x0000));
+        }, 50);
       }, done);
 
-      connection = connect();
+      const connection = connect();
 
       connection.connect((err) => {
         if (err) {
           return done(err);
         }
 
-        request = new Request('select @text', (error) => {
+        const errors: Array<Error | null | undefined> = [];
+        const request = new Request('select 1', (error) => {
           errors.push(error);
 
-          if (errors.length === 2) {
+          if (errors.length === 1) {
             try {
-              assert.instanceOf(errors[1], Error, 'the execution in progress succeeded');
-              assert.strictEqual((errors[1] as Error & { cause?: unknown }).cause, cause);
+              assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
             } catch (assertionError) {
               failure = assertionError as Error;
             }
 
-            connection.close();
+            connection.execSqlBatch(request);
+            return;
           }
+
+          try {
+            assert.deepEqual(errors, [undefined, undefined]);
+          } catch (assertionError) {
+            failure = assertionError as Error;
+          }
+
+          connection.close();
         });
 
-        async function* text() {
-          yield 'some text';
-          throw cause;
-        }
-        request.addParameter('text', TYPES.NVarChar, text(), { length: Infinity });
-
-        connection.execSql(request);
+        connection.execSqlBatch(request, { signal: controller.signal });
       });
 
       let failure: Error | undefined;
