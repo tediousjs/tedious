@@ -174,14 +174,14 @@ describe('Executing a request with an abort signal', function() {
       return buffer;
     }
 
-    function buildDoneToken(status: number): Buffer {
+    function buildDoneToken(status: number, rowCount = 0): Buffer {
       const buffer = Buffer.alloc(13);
 
       let offset = 0;
       offset = buffer.writeUInt8(0xFD, offset); // DONE
       offset = buffer.writeUInt16LE(status, offset); // status
       offset = buffer.writeUInt16LE(0x0000, offset); // curCmd
-      buffer.writeBigUInt64LE(0n, offset); // rowCount
+      buffer.writeBigUInt64LE(BigInt(rowCount), offset); // rowCount
 
       return buffer;
     }
@@ -382,7 +382,6 @@ describe('Executing a request with an abort signal', function() {
             assert.strictEqual((error as RequestError).code, 'ETIMEOUT');
             assert.strictEqual((error as RequestError).message, `Timeout: Request failed to complete in ${requestTimeout}ms`);
             assert.strictEqual(cancelEvents, 1, 'the timeout must cancel the request, as `cancel()` does');
-            assert.isFalse(request.canceled, 'the timeout must not cancel the next execution');
           } catch (assertionError) {
             failure = assertionError as Error;
           }
@@ -430,12 +429,13 @@ describe('Executing a request with an abort signal', function() {
             assert.instanceOf(error, RequestError);
             assert.strictEqual((error as RequestError).code, 'ECLOSE');
             assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+            assert.strictEqual(request.listenerCount('cancel'), 0);
 
-            // The execution completed, so aborting the signal now has no
-            // effect - in particular, no attention message is written to
-            // the closed connection.
+            // The execution completed, so canceling it now has no effect -
+            // in particular, no attention message is written to the closed
+            // connection.
             controller.abort();
-            assert.isFalse(request.canceled);
+            request.cancel();
           } catch (assertionError) {
             failure = assertionError as Error;
           }
@@ -539,6 +539,208 @@ describe('Executing a request with an abort signal', function() {
         done(failure);
       });
     });
+
+    it('stops listening to the signal and to the `cancel` event when the connection fails during the execution', function(done) {
+      const controller = new AbortController();
+
+      serve(async ({ expectMessage }) => {
+        await expectMessage(0x01);
+        sockets.forEach((socket) => {
+          socket.destroy();
+        });
+      }, done);
+
+      const connection = connect();
+      connection.on('error', () => {});
+
+      connection.connect((err) => {
+        if (err) {
+          return done(err);
+        }
+
+        const request = new Request('select 1', (error) => {
+          try {
+            assert.instanceOf(error, Error);
+            assert.lengthOf(getEventListeners(controller.signal, 'abort'), 0);
+            assert.strictEqual(request.listenerCount('cancel'), 0);
+          } catch (assertionError) {
+            failure = assertionError as Error;
+          }
+        });
+
+        connection.execSqlBatch(request, { signal: controller.signal });
+      });
+
+      let failure: Error | undefined;
+      connection.on('end', () => {
+        setImmediate(() => {
+          done(failure);
+        });
+      });
+    });
+
+    // Cancel a request while its message is still being sent, so that the
+    // message is ended with the `IGNORE` bit, and check that it fails with
+    // the error of what canceled it.
+    const ignored: Array<{ title: string, options: { requestTimeout?: number }, cancel: (request: Request, controller: AbortController) => void, check: (error: unknown, controller: AbortController) => void }> = [
+      {
+        title: 'with the abort error if its signal was aborted',
+        options: {},
+        cancel: (request, controller) => {
+          controller.abort(new Error('no longer needed'));
+        },
+        check: (error, controller) => {
+          assertAbortError(error, controller.signal.reason);
+        }
+      },
+      {
+        title: 'with the timeout error if it timed out',
+        options: { requestTimeout: 100 },
+        cancel: () => {},
+        check: (error) => {
+          assert.instanceOf(error, RequestError);
+          assert.strictEqual((error as RequestError).code, 'ETIMEOUT');
+        }
+      }
+    ];
+
+    for (const scenario of ignored) {
+      it(`fails a request that is canceled while its message is being sent ${scenario.title}`, function(done) {
+        const controller = new AbortController();
+
+        serve(async ({ expectMessage, respond }) => {
+          // The RPC request, ended with the `IGNORE` bit.
+          await expectMessage(0x03);
+          respond(buildDoneToken(0x0000));
+
+          // The message stream is still aligned.
+          await expectMessage(0x01);
+          respond(buildDoneToken(0x0010, 7)); // DONE_COUNT
+        }, done);
+
+        const connection = connect(scenario.options);
+
+        connection.connect((err) => {
+          if (err) {
+            return done(err);
+          }
+
+          const request = new Request('select @text', (error) => {
+            try {
+              scenario.check(error, controller);
+            } catch (assertionError) {
+              failure = assertionError as Error;
+              return connection.close();
+            }
+
+            const next = new Request('select 2', (error, rowCount) => {
+              try {
+                assert.ifError(error);
+                assert.strictEqual(rowCount, 7);
+              } catch (assertionError) {
+                failure = assertionError as Error;
+              }
+
+              connection.close();
+            });
+
+            connection.execSqlBatch(next);
+          });
+
+          // A parameter whose source stalls, so that the message is not
+          // sent in full before the request is canceled.
+          async function* text() {
+            yield 'some text';
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            yield 'more text';
+          }
+          request.addParameter('text', TYPES.NVarChar, text(), { length: Infinity });
+
+          connection.execSql(request, { signal: controller.signal });
+          scenario.cancel(request, controller);
+        });
+
+        let failure: Error | undefined;
+        connection.on('end', () => {
+          done(failure);
+        });
+      });
+    }
+
+    // Re-execute a request from its own `cancel` listener once its message
+    // was sent. The re-execution is rejected, which resets the request's
+    // `canceled` flag while the request is being canceled.
+    for (const trigger of ['`cancel()`', 'its request timeout'] as const) {
+      it(`fails a request that is re-executed from a \`cancel\` listener after it was canceled by ${trigger} with that cancellation's error, and keeps the message stream aligned`, function(done) {
+        let request!: Request;
+
+        serve(async ({ expectMessage, respond }) => {
+          await expectMessage(0x01);
+          if (trigger === '`cancel()`') {
+            request.cancel();
+          }
+
+          // ATTENTION
+          await expectMessage(0x06);
+          respond(buildDoneToken(0x0000));
+          respond(buildDoneToken(0x0020)); // DONE_ATTN
+
+          // The next request, which must receive its own response.
+          await expectMessage(0x01);
+          respond(buildDoneToken(0x0010, 7)); // DONE_COUNT
+        }, done);
+
+        const connection = connect(trigger === '`cancel()`' ? {} : { requestTimeout: 100 });
+
+        connection.connect((err) => {
+          if (err) {
+            return done(err);
+          }
+
+          const errors: Array<Error | null | undefined> = [];
+          let cancelEvents = 0;
+
+          request = new Request('select 1', (error) => {
+            errors.push(error);
+
+            // The first call back is the rejected re-execution's.
+            if (errors.length === 1) {
+              return;
+            }
+
+            const next = new Request('select 2', (error, rowCount) => {
+              try {
+                assert.strictEqual((errors[0] as RequestError).code, 'EINVALIDSTATE');
+                assert.instanceOf(errors[1], RequestError);
+                assert.strictEqual((errors[1] as RequestError).code, trigger === '`cancel()`' ? 'ECANCEL' : 'ETIMEOUT');
+                assert.strictEqual(cancelEvents, 1);
+
+                assert.ifError(error);
+                assert.strictEqual(rowCount, 7);
+              } catch (assertionError) {
+                failure = assertionError as Error;
+              }
+
+              connection.close();
+            });
+
+            connection.execSqlBatch(next);
+          });
+
+          request.on('cancel', () => {
+            cancelEvents += 1;
+            connection.execSqlBatch(request);
+          });
+
+          connection.execSqlBatch(request);
+        });
+
+        let failure: Error | undefined;
+        connection.on('end', () => {
+          done(failure);
+        });
+      });
+    }
 
     // Cancel an execution in flight twice, in both orders, and check that the
     // first cancellation determines its error.

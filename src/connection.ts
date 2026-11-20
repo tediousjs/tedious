@@ -2397,7 +2397,7 @@ class Connection extends EventEmitter {
    *
    * @private
    */
-  abortRequest(error: Error) {
+  abortRequest(error: Error, markRequestCanceled = true) {
     const controller = this.requestController;
     if (controller === undefined || controller.signal.aborted) {
       return;
@@ -2408,7 +2408,9 @@ class Connection extends EventEmitter {
     // Mark the request as canceled, as `cancel()` does, if it was canceled
     // otherwise, e.g. by its request timeout. This makes its token handlers
     // discard the rest of the response.
-    this.request?.cancel();
+    if (markRequestCanceled) {
+      this.request?.cancel();
+    }
   }
 
   /**
@@ -3427,15 +3429,19 @@ class Connection extends EventEmitter {
 
     // This execution is canceled by aborting its controller, with the error
     // the request then completes with: by `cancel()`, by the request timeout
-    // (see `requestTimeout`), or by the execution's abort signal. Only the
-    // signal is listened to for this execution, and only once the request is
-    // accepted: a rejected execution must not affect the request, which might
-    // still be executing another time.
+    // (see `requestTimeout`), or by the execution's abort signal. The
+    // request's `cancel` event and the signal are only listened to once the
+    // request is accepted: a rejected execution must not affect the request,
+    // which might still be executing another time.
     const controller = new AbortController();
     this.requestController = controller;
 
     const onCancel = () => {
-      this.abortRequest(new RequestError('Canceled.', 'ECANCEL'));
+      // The request is canceled already, so it is not marked again: a
+      // rejected execution of it, started from another `cancel` listener,
+      // may have reset `canceled` in the meantime, and the `cancel` event
+      // must only be emitted once.
+      this.abortRequest(new RequestError('Canceled.', 'ECANCEL'), false);
     };
     const onSignalAbort = () => {
       this.abortRequest(abortError(signal!));
@@ -4019,7 +4025,11 @@ Connection.prototype.STATE = {
         // no-ops), and need to ensure the next message (containing the
         // attention acknowledgement) is handled by the `SENT_ATTENTION`
         // state.
-        if (this.request?.canceled && this.attentionSent) {
+        //
+        // This asks the execution's controller, not `request.canceled`: a
+        // rejected execution of the same request (e.g. one started from a
+        // `cancel` listener) resets `canceled` while this one is canceled.
+        if (this.requestController?.signal.aborted && this.attentionSent) {
           return this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
@@ -4076,10 +4086,11 @@ Connection.prototype.STATE = {
           // completes the cancellation.
           this.clearCancelTimer();
 
-          this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
           this.request = undefined;
           this.releaseRequestController();
+          this.transitionTo(this.STATE.LOGGED_IN);
+
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
             this.inTransaction = false;
           }
