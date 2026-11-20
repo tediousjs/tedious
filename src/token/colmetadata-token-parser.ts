@@ -61,7 +61,7 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
   let colName;
   ({ offset, value: colName } = readColumnName(buf, offset, index, metadata, options));
 
-  return new Result({
+  const column: ColumnMetadata = {
     userType: metadata.userType,
     flags: metadata.flags,
     type: metadata.type,
@@ -73,7 +73,15 @@ function readColumn(buf: Buffer, offset: number, options: ParserOptions, index: 
     schema: metadata.schema,
     colName: colName,
     tableName: tableName
-  }, offset);
+  };
+
+  // Only vector columns have a base type and dimensions.
+  if (metadata.baseType !== undefined) {
+    column.baseType = metadata.baseType;
+    column.dimensions = metadata.dimensions;
+  }
+
+  return new Result(column, offset);
 }
 
 /**

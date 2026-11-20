@@ -7,6 +7,7 @@ import { TYPE as TOKEN_TYPE } from './token/token';
 import { type DataType, type Parameter } from './data-type';
 import { InputError } from './errors';
 import { Collation } from './collation';
+import { Vector, validateVectorColumn, type VectorBaseType } from './data-types/vector';
 
 /**
  * @private
@@ -97,8 +98,16 @@ interface ColumnOptions {
 
   /**
    * For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
+   *
+   * For Vector, the number of dimensions (required).
    */
   length?: number;
+
+  /**
+   * For Vector, the base type of the column's typed array values:
+   * `'float32'` (the default) or `'float16'`.
+   */
+  baseType?: VectorBaseType;
 
   /**
    * For Numeric, Decimal.
@@ -289,12 +298,14 @@ class BulkLoad extends EventEmitter {
    * @param type One of the supported `data types`.
    * @param __namedParameters Additional column type information. At a minimum, `nullable` must be set to true or false.
    * @param length For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
+   *   For Vector, the number of dimensions (required).
+   * @param baseType For Vector, the base type of the column's typed array values: `'float32'` (the default) or `'float16'`.
    * @param nullable Indicates whether the column accepts NULL values.
    * @param objName If the name of the column is different from the name of the property found on `rowObj` arguments passed to {@link addRow} or {@link Connection.execBulkLoad}, then you can use this option to specify the property name.
    * @param precision For Numeric, Decimal.
    * @param scale For Numeric and Decimal, the number of digits after the decimal point (defaults to 0). For Time, DateTime2, and DateTimeOffset, the fractional-second precision (the `n` in `datetime2(n)`); defaults to 0 for bulk-load columns, so set it explicitly (for example, to 7) to preserve fractional seconds.
   */
-  addColumn(name: string, type: DataType, { output = false, length, precision, scale, objName = name, nullable = true }: ColumnOptions) {
+  addColumn(name: string, type: DataType, { output = false, length, precision, scale, baseType, objName = name, nullable = true }: ColumnOptions) {
     if (this.executionStarted) {
       throw new Error('Columns cannot be added to bulk insert after execution has started.');
     }
@@ -311,6 +322,12 @@ class BulkLoad extends EventEmitter {
       nullable: nullable,
       collation: this.collation
     };
+
+    if (type === Vector) {
+      // Validated here, so that a bad option fails `addColumn` instead of
+      // `execBulkLoad` after it has started reading the rows.
+      ({ baseType: column.baseType, length: column.length } = validateVectorColumn(baseType, length));
+    }
 
     // Note: this is deliberately not keyed off the legacy variable-length
     // type id bit pattern ((type.id & 0x30) === 0x20), as that pattern does

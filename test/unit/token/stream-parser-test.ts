@@ -237,4 +237,62 @@ describe('Stream Parser', function() {
       parser.read();
     }, 'Partially Length-prefixed Bytes unmatched lengths : expected 10, but got 4 bytes');
   });
+
+  describe('vector RETURNVALUE tokens', function() {
+    const FLOAT32_VALUE = Buffer.from('a9010300000000000000803f00002040000040c0', 'hex');
+    const FLOAT16_VALUE = Buffer.from('a901030001000000003c004100c2', 'hex');
+
+    function returnValue(typeInfo: number[], value: Buffer | null) {
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0xAC);
+      buffer.writeUInt16LE(1); // ordinal
+      buffer.writeBVarchar('@out', 'ucs2');
+      buffer.writeUInt8(0x01); // status
+      buffer.writeUInt32LE(0); // user type
+      buffer.writeUInt16LE(0x0001); // flags
+      buffer.writeBuffer(Buffer.from(typeInfo));
+      if (value === null) {
+        buffer.writeUInt16LE(0xFFFF);
+      } else {
+        buffer.writeUInt16LE(value.length);
+        buffer.writeBuffer(value);
+      }
+
+      const tokens = parseByteByByte(buffer.data, []);
+      assert.lengthOf(tokens, 1);
+      assert.instanceOf(tokens[0], ReturnValueToken);
+      return tokens[0] as ReturnValueToken;
+    }
+
+    it('parses float32 values and their metadata', function() {
+      const token = returnValue([0xF5, 0x14, 0x00, 0x00], FLOAT32_VALUE);
+      assert.strictEqual(token.metadata.type, dataTypeByName.Vector);
+      assert.strictEqual(token.metadata.baseType, 'float32');
+      assert.strictEqual(token.metadata.dimensions, 3);
+      assert.instanceOf(token.value, Float32Array);
+      assert.deepEqual(Array.from(token.value as Float32Array), [1, 2.5, -3]);
+    });
+
+    it('parses float16 values', function() {
+      const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
+      if (!Float16Array) {
+        this.skip();
+      }
+
+      const token = returnValue([0xF5, 0x0E, 0x00, 0x01], FLOAT16_VALUE);
+      assert.strictEqual(token.metadata.baseType, 'float16');
+      assert.instanceOf(token.value, Float16Array);
+      assert.deepEqual(Array.from(token.value as ArrayLike<number>), [1, 2.5, -3]);
+    });
+
+    it('parses null values', function() {
+      const token = returnValue([0xF5, 0x0E, 0x00, 0x01], null);
+      assert.strictEqual(token.metadata.baseType, 'float16');
+      assert.isNull(token.value);
+    });
+
+    it('rejects a value whose dimension type does not match its metadata', function() {
+      assert.throws(() => returnValue([0xF5, 0x14, 0x00, 0x00], FLOAT16_VALUE), 'does not match the column\'s dimension type');
+    });
+  });
 });

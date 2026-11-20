@@ -1,6 +1,7 @@
 import Parser, { type ParserOptions } from './token/stream-parser';
 import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
+import { decodeVector } from './data-types/vector';
 
 import iconv from 'iconv-lite';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
@@ -386,6 +387,24 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       }
 
       return readVariant(buf, offset, options, dataLength);
+    }
+
+    case 'Vector': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+      if (dataLength === NULL) {
+        return new Result(null, offset);
+      }
+
+      let data;
+      ({ offset, value: data } = readBinary(buf, offset, dataLength));
+
+      if (metadata.baseType === undefined) {
+        throw new Error('Invalid vector metadata: the base type is missing');
+      }
+
+      return new Result(decodeVector(data, metadata.baseType), offset);
     }
 
     default: {

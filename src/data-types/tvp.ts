@@ -4,6 +4,7 @@ import { type Collation } from '../collation';
 import { InputError } from '../errors';
 import WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 import { isAsyncIterable } from './plp-stream';
+import { Vector, validateVectorColumn, type VectorBaseType } from './vector';
 
 const TVP_TYPE_ID = 0xF3;
 
@@ -20,6 +21,8 @@ interface TvpColumn {
   length?: number | undefined;
   precision?: number | undefined;
   scale?: number | undefined;
+  // For `TYPES.Vector` columns: the base type of their elements.
+  baseType?: VectorBaseType | undefined;
 }
 
 type TvpRow = unknown[];
@@ -47,13 +50,25 @@ function validateTable(value: unknown): TvpValue | null {
     throw new TypeError('Invalid table.');
   }
 
+  // A vector column's base type and length are checked up front: the base
+  // type determines the vector support version the request needs.
+  for (const column of (value as TvpValue).columns) {
+    if (column.type === Vector) {
+      try {
+        validateVectorColumn(column.baseType, column.length);
+      } catch (error: any) {
+        throw new TypeError(`Invalid table: TVP column '${column.name}' is invalid. ${error.message}`, { cause: error });
+      }
+    }
+  }
+
   return value as TvpValue;
 }
 
 // One cell per column, reused for every row: a type writes a cell's bytes
 // as soon as it is handed the cell and keeps no reference to it.
 function cellsFor(columns: TvpColumn[]): ParameterData[] {
-  return columns.map((column) => ({ value: undefined, length: column.length, scale: column.scale, precision: column.precision }));
+  return columns.map((column) => ({ value: undefined, length: column.length, scale: column.scale, precision: column.precision, baseType: column.baseType }));
 }
 
 function writeTvpTypeInfo(buffer: WritableTrackingBuffer, value: TvpValue | null) {
@@ -77,7 +92,7 @@ function writeColumns(buffer: WritableTrackingBuffer, columns: TvpColumn[], opti
     // Flags
     buffer.writeUInt16LE(0x0000);
     // TYPE_INFO
-    column.type.writeTypeInfo(buffer, { value: undefined, length: column.length, precision: column.precision, scale: column.scale }, options);
+    column.type.writeTypeInfo(buffer, { value: undefined, length: column.length, precision: column.precision, scale: column.scale, baseType: column.baseType }, options);
     // ColName
     buffer.writeUInt8(0x00);
   }
@@ -112,12 +127,11 @@ function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], cells: P
 
     try {
       cell.value = column.type.validate(row[k], collation);
+      // TvpColumnData
+      column.type.writeValue(buffer, cell, options);
     } catch (error) {
       throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
     }
-
-    // TvpColumnData
-    column.type.writeValue(buffer, cell, options);
   }
 }
 

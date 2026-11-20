@@ -342,13 +342,30 @@ export class Login7TokenHandler extends TokenHandler {
   onFeatureExtAck(token: FeatureExtAckToken) {
     const { authentication } = this.connection.config;
 
+    if (token.vectorSupport !== undefined) {
+      const version = token.vectorSupport.length === 1 ? token.vectorSupport[0] : 0;
+
+      if (version >= 1 && version <= this.connection.loginVectorSupportVersion) {
+        this.connection.vectorSupportVersion = version;
+      } else {
+        // The server acknowledged vector support that was not requested, or
+        // a version this client did not offer: values it would send in that
+        // version's format can not be parsed safely.
+        this.loginError = new ConnectionError('Received invalid vector support acknowledgement', 'EVECTORSUPPORT');
+        // FEATUREEXTACK follows LOGINACK, and the login is only failed with
+        // `loginError` if no LOGINACK was received.
+        this.loginAckReceived = false;
+        return;
+      }
+    }
+
     if (authentication.type === 'azure-active-directory-password' || authentication.type === 'azure-active-directory-access-token' || authentication.type === 'azure-active-directory-msi-vm' || authentication.type === 'azure-active-directory-msi-app-service' || authentication.type === 'azure-active-directory-service-principal-secret' || authentication.type === 'azure-active-directory-default') {
       if (token.fedAuth === undefined) {
         this.loginError = new ConnectionError('Did not receive Active Directory authentication acknowledgement');
       } else if (token.fedAuth.length !== 0) {
         this.loginError = new ConnectionError(`Active Directory authentication acknowledgment for ${authentication.type} authentication method includes extra data`);
       }
-    } else if (token.fedAuth === undefined && token.utf8Support === undefined) {
+    } else if (token.fedAuth === undefined && token.utf8Support === undefined && token.vectorSupport === undefined) {
       this.loginError = new ConnectionError('Received acknowledgement for unknown feature');
     } else if (token.fedAuth) {
       this.loginError = new ConnectionError('Did not request Active Directory authentication, but received the acknowledgment');

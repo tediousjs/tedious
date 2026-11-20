@@ -222,7 +222,10 @@ describe('RpcRequestPayload', function() {
 
     assert.instanceOf(error, InputError);
     assert.strictEqual((error as InputError).message, "Input parameter 'tvp' could not be validated");
-    assert.instanceOf((error as InputError).cause, TypeError);
-    assert.strictEqual(((error as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
+    const columnError = (error as InputError).cause as InputError;
+    assert.instanceOf(columnError, InputError);
+    assert.strictEqual(columnError.message, "TVP column 'c' has invalid data at row index 0");
+    assert.instanceOf(columnError.cause, TypeError);
+    assert.strictEqual((columnError.cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
   });
 });

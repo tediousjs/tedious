@@ -2,7 +2,11 @@ import * as net from 'net';
 import * as tls from 'tls';
 import { readFileSync } from 'fs';
 import * as sinon from 'sinon';
-import { Connection, ConnectionError } from '../../src/tedious';
+import { Connection, ConnectionError, RequestError } from '../../src/tedious';
+import { type ConnectionConfiguration } from '../../src/connection';
+import { TYPES, type DataType } from '../../src/data-type';
+import { Login7TokenHandler } from '../../src/token/handler';
+import { FeatureExtAckToken } from '../../src/token/token';
 import { assert } from 'chai';
 
 describe('Using `strict` encryption', function() {
@@ -177,6 +181,161 @@ describe('Using `strict` encryption', function() {
       }
 
       finish();
+    });
+  });
+});
+
+describe('Vector support negotiation', function() {
+  const float16: Array<{ type: DataType, baseType: 'float32' | 'float16' }> = [{ type: TYPES.Vector, baseType: 'float16' }];
+  const float32: Array<{ type: DataType, baseType: 'float32' | 'float16' }> = [{ type: TYPES.Vector, baseType: 'float32' }];
+
+  function createConnection(options: { vectorTypeSupport?: 'off' | 'v1' | 'v2', tdsVersion?: string } = {}, authentication?: ConnectionConfiguration['authentication']) {
+    return new Connection(authentication ? { server: 'localhost', authentication, options: { ...options } } : { server: 'localhost', options: { ...options } });
+  }
+
+  // Runs `fn` as if this version of Node.js had no `Float16Array`.
+  function withoutFloat16Array(fn: () => void) {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Float16Array');
+    Object.defineProperty(globalThis, 'Float16Array', { value: undefined, configurable: true, writable: true });
+    try {
+      fn();
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(globalThis, 'Float16Array', descriptor);
+      } else {
+        delete (globalThis as { Float16Array?: unknown }).Float16Array;
+      }
+    }
+  }
+
+  function acknowledge(connection: Connection, requested: number, token: FeatureExtAckToken) {
+    connection.loginVectorSupportVersion = requested;
+    const handler = new Login7TokenHandler(connection);
+    handler.loginAckReceived = true;
+    handler.onFeatureExtAck(token);
+    return handler;
+  }
+
+  describe('#requestedVectorSupportVersion', function() {
+    it('requests the version selected with `vectorTypeSupport`', function() {
+      assert.strictEqual(createConnection().requestedVectorSupportVersion(), 0);
+      assert.strictEqual(createConnection({ vectorTypeSupport: 'off' }).requestedVectorSupportVersion(), 0);
+      assert.strictEqual(createConnection({ vectorTypeSupport: 'v1' }).requestedVectorSupportVersion(), 1);
+    });
+
+    it('requests version 2 only where `Float16Array` exists', function() {
+      const connection = createConnection({ vectorTypeSupport: 'v2' });
+      if ((globalThis as { Float16Array?: unknown }).Float16Array) {
+        assert.strictEqual(connection.requestedVectorSupportVersion(), 2);
+      }
+
+      withoutFloat16Array(() => {
+        assert.strictEqual(connection.requestedVectorSupportVersion(), 1);
+      });
+    });
+
+    it('requests no vector support before TDS 7.4', function() {
+      assert.strictEqual(createConnection({ vectorTypeSupport: 'v2', tdsVersion: '7_3_B' }).requestedVectorSupportVersion(), 0);
+    });
+  });
+
+  describe('Login7TokenHandler#onFeatureExtAck', function() {
+    it('accepts a version up to the requested one', function() {
+      for (const version of [1, 2]) {
+        const connection = createConnection({ vectorTypeSupport: 'v2' });
+        const handler = acknowledge(connection, 2, new FeatureExtAckToken(undefined, true, Buffer.from([version])));
+
+        assert.isUndefined(handler.loginError);
+        assert.isTrue(handler.loginAckReceived);
+        assert.strictEqual(connection.vectorSupportVersion, version);
+      }
+    });
+
+    it('rejects invalid acknowledgements', function() {
+      for (const [requested, data] of [
+        [0, [1]], // not requested
+        [1, [2]], // a higher version than requested
+        [2, [0]], // version 0
+        [2, []], // no data
+        [2, [1, 1]] // more than one byte
+      ] as const) {
+        const connection = createConnection({ vectorTypeSupport: 'v2' });
+        const handler = acknowledge(connection, requested, new FeatureExtAckToken(undefined, undefined, Buffer.from(data)));
+
+        assert.instanceOf(handler.loginError, ConnectionError);
+        assert.strictEqual(handler.loginError!.code, 'EVECTORSUPPORT');
+        assert.isFalse(handler.loginAckReceived);
+        assert.strictEqual(connection.vectorSupportVersion, 0);
+      }
+    });
+
+    it('checks the version sent at login, not the TDS version acknowledged by the server', function() {
+      const connection = createConnection({ vectorTypeSupport: 'v2', tdsVersion: '7_3_B' });
+      const handler = acknowledge(connection, 1, new FeatureExtAckToken(undefined, undefined, Buffer.from([1])));
+
+      assert.isUndefined(handler.loginError);
+      assert.strictEqual(connection.vectorSupportVersion, 1);
+    });
+
+    it('is combined with the federated authentication acknowledgement', function() {
+      const authentication = { type: 'azure-active-directory-access-token' as const, options: { token: 'token' } };
+
+      let connection = createConnection({ vectorTypeSupport: 'v2' }, authentication);
+      let handler = acknowledge(connection, 2, new FeatureExtAckToken(Buffer.alloc(0), undefined, Buffer.from([2])));
+      assert.isUndefined(handler.loginError);
+      assert.strictEqual(connection.vectorSupportVersion, 2);
+
+      connection = createConnection({ vectorTypeSupport: 'v2' }, authentication);
+      handler = acknowledge(connection, 2, new FeatureExtAckToken(undefined, undefined, Buffer.from([2])));
+      assert.strictEqual(handler.loginError?.message, 'Did not receive Active Directory authentication acknowledgement');
+
+      connection = createConnection({ vectorTypeSupport: 'v2' });
+      handler = acknowledge(connection, 2, new FeatureExtAckToken(Buffer.alloc(0), undefined, Buffer.from([2])));
+      assert.strictEqual(handler.loginError?.message, 'Did not request Active Directory authentication, but received the acknowledgment');
+    });
+  });
+
+  describe('#checkVectorSupport', function() {
+    function check(options: { vectorTypeSupport?: 'off' | 'v1' | 'v2', tdsVersion?: string }, negotiated: number, types = float16) {
+      const connection = createConnection(options);
+      connection.vectorSupportVersion = negotiated;
+      return connection.checkVectorSupport(types);
+    }
+
+    it('accepts types the negotiated version supports', function() {
+      assert.isUndefined(check({}, 0, [{ type: TYPES.Int, baseType: undefined }] as any));
+      assert.isUndefined(check({ vectorTypeSupport: 'v1' }, 1, float32));
+      assert.isUndefined(check({ vectorTypeSupport: 'v2' }, 2, float16));
+    });
+
+    it('explains why vector support is missing', function() {
+      for (const [options, negotiated, types, message] of [
+        [{ vectorTypeSupport: 'v2', tdsVersion: '7_3_B' }, 0, float32, 'is lower than `7_4`'],
+        [{ vectorTypeSupport: 'off' }, 0, float32, 'Set the `vectorTypeSupport` connection option to `\'v1\'` or `\'v2\'` to use `TYPES.Vector`.'],
+        [{ vectorTypeSupport: 'v1' }, 1, float16, 'Set it to `\'v2\'` to use `float16` vectors.'],
+        [{ vectorTypeSupport: 'v2' }, 0, float32, 'The server does not support the `vector` data type.']
+      ] as const) {
+        const error = check(options, negotiated, types as any);
+        assert.instanceOf(error, RequestError);
+        assert.strictEqual(error!.code, 'EVECTORNOTSUPPORTED');
+        assert.include(error!.message, message);
+      }
+    });
+
+    it('explains that the server does not support `float16` vectors', function() {
+      // Without `Float16Array`, version 2 is never requested.
+      if (!(globalThis as { Float16Array?: unknown }).Float16Array) {
+        this.skip();
+      }
+
+      assert.include(check({ vectorTypeSupport: 'v2' }, 1, float16)!.message, 'The server only supports vector support version 1');
+    });
+
+    it('explains that `float16` vectors require `Float16Array`', function() {
+      withoutFloat16Array(() => {
+        const error = check({ vectorTypeSupport: 'v2' }, 1, float16);
+        assert.include(error!.message, '`float16` vectors require Float16Array');
+      });
     });
   });
 });

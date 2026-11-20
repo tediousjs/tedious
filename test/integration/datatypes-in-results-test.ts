@@ -1,10 +1,12 @@
 import { assert } from 'chai';
+import { randomUUID } from 'node:crypto';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
 import { typeByName as TYPES } from '../../src/data-type';
 
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { requireVectorSupport, serverHasVectorType } from '../helpers/vector-support';
 
 import defaultConfig from '../config';
 
@@ -570,5 +572,129 @@ describe('Datatypes in results test', function() {
     'should test udt null': [
       'select cast(null as geography)', null, '7_2'
     ]
+  });
+});
+
+describe('Vector in results', function() {
+  const Float16Array = (globalThis as { Float16Array?: new (values: number[]) => ArrayLike<number> }).Float16Array;
+  let connection: Connection;
+
+  function connect(options = {}): Promise<Connection> {
+    return new Promise((resolve, reject) => {
+      const newConnection = new Connection({ ...config, options: { ...config.options, vectorTypeSupport: 'v2', ...options } });
+      newConnection.connect((err) => (err ? reject(err) : resolve(newConnection)));
+    });
+  }
+
+  function query(connection: Connection, sql: string): Promise<Array<Array<{ value: any, metadata: any }>>> {
+    return new Promise((resolve, reject) => {
+      const rows: Array<Array<{ value: any, metadata: any }>> = [];
+      const request = new Request(sql, (err) => (err ? reject(err) : resolve(rows)));
+      request.on('row', (columns) => rows.push(columns));
+      connection.execSqlBatch(request);
+    });
+  }
+
+  function close(connection: Connection): Promise<void> {
+    return new Promise((resolve) => {
+      connection.on('end', () => resolve());
+      connection.close();
+    });
+  }
+
+  beforeEach(async function() {
+    connection = await connect();
+  });
+
+  afterEach(async function() {
+    await close(connection);
+  });
+
+  it('returns vector columns as JSON text by default', async function() {
+    if (!await serverHasVectorType(connection)) {
+      this.skip();
+    }
+
+    const off = await new Promise<Connection>((resolve, reject) => {
+      const defaultConnection = new Connection(config);
+      defaultConnection.connect((err) => (err ? reject(err) : resolve(defaultConnection)));
+    });
+    try {
+      const [[vector]] = await query(off, "SELECT CAST('[1, 2.5, -3]' AS vector(3))");
+      assert.isString(vector.value);
+      assert.deepEqual(JSON.parse(vector.value), [1, 2.5, -3]);
+    } finally {
+      await close(off);
+    }
+  });
+
+  describe('with vector support negotiated', function() {
+    beforeEach(async function() {
+      await requireVectorSupport(this, connection);
+    });
+
+    it('returns float32 vector columns as Float32Array', async function() {
+      const [[vector, nullVector]] = await query(connection, "SELECT CAST('[1, 2.5, -3]' AS vector(3)), CAST(NULL AS vector(3))");
+
+      assert.instanceOf(vector.value, Float32Array);
+      assert.deepEqual(Array.from(vector.value), [1, 2.5, -3]);
+      assert.strictEqual(vector.metadata.type, TYPES.Vector);
+      assert.strictEqual(vector.metadata.baseType, 'float32');
+      assert.strictEqual(vector.metadata.dimensions, 3);
+      assert.isUndefined(vector.metadata.precision);
+      assert.isNull(nullVector.value);
+    });
+
+    it('returns float16 vector columns as Float16Array', async function() {
+    // `float16` vectors are sent in binary form from vector support version 2.
+      if (connection.vectorSupportVersion < 2 || !Float16Array) {
+        this.skip();
+      }
+
+      const [[vector]] = await query(connection, "SELECT CAST('[1, 2.5, -3]' AS vector(3, float16))");
+      assert.instanceOf(vector.value, Float16Array);
+      assert.deepEqual(Array.from(vector.value), [1, 2.5, -3]);
+      assert.strictEqual(vector.metadata.baseType, 'float16');
+      assert.strictEqual(vector.metadata.dimensions, 3);
+    });
+
+    it('returns float16 as varchar(max) and float32 natively on SQL Server 2025 with version 1', async function() {
+      const [[majorVersion, engineEdition]] = await query(connection, `
+      SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int), CAST(SERVERPROPERTY('EngineEdition') AS int)
+    `);
+      // Float16 is a preview feature on boxed SQL Server 2025. Azure SQL and Managed Instance do not use the boxed
+      // SQL Server versioning scheme.
+      if (majorVersion.value !== 17 || engineEdition.value === 5 || engineEdition.value === 8) {
+        this.skip();
+      }
+
+      const v1 = await connect({ vectorTypeSupport: 'v1' });
+      const database = `[tedious_vector_${randomUUID().replace(/-/g, '')}]`;
+      try {
+        assert.strictEqual(v1.vectorSupportVersion, 1);
+        const [[originalDatabase]] = await query(v1, 'SELECT DB_NAME()');
+        await query(v1, `CREATE DATABASE ${database}`);
+        try {
+          await query(v1, `USE ${database}; ALTER DATABASE SCOPED CONFIGURATION SET PREVIEW_FEATURES = ON;`);
+          const [[float16, float32]] = await query(v1, `
+          SELECT CAST('[1, 2.5, -3]' AS vector(3, float16)), CAST('[1, 2.5, -3]' AS vector(3))
+        `);
+
+          assert.strictEqual(float16.metadata.type, TYPES.VarChar);
+          assert.strictEqual(float16.metadata.dataLength, 0xFFFF);
+          assert.isString(float16.value);
+          assert.deepEqual(JSON.parse(float16.value), [1, 2.5, -3]);
+          assert.strictEqual(float32.metadata.type, TYPES.Vector);
+          assert.strictEqual(float32.metadata.baseType, 'float32');
+          assert.instanceOf(float32.value, Float32Array);
+          assert.deepEqual(Array.from(float32.value), [1, 2.5, -3]);
+        } finally {
+          await query(v1, `USE [${String(originalDatabase.value).replace(/]/g, ']]')}]`);
+          await query(v1, `DROP DATABASE ${database}`);
+        }
+      } finally {
+        await close(v1);
+      }
+    });
   });
 });

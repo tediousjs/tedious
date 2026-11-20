@@ -161,6 +161,7 @@ export class BulkLoadPayload implements AsyncIterable<Buffer> {
             length: c.length,
             scale: c.scale,
             precision: c.precision,
+            baseType: c.baseType,
             value: value
           };
 
