@@ -133,8 +133,10 @@ describe('calling a procedure that takes and returns a TVP', function() {
       const request = new Request('__tediousTvpTest', (err) => {
         assert.instanceOf(err, InputError);
         assert.strictEqual(err?.message, 'Input parameter \'tvp\' could not be validated');
-        assert.instanceOf(err?.cause, TypeError);
-        assert.strictEqual((err?.cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
+        assert.instanceOf(err?.cause, InputError);
+        assert.strictEqual((err?.cause as InputError).message, 'TVP column \'c\' has invalid data at row index 0');
+        assert.instanceOf((err?.cause as InputError).cause, TypeError);
+        assert.strictEqual(((err?.cause as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
 
         connection.execSql(new Request('SELECT 1', done));
       });
