@@ -10,7 +10,23 @@ export interface ExecutionOptions {
    * Cancels the execution when aborted. The execution then completes with a
    * {@link RequestError} whose `code` is `'ABORT_ERR'`, whose `name` is
    * `'AbortError'`, and whose `cause` is the signal's `reason`, instead of a
-   * cancellation error.
+   * cancellation error. This is the same shape as the `AbortError` that
+   * Node.js' own APIs, e.g. `fs.readFile()` or `events.once()`, fail with.
+   *
+   * A signal created with `AbortSignal.timeout()` also fails the execution
+   * with this error, not with the `ETIMEOUT` error of the request timeout
+   * ({@link ConnectionOptions.requestTimeout}). Its `cause` is then a
+   * `DOMException` whose `name` is `'TimeoutError'`:
+   *
+   * ```js
+   * const request = new Request('SELECT ...', (err) => {
+   *   if (err?.code === 'ABORT_ERR' && err.cause?.name === 'TimeoutError') {
+   *     // The execution took longer than 30 seconds.
+   *   }
+   * });
+   *
+   * connection.execSql(request, { signal: AbortSignal.timeout(30_000) });
+   * ```
    *
    * If the signal is aborted already, the request is not sent at all.
    *
