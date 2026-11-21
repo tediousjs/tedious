@@ -81,6 +81,11 @@ export interface Options {
 
   /**
    * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `{}`)
+   *
+   * Each key is a column reference that is inserted into the generated SQL as-is, without quoting
+   * or escaping, so never build it from untrusted input. Unlike the column names passed to
+   * {@link BulkLoad.addColumn}, a name with special characters has to be quoted yourself as a
+   * delimited identifier, doubling any `]` (e.g. `{ '[my]]column]': 'ASC' }`).
    */
   order?: InternalOptions['order'] | undefined;
 }

@@ -2823,6 +2823,7 @@ class Connection extends EventEmitter {
    * untrusted input. If a name can contain special characters, quote each part
    * yourself as a delimited identifier, doubling any `]` (e.g. `[my]]table]`).
    *
+   * The same applies to the column names used as keys of `options.order`.
    * Column names passed to {@link BulkLoad.addColumn} are quoted and escaped
    * by tedious.
    *
