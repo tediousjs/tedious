@@ -12,6 +12,11 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # to move dist-tags via npm trusted publishing (OIDC)
+
     steps:
     - uses: actions/checkout@v7.0.1
       with:
@@ -22,11 +27,16 @@ jobs:
       with:
         node-version: "22"
         cache: 'npm'
-        registry-url: 'https://registry.npmjs.org'
+
+    # Moving dist-tags via OIDC requires npm 11.21.0 or newer, which is newer
+    # than the npm version bundled with Node.js 22. Install the npm version
+    # locked in `package-lock.json` (also used by semantic-release) instead.
+    - run: npm ci
+
+    - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
+      run: npm audit signatures
 
     - name: Tag latest release
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: |
         info=$(npm info tedious --json)
         # npm 12+ always wraps `npm info --json` output in an array, older
@@ -44,6 +54,6 @@ jobs:
 
           # ...and only once it has soaked on `next` for at least a week.
           if [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
-            npm dist-tag add "tedious@$next" latest
+            npx --no -- npm dist-tag add "tedious@$next" latest
           fi
         fi
