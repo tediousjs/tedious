@@ -27,7 +27,7 @@ import PreloginPayload from './prelogin-payload';
 import Login7Payload from './login7-payload';
 import NTLMResponsePayload from './ntlm-payload';
 import Request from './request';
-import { abortOnSignal, originalCallback, type ExecutionOptions } from './execution-options';
+import { abortError, type ExecutionOptions } from './execution-options';
 import RpcRequestPayload from './rpcrequest-payload';
 import SqlBatchPayload from './sqlbatch-payload';
 import MessageIO from './message-io';
@@ -1062,9 +1062,25 @@ class Connection extends EventEmitter {
   declare attentionSent: boolean;
 
   /**
+   * Aborted to cancel the execution of the current request, with the error
+   * that the request completes with as the reason. Whatever cancels the
+   * execution - `cancel()`, the request timeout or the abort signal of the
+   * execution - aborts it, and the first one to do so determines the error.
+   *
+   * `makeRequest` creates a new controller for every execution, which is
+   * released once the execution completed.
+   *
    * @private
    */
-  declare _cancelAfterRequestSent: () => void;
+  declare requestController: undefined | AbortController;
+
+  /**
+   * Removes the listeners that abort {@link requestController}: the ones on
+   * the request's `cancel` event and on the execution's abort signal.
+   *
+   * @private
+   */
+  declare removeRequestCancelListeners: undefined | (() => void);
 
   /**
    * @private
@@ -1807,12 +1823,8 @@ class Connection extends EventEmitter {
     this.state = this.STATE.INITIALIZED;
 
     this.attentionSent = false;
-
-    this._cancelAfterRequestSent = () => {
-      this.messageIo.sendMessage(TYPE.ATTENTION);
-      this.attentionSent = true;
-      this.createCancelTimer();
-    };
+    this.requestController = undefined;
+    this.removeRequestCancelListeners = undefined;
 
     this._onSocketClose = () => {
       this.socketClose();
@@ -2181,7 +2193,7 @@ class Connection extends EventEmitter {
    */
   cleanupConnection() {
     if (!this.closed) {
-      this.clearRequestTimer();
+      this.releaseRequestController();
       this.clearCancelTimer();
       this.closeConnection();
 
@@ -2370,17 +2382,51 @@ class Connection extends EventEmitter {
     this.requestTimer = undefined;
     const request = this.request!;
 
+    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
+    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
+
     // A request that was canceled already, e.g. via `cancel()` or an abort
-    // signal, completes with the error of that cancellation, once the server
-    // acknowledged it (or the cancel timer expired).
-    if (request.canceled) {
+    // signal, keeps the error of that cancellation.
+    this.abortRequest(new RequestError(message, 'ETIMEOUT'));
+  }
+
+  /**
+   * Cancel the execution of the current request, which then completes with
+   * the given error - unless it was canceled already, in which case it keeps
+   * the error of that cancellation.
+   *
+   * @private
+   */
+  abortRequest(error: Error, markRequestCanceled = true) {
+    const controller = this.requestController;
+    if (controller === undefined || controller.signal.aborted) {
       return;
     }
 
-    request.cancel();
-    const timeout = (request.timeout !== undefined) ? request.timeout : this.config.options.requestTimeout;
-    const message = 'Timeout: Request failed to complete in ' + timeout + 'ms';
-    request.error = new RequestError(message, 'ETIMEOUT');
+    controller.abort(error);
+
+    // Mark the request as canceled, as `cancel()` does, if it was canceled
+    // otherwise, e.g. by its request timeout. This makes its token handlers
+    // discard the rest of the response.
+    if (markRequestCanceled) {
+      this.request?.cancel();
+    }
+  }
+
+  /**
+   * Stop canceling the execution of the current request, once it completed:
+   * clear its request timer, and remove the listeners on its `cancel` event
+   * and on its abort signal. Nothing can abort the released controller after
+   * that, so the listeners on its signal are left to be garbage collected
+   * with it.
+   *
+   * @private
+   */
+  releaseRequestController() {
+    this.clearRequestTimer();
+    this.removeRequestCancelListeners?.();
+    this.removeRequestCancelListeners = undefined;
+    this.requestController = undefined;
   }
 
   /**
@@ -2777,9 +2823,7 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        // The request was never started, so it must not complete another
-        // execution of it that is in progress (see `originalCallback`).
-        originalCallback(request).call(request, error);
+        request.callback(error);
       });
 
       return;
@@ -2940,12 +2984,7 @@ class Connection extends EventEmitter {
         payload.close();
         bulkLoad.error = error;
 
-        // The `INSERT BULK` statement of this execution failed, so the
-        // signal was not listened to for the bulk load itself yet. If its
-        // callback is replaced, the replacement belongs to another execution
-        // of the bulk load that is in progress, e.g. if this execution was
-        // rejected because of it, and must not be called.
-        originalCallback(bulkLoad).call(bulkLoad, error);
+        bulkLoad.callback(error);
         return;
       }
 
@@ -3111,9 +3150,7 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        // The request was never started, so it must not complete another
-        // execution of it that is in progress (see `originalCallback`).
-        originalCallback(request).call(request, error);
+        request.callback(error);
       });
 
       return;
@@ -3148,9 +3185,7 @@ class Connection extends EventEmitter {
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        // The request was never started, so it must not complete another
-        // execution of it that is in progress (see `originalCallback`).
-        originalCallback(request).call(request, error);
+        request.callback(error);
       });
 
       return;
@@ -3358,94 +3393,132 @@ class Connection extends EventEmitter {
     if (this.state !== this.STATE.LOGGED_IN) {
       const message = 'Requests can only be made in the ' + this.STATE.LOGGED_IN.name + ' state, not the ' + this.state.name + ' state';
       this.debug.log(message);
-      // The request is rejected, e.g. because another execution of it is in
-      // progress, which this must not complete (see `originalCallback`).
-      originalCallback(request).call(request, new RequestError(message, 'EINVALIDSTATE'));
+      request.callback(new RequestError(message, 'EINVALIDSTATE'));
       return;
     }
 
-    // Only listen to the signal once the request is certain to be executed
-    // and to call back. If the request is rejected (above), or if preparing
-    // its payload throws, the signal must not affect the request, which might
-    // still be executing another time (or will be executed again later).
-    abortOnSignal(request, signal);
-
+    // A request that was canceled before it was executed, or whose signal is
+    // aborted already, is not sent at all.
     if (request.canceled) {
       process.nextTick(() => {
         request.callback(new RequestError('Canceled.', 'ECANCEL'));
       });
+      return;
+    }
+
+    if (signal?.aborted) {
+      const error = abortError(signal);
+      process.nextTick(() => {
+        request.callback(error);
+      });
+      return;
+    }
+
+    if (packetType === TYPE.SQL_BATCH) {
+      this.isSqlBatch = true;
     } else {
-      if (packetType === TYPE.SQL_BATCH) {
-        this.isSqlBatch = true;
-      } else {
-        this.isSqlBatch = false;
+      this.isSqlBatch = false;
+    }
+
+    this.request = request;
+    this.attentionSent = false;
+    request.connection! = this;
+    request.rowCount! = 0;
+    request.rows! = [];
+    request.rst! = [];
+
+    // This execution is canceled by aborting its controller, with the error
+    // the request then completes with: by `cancel()`, by the request timeout
+    // (see `requestTimeout`), or by the execution's abort signal. The
+    // request's `cancel` event and the signal are only listened to once the
+    // request is accepted: a rejected execution must not affect the request,
+    // which might still be executing another time.
+    const controller = new AbortController();
+    this.requestController = controller;
+
+    const onCancel = () => {
+      // The request is canceled already, so it is not marked again: a
+      // rejected execution of it, started from another `cancel` listener,
+      // may have reset `canceled` in the meantime, and the `cancel` event
+      // must only be emitted once.
+      this.abortRequest(new RequestError('Canceled.', 'ECANCEL'), false);
+    };
+    const onSignalAbort = () => {
+      this.abortRequest(abortError(signal!));
+    };
+
+    request.once('cancel', onCancel);
+    signal?.addEventListener('abort', onSignalAbort, { once: true });
+    this.removeRequestCancelListeners = () => {
+      request.removeListener('cancel', onCancel);
+      signal?.removeEventListener('abort', onSignalAbort);
+    };
+
+    // Whether the request message was sent off in full.
+    let messageSent = false;
+
+    // This listener is registered before any other listener of the
+    // controller's signal (e.g. the `SentClientRequest` state's), and so
+    // always runs first. Those rely on `attentionSent` being set already.
+    controller.signal.addEventListener('abort', () => {
+      if (messageSent) {
+        // The server received the whole request message, so it has to be
+        // told to stop processing it with an attention message.
+        this.messageIo.sendMessage(TYPE.ATTENTION);
+        this.attentionSent = true;
+        this.createCancelTimer();
+        return;
       }
 
-      this.request = request;
-      this.attentionSent = false;
-      request.connection! = this;
-      request.rowCount! = 0;
-      request.rows! = [];
-      request.rst! = [];
+      payloadStream.unpipe(message);
+      payloadStream.destroy();
 
-      const onCancel = () => {
-        payloadStream.unpipe(message);
-        payloadStream.destroy();
+      // The request error might already be set, e.g. if the payload
+      // stream errored before the cancellation.
+      request.error ??= controller.signal.reason;
 
-        // The request error might already be set, e.g. if the payload
-        // stream errored before the cancellation.
-        request.error ??= new RequestError('Canceled.', 'ECANCEL');
+      // set the ignore bit and end the message.
+      message.ignore = true;
+      message.end();
 
-        // set the ignore bit and end the message.
-        message.ignore = true;
-        message.end();
+      // The server responds to the ignored message like to any other
+      // request message. If that response never arrives (e.g. because
+      // the server has become unresponsive), the cancel timer ensures
+      // the canceled request still completes.
+      this.createCancelTimer();
 
-        // The server responds to the ignored message like to any other
-        // request message. If that response never arrives (e.g. because
-        // the server has become unresponsive), the cancel timer ensures
-        // the canceled request still completes.
-        this.createCancelTimer();
+      if (request instanceof Request && request.paused) {
+        // resume the request if it was paused so we can read the remaining tokens
+        request.resume();
+      }
+    }, { once: true });
 
-        if (request instanceof Request && request.paused) {
-          // resume the request if it was paused so we can read the remaining tokens
-          request.resume();
-        }
-      };
+    this.createRequestTimer();
 
-      request.once('cancel', onCancel);
+    const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
+    this.messageIo.outgoingMessageStream.write(message);
+    this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
 
-      this.createRequestTimer();
+    message.once('finish', () => {
+      messageSent = true;
 
-      const message = new Message({ type: packetType, resetConnection: this.resetConnectionOnNextRequest });
-      this.messageIo.outgoingMessageStream.write(message);
-      this.transitionTo(this.STATE.SENT_CLIENT_REQUEST);
-
-      message.once('finish', () => {
-        request.removeListener('cancel', onCancel);
-        // Prepend the listener so it always runs before the
-        // `SentClientRequest` state's `cancel` handler, regardless of the
-        // order in which the two were registered. The latter relies on
-        // `attentionSent` already being set, which only this listener does.
-        request.prependOnceListener('cancel', this._cancelAfterRequestSent);
-
-        this.resetConnectionOnNextRequest = false;
-        this.debug.payload(function() {
-          return payload!.toString('  ');
-        });
+      this.resetConnectionOnNextRequest = false;
+      this.debug.payload(function() {
+        return payload!.toString('  ');
       });
+    });
 
-      const payloadStream = Readable.from(payload);
-      payloadStream.once('error', (error) => {
-        payloadStream.unpipe(message);
+    const payloadStream = Readable.from(payload);
+    payloadStream.once('error', (error) => {
+      payloadStream.unpipe(message);
 
-        // Only set a request error if no error was set yet.
-        request.error ??= error;
+      // Only set a request error if no error was set yet.
+      request.error ??= error;
 
-        message.ignore = true;
-        message.end();
-      });
-      payloadStream.pipe(message);
-    }
+      message.ignore = true;
+      message.end();
+    });
+    payloadStream.pipe(message);
   }
 
   /**
@@ -3933,11 +4006,10 @@ Connection.prototype.STATE = {
         // event on the parser's internal stream and crash the process.
         const onParserError = (err: Error) => {
           // The request is about to fail through the socket error path, so
-          // detach its listeners first: a late `cancel()` must not write an
-          // attention packet to the destroyed socket. (On the canceled-drain
-          // path below these were never attached, and removal is a no-op.)
-          this.request?.removeListener('cancel', this._cancelAfterRequestSent);
-          this.request?.removeListener('cancel', onCancel);
+          // detach its listeners first. (On the canceled-drain path below
+          // these were never attached, and removal is a no-op.) Failing the
+          // request releases its controller, so a late `cancel()` does not
+          // write an attention packet to the destroyed socket.
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
 
@@ -3953,7 +4025,11 @@ Connection.prototype.STATE = {
         // no-ops), and need to ensure the next message (containing the
         // attention acknowledgement) is handled by the `SENT_ATTENTION`
         // state.
-        if (this.request?.canceled && this.attentionSent) {
+        //
+        // This asks the execution's controller, not `request.canceled`: a
+        // rejected execution of the same request (e.g. one started from a
+        // `cancel` listener) resets `canceled` while this one is canceled.
+        if (this.requestController?.signal.aborted && this.attentionSent) {
           return this.transitionTo(this.STATE.SENT_ATTENTION);
         }
 
@@ -3972,7 +4048,7 @@ Connection.prototype.STATE = {
           onPause();
         }
 
-        const onCancel = () => {
+        const onAbort = () => {
           // If the request was canceled before the request message was
           // fully sent, the message was terminated with the `IGNORE` bit
           // set and no attention message was sent. The server's response
@@ -3991,8 +4067,8 @@ Connection.prototype.STATE = {
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
 
-          // The `_cancelAfterRequestSent` callback will have sent a
-          // attention message, so now we need to also switch to
+          // The abort listener registered in `makeRequest` will have sent
+          // an attention message, so now we need to also switch to
           // the `SENT_ATTENTION` state to make sure the attention ack
           // message is processed correctly.
           this.transitionTo(this.STATE.SENT_ATTENTION);
@@ -4001,8 +4077,6 @@ Connection.prototype.STATE = {
         const onEndOfMessage = () => {
           tokenStreamParser.removeListener('error', onParserError);
 
-          this.request?.removeListener('cancel', this._cancelAfterRequestSent);
-          this.request?.removeListener('cancel', onCancel);
           this.request?.removeListener('pause', onPause);
           this.request?.removeListener('resume', onResume);
 
@@ -4012,9 +4086,11 @@ Connection.prototype.STATE = {
           // completes the cancellation.
           this.clearCancelTimer();
 
-          this.transitionTo(this.STATE.LOGGED_IN);
           const sqlRequest = this.request as Request;
           this.request = undefined;
+          this.releaseRequestController();
+          this.transitionTo(this.STATE.LOGGED_IN);
+
           if (this.config.options.tdsVersion < '7_2' && sqlRequest.error && this.isSqlBatch) {
             this.inTransaction = false;
           }
@@ -4022,7 +4098,10 @@ Connection.prototype.STATE = {
         };
 
         tokenStreamParser.once('end', onEndOfMessage);
-        this.request?.once('cancel', onCancel);
+
+        // Registered after the abort listener of `makeRequest`, so it always
+        // runs after that one, once the attention message was sent.
+        this.requestController?.signal.addEventListener('abort', onAbort, { once: true });
       })();
 
     },
@@ -4080,15 +4159,16 @@ Connection.prototype.STATE = {
           this.attentionSent = false;
           this.clearCancelTimer();
 
+          // The request completes with the error it was canceled with:
+          // `ECANCEL` for `cancel()`, `ETIMEOUT` for its request timeout, or
+          // an abort error for its abort signal.
           const sqlRequest = this.request!;
+          const error: Error = this.requestController!.signal.reason;
           this.request = undefined;
+          this.releaseRequestController();
           this.transitionTo(this.STATE.LOGGED_IN);
 
-          if (sqlRequest.error && sqlRequest.error instanceof RequestError && sqlRequest.error.code === 'ETIMEOUT') {
-            sqlRequest.callback(sqlRequest.error);
-          } else {
-            sqlRequest.callback(new RequestError('Canceled.', 'ECANCEL'));
-          }
+          sqlRequest.callback(error);
         }
       })().catch((err) => {
         process.nextTick(() => {
