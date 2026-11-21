@@ -440,6 +440,14 @@ describe('DateTimeOffset', function() {
       assert.deepEqual(buffer.slice(0, 6), expected);
     });
 
+    it('writes the offset a `Date` carries as `offsetMinutes`', function() {
+      for (const [offsetMinutes, hex] of [[330, '4a01'], [-840, 'b8fc'], [0, '0000']] as const) {
+        const value = Object.assign(new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)), { offsetMinutes });
+        const buffer = serialize(TYPES.DateTimeOffset, { value, scale: 0 }, optionsWithUTCTrue).data;
+        assert.deepEqual(buffer, Buffer.from('20fd002d380b' + hex, 'hex'), `offset ${offsetMinutes}`);
+      }
+    });
+
     it('correctly converts `null` values', function() {
       const value = null;
       const expected = Buffer.from([]);
@@ -460,6 +468,14 @@ describe('DateTimeOffset', function() {
   });
 
   describe('.validate', function() {
+    it('returns a TypeError for an offset SQL Server does not take', function() {
+      for (const offsetMinutes of [841, -841, 1.5]) {
+        assert.throws(() => {
+          TYPES.DateTimeOffset.validate(Object.assign(new Date(), { offsetMinutes }), undefined);
+        }, TypeError, 'The offset must be a whole number of minutes from -840 to 840.');
+      }
+    });
+
     it('returns a TypeError for dates that are out of range', function() {
       assert.throws(() => {
         const testDate = new Date();
