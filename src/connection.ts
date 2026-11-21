@@ -406,6 +406,7 @@ export interface InternalConnectionOptions {
   useUTC: boolean;
   workstationId: undefined | string;
   lowerCaseGuids: boolean;
+  decimalAsString: boolean;
 }
 
 interface KeyStoreProviderMap {
@@ -742,6 +743,16 @@ export interface ConnectionOptions {
    * (default: `false`).
    */
   lowerCaseGuids?: boolean;
+
+  /**
+   * A boolean determining whether `decimal`, `numeric`, `money` and `smallmoney` values are
+   * returned as strings that hold their exact value, such as `'1.50'` for a `decimal(10, 2)`
+   * and `'1.5000'` for a `money`, instead of as numbers, which cannot hold every value of
+   * these types exactly. A string has as many fractional digits as the type's scale.
+   *
+   * (default: `false`).
+   */
+  decimalAsString?: boolean;
 
   /**
    * The maximum number of connection retries for transient errors.
@@ -1349,7 +1360,8 @@ class Connection extends EventEmitter {
         useColumnNames: false,
         useUTC: true,
         workstationId: undefined,
-        lowerCaseGuids: false
+        lowerCaseGuids: false,
+        decimalAsString: false
       }
     };
 
@@ -1770,6 +1782,14 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.lowerCaseGuids = config.options.lowerCaseGuids;
+      }
+
+      if (config.options.decimalAsString !== undefined) {
+        if (typeof config.options.decimalAsString !== 'boolean') {
+          throw new TypeError('The "config.options.decimalAsString" property must be of type boolean.');
+        }
+
+        this.config.options.decimalAsString = config.options.decimalAsString;
       }
     }
 

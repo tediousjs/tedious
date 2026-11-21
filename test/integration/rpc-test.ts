@@ -1,8 +1,8 @@
 import { assert } from 'chai';
 import { typeByName as TYPES } from '../../src/data-type';
 
-import Connection from '../../src/connection';
-import Request from '../../src/request';
+import Connection, { type ConnectionOptions } from '../../src/connection';
+import Request, { type ParameterOptions } from '../../src/request';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
 
 import defaultConfig from '../config';
@@ -24,10 +24,11 @@ type DataType = typeof TYPES[keyof typeof TYPES];
 
 describe('RPC test', function() {
   let connection: Connection;
+  let connectionOptions: ConnectionOptions = {};
 
   beforeEach(function(done) {
     const config = getConfig();
-    connection = new Connection(config);
+    connection = new Connection({ ...config, options: { ...config.options, ...connectionOptions } });
     connection.connect(done);
 
     connection.on('infoMessage', (info) => {
@@ -65,14 +66,17 @@ describe('RPC test', function() {
     connection.execSqlBatch(request);
   }
 
-  function testProc(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown) {
+  function testProc(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown, options?: ParameterOptions) {
+    let rows = 0;
+
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
+      assert.strictEqual(rows, 1);
 
       done();
     });
 
-    request.addParameter('param', type, value);
+    request.addParameter('param', type, value, options);
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
       assert.isFalse(more);
@@ -84,6 +88,8 @@ describe('RPC test', function() {
     });
 
     request.on('row', function(columns) {
+      rows++;
+
       if (value instanceof Date) {
         assert.strictEqual(columns[0].value.getTime(), value.getTime());
       } else {
@@ -105,15 +111,18 @@ select @param\
     );
   }
 
-  function testProcOutput(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown) {
+  function testProcOutput(done: Mocha.Done, type: DataType, typeAsString: string, value: unknown, options?: ParameterOptions) {
+    let returnValues = 0;
+
     const request = new Request('#test_proc', function(err) {
       assert.ifError(err);
+      assert.strictEqual(returnValues, 1);
 
       done();
     });
 
-    request.addParameter('paramIn', type, value);
-    request.addOutputParameter('paramOut', type);
+    request.addParameter('paramIn', type, value, options);
+    request.addOutputParameter('paramOut', type, undefined, options);
 
     request.on('doneProc', function(rowCount, more, returnStatus) {
       assert.isFalse(more);
@@ -125,6 +134,8 @@ select @param\
     });
 
     request.on('returnValue', function(name, returnValue, metadata) {
+      returnValues++;
+
       assert.strictEqual(name, 'paramOut');
       if (value instanceof Date && returnValue instanceof Date) {
         assert.strictEqual(returnValue.getTime(), value.getTime());
@@ -291,6 +302,40 @@ set @paramOut = @paramIn\
 
   it('should exec proc output date time null', function(done) {
     testProcOutput(done, TYPES.DateTime, 'datetime', null);
+  });
+
+  describe('with `decimalAsString`', function() {
+    before(function() {
+      connectionOptions = { decimalAsString: true };
+    });
+
+    after(function() {
+      connectionOptions = {};
+    });
+
+    it('should exec proc decimal of precision 38', function(done) {
+      testProc(done, TYPES.Decimal, 'decimal(38, 9)', '12345678901234567.123456789', { precision: 38, scale: 9 });
+    });
+
+    it('should exec proc numeric with a fractional scale', function(done) {
+      testProc(done, TYPES.Numeric, 'numeric(10, 4)', '-12.3400', { precision: 10, scale: 4 });
+    });
+
+    it('should exec proc decimal null', function(done) {
+      testProc(done, TYPES.Decimal, 'decimal(38, 9)', null, { precision: 38, scale: 9 });
+    });
+
+    it('should exec proc output decimal of precision 38', function(done) {
+      testProcOutput(done, TYPES.Decimal, 'decimal(38, 0)', '-99999999999999999999999999999999999999', { precision: 38, scale: 0 });
+    });
+
+    it('should exec proc output numeric with a fractional scale', function(done) {
+      testProcOutput(done, TYPES.Numeric, 'numeric(38, 28)', '0.0000000000000000000000000001', { precision: 38, scale: 28 });
+    });
+
+    it('should exec proc output decimal null', function(done) {
+      testProcOutput(done, TYPES.Decimal, 'decimal(38, 9)', null, { precision: 38, scale: 9 });
+    });
   });
 
   it('should exec proc with bad name', function(done) {

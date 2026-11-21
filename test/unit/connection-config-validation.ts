@@ -130,4 +130,24 @@ describe('Connection configuration validation', function() {
     assert.strictEqual(connection.config.options.encrypt, 'strict');
     ensureConnectionIsClosed(connection, () => {});
   });
+
+  it('default decimalAsString value', function() {
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.decimalAsString, false);
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('good decimalAsString value', function() {
+    config.options.decimalAsString = true;
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.decimalAsString, true);
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('bad decimalAsString value type', function() {
+    config.options.decimalAsString = 'true';
+    assert.throws(() => {
+      new Connection(config);
+    }, TypeError, 'The "config.options.decimalAsString" property must be of type boolean.');
+  });
 });
