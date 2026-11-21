@@ -9,12 +9,6 @@ import { type SecureContextOptions } from 'tls';
 
 import { Readable } from 'stream';
 
-import {
-  ClientSecretCredential,
-  DefaultAzureCredential,
-  ManagedIdentityCredential,
-  UsernamePasswordCredential
-} from '@azure/identity';
 import { type AccessToken, type TokenCredential, isTokenCredential } from '@azure/core-auth';
 
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
@@ -40,7 +34,7 @@ import { versions } from './tds-versions';
 import Message from './message';
 import { type Metadata } from './metadata-parser';
 import { createNTLMRequest } from './ntlm';
-import { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
+import type { ColumnEncryptionAzureKeyVaultProvider } from './always-encrypted/keystore-provider-azure-key-vault';
 
 import { type Parameter, type ResolvedParameter, TYPES, resolveParameter } from './data-type';
 import { BulkLoadPayload, type Row as BulkLoadRow } from './bulk-load-payload';
@@ -3758,11 +3752,16 @@ class Connection extends EventEmitter {
         /** Instance of the token credential to use to authenticate to the resource. */
         let credentials: TokenCredential;
 
+        // Load `@azure/identity` only when a connection needs one of its
+        // credentials. It has a large dependency tree that other
+        // authentication types do not use. `import()` also loads its ES module
+        // build, so it works where `require()` of ES modules is disabled.
         switch (authentication.type) {
           case 'token-credential':
             credentials = authentication.options.credential;
             break;
-          case 'azure-active-directory-password':
+          case 'azure-active-directory-password': {
+            const { UsernamePasswordCredential } = await import('@azure/identity');
             credentials = new UsernamePasswordCredential(
               authentication.options.tenantId ?? 'common',
               authentication.options.clientId,
@@ -3770,22 +3769,29 @@ class Connection extends EventEmitter {
               authentication.options.password
             );
             break;
+          }
           case 'azure-active-directory-msi-vm':
-          case 'azure-active-directory-msi-app-service':
+          case 'azure-active-directory-msi-app-service': {
+            const { ManagedIdentityCredential } = await import('@azure/identity');
             const msiArgs = authentication.options.clientId ? [authentication.options.clientId, {}] : [{}];
             credentials = new ManagedIdentityCredential(...msiArgs);
             break;
-          case 'azure-active-directory-default':
+          }
+          case 'azure-active-directory-default': {
+            const { DefaultAzureCredential } = await import('@azure/identity');
             const args = authentication.options.clientId ? { managedIdentityClientId: authentication.options.clientId } : {};
             credentials = new DefaultAzureCredential(args);
             break;
-          case 'azure-active-directory-service-principal-secret':
+          }
+          case 'azure-active-directory-service-principal-secret': {
+            const { ClientSecretCredential } = await import('@azure/identity');
             credentials = new ClientSecretCredential(
               authentication.options.tenantId,
               authentication.options.clientId,
               authentication.options.clientSecret
             );
             break;
+          }
         }
 
         /** Access token retrieved from Entra ID for the configured permission scope(s). */
