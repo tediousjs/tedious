@@ -16,13 +16,14 @@ const FEATURE_ID = {
 function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOptions): Result<FeatureExtAckToken> {
   let fedAuth: Buffer | undefined;
   let utf8Support: boolean | undefined;
+  let columnEncryptionVersion: number | undefined;
 
   while (true) {
     let featureId;
     ({ value: featureId, offset } = readUInt8(buf, offset));
 
     if (featureId === FEATURE_ID.TERMINATOR) {
-      return new Result(new FeatureExtAckToken(fedAuth, utf8Support), offset);
+      return new Result(new FeatureExtAckToken(fedAuth, utf8Support, columnEncryptionVersion), offset);
     }
 
     let featureAckDataLen;
@@ -41,6 +42,11 @@ function featureExtAckParser(buf: Buffer, offset: number, _options: ParserOption
         break;
       case FEATURE_ID.UTF8_SUPPORT:
         utf8Support = !!featureData[0];
+        break;
+      case FEATURE_ID.COLUMNENCRYPTION:
+        // The version is followed by the enclave type if the server is
+        // configured with a secure enclave, which is not made use of.
+        columnEncryptionVersion = featureData[0] ?? 0;
         break;
     }
   }

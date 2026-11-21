@@ -12,7 +12,8 @@ import { InputError } from './errors';
 
 const STATUS = {
   BY_REF_VALUE: 0x01,
-  DEFAULT_VALUE: 0x02
+  DEFAULT_VALUE: 0x02,
+  ENCRYPTED: 0x08
 };
 
 /*
@@ -118,6 +119,9 @@ class RpcRequestPayload implements AsyncIterable<Buffer> {
     let statusFlags = 0;
     if (parameter.output) {
       statusFlags |= STATUS.BY_REF_VALUE;
+    }
+    if (parameter.encrypted) {
+      statusFlags |= STATUS.ENCRYPTED;
     }
     buffer.writeUInt8(statusFlags);
   }

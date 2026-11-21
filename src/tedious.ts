@@ -1,6 +1,8 @@
 import BulkLoad from './bulk-load';
 import Connection, { type ConnectionAuthentication, type ConnectionConfiguration, type ConnectionOptions } from './connection';
-import Request from './request';
+import Request, { type ParameterOptions, type RequestOptions } from './request';
+import { AzureKeyVaultKeyStoreProvider, RsaKeyStoreProvider, type AzureKeyVaultCryptographyClient, type AzureKeyVaultKeyStoreProviderOptions, type ColumnEncryptionKeyStoreProvider, type KeyCacheOptions, type RsaPrivateKey } from './always-encrypted/key-store-provider';
+import { type ColumnEncryptionKeyInfo, type ColumnEncryptionOptions, type CryptoMetadata, type EncryptedColumnEncryptionKey, type EncryptionType } from './always-encrypted/types';
 import { type ExecutionOptions } from './execution-options';
 import { name } from './library';
 
@@ -28,12 +30,26 @@ export {
   RequestError,
   TYPES,
   ISOLATION_LEVEL,
-  TDS_VERSION
+  TDS_VERSION,
+  AzureKeyVaultKeyStoreProvider,
+  RsaKeyStoreProvider
 };
 
 export type {
   ConnectionAuthentication,
   ConnectionConfiguration,
   ConnectionOptions,
-  ExecutionOptions
+  ExecutionOptions,
+  ParameterOptions,
+  RequestOptions,
+  AzureKeyVaultCryptographyClient,
+  AzureKeyVaultKeyStoreProviderOptions,
+  ColumnEncryptionKeyInfo,
+  ColumnEncryptionKeyStoreProvider,
+  ColumnEncryptionOptions,
+  CryptoMetadata,
+  EncryptedColumnEncryptionKey,
+  EncryptionType,
+  KeyCacheOptions,
+  RsaPrivateKey
 };

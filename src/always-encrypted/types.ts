@@ -1,92 +1,186 @@
-// This code is based on the `mssql-jdbc` library published under the conditions of MIT license.
-// Copyright (c) 2019 Microsoft Corporation
+import { type ColumnEncryptionKeyStoreProvider } from './key-store-provider';
 
-import { CEKEntry } from './cek-entry';
-import { type BaseMetadata } from '../metadata-parser';
+/**
+ * Options for Always Encrypted, see {@link ConnectionOptions.columnEncryption}.
+ */
+export interface ColumnEncryptionOptions {
+  /**
+   * The key store providers that give access to the column master keys, by
+   * the provider name the column master keys were created with in the
+   * database (`KEY_STORE_PROVIDER_NAME`), e.g. `AZURE_KEY_VAULT`.
+   *
+   * See {@link AzureKeyVaultKeyStoreProvider} and {@link RsaKeyStoreProvider}
+   * for the providers that come with `tedious`. Any object that implements
+   * {@link ColumnEncryptionKeyStoreProvider} can be used to support other
+   * key stores.
+   */
+  keyStoreProviders: { [providerName: string]: ColumnEncryptionKeyStoreProvider };
 
-export interface EncryptionKeyInfo {
+  /**
+   * The key paths of the column master keys the server is trusted to refer
+   * to. If set, column encryption keys that are protected by any other
+   * column master key are rejected.
+   *
+   * Without it, a compromised server can make the application use any key
+   * its key store providers have access to.
+   *
+   * (default: all key paths are trusted)
+   */
+  trustedKeyPaths?: readonly string[] | undefined;
+
+  /**
+   * The number of statements a connection remembers the parameter
+   * encryption metadata of, which saves asking the server for it each time
+   * such a statement is executed. `0` disables the cache.
+   *
+   * A statement is remembered by its text and the names of its parameters,
+   * whatever their types and values are.
+   *
+   * (default: `1000`)
+   */
+  parameterMetadataCacheSize?: number | undefined;
+}
+
+/**
+ * The validated and defaulted {@link ColumnEncryptionOptions}.
+ *
+ * @private
+ */
+export interface InternalColumnEncryptionOptions {
+  keyStoreProviders: Map<string, ColumnEncryptionKeyStoreProvider>;
+  // Lower cased
+  trustedKeyPaths: Set<string> | undefined;
+  parameterMetadataCacheSize: number;
+
+  // Identifies the server that the connection is made to: decrypted column
+  // encryption keys are cached per server. Lower cased.
+  serverName: string;
+}
+
+/**
+ * How a statement makes use of Always Encrypted, see {@link RequestOptions.columnEncryption}.
+ */
+export type RequestColumnEncryption = 'enabled' | 'resultSetOnly' | 'disabled';
+
+/**
+ * A column encryption key as it is stored in the database: encrypted with
+ * a column master key.
+ */
+export interface EncryptedColumnEncryptionKey {
+  /**
+   * The encrypted column encryption key.
+   */
   encryptedKey: Buffer;
-  dbId: number;
-  keyId: number;
-  keyVersion: number;
-  mdVersion: Buffer;
-  keyPath: string;
+
+  /**
+   * The name of the key store provider of the key store that holds the
+   * column master key.
+   */
   keyStoreName: string;
-  algorithmName: string;
+
+  /**
+   * The path of the column master key in its key store.
+   */
+  keyPath: string;
+
+  /**
+   * The algorithm the column encryption key was encrypted with.
+   */
+  algorithm: string;
 }
 
-export enum SQLServerEncryptionType {
-  Deterministic = 1,
-  Randomized = 2,
-  PlainText = 0,
+/**
+ * The version of the column encryption feature that is asked for when
+ * logging in: column encryption without the use of secure enclaves (which
+ * would be version 2 and above).
+ *
+ * @private
+ */
+export const COLUMN_ENCRYPTION_VERSION = 1;
+
+/**
+ * Describes a column encryption key.
+ */
+export interface ColumnEncryptionKeyInfo {
+  /**
+   * The id of the database that the key is defined in.
+   */
+  databaseId: number;
+
+  /**
+   * The id of the key in its database, the `column_encryption_key_id` of
+   * `sys.column_encryption_keys`.
+   */
+  keyId: number;
+
+  /**
+   * The version of the key. Reserved by the server, always `1` so far.
+   */
+  keyVersion: number;
+
+  /**
+   * The version of the key's metadata: an opaque value of 8 bytes, which
+   * is passed back to the server along with encrypted parameters.
+   */
+  metadataVersion: Buffer;
+
+  /**
+   * The encrypted values of the key - one per column master key that
+   * protects it. There is more than one while a column master key is being
+   * rotated.
+   */
+  values: EncryptedColumnEncryptionKey[];
 }
 
-export interface EncryptionAlgorithm {
-  encryptData: (plainText: Buffer) => Buffer;
-  decryptData: (cipherText: Buffer) => Buffer;
-}
+/**
+ * How the values of a column are encrypted.
+ *
+ * - `'deterministic'`: equal values are encrypted to equal ciphertexts,
+ *   which allows the server to look up, join and group by them.
+ * - `'randomized'`: each value is encrypted to a different ciphertext.
+ */
+export type EncryptionType = 'deterministic' | 'randomized';
 
+/**
+ * Describes how the values of a column (or of a parameter) are encrypted.
+ */
 export interface CryptoMetadata {
-  cekEntry?: CEKEntry;
-  cipherAlgorithmId: number;
-  cipherAlgorithmName?: string;
-  normalizationRuleVersion: Buffer;
-  encryptionKeyInfo?: EncryptionKeyInfo;
-  ordinal: number;
-  encryptionType: SQLServerEncryptionType;
-  cipherAlgorithm?: EncryptionAlgorithm;
-  baseTypeInfo?: BaseMetadata;
+  /**
+   * The column encryption key the values are encrypted with.
+   *
+   * Not available for output parameters.
+   */
+  key: ColumnEncryptionKeyInfo | undefined;
+
+  /**
+   * Whether equal values are encrypted to equal ciphertexts.
+   */
+  encryptionType: EncryptionType;
+
+  /**
+   * The id of the encryption algorithm. `2` is `AEAD_AES_256_CBC_HMAC_SHA256`.
+   */
+  algorithmId: number;
+
+  /**
+   * The name of the encryption algorithm, if it is a custom one.
+   */
+  algorithmName: string | undefined;
+
+  /**
+   * The version of the rules that values are brought into the form by
+   * that is encrypted. `1` is the only version there is.
+   */
+  normalizationRuleVersion: number;
 }
 
-export interface HashMap<T> {
-  [hash: string]: T;
-}
-
-
-// Fields in the first resultset of "sp_describe_parameter_encryption"
-// We expect the server to return the fields in the resultset in the same order as mentioned below.
-// If the server changes the below order, then transparent parameter encryption will break.
-export enum DescribeParameterEncryptionResultSet1 {
-  KeyOrdinal,
-  DbId,
-  KeyId,
-  KeyVersion,
-  KeyMdVersion,
-  EncryptedKey,
-  ProviderName,
-  KeyPath,
-  KeyEncryptionAlgorithm
-}
-
-
-// Fields in the second resultset of "sp_describe_parameter_encryption"
-// We expect the server to return the fields in the resultset in the same order as mentioned below.
-// If the server changes the below order, then transparent parameter encryption will break.
-export enum DescribeParameterEncryptionResultSet2 {
-  ParameterOrdinal,
-  ParameterName,
-  ColumnEncryptionAlgorithm,
-  ColumnEncrytionType,
-  ColumnEncryptionKeyOrdinal,
-  NormalizationRuleVersion
-}
-
-export enum SQLServerStatementColumnEncryptionSetting {
-  /**
-   * if "Column Encryption Setting=Enabled" in the connection string, use Enabled. Otherwise, maps to Disabled.
-   */
-  UseConnectionSetting,
-  /**
-   * Enables TCE for the command. Overrides the connection level setting for this command.
-   */
-  Enabled,
-  /**
-   * Parameters will not be encrypted, only the ResultSet will be decrypted. This is an optimization for queries that
-   * do not pass any encrypted input parameters. Overrides the connection level setting for this command.
-   */
-  ResultSetOnly,
-  /**
-   * Disables TCE for the command.Overrides the connection level setting for this command.
-   */
-  Disabled,
+export function encryptionTypeFromId(id: number): EncryptionType {
+  switch (id) {
+    case 1:
+      return 'deterministic';
+    case 2:
+      return 'randomized';
+    default:
+      throw new Error(`Unsupported column encryption type ${id}`);
+  }
 }

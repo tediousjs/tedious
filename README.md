@@ -35,6 +35,68 @@ Node.js is a prerequisite for installing tedious. Once you have installed [Node.
 ## Documentation
 More documentation and code samples are available at [tediousjs.github.io/tedious/](http://tediousjs.github.io/tedious/)
 
+<a name="always-encrypted"></a>
+## Always Encrypted
+[Always Encrypted](https://learn.microsoft.com/en-us/sql/relational-databases/security/encryption/always-encrypted-database-engine) keeps
+the values of encrypted columns, and the keys that protect them, from being revealed to SQL Server. With the `columnEncryption` option
+set, `tedious` decrypts the values of encrypted columns when they are read, and encrypts the values of the parameters that target
+encrypted columns before they are sent:
+
+```js
+const { Connection, AzureKeyVaultKeyStoreProvider } = require('tedious');
+const { DefaultAzureCredential } = require('@azure/identity');
+const { CryptographyClient } = require('@azure/keyvault-keys');
+
+const credential = new DefaultAzureCredential();
+
+const connection = new Connection({
+  // ...
+  options: {
+    columnEncryption: {
+      // By the name of the key store that the column master keys were created with
+      keyStoreProviders: {
+        AZURE_KEY_VAULT: new AzureKeyVaultKeyStoreProvider((keyId) => new CryptographyClient(keyId, credential))
+      }
+    }
+  }
+});
+```
+
+Column master keys are accessed through key store providers:
+
+- `AzureKeyVaultKeyStoreProvider` for keys stored in Azure Key Vault or Managed HSM. It is given a function that creates the
+  `CryptographyClient` of a key, so `tedious` does not depend on `@azure/keyvault-keys` itself.
+- `RsaKeyStoreProvider` for RSA keys that the application has at hand, e.g. the exported private key of a certificate. It reads the
+  format of the `MSSQL_CERTIFICATE_STORE` and `MSSQL_JAVA_KEYSTORE` key stores.
+- Any object with a `decryptColumnEncryptionKey(masterKeyPath, encryptionAlgorithm, encryptedColumnEncryptionKey)` method, for other key
+  stores.
+
+Things to know:
+
+- Requires TDS 7.4 and SQL Server 2016 or later.
+- The type of a parameter (including its precision and scale) needs to match the type of the encrypted column it targets, as the
+  server is not able to convert encrypted values. Its length may not be longer than that of the column. A length that is not
+  specified is that of the value.
+- A `time`, `datetime2` or `datetimeoffset` value that has more precision than its column is rounded to the scale of the column, the
+  way the server rounds it for a column that is not encrypted. Microsoft's JDBC driver does the same, SqlClient truncates such a
+  value instead: a lookup by a value that rounds differently than it truncates does not find what SqlClient wrote, and vice versa.
+  A `datetime2` or `datetimeoffset` value that rounds up to midnight is midnight of the next day. A `time` value that would round
+  up to midnight is clamped to the last value of its scale instead, like `23:59:59` for `time(0)`.
+- Before a request with parameters is executed for the first time, the server is asked which of its parameters need to be encrypted.
+  Requests that are known not to need this can opt out via `new Request(sql, callback, { columnEncryption: 'resultSetOnly' })`.
+- The server is what tells which parameters to encrypt. Add parameters that hold sensitive values with `{ forceEncrypt: true }` to make
+  a request fail instead of sending such a value as it is.
+- Decrypted column encryption keys are kept in memory, so that a key store is not accessed for every request: for up to 2 hours,
+  and for no longer than 15 minutes without being used. Both are options of a key store provider (`keyCacheTTL` and
+  `keyCacheIdleTimeout`), as the keys of a provider are shared by the connections that use it.
+- The request timeout covers a key store that is accessed to encrypt the parameters of a request. It does not cover one that is
+  accessed to decrypt a result set: like for every request, it ends once the first part of the response arrived. To bound a request
+  as a whole, key stores included, execute it with an abort signal (`connection.execSql(request, { signal: AbortSignal.timeout(5000) })`),
+  or give the client of a key store a timeout of its own.
+- Bulk loads, table-valued parameters and values that are read from a stream are not encrypted, and secure enclaves are not supported.
+
+See [`examples/always-encrypted.js`](examples/always-encrypted.js) for a complete example.
+
 <a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.

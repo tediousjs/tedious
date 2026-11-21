@@ -430,6 +430,13 @@ class BulkLoad extends EventEmitter {
     // Count
     tBuf.writeUInt16LE(this.columns.length);
 
+    // With column encryption negotiated, the columns are preceded by the
+    // table of the column encryption keys they are encrypted with. Bulk
+    // loads do not encrypt, so there are none.
+    if (this.options.serverSupportsColumnEncryption) {
+      tBuf.writeUInt16LE(0);
+    }
+
     for (let j = 0, len = this.columns.length; j < len; j++) {
       const c = this.columns[j];
       // UserType

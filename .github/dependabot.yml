@@ -15,3 +15,25 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  # The drivers that the Always Encrypted compatibility checks compare tedious
+  # with (see test/interop/README.md). An update can make a known difference
+  # go away, or bring a new one: the checks then fail, and
+  # known-differences.tsv of the driver is to be updated with the update.
+  - package-ecosystem: "maven"
+    directory: "/test/interop/jdbc"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: "nuget"
+    directory: "/test/interop/sqlclient"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
