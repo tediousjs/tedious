@@ -1,4 +1,5 @@
 import { isAscii } from 'buffer';
+import { endianness } from 'os';
 
 import { SINGLE_BYTE_HIGH_HALVES } from './codepage-tables';
 import { loadIconv } from './iconv';
@@ -46,14 +47,13 @@ function isUtf8(codepage: string | undefined) {
   return codepage === undefined || codepage === 'utf-8' || codepage === 'utf8';
 }
 
+const NON_ASCII = /[\u0080-\uFFFF]/;
+
 function isAsciiString(value: string) {
-  for (let i = 0; i < value.length; i++) {
-    if (value.charCodeAt(i) > 0x7F) {
-      return false;
-    }
-  }
-  return true;
+  return !NON_ASCII.test(value);
 }
+
+const LITTLE_ENDIAN = endianness() === 'LE';
 
 // --- Decoding ----------------------------------------------------------------
 
@@ -73,6 +73,9 @@ interface CodepageTable {
   // sequence, at `(lead - 0x80) << 8 | trail`, or 0 if the sequence is not a
   // character.
   readonly pairs: Uint16Array | undefined;
+
+  // For a single-byte code page: the UTF-16 code unit for every byte.
+  readonly singleBytes: Uint16Array | undefined;
 }
 
 interface DoubleByteCodepage {
@@ -248,15 +251,18 @@ function buildDoubleByteTable(codepage: string, spec: DoubleByteCodepage): Codep
     }
   }
 
-  return { high, lead, pairs };
+  return { high, lead, pairs, singleBytes: undefined };
 }
 
 function buildSingleByteTable(highHalf: string): CodepageTable {
   const high = new Uint16Array(128);
+  const singleBytes = new Uint16Array(256);
   for (let i = 0; i < 128; i++) {
     high[i] = highHalf.charCodeAt(i);
+    singleBytes[i] = i;
+    singleBytes[0x80 + i] = high[i];
   }
-  return { high, lead: undefined, pairs: undefined };
+  return { high, lead: undefined, pairs: undefined, singleBytes };
 }
 
 const tables = new Map<string, CodepageTable>();
@@ -287,6 +293,32 @@ function tableFor(codepage: string): CodepageTable {
   return table;
 }
 
+// Allocates a buffer for `count` UTF-16 code units and a `Uint16Array` view of
+// it. The view needs an even offset, which pooled buffers always have.
+function allocateUnits(count: number): [Buffer, Uint16Array] {
+  let out = Buffer.allocUnsafe(count * 2);
+  if (out.byteOffset % 2 !== 0) {
+    out = Buffer.allocUnsafeSlow(count * 2);
+  }
+  return [out, new Uint16Array(out.buffer, out.byteOffset, count)];
+}
+
+function unitsToString(out: Buffer, length: number): string {
+  if (!LITTLE_ENDIAN) {
+    out.subarray(0, length * 2).swap16();
+  }
+  return out.toString('utf16le', 0, length * 2);
+}
+
+// Decodes a value in a single-byte code page, where every byte is a character.
+function decodeSingleByte(buf: Buffer, singleBytes: Uint16Array): string {
+  const [out, units] = allocateUnits(buf.length);
+  for (let i = 0; i < buf.length; i++) {
+    units[i] = singleBytes[buf[i]];
+  }
+  return unitsToString(out, buf.length);
+}
+
 class TableDecoder implements StreamDecoder {
   declare table: CodepageTable;
 
@@ -304,11 +336,15 @@ class TableDecoder implements StreamDecoder {
       return buf.toString('latin1');
     }
 
-    const { high, lead, pairs } = this.table;
+    const { high, lead, pairs, singleBytes } = this.table;
+
+    if (singleBytes !== undefined) {
+      return decodeSingleByte(buf, singleBytes);
+    }
 
     // Every byte decodes to at most one UTF-16 code unit, but a lead byte left
     // over from the last part can add a replacement character.
-    const out = Buffer.allocUnsafe((buf.length + 1) * 2);
+    const [out, units] = allocateUnits(buf.length + 1);
     let length = 0;
 
     for (let i = 0; i < buf.length; i++) {
@@ -323,8 +359,7 @@ class TableDecoder implements StreamDecoder {
           // An invalid sequence decodes to a replacement character. As in the
           // WHATWG decoders, an ASCII byte after the lead byte is not part of
           // the sequence, but a character on its own.
-          out[length++] = REPLACEMENT_CHARACTER & 0xFF;
-          out[length++] = REPLACEMENT_CHARACTER >>> 8;
+          units[length++] = REPLACEMENT_CHARACTER;
 
           if (byte >= 0x80) {
             continue;
@@ -341,12 +376,11 @@ class TableDecoder implements StreamDecoder {
         char = high[byte - 0x80] || REPLACEMENT_CHARACTER;
       }
 
-      out[length++] = char & 0xFF;
-      out[length++] = char >>> 8;
+      units[length++] = char;
     }
 
     this.pending = pending;
-    return out.toString('utf16le', 0, length);
+    return unitsToString(out, length);
   }
 
   end(): string {
