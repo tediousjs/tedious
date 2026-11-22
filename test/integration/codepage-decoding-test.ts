@@ -55,15 +55,15 @@ describe('Decoding `varchar` values in each code page', function() {
   function execSql(sql: string): Promise<unknown[][]> {
     return new Promise((resolve, reject) => {
       const rows: unknown[][] = [];
-      const request = new Request(sql, (err) => err ? reject(err) : resolve(rows));
-      request.on('row', (columns) => rows.push(columns.map((column) => column.value)));
+      const request = new Request(sql, (err) => (err ? reject(err) : resolve(rows)));
+      request.on('row', (columns) => rows.push(columns.map((column: { value: unknown }) => column.value)));
       connection.execSql(request);
     });
   }
 
   function execSqlBatch(sql: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      connection.execSqlBatch(new Request(sql, (err) => err ? reject(err) : resolve()));
+      connection.execSqlBatch(new Request(sql, (err) => (err ? reject(err) : resolve())));
     });
   }
 
