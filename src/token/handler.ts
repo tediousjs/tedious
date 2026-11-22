@@ -299,6 +299,10 @@ export class Login7TokenHandler extends TokenHandler {
     this.connection.emit('errorMessage', token);
 
     const error = new ConnectionError(token.message, 'ELOGIN');
+    error.number = token.number;
+    error.state = token.state;
+    error.class = token.class;
+    error.serverName = token.serverName;
 
     const isLoginErrorTransient = this.connection.transientErrorLookup.isTransientError(token.number);
     if (isLoginErrorTransient && this.connection.curTransientRetryCount !== this.connection.config.options.maxRetriesOnTransientErrors) {
