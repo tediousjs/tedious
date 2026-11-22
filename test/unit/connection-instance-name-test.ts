@@ -1,11 +1,13 @@
 import { assert } from 'chai';
 import * as net from 'net';
+import sinon from 'sinon';
 import { Connection, ConnectionError } from '../../src/tedious';
 import IncomingMessageStream from '../../src/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
 import Message from '../../src/message';
+import * as instanceLookupModule from '../../src/instance-lookup';
 
 function buildLoginAckToken(): Buffer {
   const progname = 'Tedious SQL Server';
@@ -150,48 +152,88 @@ describe('Connecting with an instance name', function() {
     });
   }
 
-  function createConnection() {
+  afterEach(function() {
+    sinon.restore();
+  });
+
+  /**
+   * Makes the SQL Server Browser lookup return the mock server's port.
+   */
+  function stubInstanceLookup() {
+    return sinon.stub(instanceLookupModule, 'instanceLookup').resolves((server.address() as net.AddressInfo).port);
+  }
+
+  function createConnection(options: { instanceName: string, port?: number }) {
     return new Connection({
       server: (server.address() as net.AddressInfo).address,
-      options: {
-        port: (server.address() as net.AddressInfo).port,
-        instanceName: 'SQLEXPRESS',
-        encrypt: false
-      }
+      options: { ...options, encrypt: false }
     });
   }
 
-  it('connects to the given port directly and sends the instance name in PRELOGIN', async function() {
+  function connect(connection: Connection): Promise<Error | undefined> {
+    return new Promise((resolve) => {
+      connection.connect(resolve);
+    });
+  }
+
+  it('sends the instance name in PRELOGIN when the port was looked up', async function() {
+    const lookup = stubInstanceLookup();
     const prelogin = servePrelogin(0x00);
-    const connection = createConnection();
+    const connection = createConnection({ instanceName: 'SQLEXPRESS' });
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        connection.connect((err) => {
-          err ? reject(err) : resolve();
-        });
-      });
-
+      assert.isUndefined(await connect(connection));
+      assert.isTrue(lookup.calledOnce);
+      assert.strictEqual(lookup.firstCall.args[0].instanceName, 'SQLEXPRESS');
       assert.deepEqual(readInstanceOption(await prelogin), Buffer.from('SQLEXPRESS\x00'));
     } finally {
       connection.close();
     }
   });
 
-  it('fails to connect if the server rejects the instance name', async function() {
+  it('fails with `EINSTLOOKUP` if the server is a different instance than the looked up one', async function() {
+    stubInstanceLookup();
     servePrelogin(0x01);
-    const connection = createConnection();
+    const connection = createConnection({ instanceName: 'SQLEXPRESS' });
 
     try {
-      const err = await new Promise<Error | undefined>((resolve) => {
-        connection.connect(resolve);
-      });
+      const err = await connect(connection);
 
       assert.instanceOf(err, ConnectionError);
-      assert.strictEqual((err as ConnectionError).code, 'EINSTANCE');
+      assert.strictEqual((err as ConnectionError).code, 'EINSTLOOKUP');
       assert.include(err!.message, 'SQLEXPRESS');
+      assert.include(err!.message, String((server.address() as net.AddressInfo).port));
     } finally {
       connection.close();
     }
   });
+
+  it('connects to an explicit port directly, without sending the instance name', async function() {
+    const lookup = stubInstanceLookup();
+    const prelogin = servePrelogin(0x00);
+    const connection = createConnection({ instanceName: 'SQLEXPRESS', port: (server.address() as net.AddressInfo).port });
+
+    try {
+      assert.isUndefined(await connect(connection));
+      assert.isTrue(lookup.notCalled);
+      assert.deepEqual(readInstanceOption(await prelogin), Buffer.from([0x00]));
+    } finally {
+      connection.close();
+    }
+  });
+
+  for (const instanceName of ['MSSQLSERVER', 'mssqlserver', 'INSTÄNZ']) {
+    it(`does not send the instance name '${instanceName}' in PRELOGIN`, async function() {
+      stubInstanceLookup();
+      const prelogin = servePrelogin(0x00);
+      const connection = createConnection({ instanceName });
+
+      try {
+        assert.isUndefined(await connect(connection));
+        assert.deepEqual(readInstanceOption(await prelogin), Buffer.from([0x00]));
+      } finally {
+        connection.close();
+      }
+    });
+  }
 });

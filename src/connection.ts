@@ -706,10 +706,13 @@ export interface ConnectionOptions {
    *
    * (no default)
    *
-   * If {@link port} is also set, the connection is made to that port directly
-   * and no SQL Server Browser lookup takes place. In either case, the instance
-   * name is sent to the server during PRELOGIN, and the connection fails if the
-   * server reports that it does not match.
+   * If {@link port} is also set, the connection is made to that port directly,
+   * no SQL Server Browser lookup takes place, and the instance name is not used.
+   *
+   * Otherwise, the port is looked up via the SQL Server Browser, and the
+   * instance name is also sent to the server during PRELOGIN, so that it can
+   * confirm that the port belongs to that instance. If the server reports a
+   * mismatch, the connection fails with an `EINSTLOOKUP` error.
    */
   instanceName?: string | undefined;
 
@@ -772,7 +775,8 @@ export interface ConnectionOptions {
    * Port to connect to (default: `1433`, unless {@link instanceName} is set).
    *
    * If {@link instanceName} is also set, this port is used directly instead of
-   * looking up the instance's port via the SQL Server Browser.
+   * looking up the instance's port via the SQL Server Browser, and the instance
+   * name is ignored.
    */
   port?: number | undefined;
 
@@ -2116,11 +2120,13 @@ class Connection extends EventEmitter {
           this.transitionTo(this.STATE.SENT_PRELOGIN);
           const preloginResponse = await this.readPreloginResponse(signal);
 
-          // A server that does not host the requested instance answers the
-          // `INSTOPT` option with a non-zero value.
+          // A server that is not the requested instance answers the `INSTOPT`
+          // option with `0x01`. As an instance name is only sent when the port
+          // was looked up via the SQL Server Browser, this means that the
+          // lookup returned a port that belongs to a different instance.
           const instanceName = this.getPreloginInstanceName();
-          if (instanceName && preloginResponse.instance) {
-            throw new ConnectionError(`Server did not accept instance name '${instanceName}'`, 'EINSTANCE');
+          if (instanceName !== undefined && preloginResponse.instance === 0x01) {
+            throw new ConnectionError(`Port ${port} on ${this.config.server}, returned by the SQL Server Browser for instance '${instanceName}', belongs to a different instance`, 'EINSTLOOKUP');
           }
 
           await this.performTlsNegotiation(preloginResponse, signal);
@@ -2508,13 +2514,35 @@ class Connection extends EventEmitter {
   }
 
   /**
-   * The instance name to send in the `INSTOPT` PRELOGIN option. After a
-   * redirect, this is the instance named in the routing target, if any.
+   * The instance name to send in the `INSTOPT` PRELOGIN option, or `undefined`
+   * to send an empty instance name, which the server always accepts.
+   *
+   * The instance name is only sent to verify a port that was looked up via
+   * the SQL Server Browser. Microsoft.Data.SqlClient uses the `INSTOPT`
+   * response for the same purpose, and its managed networking implementation
+   * (used on Linux and macOS) never sends an instance name at all:
+   *
+   * - With an explicit port, or after a redirect (which always carries a
+   *   port), no instance name is sent.
+   * - `MSSQLSERVER` (the default instance) is not sent, because SQL Server
+   *   2008 R2 and older do not accept it.
+   * - Instance names with characters other than printable ASCII are not sent,
+   *   because the server compares the name in its own code page, which is
+   *   unknown to the client.
    *
    * @private
    */
   getPreloginInstanceName(): string | undefined {
-    return this.routingData ? this.routingData.instance : this.config.options.instanceName;
+    if (this.routingData || this.config.options.port !== undefined) {
+      return undefined;
+    }
+
+    const instanceName = this.config.options.instanceName;
+    if (instanceName === undefined || instanceName === '' || instanceName.toUpperCase() === 'MSSQLSERVER' || !/^[ -~]+$/.test(instanceName)) {
+      return undefined;
+    }
+
+    return instanceName;
   }
 
   /**
