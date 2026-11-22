@@ -23,6 +23,34 @@ Node.js is a prerequisite for installing tedious. Once you have installed [Node.
 
     npm install tedious
 
+### Optional: `iconv-lite`
+
+Sending non-ASCII text as `VarChar`, `Char` or `Text` to a column, parameter or
+bulk load whose collation uses a legacy code page (any collation without the
+`_UTF8` suffix, such as `Latin1_General_CI_AS` or `Japanese_CI_AS`) needs the
+[`iconv-lite`](https://www.npmjs.com/package/iconv-lite) package, which tedious
+loads when it is first needed. It is an optional peer dependency, so install it
+yourself if your application does this:
+
+    npm install iconv-lite
+
+Without it, such a value fails with an error that names the code page.
+Everything else works without `iconv-lite`:
+
+- reading `varchar`, `char` and `text` values in any collation, which tedious
+  decodes with its own tables and Node.js' built-in `TextDecoder`. The
+  double-byte code pages (CP932, CP936, CP949 and CP950) need a Node.js build
+  with full ICU support, as the official builds have.
+- sending ASCII text, or any text to a UTF-8 collation, as `VarChar`, `Char` or
+  `Text`.
+- sending text as `NVarChar`, `NChar` or `NText`, which avoids code pages
+  altogether.
+
+If you bundle your application and do not need `iconv-lite`, mark it as an
+external module (for example, `external: ['iconv-lite']` with esbuild, or
+`externals: { 'iconv-lite': 'commonjs iconv-lite' }` with webpack) so the
+bundler does not fail to resolve it.
+
 ## Getting Started
 - [Node.js SQL Server Guide](https://learn.microsoft.com/en-us/sql/connect/node-js/node-js-driver-for-sql-server)
 - [Node.js + macOS](https://learn.microsoft.com/en-us/sql/connect/node-js/step-1-configure-development-environment-for-node-js-development#macos)

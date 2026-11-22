@@ -2,7 +2,7 @@ import Parser, { type ParserOptions } from './token/stream-parser';
 import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
-import iconv from 'iconv-lite';
+import { createDecoder, decode, type StreamDecoder } from './text-encoding';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
@@ -12,7 +12,6 @@ const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
-const DEFAULT_ENCODING = 'utf8';
 
 function readTinyInt(buf: Buffer, offset: number): Result<number> {
   return readUInt8(buf, offset);
@@ -567,12 +566,12 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
   return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
 }
 
-function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
+function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string | undefined): Result<string> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
 
-  return new Result(iconv.decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  return new Result(decode(buf.subarray(offset, offset + dataLength), codepage), offset + dataLength);
 }
 
 function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
@@ -602,6 +601,12 @@ class PLPReader {
   declare chunks: Buffer[];
   declare length: number;
 
+  // For a `varchar(max)` value, the decoder its chunks are decoded with as
+  // they arrive, and the text decoded so far. The decoder keeps a character
+  // that is split across chunks until its last byte has arrived.
+  declare decoder: StreamDecoder | undefined;
+  declare text: string[];
+
   // Number of bytes of the current PLP chunk that have not been read yet.
   declare chunkRemaining: number;
 
@@ -611,6 +616,8 @@ class PLPReader {
     this.chunks = [];
     this.length = 0;
     this.chunkRemaining = 0;
+    this.decoder = metadata.type.name === 'VarChar' ? createDecoder(metadata.collation?.codepage) : undefined;
+    this.text = [];
   }
 
   read(parser: Parser): unknown {
@@ -643,7 +650,11 @@ class PLPReader {
         throw new NotEnoughDataError(start + 1);
       }
 
-      this.chunks.push(buf.subarray(start, end));
+      if (this.decoder !== undefined) {
+        this.text.push(this.decoder.write(buf.subarray(start, end)));
+      } else {
+        this.chunks.push(buf.subarray(start, end));
+      }
       this.length += end - start;
       this.chunkRemaining -= end - start;
       parser.position = end;
@@ -651,6 +662,11 @@ class PLPReader {
 
     if (this.expectedLength !== UNKNOWN_PLP_LEN && this.length !== Number(this.expectedLength)) {
       throw new Error('Partially Length-prefixed Bytes unmatched lengths : expected ' + this.expectedLength + ', but got ' + this.length + ' bytes');
+    }
+
+    if (this.decoder !== undefined) {
+      this.text.push(this.decoder.end());
+      return this.text.join('');
     }
 
     // `Buffer.concat` always copies, so the value never keeps the (possibly
@@ -661,9 +677,6 @@ class PLPReader {
       case 'NVarChar':
       case 'Xml':
         return data.toString('ucs2');
-
-      case 'VarChar':
-        return iconv.decode(data, this.metadata.collation?.codepage ?? DEFAULT_ENCODING);
 
       default:
         return data;
