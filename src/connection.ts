@@ -706,7 +706,10 @@ export interface ConnectionOptions {
    *
    * (no default)
    *
-   * Mutually exclusive with {@link port}.
+   * If {@link port} is also set, the connection is made to that port directly
+   * and no SQL Server Browser lookup takes place. In either case, the instance
+   * name is sent to the server during PRELOGIN, and the connection fails if the
+   * server reports that it does not match.
    */
   instanceName?: string | undefined;
 
@@ -766,9 +769,10 @@ export interface ConnectionOptions {
   packetSize?: number;
 
   /**
-   * Port to connect to (default: `1433`).
+   * Port to connect to (default: `1433`, unless {@link instanceName} is set).
    *
-   * Mutually exclusive with {@link instanceName}
+   * If {@link instanceName} is also set, this port is used directly instead of
+   * looking up the instance's port via the SQL Server Browser.
    */
   port?: number | undefined;
 
@@ -1354,10 +1358,6 @@ class Connection extends EventEmitter {
     };
 
     if (config.options) {
-      if (config.options.port && config.options.instanceName) {
-        throw new Error('Port and instanceName are mutually exclusive, but ' + config.options.port + ' and ' + config.options.instanceName + ' provided');
-      }
-
       if (config.options.abortTransactionOnError !== undefined) {
         if (typeof config.options.abortTransactionOnError !== 'boolean' && config.options.abortTransactionOnError !== null) {
           throw new TypeError('The "config.options.abortTransactionOnError" property must be of type string or null.');
@@ -1593,7 +1593,11 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.instanceName = config.options.instanceName;
-        this.config.options.port = undefined;
+
+        // Without an explicit port, the port is looked up via the SQL Server Browser.
+        if (config.options.port === undefined) {
+          this.config.options.port = undefined;
+        }
       }
 
       if (config.options.isolationLevel !== undefined) {
@@ -1644,7 +1648,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.port = config.options.port;
-        this.config.options.instanceName = undefined;
       }
 
       if (config.options.readOnlyIntent !== undefined) {
@@ -2112,6 +2115,14 @@ class Connection extends EventEmitter {
 
           this.transitionTo(this.STATE.SENT_PRELOGIN);
           const preloginResponse = await this.readPreloginResponse(signal);
+
+          // A server that does not host the requested instance answers the
+          // `INSTOPT` option with a non-zero value.
+          const instanceName = this.getPreloginInstanceName();
+          if (instanceName && preloginResponse.instance) {
+            throw new ConnectionError(`Server did not accept instance name '${instanceName}'`, 'EINSTANCE');
+          }
+
           await this.performTlsNegotiation(preloginResponse, signal);
 
           this.sendLogin7Packet();
@@ -2497,6 +2508,16 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * The instance name to send in the `INSTOPT` PRELOGIN option. After a
+   * redirect, this is the instance named in the routing target, if any.
+   *
+   * @private
+   */
+  getPreloginInstanceName(): string | undefined {
+    return this.routingData ? this.routingData.instance : this.config.options.instanceName;
+  }
+
+  /**
    * @private
    */
   sendPreLogin() {
@@ -2506,7 +2527,8 @@ class Connection extends EventEmitter {
       // this function. Therefore, the encrypt will be set to false here.
       // Otherwise, we will set encrypt here based on the encrypt Boolean value from the configuration.
       encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
-      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 },
+      instanceName: this.getPreloginInstanceName()
     });
 
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);

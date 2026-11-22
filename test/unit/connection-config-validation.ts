@@ -20,6 +20,30 @@ describe('Connection configuration validation', function() {
     config.server = 'localhost';
   });
 
+  it('defaults the port to 1433', function() {
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.port, 1433);
+    assert.isUndefined(connection.config.options.instanceName);
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('does not default the port when an instance name is given', function() {
+    config.options.instanceName = 'SQLEXPRESS';
+    const connection = new Connection(config);
+    assert.isUndefined(connection.config.options.port);
+    assert.strictEqual(connection.config.options.instanceName, 'SQLEXPRESS');
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
+  it('accepts both a port and an instance name', function() {
+    config.options.instanceName = 'SQLEXPRESS';
+    config.options.port = 1434;
+    const connection = new Connection(config);
+    assert.strictEqual(connection.config.options.port, 1434);
+    assert.strictEqual(connection.config.options.instanceName, 'SQLEXPRESS');
+    ensureConnectionIsClosed(connection, () => {});
+  });
+
   it('default transient retry interval', function() {
     const connection = new Connection(config);
     assert.strictEqual(connection.config.options.connectionRetryInterval, 500);
