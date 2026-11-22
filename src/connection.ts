@@ -2861,7 +2861,17 @@ class Connection extends EventEmitter {
   /**
    * Creates a new BulkLoad instance.
    *
-   * @param table The name of the table to bulk-insert into.
+   * `table` is inserted into the generated SQL as-is, so it can be any T-SQL
+   * table reference, like `MyTable`, `dbo.MyTable`, `[my schema].[my table]` or
+   * `#tempTable`. Because it is not quoted or escaped, never build it from
+   * untrusted input. If a name can contain special characters, quote each part
+   * yourself as a delimited identifier, doubling any `]` (e.g. `[my]]table]`).
+   *
+   * The same applies to the column names used as keys of `options.order`.
+   * Column names passed to {@link BulkLoad.addColumn} are quoted and escaped
+   * by tedious.
+   *
+   * @param table The T-SQL reference of the table to bulk-insert into. It is used as-is, without quoting or escaping.
    * @param options A set of bulk load options.
    */
   newBulkLoad(table: string, callback: BulkLoadCallback): BulkLoad
