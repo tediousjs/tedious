@@ -248,6 +248,26 @@ describe('InstanceLookup', function() {
 
       assert.strictEqual(result, 1433);
     });
+
+    it('does not send further requests once a response was received', async function() {
+      let requestCount = 0;
+      server.on('message', (msg, rinfo) => {
+        requestCount++;
+        server.send('ServerName;WINDOWS2;InstanceName;second;IsClustered;No;Version;10.50.2500.0;tcp;1433;;', rinfo.port, rinfo.address);
+      });
+
+      const result = await instanceLookup({
+        server: (server.address() as AddressInfo).address,
+        port: (server.address() as AddressInfo).port,
+        instanceName: 'second',
+        timeout: 500,
+        retries: 3,
+        signal: new AbortController().signal
+      });
+
+      assert.strictEqual(result, 1433);
+      assert.strictEqual(requestCount, 1);
+    });
   });
 
   describe('when receiving a response that does not contain the requested instance name', function() {
