@@ -20,7 +20,7 @@ import { type AccessToken, type TokenCredential, isTokenCredential } from '@azur
 import BulkLoad, { type Options as BulkLoadOptions, type Callback as BulkLoadCallback } from './bulk-load';
 import Debug from './debug';
 import { EventEmitter, once } from 'events';
-import { instanceLookup } from './instance-lookup';
+import { instanceLookup, SQL_SERVER_BROWSER_PORT } from './instance-lookup';
 import { TransientErrorLookup } from './transient-error-lookup';
 import { TYPE } from './packet';
 import PreloginPayload from './prelogin-payload';
@@ -2028,7 +2028,20 @@ class Connection extends EventEmitter {
   async initialiseConnection() {
     const timeoutController = new AbortController();
 
+    // Whether the connection is still waiting for the SQL Server Browser to
+    // return the port of the named instance.
+    let lookingUpInstancePort = false;
+
     const connectTimer = setTimeout(() => {
+      if (lookingUpInstancePort) {
+        const message = `Failed to connect to ${this.config.server}\\${this.config.options.instanceName} in ${this.config.options.connectTimeout}ms: ` +
+          `timed out waiting for the SQL Server Browser on ${this.config.server} (UDP port ${SQL_SERVER_BROWSER_PORT}) to return the port of instance '${this.config.options.instanceName}'`;
+        this.debug.log(message);
+
+        timeoutController.abort(new ConnectionError(message, 'ETIMEOUT'));
+        return;
+      }
+
       const hostPostfix = this.config.options.port ? `:${this.config.options.port}` : `\\${this.config.options.instanceName}`;
       // If we have routing data stored, this connection has been redirected
       const server = this.routingData ? this.routingData.server : this.config.server;
@@ -2048,6 +2061,7 @@ class Connection extends EventEmitter {
       let port = this.config.options.port;
 
       if (!port) {
+        lookingUpInstancePort = true;
         try {
           port = await instanceLookup({
             server: this.config.server,
@@ -2059,6 +2073,8 @@ class Connection extends EventEmitter {
           signal.throwIfAborted();
 
           throw new ConnectionError(err.message, 'EINSTLOOKUP', { cause: err });
+        } finally {
+          lookingUpInstancePort = false;
         }
       }
 
