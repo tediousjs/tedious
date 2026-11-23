@@ -41,6 +41,18 @@ const COLLATIONS: Array<[codepage: string, collation: string, doubleByte: boolea
 
 const DATABASE = '__tedious_codepages';
 
+// Best fits that newer versions of Windows (such as Windows Server 2022) have
+// for the single-byte code pages, and that SQL Server uses when it runs on
+// them or on Linux. SQL Server on older versions of Windows (such as the one
+// AppVeyor's Visual Studio 2022 image runs) encodes these characters as "?",
+// as do Microsoft's published tables. tedious encodes them as the newer versions
+// do; this is the only difference between SQL Server versions and hosts.
+const NEWER_WINDOWS_BEST_FITS = new Set([
+  0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A,
+  0x2010, 0x2011, 0x2012, 0x2015, 0x201A, 0x201B, 0x201E, 0x201F, 0x2024, 0x202F,
+  0x2032, 0x2033, 0x2035, 0x2036, 0x2044, 0x20A4, 0x2236
+]);
+
 function hex(text: string) {
   return Array.from(text, (c) => 'U+' + c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')).join(' ');
 }
@@ -176,7 +188,7 @@ describe('`varchar` values in each code page', function() {
     assert.deepEqual(differences, []);
   });
 
-  for (const [codepage, collation] of COLLATIONS) {
+  for (const [codepage, collation, doubleByte] of COLLATIONS) {
     it(`encodes ${codepage} (${collation}) as SQL Server does`, async function() {
       await useDatabaseWithCollation(collation);
 
@@ -188,20 +200,32 @@ describe('`varchar` values in each code page', function() {
       assert.strictEqual(rows.length, 65536);
 
       const differences = [];
+      const olderWindows = new Set<number>();
       for (const [v, converted] of rows as Array<[number | string, Buffer]>) {
-        const char = String.fromCharCode(Number(v));
+        const unit = Number(v);
+        const char = String.fromCharCode(unit);
         const encoded = encode(char, codepage);
-        if (!encoded.equals(converted)) {
-          differences.push(`${hex(char)}: encoded ${encoded.toString('hex')}, SQL Server ${converted.toString('hex')}`);
+        if (encoded.equals(converted)) {
+          continue;
         }
+
+        if (!doubleByte && NEWER_WINDOWS_BEST_FITS.has(unit) && converted.equals(Buffer.from('?'))) {
+          olderWindows.add(unit);
+          continue;
+        }
+
+        differences.push(`${hex(char)}: encoded ${encoded.toString('hex')}, SQL Server ${converted.toString('hex')}`);
       }
       assert.deepEqual(differences.slice(0, 20), [], `${differences.length} characters are encoded differently`);
 
-      // All of them in one value, with a surrogate pair and unpaired
+      // All of them in one value (but for those SQL Server encodes as "?" on
+      // older versions of Windows), with a surrogate pair and unpaired
       // surrogates, sent as a parameter and as a streamed parameter.
       let value = '';
       for (let char = 0; char <= 0xFFFF; char++) {
-        value += String.fromCharCode(char);
+        if (!olderWindows.has(char)) {
+          value += String.fromCharCode(char);
+        }
       }
       value += 'a\u{1F600}b\uD83Dc\uDE00';
 

@@ -14,7 +14,8 @@
 // mappings are those of Microsoft's WindowsBestFit tables (WCTABLE sections of
 // bestfit<N>.txt at https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/),
 // which SQL Server extends with a few more, mostly spaces and dashes from
-// U+2000 to U+2036.
+// U+2000 to U+2036. SQL Server takes these from Windows: on older versions of
+// Windows, which lack those few, it encodes them as "?" instead.
 //
 // Each code page has a list of space-separated entries, in Unicode order:
 //
