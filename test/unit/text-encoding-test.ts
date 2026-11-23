@@ -274,44 +274,29 @@ describe('text encoding', function() {
       assert.strictEqual(decoder.write(Buffer.from([0x61, 0x82])) + decoder.write(Buffer.from([0x20, 0x62])) + decoder.end(), 'a・b');
     });
 
-    describe('if `TextDecoder` does not support a double-byte code page', function() {
+    describe('without `TextDecoder` support for the legacy code pages', function() {
       afterEach(function() {
         sinon.restore();
         resetTables();
       });
 
-      it('fails with an error naming the code page', function() {
+      // As on a Node.js build without full ICU, where `TextDecoder` only
+      // supports UTF-8 and UTF-16. tedious does not use it for code pages.
+      it('decodes and encodes every code page', function() {
         resetTables();
-        sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('The "shift_jis" encoding is not supported'));
-
-        assert.throws(
-          () => decode(Buffer.from([0x82, 0xA0]), 'CP932'),
-          Error,
-          'Text in code page CP932 requires a Node.js build with full ICU support, but its TextDecoder does not support the \'shift_jis\' encoding.'
-        );
-      });
-
-      it('still decodes single-byte code pages and ASCII', function() {
-        resetTables();
-        sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('not supported'));
+        const OriginalTextDecoder = globalThis.TextDecoder;
+        sinon.stub(globalThis, 'TextDecoder').callsFake(function(label?: string, options?: ConstructorParameters<typeof TextDecoder>[1]) {
+          if (label !== undefined && label !== 'utf-8') {
+            throw new RangeError(`The "${label}" encoding is not supported`);
+          }
+          return new OriginalTextDecoder(label, options);
+        });
 
         assert.strictEqual(decode(Buffer.from([0x63, 0x61, 0x66, 0xE9]), 'CP1252'), 'café');
-        assert.strictEqual(decode(Buffer.from('abc'), 'CP932'), 'abc');
-      });
-
-      it('fails to encode non-ASCII text in that code page with the same error', function() {
-        resetTables();
-        sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('not supported'));
-
-        assert.throws(() => encode('日本', 'CP932'), Error, 'Text in code page CP932 requires a Node.js build with full ICU support');
-      });
-
-      it('still encodes single-byte code pages and ASCII', function() {
-        resetTables();
-        sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('not supported'));
-
-        assert.deepEqual(encode('café', 'CP1252'), Buffer.from([0x63, 0x61, 0x66, 0xE9]));
-        assert.deepEqual(encode('abc', 'CP932'), Buffer.from('abc'));
+        assert.strictEqual(decode(Buffer.from([0x93, 0xFA, 0x96, 0x7B]), 'CP932'), '日本');
+        assert.strictEqual(decode(Buffer.from([0xC7, 0xD1, 0x8C, 0x63]), 'CP949'), '한똠');
+        assert.deepEqual(encode('日本', 'CP932'), Buffer.from([0x93, 0xFA, 0x96, 0x7B]));
+        assert.deepEqual(encode('中文', 'CP936'), Buffer.from([0xD6, 0xD0, 0xCE, 0xC4]));
       });
     });
   });

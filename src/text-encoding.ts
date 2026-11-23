@@ -1,7 +1,7 @@
 import { isAscii, isUtf8 as isValidUtf8 } from 'buffer';
 import { endianness } from 'os';
 
-import { SINGLE_BYTE_HIGH_HALVES } from './codepage-tables';
+import { DOUBLE_BYTE_TABLES, SINGLE_BYTE_HIGH_HALVES, type DoubleByteTable } from './codepage-tables';
 import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
 
 // Converts `char`, `varchar` and `text` values between JavaScript strings and
@@ -10,13 +10,12 @@ import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
 // Decoding:
 //
 // - UTF-8 is decoded with Node.js' built-in UTF-8 decoder.
-// - The single-byte code pages (CP437, CP850, CP874 and CP1250 to CP1258) are
-//   decoded with the tables in `codepage-tables.ts`, which are Windows' own
-//   (as are the ones SQL Server uses to convert `varchar` to `nvarchar`).
-// - The double-byte code pages (CP932, CP936, CP949 and CP950) are decoded
-//   with tables built on first use from Node.js' `TextDecoder`, with the
-//   corrections listed in `DOUBLE_BYTE_CODEPAGES` where `TextDecoder` does not
-//   decode a byte sequence as Windows does.
+// - The legacy code pages (CP437, CP850, CP874, CP1250 to CP1258, and the
+//   double-byte CP932, CP936, CP949 and CP950) are decoded with the tables in
+//   `codepage-tables.ts`, which are Windows' own (as are the ones SQL Server
+//   uses to convert `varchar` to `nvarchar`). As in Windows, an invalid byte
+//   sequence decodes to the code page's default character: "?", or U+30FB
+//   (・) in CP932.
 //
 // Encoding UTF-8 is left to Node.js. The legacy code pages are encoded with
 // the inverse of the decoding tables, adjusted with the best-fit mappings and
@@ -24,7 +23,6 @@ import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
 // that a value is encoded exactly as SQL Server would convert it to `varchar`
 // itself.
 
-const REPLACEMENT_CHARACTER = 0xFFFD;
 const QUESTION_MARK = 0x3F;
 
 /**
@@ -84,185 +82,26 @@ interface CodepageTable {
   readonly defaultChar: number;
 }
 
-interface DoubleByteCodepage {
-  // The WHATWG encoding label `TextDecoder` decodes this code page as.
-  readonly label: string;
-
-  // The ranges of lead bytes, as Windows defines them.
-  readonly leadBytes: ReadonlyArray<readonly [number, number]>;
-
-  // Single bytes `TextDecoder` does not decode as Windows does.
-  readonly singleByteCorrections?: ReadonlyArray<readonly [byte: number, char: number]>;
-
-  // Runs of two-byte sequences `TextDecoder` does not decode as Windows does:
-  // `count` consecutive sequences from `sequence` decode to consecutive
-  // characters from `char`.
-  readonly doubleByteCorrections?: ReadonlyArray<readonly [sequence: number, char: number, count: number]>;
-
-  // Whether to add the Unified Hangul Code extension (see `addUhcExtension`).
-  readonly uhc?: boolean;
-
-  // What Windows decodes an invalid byte sequence to, if not "?".
-  readonly defaultChar?: number;
-}
-
-// The differences from `TextDecoder` were found by comparing it with
-// Microsoft's tables for each code page (WindowsBestFit/bestfit<N>.txt at
-// https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/); see
-// `test/unit/text-encoding-test.ts`.
-//
-// As in Windows (and so in SQL Server), an invalid byte sequence decodes to
-// the code page's default character: "?", or U+30FB (・) in CP932.
-const DOUBLE_BYTE_CODEPAGES: { readonly [codepage: string]: DoubleByteCodepage } = {
-  CP932: {
-    label: 'shift_jis',
-    defaultChar: 0x30FB,
-    leadBytes: [[0x81, 0x9F], [0xE0, 0xFC]],
-    // Windows maps these bytes to U+0080 and to private use characters, where
-    // the WHATWG Shift_JIS decoder treats them as errors.
-    singleByteCorrections: [[0x80, 0x0080], [0xA0, 0xF8F0], [0xFD, 0xF8F1], [0xFE, 0xF8F2], [0xFF, 0xF8F3]]
-  },
-  CP936: {
-    label: 'gbk',
-    leadBytes: [[0x81, 0xFE]],
-    singleByteCorrections: [[0xFF, 0xF8F5]],
-    // `TextDecoder` decodes GBK as GB18030-2005, which maps these sequences to
-    // characters that were added to Unicode later. Windows' CP936 maps them to
-    // the private use characters they were assigned before.
-    doubleByteCorrections: [
-      [0xA2E3, 0xE76C, 1], [0xA3A0, 0xE5E5, 1], [0xA6D9, 0xE78D, 7], [0xA6EC, 0xE794, 2],
-      [0xA6F3, 0xE796, 1], [0xA8BC, 0xE7C7, 1], [0xA8BF, 0xE7C8, 1], [0xA989, 0xE7E7, 13],
-      [0xFE50, 0xE815, 1], [0xFE54, 0xE819, 24], [0xFE6D, 0xE832, 9], [0xFE77, 0xE83C, 8],
-      [0xFE80, 0xE844, 17], [0xFE92, 0xE856, 15]
-    ]
-  },
-  CP949: {
-    label: 'euc-kr',
-    leadBytes: [[0x81, 0xFE]],
-    singleByteCorrections: [[0x80, 0x0080], [0xFF, 0xF8F7]],
-    // The euro sign and the registered sign were added to CP949 later.
-    doubleByteCorrections: [[0xA2E6, 0x20AC, 1], [0xA2E7, 0x00AE, 1]],
-    uhc: true
-  },
-  CP950: {
-    label: 'big5',
-    leadBytes: [[0x81, 0xFE]]
-  }
-};
-
-function createTextDecoder(codepage: string, label: string) {
-  try {
-    return new TextDecoder(label);
-  } catch (error) {
-    throw new Error(
-      `Text in code page ${codepage} requires a Node.js build with full ICU support, ` +
-      `but its TextDecoder does not support the '${label}' encoding.`,
-      { cause: error }
-    );
-  }
-}
-
-// CP949 is EUC-KR extended with the Unified Hangul Code (UHC): the 8,822 modern
-// Hangul syllables that are not in KS X 1001 are added in Unicode order, in the
-// two-byte sequences that EUC-KR leaves unused. Node.js' `TextDecoder` only
-// decodes EUC-KR itself, so the extension is added here.
-function addUhcExtension(pairs: Uint16Array) {
-  // The syllables KS X 1001 has, in rows 0xB0 to 0xC8.
-  const inKsX1001 = new Set<number>();
-  for (let lead = 0xB0; lead <= 0xC8; lead++) {
-    for (let trail = 0xA1; trail <= 0xFE; trail++) {
-      inKsX1001.add(pairs[((lead - 0x80) << 8) | trail]);
-    }
-  }
-
-  let syllable = 0xAC00;
-  const nextSyllable = () => {
-    while (inKsX1001.has(syllable)) {
-      syllable++;
-    }
-    return syllable++;
-  };
-
-  for (let lead = 0x81; lead <= 0xC6; lead++) {
-    // Up to lead byte 0xA0, the extension uses all trail bytes outside of the
-    // EUC-KR range; after that, only those below 0xA1.
-    const ranges = [[0x41, 0x5A], [0x61, 0x7A], [0x81, lead <= 0xA0 ? 0xFE : 0xA0]];
-    for (const [first, last] of ranges) {
-      for (let trail = first; trail <= last; trail++) {
-        const char = nextSyllable();
-        if (char > 0xD7A3) {
-          return;
-        }
-        pairs[((lead - 0x80) << 8) | trail] = char;
-      }
-    }
-  }
-}
-
-function buildDoubleByteTable(codepage: string, spec: DoubleByteCodepage): CodepageTable {
-  const decoder = createTextDecoder(codepage, spec.label);
-
+function buildDoubleByteTable(spec: DoubleByteTable): CodepageTable {
   const lead = new Uint8Array(256);
   for (const [first, last] of spec.leadBytes) {
     lead.fill(1, first, last + 1);
   }
 
   const high = new Uint16Array(128);
-  for (let byte = 0x80; byte <= 0xFF; byte++) {
-    if (!lead[byte]) {
-      const char = decoder.decode(Buffer.of(byte));
-      if (char.length === 1 && char.charCodeAt(0) !== REPLACEMENT_CHARACTER) {
-        high[byte - 0x80] = char.charCodeAt(0);
-      }
-    }
+  for (let i = 0; i < 128; i++) {
+    high[i] = spec.singleBytes.charCodeAt(i);
   }
 
-  // Decode every possible two-byte sequence at once, each followed by a line
-  // feed (which is never part of a two-byte sequence) to tell them apart.
-  const leads = [];
-  for (let byte = 0x80; byte <= 0xFF; byte++) {
-    if (lead[byte]) {
-      leads.push(byte);
-    }
-  }
-
-  const sequences = Buffer.alloc(leads.length * 0xBF * 3);
-  let offset = 0;
-  for (const leadByte of leads) {
-    for (let trail = 0x40; trail <= 0xFE; trail++) {
-      sequences[offset++] = leadByte;
-      sequences[offset++] = trail;
-      sequences[offset++] = 0x0A;
-    }
-  }
-
-  const decoded = decoder.decode(sequences).split('\n');
   const pairs = new Uint16Array(0x8000);
-  let index = 0;
-  for (const leadByte of leads) {
-    for (let trail = 0x40; trail <= 0xFE; trail++) {
-      const char = decoded[index++];
-      if (char.length === 1 && char.charCodeAt(0) !== REPLACEMENT_CHARACTER) {
-        pairs[((leadByte - 0x80) << 8) | trail] = char.charCodeAt(0);
-      }
+  for (const [leadByte, row] of Object.entries(spec.rows)) {
+    const offset = (Number(leadByte) - 0x80) << 8;
+    for (let i = 0; i < row.length; i++) {
+      pairs[offset | (0x40 + i)] = row.charCodeAt(i);
     }
   }
 
-  if (spec.uhc) {
-    addUhcExtension(pairs);
-  }
-
-  for (const [byte, char] of spec.singleByteCorrections ?? []) {
-    high[byte - 0x80] = char;
-  }
-
-  for (const [sequence, char, count] of spec.doubleByteCorrections ?? []) {
-    for (let i = 0; i < count; i++) {
-      pairs[sequence + i - 0x8000] = char + i;
-    }
-  }
-
-  return { high, lead, pairs, singleBytes: undefined, defaultChar: spec.defaultChar ?? QUESTION_MARK };
+  return { high, lead, pairs, singleBytes: undefined, defaultChar: spec.defaultChar };
 }
 
 function buildSingleByteTable(highHalf: string): CodepageTable {
@@ -292,11 +131,11 @@ function tableFor(codepage: string): CodepageTable {
   let table = tables.get(codepage);
   if (table === undefined) {
     const highHalf = SINGLE_BYTE_HIGH_HALVES[codepage];
-    const doubleByte = DOUBLE_BYTE_CODEPAGES[codepage];
+    const doubleByte = DOUBLE_BYTE_TABLES[codepage];
     if (highHalf !== undefined) {
       table = buildSingleByteTable(highHalf);
     } else if (doubleByte !== undefined) {
-      table = buildDoubleByteTable(codepage, doubleByte);
+      table = buildDoubleByteTable(doubleByte);
     } else {
       throw new Error(`Unsupported code page: ${codepage}.`);
     }

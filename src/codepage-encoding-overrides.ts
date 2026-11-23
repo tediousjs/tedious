@@ -23,6 +23,10 @@
 // - `UUUU-VVVV:XX`: every character from U+UUUU to U+VVVV is encoded as `XX`.
 // - `UUUU-VVVV:XX+`: the characters from U+UUUU to U+VVVV are encoded as
 //   consecutive codes from `XX`.
+//
+// The best-fit mappings are derived from data files of the Unicode
+// Consortium, used under the Unicode License v3; see THIRD-PARTY-NOTICES.md
+// for its copyright and permission notice.
 
 export const ENCODING_OVERRIDES: { readonly [codepage: string]: string } = {
   CP437:

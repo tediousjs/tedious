@@ -34,10 +34,6 @@ collation. An invalid byte sequence in a value is decoded as SQL Server decodes
 it too: to `?` (or `・` in Japanese collations) in a double-byte code page, and
 to U+FFFD in UTF-8.
 
-The double-byte code pages (CP932, CP936, CP949 and CP950, used by Japanese,
-Chinese and Korean collations) need a Node.js build with full ICU support, as
-the official builds have.
-
 ## Getting started
 
 Platform-specific guides are available for:
@@ -133,3 +129,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The code page tables tedious uses to convert `varchar` values are derived from
+data files of the Unicode Consortium, under the Unicode License v3; see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
