@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 12 * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Promote `next` to `latest` without waiting for the one week soak period'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -11,7 +16,15 @@ permissions:
 jobs:
   release:
     name: Release
+    # `workflow_dispatch` lets the job be started from any branch in the UI,
+    # but dist-tags must only ever be moved from `master`.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # to move dist-tags via npm trusted publishing (OIDC)
+
     steps:
     - uses: actions/checkout@v7.0.1
       with:
@@ -22,11 +35,19 @@ jobs:
       with:
         node-version: "22"
         cache: 'npm'
-        registry-url: 'https://registry.npmjs.org'
+
+    # Moving dist-tags via OIDC requires npm 11.21.0 or newer, which is newer
+    # than the npm version bundled with Node.js 22. Install the npm version
+    # locked in `package-lock.json` (also used by semantic-release) instead.
+    - run: npm ci
+
+    - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
+      run: npm audit signatures
 
     - name: Tag latest release
       env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # Always empty (i.e. not forced) for scheduled runs.
+        FORCE: ${{ inputs.force }}
       run: |
         info=$(npm info tedious --json)
         # npm 12+ always wraps `npm info --json` output in an array, older
@@ -42,8 +63,16 @@ jobs:
           publish_date=$(date -d "$(jq -r '.time["'"$next"'"]' <<< "$info")" +"$date_format")
           week_ago=$(date -d '-7 days' +"$date_format")
 
-          # ...and only once it has soaked on `next` for at least a week.
-          if [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
-            npm dist-tag add "tedious@$next" latest
+          # ...and only once it has soaked on `next` for at least a week,
+          # unless the promotion was forced.
+          if [[ "$FORCE" == "true" ]]; then
+            echo "Force-promoting tedious@$next (published $publish_date) to latest"
+            npx --no -- npm dist-tag add "tedious@$next" latest
+          elif [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
+            npx --no -- npm dist-tag add "tedious@$next" latest
+          else
+            echo "tedious@$next was published $publish_date, waiting until it has been on next for a week"
           fi
+        else
+          echo "tedious@$next on next is not newer than tedious@$latest on latest, nothing to promote"
         fi
