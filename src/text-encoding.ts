@@ -84,20 +84,28 @@ interface CodepageTable {
 
 function buildDoubleByteTable(spec: DoubleByteTable): CodepageTable {
   const lead = new Uint8Array(256);
+  const leads = [];
   for (const [first, last] of spec.leadBytes) {
     lead.fill(1, first, last + 1);
+    for (let byte = first; byte <= last; byte++) {
+      leads.push(byte);
+    }
   }
 
+  // See `DOUBLE_BYTE_TABLES` for the layout of the data.
+  const data = Buffer.from(spec.data, 'base64');
   const high = new Uint16Array(128);
   for (let i = 0; i < 128; i++) {
-    high[i] = spec.singleBytes.charCodeAt(i);
+    high[i] = data.readUInt16LE(i * 2);
   }
 
   const pairs = new Uint16Array(0x8000);
-  for (const [leadByte, row] of Object.entries(spec.rows)) {
-    const offset = (Number(leadByte) - 0x80) << 8;
-    for (let i = 0; i < row.length; i++) {
-      pairs[offset | (0x40 + i)] = row.charCodeAt(i);
+  let offset = 256;
+  for (const leadByte of leads) {
+    const row = (leadByte - 0x80) << 8;
+    for (let trail = 0x40; trail <= 0xFE; trail++) {
+      pairs[row | trail] = data.readUInt16LE(offset);
+      offset += 2;
     }
   }
 

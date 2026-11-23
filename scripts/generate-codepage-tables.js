@@ -118,31 +118,6 @@ function escape(code) {
   return '\\u' + code.toString(16).toUpperCase().padStart(4, '0');
 }
 
-// Characters that are written as themselves: printable, and neither
-// whitespace, a combining mark, a private use character nor otherwise
-// confusing in an editor.
-function isPlain(code) {
-  const char = String.fromCharCode(code);
-  return code > 0x7E &&
-    !/[\p{C}\p{Z}\p{M}\p{Co}]/u.test(char) &&
-    !(code >= 0xD800 && code <= 0xDFFF) &&
-    code !== 0xFFFD;
-}
-
-function literal(codes) {
-  let text = '';
-  for (const code of codes) {
-    if (code >= 0x20 && code < 0x7F && code !== 0x27 && code !== 0x5C) {
-      text += String.fromCharCode(code);
-    } else if (isPlain(code)) {
-      text += String.fromCharCode(code);
-    } else {
-      text += escape(code);
-    }
-  }
-  return `'${text}'`;
-}
-
 // The Unicode License v3, which the tables are under. A comment with
 // `@license`, so that bundlers keep it with the tables.
 const LICENSE = `/**
@@ -242,17 +217,15 @@ export const SINGLE_BYTE_HIGH_HALVES: { readonly [codepage: string]: string } = 
 //
 // - \`leadBytes\`: the ranges of bytes that start a two-byte sequence.
 // - \`defaultChar\`: what an invalid sequence decodes to.
-// - \`singleBytes\`: the character for each byte from 0x80 to 0xFF, at index
-//   byte - 0x80, or U+0000 for a lead byte or a byte that is not a character.
-// - \`rows\`: for each lead byte, the character for each trail byte from 0x40
-//   to 0xFE, at index trail - 0x40, or U+0000 if the sequence is not a
-//   character.
+// - \`data\`: base64 of little-endian 16-bit values, each a UTF-16 code unit or
+//   0 for no character: first one for each byte from 0x80 to 0xFF (0 for a
+//   lead byte), then, for each lead byte in order, one for each trail byte
+//   from 0x40 to 0xFE.
 
 export interface DoubleByteTable {
   readonly leadBytes: ReadonlyArray<readonly [first: number, last: number]>;
   readonly defaultChar: number;
-  readonly singleBytes: string;
-  readonly rows: { readonly [lead: number]: string };
+  readonly data: string;
 }
 
 export const DOUBLE_BYTE_TABLES: { readonly [codepage: string]: DoubleByteTable } = {
@@ -267,45 +240,47 @@ export const DOUBLE_BYTE_TABLES: { readonly [codepage: string]: DoubleByteTable 
       }
     }
 
-    const isLead = (byte) => leadRanges.some(([first, last]) => byte >= first && byte <= last);
-    const singleCodes = [];
-    for (let byte = 0x80; byte <= 0xFF; byte++) {
-      singleCodes.push(isLead(byte) ? 0 : (single.get(byte) ?? 0));
-    }
-
-    let entry = `  ${codepage}: {\n`;
-    entry += `    leadBytes: [${leadRanges.map(([first, last]) => `[${hex(first, 2)}, ${hex(last, 2)}]`).join(', ')}],\n`;
-    entry += `    defaultChar: ${hex(defaultChar, 4)},\n`;
-    entry += `    singleBytes:\n${[0, 1, 2, 3, 4, 5, 6, 7].map((i) => `      ${literal(singleCodes.slice(i * 16, i * 16 + 16))}`).join(' +\n')},\n`;
-    entry += '    rows: {\n';
-
+    const leads = [];
     for (const [first, last] of leadRanges) {
       for (let lead = first; lead <= last; lead++) {
         if (!pairs.has(lead)) {
           throw new Error(`${codepage}: lead byte ${hex(lead, 2)} has no DBCSTABLE`);
         }
+        leads.push(lead);
       }
     }
+    if (leads.length !== pairs.size) {
+      throw new Error(`${codepage}: a DBCSTABLE is outside of the lead byte ranges`);
+    }
 
-    const rows = [];
-    for (const [lead, trails] of [...pairs].sort(([a], [b]) => a - b)) {
+    const codes = [];
+    for (let byte = 0x80; byte <= 0xFF; byte++) {
+      codes.push(leads.includes(byte) ? 0 : (single.get(byte) ?? 0));
+    }
+    for (const lead of leads) {
+      const trails = pairs.get(lead);
       for (const trail of trails.keys()) {
         if (trail < 0x40 || trail > 0xFE) {
           throw new Error(`${codepage}: sequence ${hex((lead << 8) | trail, 4)} is out of range`);
         }
       }
-
-      const lines = [];
-      for (let start = 0x40; start <= 0xF0; start += 0x10) {
-        const codes = [];
-        for (let trail = start; trail < Math.min(start + 0x10, 0xFF); trail++) {
-          codes.push(trails.get(trail) ?? 0);
-        }
-        lines.push(`        ${literal(codes)}`);
+      for (let trail = 0x40; trail <= 0xFE; trail++) {
+        codes.push(trails.get(trail) ?? 0);
       }
-      rows.push(`      ${hex(lead, 2)}:\n` + lines.join(' +\n'));
     }
-    entry += rows.join(',\n') + '\n    }\n  }';
+
+    const data = Buffer.alloc(codes.length * 2);
+    codes.forEach((code, i) => data.writeUInt16LE(code, i * 2));
+    const base64 = data.toString('base64');
+    const lines = [];
+    for (let i = 0; i < base64.length; i += 96) {
+      lines.push(`      '${base64.slice(i, i + 96)}'`);
+    }
+
+    let entry = `  ${codepage}: {\n`;
+    entry += `    leadBytes: [${leadRanges.map(([first, last]) => `[${hex(first, 2)}, ${hex(last, 2)}]`).join(', ')}],\n`;
+    entry += `    defaultChar: ${hex(defaultChar, 4)},\n`;
+    entry += `    data:\n${lines.join(' +\n')}\n  }`;
     doubles.push(entry);
   }
   out += doubles.join(',\n') + '\n};\n';
