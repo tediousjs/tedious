@@ -19,7 +19,13 @@ import sspiParser from './sspi-token-parser';
 import tabNameParser from './tabname-token-parser';
 import { NotEnoughDataError, type Result } from './helpers';
 
-export type ParserOptions = Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'>;
+export type ParserOptions =
+  Pick<InternalConnectionOptions, 'useUTC' | 'lowerCaseGuids' | 'tdsVersion' | 'useColumnNames' | 'columnNameReplacer' | 'camelCaseColumns'> &
+  // `serverSupportsColumnEncryption` says whether the tokens carry
+  // encryption metadata (the column encryption feature was negotiated).
+  // Encrypted values are decrypted if `columnEncryption` is set as well, and
+  // left as they are otherwise.
+  Partial<Pick<InternalConnectionOptions, 'serverSupportsColumnEncryption' | 'columnEncryption'>>;
 
 /**
  * Parses a token that is short enough to simply be parsed again from its

@@ -1,5 +1,6 @@
 import { Collation } from '../collation';
 import { type Metadata } from '../metadata-parser';
+import { type ColumnEncryptionKeyInfo } from '../always-encrypted/types';
 import { type ColumnMetadata } from './colmetadata-token-parser';
 import { TokenHandler } from './handler';
 
@@ -94,10 +95,18 @@ export class ColMetadataToken extends Token {
 
   declare columns: ColumnMetadata[];
 
-  constructor(columns: ColumnMetadata[]) {
+  /**
+   * The column encryption keys that need to be available (see
+   * `loadColumnEncryptionKeys`) before the rows of the result set are
+   * parsed, if any of its columns are to be decrypted.
+   */
+  declare columnEncryptionKeys: ColumnEncryptionKeyInfo[] | undefined;
+
+  constructor(columns: ColumnMetadata[], columnEncryptionKeys?: ColumnEncryptionKeyInfo[]) {
     super('COLMETADATA', 'onColMetadata');
 
     this.columns = columns;
+    this.columnEncryptionKeys = columnEncryptionKeys;
   }
 }
 
@@ -381,11 +390,20 @@ export class FeatureExtAckToken extends Token {
    * undefined when UTF8_SUPPORT not included in token. */
   declare utf8Support: boolean | undefined;
 
-  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined) {
+  /**
+   * The version of the column encryption feature (Always Encrypted) that
+   * the server acknowledged.
+   *
+   * undefined when COLUMNENCRYPTION not included in token.
+   */
+  declare columnEncryptionVersion: number | undefined;
+
+  constructor(fedAuth: Buffer | undefined, utf8Support: boolean | undefined, columnEncryptionVersion?: number | undefined) {
     super('FEATUREEXTACK', 'onFeatureExtAck');
 
     this.fedAuth = fedAuth;
     this.utf8Support = utf8Support;
+    this.columnEncryptionVersion = columnEncryptionVersion;
   }
 }
 

@@ -1,0 +1,68 @@
+name: Driver compatibility
+
+on:
+  push:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  pull_request:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+concurrency:
+  # Pull request runs share a group per PR, so a new push cancels the older
+  # run. Push runs get a unique group (the run id), so they are never
+  # cancelled or replaced while queued.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Checks that tedious and Microsoft's drivers read what the other one
+  # encrypted with Always Encrypted. See test/interop/README.md.
+  always-encrypted:
+    name: Always Encrypted / ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      matrix:
+        include:
+          # The versions of the drivers are those of test/interop/jdbc/pom.xml
+          # and test/interop/sqlclient/Interop.csproj. The JDK, Maven and the
+          # .NET SDK are the ones that the runner image comes with.
+          - driver: jdbc
+            name: Microsoft JDBC Driver
+          - driver: sqlclient
+            name: Microsoft.Data.SqlClient
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Use Node.js 22
+      uses: actions/setup-node@v7.1.0
+      with:
+        node-version: 22
+        cache: 'npm'
+
+    - name: Generate TLS Certificate
+      run: |
+        openssl req -x509 -newkey rsa:4096 -nodes -addext "extendedKeyUsage = serverAuth" -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
+
+    - name: Start containers
+      run: |
+        docker compose -f "test/docker-compose.linux.yml" up --detach
+
+    - name: Set up CI configuration
+      shell: bash
+      run: cp -f test/config.ci.ts test/config.ts
+
+    - run: npm ci
+
+    - name: run compatibility checks
+      env:
+        DRIVER: ${{ matrix.driver }}
+      run: test/interop/run.sh "$DRIVER"

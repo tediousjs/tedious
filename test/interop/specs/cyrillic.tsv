@@ -1,0 +1,7 @@
+# Character data in a database whose code page is Windows-1251.
+# name	type	kind	parameters	collation	written by	values (`given=>stored` where the column does not hold what it is given)
+c_char	char(10)	char	10	Cyrillic_General_BIN2	all	Привет
+c_varchar	varchar(100)	varchar	100	Cyrillic_General_BIN2	all	Привет мир	abc Ж
+c_varchar_max	varchar(max)	varcharmax	-	Cyrillic_General_BIN2	all	Привет мир	repeat:Привет мир:700
+c_nvarchar	nvarchar(50)	nvarchar	50	Cyrillic_General_BIN2	all	Привет мир
+c_int	int	int	-	-	all	42

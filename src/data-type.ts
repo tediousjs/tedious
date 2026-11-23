@@ -37,7 +37,6 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
-import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
@@ -56,9 +55,10 @@ export interface Parameter {
 
   nullable?: boolean | undefined;
 
+  /**
+   * Whether the value is required to be encrypted, see `ParameterOptions`.
+   */
   forceEncrypt?: boolean | undefined;
-  cryptoMetadata?: CryptoMetadata | undefined;
-  encryptedVal?: Buffer | undefined;
 }
 
 
@@ -128,6 +128,12 @@ export interface ResolvedParameter {
   output: boolean;
   type: DataType;
   data: ParameterData;
+
+  /**
+   * Whether the value was encrypted, and is followed by the description of
+   * how it was encrypted.
+   */
+  encrypted?: boolean | undefined;
 }
 
 /**
