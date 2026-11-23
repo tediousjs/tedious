@@ -54,4 +54,79 @@ describe('NBCRow Token Parser', function() {
       assert.isTrue((await parser.next()).done);
     });
   });
+
+  it('should parse json', async function() {
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.JSON,
+      collation: undefined
+    }];
+    const value = '{"a":"\u00fc"}';
+    const payload = Buffer.from(value, 'utf8');
+
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(0xd2);
+    buffer.writeUInt8(0x00); // null bitmap - column is not null
+    buffer.writeUInt64LE(payload.length); // PLP total length
+    buffer.writeUInt32LE(payload.length); // chunk length
+    buffer.writeBuffer(payload);
+    buffer.writeUInt32LE(0); // PLP terminator
+
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, NBCRowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse json columns that are null in the bitmap and json that arrives byte by byte', async function() {
+    const jsonColumn = (colName: string): ColumnMetadata => ({
+      colName,
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.JSON,
+      collation: undefined
+    });
+    const colMetadata: ColumnMetadata[] = [jsonColumn('col0'), jsonColumn('col1')];
+    const value = '["\u{1F600}"]';
+    const payload = Buffer.from(value, 'utf8');
+
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(0xd2);
+    buffer.writeUInt8(0x01); // null bitmap - the first column is null
+    buffer.writeUInt64LE(payload.length); // PLP total length
+    buffer.writeUInt32LE(payload.length); // chunk length
+    buffer.writeBuffer(payload);
+    buffer.writeUInt32LE(0); // PLP terminator
+
+    const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
+
+    const parser = Parser.parseTokens(chunks, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, NBCRowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.isNull(token.columns[0].value);
+    assert.strictEqual(token.columns[1].value, value);
+    assert.isTrue((await parser.next()).done);
+  });
 });

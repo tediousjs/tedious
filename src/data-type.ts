@@ -42,6 +42,7 @@ import { type CryptoMetadata } from './always-encrypted/types';
 import { type InternalConnectionOptions } from './connection';
 import { Collation } from './collation';
 import WritableTrackingBuffer from './tracking-buffer/writable-tracking-buffer';
+import Json from './data-types/json';
 
 export interface Parameter {
   type: DataType;
@@ -266,6 +267,7 @@ export const TYPE = {
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
+  [Json.id]: Json
 };
 
 /**
@@ -537,6 +539,13 @@ export const TYPE = {
  *     <td>✓</td>
  *     <td>-</td>
  *   </tr>
+ *   <tr>
+ *     <td><code>json</code><sup>5</sup></td>
+ *     <td><code>{@link TYPES.JSON}</code></td>
+ *     <td><code>string</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
  * </tbody>
  * </table>
  *
@@ -569,6 +578,25 @@ export const TYPE = {
  *       Note that the order of bytes is not the same as the character representation. See
  *       <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
  *       for an example of the different ordering of bytes.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>JSON</h4>
+ *     <p>
+ *       Requires a server that supports the <code>json</code> data type (SQL Server 2025 or Azure SQL) and TDS 7.4.
+ *       Values are always returned as a string of JSON text; they are not parsed.
+ *     </p>
+ *     <p>
+ *       Values are JSON text in both directions. A parameter value (including a bulk load or table-valued parameter
+ *       cell) must be a <code>string</code> of JSON text, or <code>null</code>/<code>undefined</code> for SQL
+ *       <code>NULL</code>. It is sent as is: <code>'[1, 2]'</code> is an array, and a JSON string value has to be
+ *       written with its quotes, e.g. <code>'"abc"'</code>. The server validates the text. Any other value is rejected;
+ *       tedious never calls <code>JSON.stringify</code> or <code>JSON.parse</code>, so callers encode and decode values
+ *       themselves (e.g. <code>JSON.stringify(value)</code> before passing it as a parameter).
+ *     </p>
+ *     <p>
+ *       A parameter value can also be an async iterable (e.g. a <code>Readable</code> with <code>encoding: 'utf8'</code>)
+ *       of string chunks of JSON text, which is read while the request is sent.
  *     </p>
  *   </li>
  * </ol>
@@ -604,7 +632,8 @@ export const TYPES = {
   DateTimeOffset,
   UDT,
   TVP,
-  Variant
+  Variant,
+  JSON: Json
 };
 
 export const typeByName = TYPES;

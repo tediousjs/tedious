@@ -1395,4 +1395,121 @@ describe('Row Token Parser', function() {
     assert.strictEqual(token.columns[0].value, null);
     assert.isTrue((await parser.next()).done);
   });
+
+  it('should parse json', async function() {
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.JSON,
+      collation: undefined
+    }];
+    const value = '{"a":"\u00fc"}';
+    const payload = Buffer.from(value, 'utf8');
+
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(0xd1);
+    buffer.writeUInt64LE(payload.length); // PLP total length
+    buffer.writeUInt32LE(payload.length); // chunk length
+    buffer.writeBuffer(payload);
+    buffer.writeUInt32LE(0); // PLP terminator
+
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[0].metadata, colMetadata[0]);
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse null json', async function() {
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.JSON,
+      collation: undefined
+    }];
+
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(0xd1);
+    buffer.writeBuffer(Buffer.alloc(8, 0xFF)); // PLP null
+
+    const parser = Parser.parseTokens([buffer.data], options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 1);
+    assert.strictEqual(token.columns[0].value, null);
+    assert.isTrue((await parser.next()).done);
+  });
+
+  it('should parse json split across PLP chunks and incoming data, mid UTF-8 character', async function() {
+    const colMetadata: ColumnMetadata[] = [{
+      colName: 'col0',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.JSON,
+      collation: undefined
+    }, {
+      colName: 'col1',
+      userType: 0,
+      flags: 0,
+      precision: undefined,
+      scale: undefined,
+      dataLength: undefined,
+      schema: undefined,
+      udtInfo: undefined,
+      type: dataTypeByName.Int,
+      collation: undefined
+    }];
+    const value = '{"a":"\u00fc\u{1F600}"}';
+    const payload = Buffer.from(value, 'utf8');
+    // Split inside the 4-byte UTF-8 sequence of the emoji.
+    const split = payload.indexOf(0xf0) + 2;
+
+    const buffer = new WritableTrackingBuffer();
+    buffer.writeUInt8(0xd1);
+    buffer.writeBuffer(Buffer.from([0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])); // unknown PLP length
+    buffer.writeUInt32LE(split);
+    buffer.writeBuffer(payload.subarray(0, split));
+    buffer.writeUInt32LE(payload.length - split);
+    buffer.writeBuffer(payload.subarray(split));
+    buffer.writeUInt32LE(0); // PLP terminator
+    buffer.writeUInt32LE(42);
+
+    const chunks = Array.from(buffer.data, (byte) => Buffer.from([byte]));
+
+    const parser = Parser.parseTokens(chunks, options, colMetadata);
+    const result = await parser.next();
+    assert.isFalse(result.done);
+    const token = result.value;
+
+    assert.instanceOf(token, RowToken);
+    assert.strictEqual(token.columns.length, 2);
+    assert.strictEqual(token.columns[0].value, value);
+    assert.strictEqual(token.columns[1].value, 42);
+    assert.isTrue((await parser.next()).done);
+  });
 });

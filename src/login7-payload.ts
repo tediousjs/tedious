@@ -444,6 +444,17 @@ class Login7Payload {
     buf.writeUInt8(UTF8_SUPPORT_CLIENT_SUPPORTS_UTF8, 5);
     buffers.push(buf);
 
+    // Signal JSON support: Value 0x0D, the single data byte is the highest
+    // JSON version the client supports. The server only sends or accepts the
+    // `json` data type (0xF4) after acknowledging this feature.
+    const JSON_SUPPORT_FEATURE_ID = 0x0d;
+    const JSON_SUPPORT_MAX_VERSION = 0x01;
+    const jsonSupportBuf = Buffer.alloc(6);
+    jsonSupportBuf.writeUInt8(JSON_SUPPORT_FEATURE_ID, 0);
+    jsonSupportBuf.writeUInt32LE(1, 1);
+    jsonSupportBuf.writeUInt8(JSON_SUPPORT_MAX_VERSION, 5);
+    buffers.push(jsonSupportBuf);
+
     buffers.push(Buffer.from([FEATURE_EXT_TERMINATOR]));
 
     return Buffer.concat(buffers);

@@ -3,6 +3,7 @@ import { type InternalConnectionOptions } from '../../src/connection';
 import WritableTrackingBuffer from '../../src/tracking-buffer/writable-tracking-buffer';
 
 import { assert } from 'chai';
+import { Readable } from 'stream';
 
 // Test options - using type assertion since tests only exercise code paths
 // that use a subset of the full InternalConnectionOptions
@@ -1648,6 +1649,31 @@ describe('TVP', function() {
 
       assert.deepEqual(await write({ value: null }, optionsWithUTCFalse), expected);
     });
+
+    it('substitutes `varchar(max)` type info for `json` columns', async function() {
+      const value = {
+        columns: [{ name: 'value', type: TYPES.JSON }],
+        rows: [['{"a":1}']]
+      };
+
+      const expected = Buffer.concat([
+        Buffer.from('0100', 'hex'), // column count
+        Buffer.from('000000000000', 'hex'), // user type + flags
+        // The `json` data type (0xF4) is substituted with `varchar(max)`
+        // and the Latin1_General_100_BIN2_UTF8 collation.
+        Buffer.from('a7ffff0904002600', 'hex'),
+        Buffer.from('00', 'hex'), // column name (always zero length)
+        Buffer.from('00', 'hex'), // end of column metadata
+        Buffer.from('01', 'hex'), // row token
+        Buffer.from('feffffffffffffff', 'hex'), // unknown PLP length
+        Buffer.from('07000000', 'hex'), // PLP chunk length
+        Buffer.from('{"a":1}', 'utf8'),
+        Buffer.from('00000000', 'hex'), // PLP terminator
+        Buffer.from('00', 'hex') // end of rows
+      ]);
+
+      assert.deepEqual(await write({ value }, optionsWithUTCFalse), expected);
+    });
   });
 
   describe('.writeTypeInfo', function() {
@@ -1897,6 +1923,130 @@ describe('VarChar', function() {
 
       const result2 = typeInfo(TYPES.VarChar, { value: null, length: 8500 }, options);
       assert.deepEqual(result2, expected1);
+    });
+  });
+});
+
+describe('JSON', function() {
+  describe('.declaration', function() {
+    it('returns "json"', function() {
+      assert.strictEqual(TYPES.JSON.declaration({ value: '{}' } as any), 'json');
+    });
+  });
+
+  describe('.writeTypeInfo', function() {
+    it('writes the JSON type token without additional metadata', function() {
+      const result = typeInfo(TYPES.JSON, { value: null }, options);
+      assert.deepEqual(result, Buffer.from([0xF4]));
+    });
+  });
+
+  describe('.writeValue length field', function() {
+    it('writes the PLP null length for `null` values', function() {
+      const { length } = serialize(TYPES.JSON, { value: null }, options);
+      assert.deepEqual(length, Buffer.from('ffffffffffffffff', 'hex'));
+    });
+
+    it('writes the unknown PLP length for non-null values', function() {
+      const { length } = serialize(TYPES.JSON, { value: Buffer.from('{"a":1}') }, options);
+      assert.deepEqual(length, Buffer.from('feffffffffffffff', 'hex'));
+    });
+  });
+
+  describe('.writeValue data', function() {
+    it('writes no data for `null` values', function() {
+      const { data } = serialize(TYPES.JSON, { value: null }, options);
+      assert.deepEqual(data, Buffer.alloc(0));
+    });
+
+    it('writes only the PLP terminator for empty values', function() {
+      const { data } = serialize(TYPES.JSON, { value: Buffer.alloc(0) }, options);
+      assert.deepEqual(data, Buffer.from('00000000', 'hex'));
+    });
+
+    it('writes a single length-prefixed chunk followed by the PLP terminator', function() {
+      const value = Buffer.from('{"a":1}', 'utf8');
+      const { data } = serialize(TYPES.JSON, { value: value }, options);
+
+      const expected = Buffer.concat([
+        Buffer.from('07000000', 'hex'),
+        value,
+        Buffer.from('00000000', 'hex')
+      ]);
+      assert.deepEqual(data, expected);
+    });
+  });
+
+  describe('.validate', function() {
+    it('returns `null` for `null` and `undefined` values', function() {
+      assert.isNull(TYPES.JSON.validate(null, undefined));
+      assert.isNull(TYPES.JSON.validate(undefined, undefined));
+    });
+
+    it('returns strings as UTF-8 encoded JSON text', function() {
+      const result = TYPES.JSON.validate('{"a":"ü"}', undefined);
+      assert.deepEqual(result, Buffer.from('{"a":"ü"}', 'utf8'));
+    });
+
+    it('does not parse strings, leaving their validation to the server', function() {
+      assert.deepEqual(TYPES.JSON.validate('{oops', undefined), Buffer.from('{oops', 'utf8'));
+    });
+
+    it('returns an empty string as empty JSON text, leaving its validation to the server', function() {
+      assert.deepEqual(TYPES.JSON.validate('', undefined), Buffer.alloc(0));
+    });
+
+    it('encodes multi-byte UTF-8 characters', function() {
+      assert.deepEqual(TYPES.JSON.validate('["\u{1F600}"]', undefined), Buffer.from('5b22f09f9880225d', 'hex'));
+    });
+
+    // Strings only: tedious never calls `JSON.stringify` on a value.
+    for (const [description, value] of [
+      ['plain objects', { a: 1 }],
+      ['arrays', [1, 2]],
+      ['numbers', 42],
+      ['booleans', true],
+      ['`Date`s', new Date(0)],
+      ['`String` objects', new String('[1]')],
+      ['`Buffer`s', Buffer.from('{"a":1}')],
+      ['typed arrays', new Uint8Array([1, 2])],
+      ['`ArrayBuffer`s', new ArrayBuffer(2)],
+      ['`Map`s', new Map([['a', 1]])],
+      ['`Set`s', new Set([1])],
+      ['bigints', 1n],
+      ['symbols', Symbol('x')],
+      ['functions', () => {}],
+      ['async iterables', (async function * () { yield '{"a":1}'; })()],
+      ['streams', Readable.from(['{}'])]
+    ] as const) {
+      it(`throws for ${description}`, function() {
+        assert.throws(() => {
+          TYPES.JSON.validate(value, undefined);
+        }, TypeError, 'Invalid JSON value: expected a string of JSON text.');
+      });
+    }
+
+    it('does not include the value in its error messages', function() {
+      assert.throws(() => {
+        TYPES.JSON.validate({ secret: 'secret-token-abc' }, undefined);
+      }, TypeError, /^(?!.*secret)/);
+    });
+  });
+
+  describe('.resolve', function() {
+    it('validates in-memory values', function() {
+      assert.deepEqual(TYPES.JSON.resolve!({ type: TYPES.JSON, name: 'p', output: false, value: '{"a":1}' }, undefined, options), { value: Buffer.from('{"a":1}', 'utf8') });
+    });
+
+    it('rejects in-memory values that are not strings', function() {
+      assert.throws(() => {
+        TYPES.JSON.resolve!({ type: TYPES.JSON, name: 'p', output: false, value: { a: 1 } }, undefined, options);
+      }, TypeError, 'Invalid JSON value: expected a string of JSON text.');
+    });
+
+    it('leaves async iterables to be read while the request is written', function() {
+      const value = Readable.from(['{}']);
+      assert.strictEqual(TYPES.JSON.resolve!({ type: TYPES.JSON, name: 'p', output: false, value }, undefined, options).value, value);
     });
   });
 });

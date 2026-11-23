@@ -406,7 +406,8 @@ function isPLPStream(metadata: Metadata) {
       return true;
     }
 
-    case 'UDT': {
+    case 'UDT':
+    case 'JSON': {
       return true;
     }
   }
@@ -664,6 +665,10 @@ class PLPReader {
 
       case 'VarChar':
         return iconv.decode(data, this.metadata.collation?.codepage ?? DEFAULT_ENCODING);
+
+      // JSON text is always UTF-8. The value is returned unparsed.
+      case 'JSON':
+        return data.toString('utf8');
 
       default:
         return data;

@@ -225,4 +225,44 @@ describe('RpcRequestPayload', function() {
     assert.instanceOf((error as InputError).cause, TypeError);
     assert.strictEqual(((error as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
   });
+  describe('json TVP columns', function() {
+    const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
+
+    it('substitutes `varchar(max)` type info with the UTF-8 json collation', async function() {
+      const resolved = resolveParameter({
+        type: TYPES.TVP, name: 'tvp', output: false,
+        value: { name: 'TestType', columns: [{ name: 'doc', type: TYPES.JSON }], rows: [['{"a":"\u00fc"}'], [null]] }
+      }, undefined, options);
+
+      const data = await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+
+      // UserType, Flags, then varchar(max) TYPE_INFO: 0xA7, 0xFFFF and the
+      // Latin1_General_100_BIN2_UTF8 collation; then an empty ColName.
+      const columnMetadata = Buffer.from('000000000000a7ffff090400260000', 'hex');
+      assert.notStrictEqual(data.indexOf(columnMetadata), -1);
+      assert.notStrictEqual(data.indexOf(Buffer.from('{"a":"\u00fc"}', 'utf8')), -1);
+    });
+
+    it('rejects json cells that are not strings', async function() {
+      const resolved = resolveParameter({
+        type: TYPES.TVP, name: 'tvp', output: false,
+        value: { name: 'TestType', columns: [{ name: 'doc', type: TYPES.JSON }], rows: [[{ a: 1 }]] }
+      }, undefined, options);
+
+      let error: unknown;
+      try {
+        await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+      } catch (err) {
+        error = err;
+      }
+
+      assert.instanceOf(error, InputError);
+      let cause: unknown = error;
+      while (cause instanceof InputError) {
+        cause = cause.cause;
+      }
+      assert.instanceOf(cause, TypeError);
+      assert.strictEqual((cause as TypeError).message, 'Invalid JSON value: expected a string of JSON text.');
+    });
+  });
 });

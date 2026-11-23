@@ -84,6 +84,17 @@ describe('BulkLoad', function() {
       assert.strictEqual(error.cause, cause);
     });
 
+    it('rejects json row values that are not strings', async function() {
+      for (const value of [{ a: 1 }, [1], 1, Buffer.from('{}')]) {
+        const error = await writeRow(TYPES.JSON, [['{"a":1}'], [value]], 'doc');
+
+        assert.instanceOf(error, InputError);
+        assert.strictEqual(error.message, "Column 'doc' could not be validated at row index 1");
+        assert.instanceOf(error.cause, TypeError);
+        assert.strictEqual((error.cause as TypeError).message, 'Invalid JSON value: expected a string of JSON text.');
+      }
+    });
+
     it('rejects oversized Binary row values without silently truncating them', async function() {
       const bulkLoad = new BulkLoad('tablename', undefined, connectionOptions, {}, () => {});
       bulkLoad.addColumn('value', TYPES.Binary, { length: 3, nullable: true });
@@ -800,6 +811,27 @@ describe('BulkLoad', function() {
 
       connection.execBulkLoad(bulkLoad, source);
       assert.isFalse(source.destroyed);
+    });
+  });
+
+  describe('#getColMetaData', function() {
+    it('substitutes `varchar(max)` type info for `json` columns', function() {
+      const request = new BulkLoad('tablename', undefined, connectionOptions, { }, () => {});
+      request.addColumn('value', TYPES.JSON, { nullable: true });
+
+      const expected = Buffer.concat([
+        Buffer.from([0x81]), // COLMETADATA
+        Buffer.from([0x01, 0x00]), // column count
+        Buffer.from([0x00, 0x00, 0x00, 0x00]), // user type
+        Buffer.from([0x05, 0x00]), // flags (updateableReadWrite | nullable)
+        // The `json` data type (0xF4) is rejected by the server in bulk
+        // loads - `varchar(max)` with the Latin1_General_100_BIN2_UTF8
+        // collation is sent instead.
+        Buffer.from([0xA7, 0xFF, 0xFF, 0x09, 0x04, 0x00, 0x26, 0x00]),
+        Buffer.from('\x05v\0a\0l\0u\0e\0', 'binary') // column name
+      ]);
+
+      assert.deepEqual(request.getColMetaData(), expected);
     });
   });
 

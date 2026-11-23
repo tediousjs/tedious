@@ -224,7 +224,7 @@ describe('Login7Payload', function() {
           2 + 2 + (2 * payload.changePassword.length) +
           4 + // cbSSPILong
           4 + // Extension offset
-          1 + (1 + 4 + 1) + (1 + 4 + 1) + 1; // Feature ext - v7.4 includes UTF8_SUPPORT unlike prior versions
+          1 + (1 + 4 + 1) + (1 + 4 + 1) + (1 + 4 + 1) + 1; // Feature ext - v7.4 includes UTF8_SUPPORT and JSON_SUPPORT unlike prior versions
 
         assert.lengthOf(data, expectedLength);
       });
@@ -279,6 +279,7 @@ describe('Login7Payload', function() {
           4 + // Extension offset
           (1 + 4 + 1 + 4 + (token.length * 2)) + // SECURITYTOKEN feature
           (1 + 4 + 1) + // UTF8_SUPPORT feature
+          (1 + 4 + 1) + // JSON_SUPPORT feature
           1; // Terminator
 
         assert.lengthOf(data, expectedLength);
@@ -331,7 +332,7 @@ describe('Login7Payload', function() {
           2 + 2 + (2 * payload.changePassword.length) +
           4 + // cbSSPILong
           4 + // Extension offset
-          1 + (1 + 4 + 1) + (1 + 4 + 1) + 1; // Feature ext - v7.4 includes UTF8_SUPPORT unlike prior versions
+          1 + (1 + 4 + 1) + (1 + 4 + 1) + (1 + 4 + 1) + 1; // Feature ext - v7.4 includes UTF8_SUPPORT and JSON_SUPPORT unlike prior versions
 
         assert.lengthOf(data, expectedLength);
       });
