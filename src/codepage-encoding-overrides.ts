@@ -1,3 +1,49 @@
+/**
+ * @license
+ * The best-fit mappings in this file are those of data files of the Unicode
+ * Consortium, which are under this license:
+ *
+ * UNICODE LICENSE V3
+ *
+ * COPYRIGHT AND PERMISSION NOTICE
+ *
+ * Copyright © 1991-2026 Unicode, Inc.
+ *
+ * NOTICE TO USER: Carefully read the following legal agreement. BY
+ * DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+ * SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+ * TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+ * DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of data files and any associated documentation (the "Data Files") or
+ * software and any associated documentation (the "Software") to deal in the
+ * Data Files or Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, and/or sell
+ * copies of the Data Files or Software, and to permit persons to whom the
+ * Data Files or Software are furnished to do so, provided that either (a)
+ * this copyright and permission notice appear with all copies of the Data
+ * Files or Software, or (b) this copyright and permission notice appear in
+ * associated Documentation.
+ *
+ * THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+ * KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+ * THIRD PARTY RIGHTS.
+ *
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+ * BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+ * OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+ * WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+ * FILES OR SOFTWARE.
+ *
+ * Except as contained in this notice, the name of a copyright holder shall
+ * not be used in advertising or otherwise to promote the sale, use or other
+ * dealings in these Data Files or Software without prior written
+ * authorization of the copyright holder.
+ */
+
 // How SQL Server encodes the characters whose encoding is not simply the byte
 // sequence that decodes to them (see `codepage-tables.ts`). These are:
 //
@@ -23,10 +69,6 @@
 // - `UUUU-VVVV:XX`: every character from U+UUUU to U+VVVV is encoded as `XX`.
 // - `UUUU-VVVV:XX+`: the characters from U+UUUU to U+VVVV are encoded as
 //   consecutive codes from `XX`.
-//
-// The best-fit mappings are derived from data files of the Unicode
-// Consortium, used under the Unicode License v3; see THIRD-PARTY-NOTICES.md
-// for its copyright and permission notice.
 
 export const ENCODING_OVERRIDES: { readonly [codepage: string]: string } = {
   CP437:

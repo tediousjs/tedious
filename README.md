@@ -131,5 +131,6 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The code page tables tedious uses to convert `varchar` values are derived from
-data files of the Unicode Consortium, under the Unicode License v3; see
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+data files of the Unicode Consortium, under the Unicode License v3, whose
+notice is at the top of `src/codepage-tables.ts` and
+`src/codepage-encoding-overrides.ts`.
