@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, Request } from '../../src/tedious';
-import IncomingMessageStream from '../helpers/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -59,7 +59,7 @@ function buildPacketSizeChangeToken(newSize: string, oldSize = '4096'): Buffer {
   return buffer;
 }
 
-async function drainMessage(message: Message): Promise<void> {
+async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
   const iterator = message[Symbol.asyncIterator]();
   while (!(await iterator.next()).done) {
     // Discard the data.
@@ -74,18 +74,17 @@ async function drainMessage(message: Message): Promise<void> {
 function serve(server: net.Server, { loginPrefix = Buffer.alloc(0), requestResponse }: { loginPrefix?: Buffer, requestResponse?: Buffer }, onError: (err: Error) => void) {
   server.on('connection', async (connection) => {
     const debug = new Debug();
-    const incomingMessageStream = new IncomingMessageStream(debug);
     const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-    connection.pipe(incomingMessageStream);
+    const incomingMessageReader = new IncomingMessageReader(connection, debug);
     outgoingMessageStream.pipe(connection);
 
     try {
-      const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+      const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
       // PRELOGIN
       {
-        const { value: message } = await messageIterator.next();
+        const message = await incomingMessageReader.readMessage();
         assert.strictEqual(message.type, 0x12);
         await drainMessage(message);
 
@@ -97,7 +96,7 @@ function serve(server: net.Server, { loginPrefix = Buffer.alloc(0), requestRespo
 
       // LOGIN7
       {
-        const { value: message } = await messageIterator.next();
+        const message = await incomingMessageReader.readMessage();
         assert.strictEqual(message.type, 0x10);
         await drainMessage(message);
 

@@ -69,11 +69,31 @@ class IncomingMessageReader {
   }
 
   async readMessage(): Promise<IncomingMessage> {
+    const message = await this.readMessageOrEnd();
+    if (message === undefined) {
+      throw new Error('unexpected end of message stream');
+    }
+    return message;
+  }
+
+  /**
+   * Iterate over all messages, until the source ends at a message boundary.
+   * As with `readMessage`, each message must be consumed (or abandoned)
+   * before the next one is read.
+   */
+  async *[Symbol.asyncIterator](): AsyncGenerator<IncomingMessage, void, undefined> {
+    let message;
+    while ((message = await this.readMessageOrEnd()) !== undefined) {
+      yield message;
+    }
+  }
+
+  private async readMessageOrEnd(): Promise<IncomingMessage | undefined> {
     await this.previous;
 
     const header = await this.readHeader();
     if (header === undefined) {
-      throw new Error('unexpected end of message stream');
+      return undefined;
     }
 
     let done!: () => void;

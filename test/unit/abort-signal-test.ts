@@ -4,7 +4,7 @@ import * as net from 'net';
 
 import { Connection, Request, RequestError, TYPES } from '../../src/tedious';
 import { abortOnSignal } from '../../src/execution-options';
-import IncomingMessageStream from '../helpers/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -274,7 +274,7 @@ describe('Executing a request with an abort signal', function() {
       return buffer;
     }
 
-    async function drainMessage(message: Message): Promise<void> {
+    async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
       const iterator = message[Symbol.asyncIterator]();
       while (!(await iterator.next()).done) {
         // Discard the data.
@@ -293,18 +293,14 @@ describe('Executing a request with an abort signal', function() {
     function serve(handler: (session: MockSession) => Promise<void>, done: (err?: any) => void) {
       server.on('connection', async (socket) => {
         const debug = new Debug();
-        const incomingMessageStream = new IncomingMessageStream(debug);
         const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-        socket.pipe(incomingMessageStream);
+        const incomingMessageReader = new IncomingMessageReader(socket, debug);
         outgoingMessageStream.pipe(socket);
 
         try {
-          const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
           const expectMessage = async (type: number) => {
-            const { value: message, done } = await messageIterator.next();
-            assert.isNotOk(done);
+            const message = await incomingMessageReader.readMessage();
             assert.strictEqual(message.type, type);
             await drainMessage(message);
           };

@@ -330,7 +330,7 @@ describe('MessageIO', function() {
           }
 
           // How the payloads of the individual packets are chunked up by the buffering
-          // inside the `IncomingMessageStream` is an implementation detail we don't care
+          // inside the `IncomingMessageReader` is an implementation detail we don't care
           // about (and it varies across Node.js versions), so only assert on the
           // concatenated data.
           assert.deepEqual(Buffer.concat(receivedData), payload);

@@ -72,6 +72,20 @@ describe('IncomingMessageReader', function() {
     }
   });
 
+  it('iterates over messages until the source ends', async function() {
+    const source = new PassThrough();
+    const reader = new IncomingMessageReader(source, new Debug());
+    source.write(packet(0x12, Buffer.from('one'), true));
+    source.write(packet(0x04, Buffer.from('tw'), false));
+    source.end(packet(0x04, Buffer.from('o'), true));
+
+    const messages = [];
+    for await (const message of reader) {
+      messages.push([message.type, (await collect(message)).toString()]);
+    }
+    assert.deepEqual(messages, [[0x12, 'one'], [0x04, 'two']]);
+  });
+
   it('does not copy payload data', async function() {
     const source = new PassThrough();
     const reader = new IncomingMessageReader(source, new Debug());

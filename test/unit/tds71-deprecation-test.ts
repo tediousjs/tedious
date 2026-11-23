@@ -2,7 +2,7 @@ import { assert } from 'chai';
 import * as net from 'net';
 import { Connection } from '../../src/tedious';
 import { tds71DeprecationWarning } from '../../src/token/handler';
-import IncomingMessageStream from '../helpers/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -54,7 +54,7 @@ function buildDoneToken(use64BitRowCount: boolean): Buffer {
 /**
  * Reads and discards all data of the given message.
  */
-async function drainMessage(message: Message): Promise<void> {
+async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
   const iterator = message[Symbol.asyncIterator]();
   while (!(await iterator.next()).done) {
     // Discard the data.
@@ -67,18 +67,16 @@ async function drainMessage(message: Message): Promise<void> {
  */
 async function handleConnection(connection: net.Socket, tdsVersion: number[]): Promise<void> {
   const debug = new Debug();
-  const incomingMessageStream = new IncomingMessageStream(debug);
   const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-  connection.pipe(incomingMessageStream);
+  const incomingMessageReader = new IncomingMessageReader(connection, debug);
   outgoingMessageStream.pipe(connection);
 
-  const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
   const use64BitRowCount = tdsVersion[0] >= 0x72;
 
   // PRELOGIN
   {
-    const { value: message } = await messageIterator.next();
+    const message = await incomingMessageReader.readMessage();
     assert.strictEqual(message.type, 0x12);
 
     await drainMessage(message);
@@ -91,7 +89,7 @@ async function handleConnection(connection: net.Socket, tdsVersion: number[]): P
 
   // LOGIN7
   {
-    const { value: message } = await messageIterator.next();
+    const message = await incomingMessageReader.readMessage();
     assert.strictEqual(message.type, 0x10);
 
     await drainMessage(message);
@@ -103,7 +101,7 @@ async function handleConnection(connection: net.Socket, tdsVersion: number[]): P
 
   // SQL Batch (Initial SQL)
   {
-    const { value: message } = await messageIterator.next();
+    const message = await incomingMessageReader.readMessage();
     assert.strictEqual(message.type, 0x01);
 
     await drainMessage(message);

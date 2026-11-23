@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, ConnectionError, Request, RequestError } from '../../src/tedious';
-import IncomingMessageStream from '../helpers/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -52,14 +52,13 @@ describe('Closing a connection while connecting', function() {
     // in and end up in the `LoggedIn` state, despite being closed.
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
@@ -214,14 +213,13 @@ describe('Closing a connection with an active request', function() {
     // requests made afterwards.
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {

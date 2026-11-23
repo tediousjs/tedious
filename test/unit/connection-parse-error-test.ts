@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, Request } from '../../src/tedious';
-import IncomingMessageStream from '../helpers/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -71,7 +71,7 @@ function buildInfoToken(): Buffer {
 /**
  * Reads and discards all data of the given message.
  */
-async function drainMessage(message: Message): Promise<void> {
+async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
   const iterator = message[Symbol.asyncIterator]();
   while (!(await iterator.next()).done) {
     // Discard the data.
@@ -79,7 +79,7 @@ async function drainMessage(message: Message): Promise<void> {
 }
 
 interface ScriptedExchange {
-  messageIterator: AsyncIterator<Message>;
+  incomingMessageReader: IncomingMessageReader;
   outgoingMessageStream: OutgoingMessageStream;
 }
 
@@ -91,18 +91,15 @@ interface ScriptedExchange {
 function serveUntilRequest(server: net.Server, onRequest: (exchange: ScriptedExchange) => Promise<void> | void, onError: (err: Error) => void) {
   server.on('connection', async (connection) => {
     const debug = new Debug();
-    const incomingMessageStream = new IncomingMessageStream(debug);
     const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-    connection.pipe(incomingMessageStream);
+    const incomingMessageReader = new IncomingMessageReader(connection, debug);
     outgoingMessageStream.pipe(connection);
 
     try {
-      const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
       // PRELOGIN
       {
-        const { value: message } = await messageIterator.next();
+        const message = await incomingMessageReader.readMessage();
         assert.strictEqual(message.type, 0x12);
 
         await drainMessage(message);
@@ -115,7 +112,7 @@ function serveUntilRequest(server: net.Server, onRequest: (exchange: ScriptedExc
 
       // LOGIN7
       {
-        const { value: message } = await messageIterator.next();
+        const message = await incomingMessageReader.readMessage();
         assert.strictEqual(message.type, 0x10);
 
         await drainMessage(message);
@@ -127,7 +124,7 @@ function serveUntilRequest(server: net.Server, onRequest: (exchange: ScriptedExc
 
       // SQL Batch (Initial SQL)
       {
-        const { value: message } = await messageIterator.next();
+        const message = await incomingMessageReader.readMessage();
         assert.strictEqual(message.type, 0x01);
 
         await drainMessage(message);
@@ -139,12 +136,12 @@ function serveUntilRequest(server: net.Server, onRequest: (exchange: ScriptedExc
 
       // SQL Batch (the request under test)
       {
-        const { value: message } = await messageIterator.next();
+        const message = await incomingMessageReader.readMessage();
         assert.strictEqual(message.type, 0x01);
 
         await drainMessage(message);
 
-        await onRequest({ messageIterator, outgoingMessageStream });
+        await onRequest({ incomingMessageReader, outgoingMessageStream });
       }
     } catch (err: any) {
       onError(err);
@@ -197,18 +194,15 @@ describe('A token parse failure in a response', function() {
   it('fails the connection cleanly when the Login7 response contains an invalid token', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -221,7 +215,7 @@ describe('A token parse failure in a response', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -359,12 +353,12 @@ describe('A token parse failure in a response', function() {
       signalRequestReceived = resolve;
     });
 
-    serveUntilRequest(server, async ({ messageIterator, outgoingMessageStream }) => {
+    serveUntilRequest(server, async ({ incomingMessageReader, outgoingMessageStream }) => {
       // No response before the attention message arrives.
       signalRequestReceived();
 
       // ATTENTION
-      const { value: message } = await messageIterator.next();
+      const message = await incomingMessageReader.readMessage();
       assert.strictEqual(message.type, 0x06);
 
       await drainMessage(message);

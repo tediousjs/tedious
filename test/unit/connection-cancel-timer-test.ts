@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, Request } from '../../src/tedious';
-import IncomingMessageStream from '../helpers/incoming-message-stream';
+import IncomingMessageReader, { type IncomingMessage } from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -39,7 +39,7 @@ async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
 // its payload. Guards against the message stream ending unexpectedly, so a
 // premature end surfaces as a clear assertion failure rather than a `TypeError`
 // on `message.type`.
-async function expectMessage(iterator: AsyncIterableIterator<Message>, expectedType: number): Promise<void> {
+async function expectMessage(iterator: AsyncIterator<IncomingMessage>, expectedType: number): Promise<void> {
   const { value: message, done } = await iterator.next();
   assert.isNotOk(done, 'expected another message from the client, but the stream ended');
   assert.isDefined(message, 'expected a message from the client, but received none');
@@ -104,13 +104,12 @@ describe('Connection cancel timer handling', function() {
       socket.on('error', () => { /* ignore */ });
 
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      socket.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(socket, debug);
       outgoingMessageStream.pipe(socket);
 
-      const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+      const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
       try {
         // PRELOGIN
