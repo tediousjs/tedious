@@ -589,10 +589,15 @@ export const TYPE = {
  *     <p>
  *       Values are JSON text in both directions. A parameter value (including a bulk load or table-valued parameter
  *       cell) must be a <code>string</code> of JSON text, or <code>null</code>/<code>undefined</code> for SQL
- *       <code>NULL</code>. It is sent as is: <code>'[1, 2]'</code> is an array, and a JSON string value has to be
- *       written with its quotes, e.g. <code>'"abc"'</code>. The server validates the text. Any other value is rejected;
- *       tedious never calls <code>JSON.stringify</code> or <code>JSON.parse</code>, so callers encode and decode values
- *       themselves (e.g. <code>JSON.stringify(value)</code> before passing it as a parameter).
+ *       <code>NULL</code>. It is sent as is, e.g. <code>'{"a": [1, 2]}'</code>, and the server validates the text: it only
+ *       accepts JSON objects and arrays, so scalars like <code>'42'</code> or <code>'"abc"'</code> are rejected. Any other
+ *       value is rejected; tedious never calls <code>JSON.stringify</code> or <code>JSON.parse</code>, so callers encode and
+ *       decode values themselves (e.g. <code>JSON.stringify(value)</code> before passing it as a parameter).
+ *     </p>
+ *     <p>
+ *       Bulk loading into <code>json</code> columns requires SQL Server 2025 CU5 or later. Earlier builds fail the bulk
+ *       load with a TDS protocol error, or silently drop the rows after the first <code>NULL</code> value, depending on
+ *       the column order (see <a href="https://github.com/dotnet/SqlClient/issues/3737">dotnet/SqlClient#3737</a>).
  *     </p>
  *     <p>
  *       A parameter value can also be an async iterable (e.g. a <code>Readable</code> with <code>encoding: 'utf8'</code>)
