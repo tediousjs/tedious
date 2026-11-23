@@ -399,6 +399,20 @@ describe('DateTime', function() {
   });
 });
 
+describe('date and time types', function() {
+  describe('.writeValue', function() {
+    it('throws for an invalid date', function() {
+      for (const type of [TYPES.Date, TYPES.DateTime, TYPES.DateTime2, TYPES.DateTimeOffset]) {
+        for (const opts of [optionsWithUTCTrue, optionsWithUTCFalse]) {
+          assert.throws(() => {
+            serialize(type, { value: new Date(NaN), scale: 7 }, opts);
+          }, TypeError, 'Invalid date.', `${type.name} (useUTC: ${opts.useUTC})`);
+        }
+      }
+    });
+  });
+});
+
 describe('DateTime2', function() {
   describe('.writeValue length field', function() {
     it('returns the correct data length', function() {

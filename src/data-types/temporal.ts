@@ -11,8 +11,11 @@ const MILLISECONDS_PER_DAY = 86_400_000;
  */
 export function epochDay(year: number, month: number, day: number): number {
   const date = new Date(0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getTime() / MILLISECONDS_PER_DAY;
+  const time = date.setUTCFullYear(year, month - 1, day);
+  if (Number.isNaN(time)) {
+    throw new TypeError('Invalid date.');
+  }
+  return time / MILLISECONDS_PER_DAY;
 }
 
 const YEAR_ONE = epochDay(1, 1, 1);
