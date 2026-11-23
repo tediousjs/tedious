@@ -1,4 +1,4 @@
-import { isAscii } from 'buffer';
+import { isAscii, isUtf8 as isValidUtf8 } from 'buffer';
 import { endianness } from 'os';
 
 import { SINGLE_BYTE_HIGH_HALVES } from './codepage-tables';
@@ -25,6 +25,7 @@ import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
 // itself.
 
 const REPLACEMENT_CHARACTER = 0xFFFD;
+const QUESTION_MARK = 0x3F;
 
 /**
  * A decoder for a value that arrives in several parts, such as a `varchar(max)`
@@ -78,6 +79,9 @@ interface CodepageTable {
 
   // For a single-byte code page: the UTF-16 code unit for every byte.
   readonly singleBytes: Uint16Array | undefined;
+
+  // For a double-byte code page: what an invalid byte sequence decodes to.
+  readonly defaultChar: number;
 }
 
 interface DoubleByteCodepage {
@@ -97,17 +101,22 @@ interface DoubleByteCodepage {
 
   // Whether to add the Unified Hangul Code extension (see `addUhcExtension`).
   readonly uhc?: boolean;
+
+  // What Windows decodes an invalid byte sequence to, if not "?".
+  readonly defaultChar?: number;
 }
 
 // The differences from `TextDecoder` were found by comparing it with
 // Microsoft's tables for each code page (WindowsBestFit/bestfit<N>.txt at
 // https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/); see
-// `test/unit/text-encoding-test.ts`. Windows also maps a handful of undefined
-// sequences to a default character (such as 0x8540 in CP932 to U+30FB);
-// those are decoded as U+FFFD instead, like any other invalid sequence.
+// `test/unit/text-encoding-test.ts`.
+//
+// As in Windows (and so in SQL Server), an invalid byte sequence decodes to
+// the code page's default character: "?", or U+30FB (・) in CP932.
 const DOUBLE_BYTE_CODEPAGES: { readonly [codepage: string]: DoubleByteCodepage } = {
   CP932: {
     label: 'shift_jis',
+    defaultChar: 0x30FB,
     leadBytes: [[0x81, 0x9F], [0xE0, 0xFC]],
     // Windows maps these bytes to U+0080 and to private use characters, where
     // the WHATWG Shift_JIS decoder treats them as errors.
@@ -253,7 +262,7 @@ function buildDoubleByteTable(codepage: string, spec: DoubleByteCodepage): Codep
     }
   }
 
-  return { high, lead, pairs, singleBytes: undefined };
+  return { high, lead, pairs, singleBytes: undefined, defaultChar: spec.defaultChar ?? QUESTION_MARK };
 }
 
 function buildSingleByteTable(highHalf: string): CodepageTable {
@@ -264,7 +273,7 @@ function buildSingleByteTable(highHalf: string): CodepageTable {
     singleBytes[i] = i;
     singleBytes[0x80 + i] = high[i];
   }
-  return { high, lead: undefined, pairs: undefined, singleBytes };
+  return { high, lead: undefined, pairs: undefined, singleBytes, defaultChar: QUESTION_MARK };
 }
 
 const tables = new Map<string, CodepageTable>();
@@ -339,14 +348,14 @@ class TableDecoder implements StreamDecoder {
       return buf.toString('latin1');
     }
 
-    const { high, lead, pairs, singleBytes } = this.table;
+    const { high, lead, pairs, singleBytes, defaultChar } = this.table;
 
     if (singleBytes !== undefined) {
       return decodeSingleByte(buf, singleBytes);
     }
 
     // Every byte decodes to at most one UTF-16 code unit, but a lead byte left
-    // over from the last part can add a replacement character.
+    // over from the last part can add a character.
     const [out, units] = allocateUnits(buf.length + 1);
     let length = 0;
 
@@ -359,12 +368,12 @@ class TableDecoder implements StreamDecoder {
         pending = -1;
 
         if (char === 0) {
-          // An invalid sequence decodes to a replacement character. As in the
-          // WHATWG decoders, an ASCII byte after the lead byte is not part of
-          // the sequence, but a character on its own.
-          units[length++] = REPLACEMENT_CHARACTER;
+          // As in Windows, an invalid sequence of a lead byte and any byte
+          // but 0x00 decodes to the default character as a whole. A 0x00
+          // byte is a character on its own.
+          units[length++] = defaultChar;
 
-          if (byte >= 0x80) {
+          if (byte !== 0x00) {
             continue;
           }
 
@@ -376,7 +385,7 @@ class TableDecoder implements StreamDecoder {
         pending = byte;
         continue;
       } else {
-        char = high[byte - 0x80] || REPLACEMENT_CHARACTER;
+        char = high[byte - 0x80] || defaultChar;
       }
 
       units[length++] = char;
@@ -387,28 +396,129 @@ class TableDecoder implements StreamDecoder {
   }
 
   end(): string {
+    // A lead byte at the end of a value (which SQL Server itself never
+    // stores) decodes to the default character, as any invalid sequence.
     if (this.pending !== -1) {
       this.pending = -1;
-      return '�';
+      return String.fromCharCode(this.table.defaultChar);
     }
     return '';
   }
 }
 
+// The lead bytes of UTF-8 sequences whose second byte has a narrower range
+// than 0x80 to 0xBF, and that range. With any other continuation byte (an
+// overlong form, a surrogate, or a code point above U+10FFFF), the WHATWG
+// decoder decodes the lead byte and the continuation byte to a replacement
+// character each, but Windows (and so SQL Server) decodes the two to one.
+const RESTRICTED_LEADS: ReadonlyArray<readonly [lead: number, first: number, last: number]> = [
+  [0xE0, 0xA0, 0xBF], [0xED, 0x80, 0x9F], [0xF0, 0x90, 0xBF], [0xF4, 0x80, 0x8F]
+];
+
+// Replaces each such lead and continuation byte with a single 0xFF byte, which
+// is never valid and so decodes to one replacement character, so that the
+// WHATWG decoder decodes invalid UTF-8 as Windows does. Valid UTF-8 is
+// returned as is.
+function withWindowsErrors(buf: Buffer): Buffer {
+  if (isValidUtf8(buf)) {
+    return buf;
+  }
+
+  // A part of a streamed value is usually valid but for a character split at
+  // its start or end. Then only the split character at the end can have such
+  // a lead byte.
+  let start = 0;
+  while (start < 3 && start < buf.length && (buf[start] & 0xC0) === 0x80) {
+    start++;
+  }
+  let end = buf.length;
+  while (end > start && buf.length - end < 3 && (buf[end - 1] & 0xC0) === 0x80) {
+    end--;
+  }
+  if (end > start && buf[end - 1] >= 0xC0) {
+    end--;
+  }
+  if (isValidUtf8(buf.subarray(start, end)) && !hasRestrictedLead(buf, end)) {
+    return buf;
+  }
+
+  let invalid: number[] | undefined;
+  for (const [leadByte, first, last] of RESTRICTED_LEADS) {
+    for (let i = buf.indexOf(leadByte); i !== -1 && i < buf.length - 1; i = buf.indexOf(leadByte, i + 1)) {
+      const next = buf[i + 1];
+      if (next >= 0x80 && next <= 0xBF && (next < first || next > last)) {
+        (invalid ??= []).push(i);
+      }
+    }
+  }
+
+  if (invalid === undefined) {
+    return buf;
+  }
+
+  invalid.sort((a, b) => a - b);
+  const out = Buffer.allocUnsafe(buf.length - invalid.length);
+  let from = 0;
+  let length = 0;
+  for (const i of invalid) {
+    length += buf.copy(out, length, from, i);
+    out[length++] = 0xFF;
+    from = i + 2;
+  }
+  length += buf.copy(out, length, from);
+  return out.subarray(0, length);
+}
+
+// Whether a restricted lead byte from `from` on is followed by a continuation
+// byte out of its range.
+function hasRestrictedLead(buf: Buffer, from: number) {
+  for (let i = from; i < buf.length - 1; i++) {
+    for (const [leadByte, first, last] of RESTRICTED_LEADS) {
+      const next = buf[i + 1];
+      if (buf[i] === leadByte && next >= 0x80 && next <= 0xBF && (next < first || next > last)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function isRestrictedLead(byte: number) {
+  return byte === 0xE0 || byte === 0xED || byte === 0xF0 || byte === 0xF4;
+}
+
 class Utf8Decoder implements StreamDecoder {
   declare decoder: TextDecoder;
+
+  // A lead byte from the end of the last part whose continuation byte is
+  // needed to tell how an invalid sequence decodes (see `withWindowsErrors`),
+  // or undefined.
+  declare pending: Buffer | undefined;
 
   constructor() {
     // A byte order mark is part of the value, as it is in an `nvarchar` value.
     this.decoder = new TextDecoder('utf-8', { ignoreBOM: true });
+    this.pending = undefined;
   }
 
   write(buf: Buffer): string {
-    return this.decoder.decode(buf, { stream: true });
+    if (this.pending !== undefined) {
+      buf = Buffer.concat([this.pending, buf]);
+      this.pending = undefined;
+    }
+
+    if (buf.length > 0 && isRestrictedLead(buf[buf.length - 1])) {
+      this.pending = buf.subarray(buf.length - 1);
+      buf = buf.subarray(0, buf.length - 1);
+    }
+
+    return this.decoder.decode(withWindowsErrors(buf), { stream: true });
   }
 
   end(): string {
-    return this.decoder.decode();
+    const pending = this.pending;
+    this.pending = undefined;
+    return (pending !== undefined ? this.decoder.decode(pending, { stream: true }) : '') + this.decoder.decode();
   }
 }
 
@@ -433,7 +543,7 @@ export function createDecoder(codepage: string | undefined): StreamDecoder {
  */
 export function decode(buf: Buffer, codepage: string | undefined): string {
   if (isUtf8(codepage)) {
-    return buf.toString('utf8');
+    return withWindowsErrors(buf).toString('utf8');
   }
 
   if (isAscii(buf)) {
@@ -446,7 +556,6 @@ export function decode(buf: Buffer, codepage: string | undefined): string {
 
 // --- Encoding ----------------------------------------------------------------
 
-const QUESTION_MARK = 0x3F;
 
 /**
  * How every UTF-16 code unit is encoded in a legacy code page. As in SQL

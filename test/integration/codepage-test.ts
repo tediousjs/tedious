@@ -133,26 +133,48 @@ describe('`varchar` values in each code page', function() {
 
       assert.strictEqual(rows.length, doubleByte ? 256 + 32768 : 256);
 
-      let invalid = 0;
+      const differences = [];
       for (const [bytes, decoded, converted] of rows as Array<[Buffer, string, string]>) {
-        if (decoded === converted) {
-          continue;
+        if (decoded !== converted) {
+          differences.push(`${bytes.toString('hex')}: decoded ${hex(decoded)}, SQL Server ${hex(converted)}`);
         }
-
-        // Where SQL Server converts an invalid sequence to its default
-        // character, tedious decodes it to U+FFFD.
-        const description = `${bytes.toString('hex')}: decoded ${hex(decoded)}, SQL Server ${hex(converted)}`;
-        assert.isTrue(doubleByte, description);
-        assert.include(decoded, '�', description);
-        assert.match(converted, codepage === 'CP932' ? /・/ : /\?/, description);
-        invalid++;
       }
-
-      if (!doubleByte) {
-        assert.strictEqual(invalid, 0);
-      }
+      assert.deepEqual(differences.slice(0, 20), [], `${differences.length} byte sequences are decoded differently`);
     });
   }
+
+  it('decodes UTF-8, including invalid sequences, as SQL Server does', async function() {
+    const [[version]] = await execSql('SELECT CAST(SERVERPROPERTY(\'ProductMajorVersion\') AS int)');
+    if ((version as number) < 15) {
+      // UTF-8 collations were added in SQL Server 2019.
+      this.skip();
+    }
+
+    await useDatabaseWithCollation('Latin1_General_100_CI_AS_SC_UTF8');
+
+    // Valid text, and the invalid sequences SQL Server stores in a UTF-8
+    // `varchar` (it rejects other invalid sequences): overlong forms,
+    // surrogates and code points above U+10FFFF.
+    const values = [
+      '616263', 'c3a9e282acf09f9880', 'efbbbf61', 'f48fbfbf', 'efbfbf',
+      'e08080', 'e09f80', 'f0808080', 'f08f8080', 'eda080', 'edbfbf', 'eda080edb080', 'eda061',
+      'f4908080', 'f4908061', 'f4bfbfbf'
+    ];
+
+    const rows = await execSql(`
+      SELECT CAST(v AS varbinary(20)), v, CAST(v AS nvarchar(20))
+      FROM (VALUES ${values.map((value) => `(CAST(0x${value} AS varchar(20)))`).join(', ')}) AS n (v)
+    `);
+
+    const differences = [];
+    for (const [bytes, decoded, converted] of rows as Array<[Buffer, string, string]>) {
+      if (decoded !== converted) {
+        differences.push(`${bytes.toString('hex')}: decoded ${hex(decoded)}, SQL Server ${hex(converted)}`);
+      }
+    }
+    assert.strictEqual(rows.length, values.length);
+    assert.deepEqual(differences, []);
+  });
 
   for (const [codepage, collation] of COLLATIONS) {
     it(`encodes ${codepage} (${collation}) as SQL Server does`, async function() {

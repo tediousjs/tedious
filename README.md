@@ -30,7 +30,9 @@ of their collation itself, exactly as SQL Server converts them from and to
 `nvarchar`. A character the code page does not have is sent as a similar one
 where Windows defines one (such as `Ā` as `A`), and otherwise as `?`. To send
 such characters unchanged, use `NVarChar`, `NChar` or `NText`, or a UTF-8
-collation.
+collation. An invalid byte sequence in a value is decoded as SQL Server decodes
+it too: to `?` (or `・` in Japanese collations) in a double-byte code page, and
+to U+FFFD in UTF-8.
 
 The double-byte code pages (CP932, CP936, CP949 and CP950, used by Japanese,
 Chinese and Korean collations) need a Node.js build with full ICU support, as

@@ -209,12 +209,46 @@ describe('text encoding', function() {
       assert.strictEqual(decode(encode('中文文本', 'CP950'), 'CP950'), '中文文本');
     });
 
-    it('decodes a lead byte at the end of a value to a replacement character', function() {
-      assert.strictEqual(decode(Buffer.from([0x61, 0x82]), 'CP932'), 'a�');
+    it('decodes an invalid two-byte sequence to the code page\'s default character, as SQL Server does', function() {
+      // A lead byte and any other byte, even an ASCII one, are decoded as one.
+      assert.strictEqual(decode(Buffer.from([0x82, 0x20, 0x61]), 'CP932'), '・a');
+      assert.strictEqual(decode(Buffer.from([0x81, 0xFF, 0x61]), 'CP932'), '・a');
+      assert.strictEqual(decode(Buffer.from([0x81, 0x20, 0x61]), 'CP949'), '?a');
+      assert.strictEqual(decode(Buffer.from([0x81, 0x7F]), 'CP950'), '?');
+      assert.strictEqual(decode(Buffer.from([0xFF, 0x30]), 'CP936'), '\uF8F50');
     });
 
-    it('decodes an invalid sequence followed by an ASCII byte as a replacement character and that byte', function() {
-      assert.strictEqual(decode(Buffer.from([0x82, 0x20, 0x61]), 'CP932'), '� a');
+    it('decodes a lead byte followed by 0x00 to the default character and U+0000', function() {
+      assert.strictEqual(decode(Buffer.from([0x82, 0x00, 0x61]), 'CP932'), '・\u0000a');
+      assert.strictEqual(decode(Buffer.from([0x81, 0x00]), 'CP936'), '?\u0000');
+    });
+
+    it('decodes a lead byte at the end of a value to the default character', function() {
+      assert.strictEqual(decode(Buffer.from([0x61, 0x82]), 'CP932'), 'a・');
+      assert.strictEqual(decode(Buffer.from([0x61, 0xB0]), 'CP949'), 'a?');
+    });
+
+    it('decodes invalid UTF-8 as SQL Server does', function() {
+      // A lead byte and a continuation byte out of its range are one error.
+      assert.strictEqual(decode(Buffer.from('eda080', 'hex'), 'utf-8'), '\uFFFD\uFFFD');
+      assert.strictEqual(decode(Buffer.from('eda061', 'hex'), 'utf-8'), '\uFFFDa');
+      assert.strictEqual(decode(Buffer.from('e08080', 'hex'), 'utf-8'), '\uFFFD\uFFFD');
+      assert.strictEqual(decode(Buffer.from('f0808080', 'hex'), 'utf-8'), '\uFFFD\uFFFD\uFFFD');
+      assert.strictEqual(decode(Buffer.from('f4908061', 'hex'), 'utf-8'), '\uFFFD\uFFFDa');
+      // Others are one error per byte, as in the WHATWG decoder.
+      assert.strictEqual(decode(Buffer.from('61c362ff', 'hex'), 'utf-8'), 'a\uFFFDb\uFFFD');
+      // And valid sequences with these lead bytes are characters.
+      assert.strictEqual(decode(Buffer.from('e0a080ed9fbff0908080f48fbfbf', 'hex'), 'utf-8'), '\u0800\uD7FF\u{10000}\u{10FFFF}');
+    });
+
+    it('decodes streamed invalid UTF-8 as a whole value would be, at every split', function() {
+      const bytes = Buffer.from('61eda080e08080f0808080f48fbfbfc3a9f4908061eda061ed', 'hex');
+      const expected = decode(bytes, 'utf-8');
+      for (let split = 0; split <= bytes.length; split++) {
+        const decoder = createDecoder('utf-8');
+        const text = decoder.write(bytes.subarray(0, split)) + decoder.write(Buffer.alloc(0)) + decoder.write(bytes.subarray(split)) + decoder.end();
+        assert.strictEqual(text, expected, `split at ${split}`);
+      }
     });
 
     it('decodes characters split across the parts of a streamed value', function() {
@@ -230,10 +264,15 @@ describe('text encoding', function() {
       }
     });
 
-    it('decodes a lead byte at the end of a streamed value to a replacement character', function() {
+    it('decodes a lead byte at the end of a streamed value to the default character', function() {
       const decoder = createDecoder('CP949');
       assert.strictEqual(decoder.write(Buffer.from([0x61, 0xB0])), 'a');
-      assert.strictEqual(decoder.end(), '�');
+      assert.strictEqual(decoder.end(), '?');
+    });
+
+    it('decodes an invalid sequence split across the parts of a streamed value as a whole', function() {
+      const decoder = createDecoder('CP932');
+      assert.strictEqual(decoder.write(Buffer.from([0x61, 0x82])) + decoder.write(Buffer.from([0x20, 0x62])) + decoder.end(), 'a・b');
     });
 
     describe('if `TextDecoder` does not support a double-byte code page', function() {
@@ -376,14 +415,13 @@ describe('text encoding', function() {
   //   is U+F8F0), and the user-defined areas of the double-byte code pages
   //   (CP936 0xAAA1 is U+E000, CP950 0x8140 is U+EEB8).
   //
-  // - An invalid two-byte sequence, which both decode to U+FFFD, but
-  //   `iconv-lite` then decodes the trail byte again, as a character of its own,
-  //   while it is part of the invalid sequence here, as in Windows and in the
-  //   WHATWG decoders. (A trail byte that is ASCII is a character of its own in
-  //   both.)
+  // - An invalid byte sequence (a lead byte with a byte that does not make a
+  //   character with it, or with no byte after it), which `iconv-lite`
+  //   decodes to U+FFFD (followed by the trail byte, as a character of its
+  //   own), and which is decoded to the code page's default character here,
+  //   as in Windows (with the trail byte, unless it is 0x00).
   //
-  // `iconv-lite` never decodes a byte or sequence to a character where it is
-  // decoded to U+FFFD here, and the two never decode one to different
+  // Otherwise, the two never decode a byte or sequence to different
   // characters.
   describe('equivalence with `iconv-lite`', function() {
     // The single bytes that decode differently, all of which `iconv-lite`
@@ -445,10 +483,10 @@ describe('text encoding', function() {
     // How many inputs (single bytes, and two bytes from 0x8000 to 0xFFFF)
     // decode differently, of each kind.
     const doubleByteDifferences: { [codepage: string]: { iconvHasNoMapping: number, invalidSequence: number } } = {
-      CP932: { iconvHasNoMapping: 1231, invalidSequence: 1604 },
-      CP936: { iconvHasNoMapping: 2281, invalidSequence: 252 },
-      CP949: { iconvHasNoMapping: 450, invalidSequence: 2750 },
-      CP950: { iconvHasNoMapping: 6479, invalidSequence: 4598 }
+      CP932: { iconvHasNoMapping: 1231, invalidSequence: 9896 },
+      CP936: { iconvHasNoMapping: 2281, invalidSequence: 8694 },
+      CP949: { iconvHasNoMapping: 450, invalidSequence: 15398 },
+      CP950: { iconvHasNoMapping: 6479, invalidSequence: 12914 }
     };
 
     // Characters Windows decodes bytes and sequences to, as samples. They
@@ -486,7 +524,12 @@ describe('text encoding', function() {
 
           const description = `${buf.toString('hex')}: iconv-lite ${hex(expected)}, decoded ${hex(actual)}`;
           assert.include(expected, '�', description);
-          if (actual.includes('�')) {
+          assert.notInclude(actual, '�', description);
+          const defaultChar = codepage === 'CP932' ? '・' : '?';
+          // An invalid sequence adds a default character, except for a lead
+          // byte followed by a "?" (0x3F), which both decode to one.
+          const count = (text: string) => text.split(defaultChar).length;
+          if (count(actual) > count(expected) || (actual === defaultChar && expected === '\uFFFD' + defaultChar)) {
             differences.invalidSequence++;
           } else {
             differences.iconvHasNoMapping++;
