@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection } from '../../src/tedious';
-import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -71,18 +71,17 @@ describe('Automatic Connection Retry', function() {
       connectionCount++;
 
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -98,7 +97,7 @@ describe('Automatic Connection Retry', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -149,18 +148,17 @@ describe('Automatic Connection Retry', function() {
       connectionCount++;
 
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -177,7 +175,7 @@ describe('Automatic Connection Retry', function() {
         if (connectionCount < 3) {
           // LOGIN7
           {
-            const { value: message } = await messageIterator.next();
+            const message = await incomingMessageReader.readMessage();
             assert.strictEqual(message.type, 0x10);
 
             const chunks: Buffer[] = [];
@@ -192,7 +190,7 @@ describe('Automatic Connection Retry', function() {
         } else {
           // LOGIN7
           {
-            const { value: message } = await messageIterator.next();
+            const message = await incomingMessageReader.readMessage();
             assert.strictEqual(message.type, 0x10);
 
             const chunks: Buffer[] = [];
@@ -207,7 +205,7 @@ describe('Automatic Connection Retry', function() {
 
           // SQL Batch (Initial SQL)
           {
-            const { value: message } = await messageIterator.next();
+            const message = await incomingMessageReader.readMessage();
             assert.strictEqual(message.type, 0x01);
 
             const chunks: Buffer[] = [];
@@ -259,18 +257,15 @@ describe('Automatic Connection Retry', function() {
       connectionCount++;
 
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await new Promise<void>((resolve) => {
@@ -312,18 +307,17 @@ describe('Automatic Connection Retry', function() {
       connectionCount++;
 
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -339,7 +333,7 @@ describe('Automatic Connection Retry', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];

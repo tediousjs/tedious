@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, ConnectionError } from '../../src/tedious';
-import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -48,18 +48,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted after the prelogin message is sent', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           setImmediate(() => {
@@ -95,18 +92,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted after the prelogin response is received', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -151,18 +145,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted after the Login7 message is sent', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -178,7 +169,7 @@ describe('Connection failure handling', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           setImmediate(() => {
@@ -214,18 +205,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted while the Login7 response is being received', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -241,7 +229,7 @@ describe('Connection failure handling', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -289,18 +277,15 @@ describe('Connection failure handling', function() {
   it('should time out correctly when the Login7 response stalls', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -316,7 +301,7 @@ describe('Connection failure handling', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -361,18 +346,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted after the Login7 response is received', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -388,7 +370,7 @@ describe('Connection failure handling', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -432,18 +414,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted after the initial SQL message is sent', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -459,7 +438,7 @@ describe('Connection failure handling', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -474,7 +453,7 @@ describe('Connection failure handling', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           setImmediate(() => {
@@ -510,18 +489,15 @@ describe('Connection failure handling', function() {
   it('should fail correctly when the connection is aborted after the initial SQL response is received', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -537,7 +513,7 @@ describe('Connection failure handling', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -552,7 +528,7 @@ describe('Connection failure handling', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           const chunks: Buffer[] = [];

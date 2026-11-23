@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, ConnectionError, Request, RequestError, TYPES } from '../../src/tedious';
-import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -102,7 +102,7 @@ function buildErrorToken(): Buffer {
 /**
  * Reads and discards all data of the given message.
  */
-async function drainMessage(message: Message): Promise<void> {
+async function drainMessage(message: AsyncIterable<Buffer>): Promise<void> {
   const iterator = message[Symbol.asyncIterator]();
   while (!(await iterator.next()).done) {
     // Discard the data.
@@ -141,18 +141,15 @@ describe('Canceling a request', function() {
 
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -165,7 +162,7 @@ describe('Canceling a request', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -177,7 +174,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -190,7 +187,7 @@ describe('Canceling a request', function() {
         // SQL Batch (`select 1`) - no response is sent before
         // the attention message arrives.
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -200,7 +197,7 @@ describe('Canceling a request', function() {
 
         // ATTENTION
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x06);
 
           await drainMessage(message);
@@ -220,7 +217,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (`select 2`)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -279,18 +276,15 @@ describe('Canceling a request', function() {
   it('should complete the request with `ECANCEL` when canceled before the request message was fully sent', function(done) {
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -303,7 +297,7 @@ describe('Canceling a request', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -315,7 +309,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -330,7 +324,7 @@ describe('Canceling a request', function() {
         // `IGNORE` bit. The server discards the request, but still
         // responds with a (empty) response message.
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -343,7 +337,7 @@ describe('Canceling a request', function() {
         // SQL Batch (`select 2`) - no attention message is expected
         // in between, as the canceled request was never fully sent.
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -407,18 +401,15 @@ describe('Canceling a request', function() {
 
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -431,7 +422,7 @@ describe('Canceling a request', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -443,7 +434,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -458,7 +449,7 @@ describe('Canceling a request', function() {
         // The message is received but never responded to, like a server
         // that has become unresponsive.
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -529,18 +520,15 @@ describe('Canceling a request', function() {
 
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -553,7 +541,7 @@ describe('Canceling a request', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -565,7 +553,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -577,7 +565,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (`insert bulk ...`)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -592,7 +580,7 @@ describe('Canceling a request', function() {
         // `IGNORE` bit. The message is received but never responded to,
         // like a server that has become unresponsive.
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x07);
 
           await drainMessage(message);
@@ -672,18 +660,15 @@ describe('Canceling a request', function() {
 
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -696,7 +681,7 @@ describe('Canceling a request', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -708,7 +693,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -720,7 +705,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (`insert bulk ...`)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -732,7 +717,7 @@ describe('Canceling a request', function() {
 
         // Bulk Load
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x07);
 
           // Send the first packet of the response message right away,
@@ -766,7 +751,7 @@ describe('Canceling a request', function() {
         // in between, as the canceled bulk load message was never
         // fully sent.
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -868,18 +853,15 @@ describe('Canceling a request', function() {
 
     server.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
-
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           await drainMessage(message);
@@ -892,7 +874,7 @@ describe('Canceling a request', function() {
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           await drainMessage(message);
@@ -904,7 +886,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -916,7 +898,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (`insert bulk ...`)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);
@@ -928,7 +910,7 @@ describe('Canceling a request', function() {
 
         // Bulk Load
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x07);
 
           // Start responding with an error right away, while the client is
@@ -951,7 +933,7 @@ describe('Canceling a request', function() {
           signalDrained();
 
           // The cancellation is performed by sending an attention message.
-          const { value: attentionMessage } = await messageIterator.next();
+          const attentionMessage = await incomingMessageReader.readMessage();
           assert.strictEqual(attentionMessage.type, 0x06);
 
           await drainMessage(attentionMessage);
@@ -971,7 +953,7 @@ describe('Canceling a request', function() {
 
         // SQL Batch (`select 2`)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           await drainMessage(message);

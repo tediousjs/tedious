@@ -1,4 +1,3 @@
-import BufferList from 'bl';
 import { Duplex } from 'stream';
 
 import Debug from './debug';
@@ -8,7 +7,6 @@ import { Packet, HEADER_LENGTH } from './packet';
 class OutgoingMessageStream extends Duplex {
   declare packetSize: number;
   declare debug: Debug;
-  declare bl: any;
 
   declare currentMessage: Message | undefined;
 
@@ -17,7 +15,6 @@ class OutgoingMessageStream extends Duplex {
 
     this.packetSize = packetSize;
     this.debug = debug;
-    this.bl = new BufferList();
 
     // When the writable side is ended, push `null`
     // to also end the readable side.
@@ -30,17 +27,29 @@ class OutgoingMessageStream extends Duplex {
     const length = this.packetSize - HEADER_LENGTH;
     let packetNumber = 0;
 
+    // Data of the message that was not sent yet. Always less than one
+    // packet's worth once the 'data' handler returns.
+    let pending: Buffer[] = [];
+    let pendingLength = 0;
+
     this.currentMessage = message;
     this.currentMessage.on('data', (data: Buffer) => {
       if (message.ignore) {
         return;
       }
 
-      this.bl.append(data);
+      pending.push(data);
+      pendingLength += data.length;
 
-      while (this.bl.length > length) {
-        const data = this.bl.slice(0, length);
-        this.bl.consume(length);
+      if (pendingLength <= length) {
+        return;
+      }
+
+      let buffered = pending.length === 1 ? pending[0] : Buffer.concat(pending, pendingLength);
+
+      while (buffered.length > length) {
+        const data = buffered.subarray(0, length);
+        buffered = buffered.subarray(length);
 
         // TODO: Get rid of creating `Packet` instances here.
         const packet = new Packet(message.type);
@@ -55,11 +64,15 @@ class OutgoingMessageStream extends Duplex {
           message.pause();
         }
       }
+
+      pending = buffered.length ? [buffered] : [];
+      pendingLength = buffered.length;
     });
 
     this.currentMessage.on('end', () => {
-      const data = this.bl.slice();
-      this.bl.consume(data.length);
+      const data = pending.length === 1 ? pending[0] : Buffer.concat(pending, pendingLength);
+      pending = [];
+      pendingLength = 0;
 
       // TODO: Get rid of creating `Packet` instances here.
       const packet = new Packet(message.type);

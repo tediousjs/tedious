@@ -1,8 +1,21 @@
-import BufferList from 'bl';
+import { Writable } from 'stream';
 import { assert } from 'chai';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Message from '../../src/message';
 import Debug from '../../src/debug';
+
+function collect(callback: (err: Error | null, buf: Buffer) => void) {
+  const chunks: Buffer[] = [];
+  const writable = new Writable({
+    write(chunk: Buffer, _encoding, cb) {
+      chunks.push(chunk);
+      cb();
+    }
+  });
+  writable.on('finish', () => callback(null, Buffer.concat(chunks)));
+  writable.on('error', (err) => callback(err, Buffer.alloc(0)));
+  return writable;
+}
 
 describe('OutgoingMessageStream', function() {
   it('wraps the given message contents into a packet', function(done) {
@@ -12,7 +25,7 @@ describe('OutgoingMessageStream', function() {
     message.end(contents);
 
     const outgoing = new OutgoingMessageStream(new Debug(), { packetSize: 1024 * 4 });
-    const result = new BufferList(function(err, buf) {
+    const result = collect(function(err, buf) {
       if (err) {
         return done(err);
       }
@@ -45,7 +58,7 @@ describe('OutgoingMessageStream', function() {
 
     const outgoing = new OutgoingMessageStream(new Debug(), { packetSize: 8 + 4 });
 
-    const result = new BufferList(function(err, buf) {
+    const result = collect(function(err, buf) {
       if (err) {
         return done(err);
       }
@@ -84,7 +97,7 @@ describe('OutgoingMessageStream', function() {
     ];
 
     const outgoing = new OutgoingMessageStream(new Debug(), { packetSize: 1024 * 4 });
-    const result = new BufferList(function(err, buf) {
+    const result = collect(function(err, buf) {
       if (err) {
         return done(err);
       }

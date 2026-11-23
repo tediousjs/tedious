@@ -9,7 +9,7 @@ import { Duplex } from 'stream';
 
 import Debug from '../../src/debug';
 import MessageIO from '../../src/message-io';
-import Message from '../../src/message';
+import { IncomingMessage } from '../../src/incoming-message-reader';
 import { Packet, TYPE } from '../../src/packet';
 
 const packetType = 2;
@@ -159,7 +159,7 @@ describe('MessageIO', function() {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
           const message = await io.readMessage();
-          assert.instanceOf(message, Message);
+          assert.instanceOf(message, IncomingMessage);
 
           const chunks = [];
           for await (const chunk of message) {
@@ -190,7 +190,7 @@ describe('MessageIO', function() {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
           const message = await io.readMessage();
-          assert.instanceOf(message, Message);
+          assert.instanceOf(message, IncomingMessage);
 
           const chunks = [];
           for await (const chunk of message) {
@@ -229,7 +229,7 @@ describe('MessageIO', function() {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
           const message = await io.readMessage();
-          assert.instanceOf(message, Message);
+          assert.instanceOf(message, IncomingMessage);
 
           const receivedData: Buffer[] = [];
           for await (const chunk of message) {
@@ -275,7 +275,7 @@ describe('MessageIO', function() {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
           const message = await io.readMessage();
-          assert.instanceOf(message, Message);
+          assert.instanceOf(message, IncomingMessage);
 
           const receivedData: Buffer[] = [];
           for await (const chunk of message) {
@@ -322,7 +322,7 @@ describe('MessageIO', function() {
           const io = new MessageIO(clientConnection, packetSize, debug);
 
           const message = await io.readMessage();
-          assert.instanceOf(message, Message);
+          assert.instanceOf(message, IncomingMessage);
 
           const receivedData: Buffer[] = [];
           for await (const chunk of message) {
@@ -330,7 +330,7 @@ describe('MessageIO', function() {
           }
 
           // How the payloads of the individual packets are chunked up by the buffering
-          // inside the `IncomingMessageStream` is an implementation detail we don't care
+          // inside the `IncomingMessageReader` is an implementation detail we don't care
           // about (and it varies across Node.js versions), so only assert on the
           // concatenated data.
           assert.deepEqual(Buffer.concat(receivedData), payload);

@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import * as net from 'net';
 import { Connection, ConnectionError } from '../../src/tedious';
-import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessageReader from '../../src/incoming-message-reader';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';
@@ -81,18 +81,17 @@ describe('Connecting to a server that sends a re-routing information', function(
   it('connects to the server specified in the re-routing data', async function() {
     routingServer.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -108,7 +107,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -138,18 +137,17 @@ describe('Connecting to a server that sends a re-routing information', function(
 
     targetServer.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -165,7 +163,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -180,7 +178,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           const chunks: Buffer[] = [];
@@ -229,18 +227,17 @@ describe('Connecting to a server that sends a re-routing information', function(
   it('connects to the server specified in the re-routing data, ignoring instance name information', async function() {
     routingServer.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -256,7 +253,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -286,18 +283,17 @@ describe('Connecting to a server that sends a re-routing information', function(
 
     targetServer.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -313,7 +309,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];
@@ -328,7 +324,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // SQL Batch (Initial SQL)
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x01);
 
           const chunks: Buffer[] = [];
@@ -377,18 +373,17 @@ describe('Connecting to a server that sends a re-routing information', function(
   it('should throw an error with redirect information when target server connection fails', async function() {
     routingServer.on('connection', async (connection) => {
       const debug = new Debug();
-      const incomingMessageStream = new IncomingMessageStream(debug);
       const outgoingMessageStream = new OutgoingMessageStream(debug, { packetSize: 4 * 1024 });
 
-      connection.pipe(incomingMessageStream);
+      const incomingMessageReader = new IncomingMessageReader(connection, debug);
       outgoingMessageStream.pipe(connection);
 
       try {
-        const messageIterator = incomingMessageStream[Symbol.asyncIterator]();
+        const messageIterator = incomingMessageReader[Symbol.asyncIterator]();
 
         // PRELOGIN
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x12);
 
           const chunks: Buffer[] = [];
@@ -404,7 +399,7 @@ describe('Connecting to a server that sends a re-routing information', function(
 
         // LOGIN7
         {
-          const { value: message } = await messageIterator.next();
+          const message = await incomingMessageReader.readMessage();
           assert.strictEqual(message.type, 0x10);
 
           const chunks: Buffer[] = [];

@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import StreamParser, { type ParserOptions } from './stream-parser';
 import Debug from '../debug';
-import Message from '../message';
 import { TokenHandler } from './handler';
 
 /**
@@ -17,7 +16,7 @@ export class Parser extends EventEmitter {
   declare paused: boolean;
   declare onResume: (() => void) | undefined;
 
-  constructor(message: Message | Iterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions) {
+  constructor(message: AsyncIterable<Buffer> | Iterable<Buffer>, debug: Debug, handler: TokenHandler, options: ParserOptions) {
     super();
 
     this.debug = debug;
@@ -35,7 +34,7 @@ export class Parser extends EventEmitter {
     });
   }
 
-  async run(message: Message | Iterable<Buffer>, handler: TokenHandler) {
+  async run(message: AsyncIterable<Buffer> | Iterable<Buffer>, handler: TokenHandler) {
     const parser = new StreamParser(this.options);
 
     // Iterate manually - unlike `for await`, this does not destroy the message

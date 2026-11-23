@@ -64,7 +64,6 @@
     "@azure/keyvault-keys": "^4.10.2",
     "@js-joda/core": "^6.0.1",
     "@types/node": ">=22",
-    "bl": "^6.1.4",
     "iconv-lite": "^0.7.0",
     "js-md4": "^0.3.2",
     "native-duplexpair": "^1.0.0"
