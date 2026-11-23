@@ -95,7 +95,12 @@ describe('Initiate Connect Test', function() {
     }
 
     connection.connect(function(err) {
-      assert.isDefined(err);
+      assert.instanceOf(err, ConnectionError);
+      assert.strictEqual((err as ConnectionError).code, 'ELOGIN');
+      // 18456: Login failed for user
+      assert.strictEqual((err as ConnectionError).number, 18456);
+      assert.isNumber((err as ConnectionError).state);
+      assert.isNumber((err as ConnectionError).class);
 
       connection.close();
     });
