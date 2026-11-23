@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 12 * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Promote `next` to `latest` without waiting for the one week soak period'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -40,6 +45,9 @@ jobs:
       run: npm audit signatures
 
     - name: Tag latest release
+      env:
+        # Always empty (i.e. not forced) for scheduled runs.
+        FORCE: ${{ inputs.force }}
       run: |
         info=$(npm info tedious --json)
         # npm 12+ always wraps `npm info --json` output in an array, older
@@ -55,8 +63,16 @@ jobs:
           publish_date=$(date -d "$(jq -r '.time["'"$next"'"]' <<< "$info")" +"$date_format")
           week_ago=$(date -d '-7 days' +"$date_format")
 
-          # ...and only once it has soaked on `next` for at least a week.
-          if [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
+          # ...and only once it has soaked on `next` for at least a week,
+          # unless the promotion was forced.
+          if [[ "$FORCE" == "true" ]]; then
+            echo "Force-promoting tedious@$next (published $publish_date) to latest"
             npx --no -- npm dist-tag add "tedious@$next" latest
+          elif [[ "$publish_date" < "$week_ago" || "$publish_date" == "$week_ago" ]]; then
+            npx --no -- npm dist-tag add "tedious@$next" latest
+          else
+            echo "tedious@$next was published $publish_date, waiting until it has been on next for a week"
           fi
+        else
+          echo "tedious@$next on next is not newer than tedious@$latest on latest, nothing to promote"
         fi
