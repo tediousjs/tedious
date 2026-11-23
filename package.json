@@ -60,7 +60,7 @@
   },
   "dependencies": {
     "@azure/core-auth": "^1.10.1",
-    "@azure/identity": "^4.13.1",
+    "@azure/identity": "^4.14.1",
     "@azure/keyvault-keys": "^4.10.2",
     "@types/node": ">=22",
     "bl": "^6.1.4",
