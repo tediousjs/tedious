@@ -10,6 +10,18 @@ const options: InternalConnectionOptions = {} as InternalConnectionOptions;
 const optionsWithUTCFalse: InternalConnectionOptions = { useUTC: false } as InternalConnectionOptions;
 const optionsWithUTCTrue: InternalConnectionOptions = { useUTC: true } as InternalConnectionOptions;
 
+function utcDate(year: number, month: number, day: number) {
+  const value = new Date(0);
+  value.setUTCFullYear(year, month - 1, day);
+  return value;
+}
+
+function localDate(year: number, month: number, day: number) {
+  const value = new Date(2000, 0, 1);
+  value.setFullYear(year, month - 1, day);
+  return value;
+}
+
 function typeInfo(type: DataType, parameter: ParameterData, options: InternalConnectionOptions) {
   const buffer = new WritableTrackingBuffer();
   type.writeTypeInfo(buffer, parameter, options);
@@ -273,6 +285,27 @@ describe('Date', function() {
         assert.deepEqual(buffer, expectedBuffer);
       }
     });
+
+    it('counts days from 0001-01-01 across calendar edge cases', function() {
+      for (const [year, month, day, expected] of [
+        [1, 1, 1, 0],
+        [99, 12, 31, 36158],
+        [100, 3, 1, 36218],
+        [1900, 2, 28, 693653],
+        [1900, 3, 1, 693654],
+        [2000, 2, 29, 730178],
+        [2000, 3, 1, 730179],
+        [9999, 12, 31, 3652058]
+      ]) {
+        for (const [value, opts] of [
+          [utcDate(year, month, day), optionsWithUTCTrue],
+          [localDate(year, month, day), optionsWithUTCFalse]
+        ] as [Date, InternalConnectionOptions][]) {
+          const buffer = serialize(TYPES.Date, { value }, opts).data;
+          assert.strictEqual(buffer.readUIntLE(0, 3), expected, `${year}-${month}-${day} (useUTC: ${opts.useUTC})`);
+        }
+      }
+    });
   });
 
   describe('.writeTypeInfo', function() {
@@ -320,6 +353,25 @@ describe('DateTime', function() {
         const expectedNoOfDays = testSet[1];
         const buffer = serialize(TYPES.DateTime, parameter, optionsWithUTCFalse).data;
         assert.strictEqual(buffer.readInt32LE(0), expectedNoOfDays);
+      }
+    });
+
+    it('counts days from 1900-01-01 across calendar edge cases', function() {
+      for (const [year, month, day, expected] of [
+        [1753, 1, 1, -53690],
+        [1899, 12, 31, -1],
+        [1900, 1, 1, 0],
+        [1900, 3, 1, 59],
+        [2000, 3, 1, 36584],
+        [9999, 12, 31, 2958463]
+      ]) {
+        for (const [value, opts] of [
+          [utcDate(year, month, day), optionsWithUTCTrue],
+          [localDate(year, month, day), optionsWithUTCFalse]
+        ] as [Date, InternalConnectionOptions][]) {
+          const buffer = serialize(TYPES.DateTime, { value }, opts).data;
+          assert.strictEqual(buffer.readInt32LE(0), expected, `${year}-${month}-${day} (useUTC: ${opts.useUTC})`);
+        }
       }
     });
   });

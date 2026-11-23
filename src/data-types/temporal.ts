@@ -1,7 +1,21 @@
-import { ChronoUnit, LocalDate } from '@js-joda/core';
 import type WritableTrackingBuffer from '../tracking-buffer/writable-tracking-buffer';
 
-const YEAR_ONE = LocalDate.ofYearDay(1, 1);
+const MILLISECONDS_PER_DAY = 86_400_000;
+
+/**
+ * The number of days from 1970-01-01 to the given date in the proleptic
+ * Gregorian calendar. `month` is 1-based.
+ *
+ * Uses `setUTCFullYear` rather than `Date.UTC`, because `Date.UTC` maps
+ * years 0-99 to 1900-1999.
+ */
+export function epochDay(year: number, month: number, day: number): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  return date.getTime() / MILLISECONDS_PER_DAY;
+}
+
+const YEAR_ONE = epochDay(1, 1, 1);
 
 /**
  * A `Date` that may carry the sub-millisecond part of a `time`, `datetime2`
@@ -15,11 +29,11 @@ export interface TemporalValue extends Date {
  * The number of days from 0001-01-01 to the calendar date of `value`.
  */
 export function daysSinceYearOne(value: Date, useUTC: boolean): number {
-  const date = useUTC ?
-    LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()) :
-    LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate());
+  const days = useUTC ?
+    epochDay(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()) :
+    epochDay(value.getFullYear(), value.getMonth() + 1, value.getDate());
 
-  return YEAR_ONE.until(date, ChronoUnit.DAYS);
+  return days - YEAR_ONE;
 }
 
 /**
