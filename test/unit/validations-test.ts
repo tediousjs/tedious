@@ -206,7 +206,13 @@ describe('Validations', function() {
     assert.strictEqual(value, 1516.61556);
 
     value = TYPE.Decimal.validate('1516.61556', undefined);
-    assert.strictEqual(value, 1516.61556);
+    assert.strictEqual(value, '1516.61556');
+
+    value = TYPE.Decimal.validate(' -0.5 ', undefined);
+    assert.strictEqual(value, '-0.5');
+
+    value = TYPE.Decimal.validate('1e3', undefined);
+    assert.strictEqual(value, 1000);
 
     assert.throws(() => {
       TYPE.Decimal.validate('xxx', undefined);
@@ -221,7 +227,10 @@ describe('Validations', function() {
     assert.strictEqual(value, 1516.61556);
 
     value = TYPE.Numeric.validate('1516.61556', undefined);
-    assert.strictEqual(value, 1516.61556);
+    assert.strictEqual(value, '1516.61556');
+
+    value = TYPE.Numeric.validate('1e3', undefined);
+    assert.strictEqual(value, 1000);
 
     assert.throws(() => {
       TYPE.Numeric.validate('xxx', undefined);
@@ -236,7 +245,14 @@ describe('Validations', function() {
     assert.strictEqual(value, 1516.61556);
 
     value = TYPE.Money.validate('1516.61556', undefined);
-    assert.strictEqual(value, 1516.61556);
+    assert.strictEqual(value, '1516.61556');
+
+    value = TYPE.Money.validate('-922337203685477.5808', undefined);
+    assert.strictEqual(value, '-922337203685477.5808');
+
+    assert.throws(() => {
+      TYPE.Money.validate('922337203685477.5808', undefined);
+    }, TypeError, 'Value must be between -922337203685477.5808 and 922337203685477.5807, inclusive.');
 
     assert.throws(() => {
       TYPE.Money.validate('xxx', undefined);
@@ -252,6 +268,13 @@ describe('Validations', function() {
 
     assert.throws(() => {
       TYPE.SmallMoney.validate(214748.3648, undefined);
+    }, TypeError, 'Value must be between -214748.3648 and 214748.3647');
+
+    value = TYPE.SmallMoney.validate('-214748.3648', undefined);
+    assert.strictEqual(value, '-214748.3648');
+
+    assert.throws(() => {
+      TYPE.SmallMoney.validate('-214748.3649', undefined);
     }, TypeError, 'Value must be between -214748.3648 and 214748.3647');
   });
 

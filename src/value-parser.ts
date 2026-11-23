@@ -10,6 +10,7 @@ const NULL = (1 << 16) - 1;
 const MAX = (1 << 16) - 1;
 const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
+const MONEY_SCALE = 4;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
 const DEFAULT_ENCODING = 'utf8';
@@ -41,21 +42,41 @@ function readFloat(buf: Buffer, offset: number): Result<number> {
   return readDoubleLE(buf, offset);
 }
 
-function readSmallMoney(buf: Buffer, offset: number): Result<number> {
+function readSmallMoney(buf: Buffer, offset: number, options: ParserOptions): Result<number | string> {
   let value;
   ({ offset, value } = readInt32LE(buf, offset));
+
+  if (options.decimalAsString) {
+    return new Result(formatScaled(BigInt(value), MONEY_SCALE), offset);
+  }
 
   return new Result(value / MONEY_DIVISOR, offset);
 }
 
-function readMoney(buf: Buffer, offset: number): Result<number> {
+function readMoney(buf: Buffer, offset: number, options: ParserOptions): Result<number | string> {
   let high;
   ({ offset, value: high } = readInt32LE(buf, offset));
 
   let low;
   ({ offset, value: low } = readUInt32LE(buf, offset));
 
+  if (options.decimalAsString) {
+    return new Result(formatScaled((BigInt(high) << 32n) + BigInt(low), MONEY_SCALE), offset);
+  }
+
   return new Result((low + (0x100000000 * high)) / MONEY_DIVISOR, offset);
+}
+
+/**
+ * Formats `value / 10^scale` as an exact decimal string with `scale`
+ * fractional digits, as `-150n` at scale 2 is `'-1.50'`.
+ */
+function formatScaled(value: bigint, scale: number): string {
+  const negative = value < 0n;
+  const digits = (negative ? -value : value).toString().padStart(scale + 1, '0');
+  const integer = digits.slice(0, digits.length - scale);
+  const text = scale > 0 ? integer + '.' + digits.slice(digits.length - scale) : integer;
+  return negative ? '-' + text : text;
 }
 
 function readBit(buf: Buffer, offset: number): Result<boolean> {
@@ -137,11 +158,11 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
     }
 
     case 'SmallMoney': {
-      return readSmallMoney(buf, offset);
+      return readSmallMoney(buf, offset, options);
     }
 
     case 'Money':
-      return readMoney(buf, offset);
+      return readMoney(buf, offset, options);
 
     case 'MoneyN': {
       let dataLength;
@@ -152,9 +173,9 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
           return new Result(null, offset);
 
         case 4:
-          return readSmallMoney(buf, offset);
+          return readSmallMoney(buf, offset, options);
         case 8:
-          return readMoney(buf, offset);
+          return readMoney(buf, offset, options);
 
         default:
           throw new Error('Unsupported dataLength ' + dataLength + ' for MoneyN');
@@ -358,7 +379,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
         return new Result(null, offset);
       }
 
-      return readNumeric(buf, offset, dataLength, metadata.precision!, metadata.scale!);
+      return readNumeric(buf, offset, dataLength, metadata.precision!, metadata.scale!, options);
     }
 
     case 'UniqueIdentifier': {
@@ -419,11 +440,18 @@ function readUniqueIdentifier(buf: Buffer, offset: number, options: ParserOption
   return new Result(options.lowerCaseGuids ? bufferToLowerCaseGuid(data) : bufferToUpperCaseGuid(data), offset);
 }
 
-function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number): Result<number> {
+function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision: number, scale: number, options: ParserOptions): Result<number | string> {
   let sign;
   ({ offset, value: sign } = readUInt8(buf, offset));
 
   sign = sign === 1 ? 1 : -1;
+
+  if (options.decimalAsString) {
+    let magnitude;
+    ({ offset, value: magnitude } = readUNumericBigInt(buf, offset, dataLength));
+
+    return new Result(formatScaled(sign === 1 ? magnitude : -magnitude, scale), offset);
+  }
 
   let value;
   if (dataLength === 5) {
@@ -439,6 +467,36 @@ function readNumeric(buf: Buffer, offset: number, dataLength: number, _precision
   }
 
   return new Result((value * sign) / Math.pow(10, scale), offset);
+}
+
+/**
+ * Reads the magnitude of a `decimal` or `numeric` value exactly, as a
+ * `bigint`. `dataLength` counts the sign byte before it, as in `readNumeric`.
+ */
+function readUNumericBigInt(buf: Buffer, offset: number, dataLength: number): Result<bigint> {
+  if (dataLength === 5) {
+    let value;
+    ({ offset, value } = readUInt32LE(buf, offset));
+    return new Result(BigInt(value), offset);
+  }
+
+  if (dataLength !== 9 && dataLength !== 13 && dataLength !== 17) {
+    throw new Error(`Unsupported numeric dataLength ${dataLength}`);
+  }
+
+  let low;
+  ({ offset, value: low } = readBigUInt64LE(buf, offset));
+
+  let high = 0n;
+  if (dataLength === 13) {
+    let value;
+    ({ offset, value } = readUInt32LE(buf, offset));
+    high = BigInt(value);
+  } else if (dataLength === 17) {
+    ({ offset, value: high } = readBigUInt64LE(buf, offset));
+  }
+
+  return new Result((high << 64n) + low, offset);
 }
 
 function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLength: number): Result<unknown> {
@@ -484,10 +542,10 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       return readFloat(buf, offset);
 
     case 'SmallMoney':
-      return readSmallMoney(buf, offset);
+      return readSmallMoney(buf, offset, options);
 
     case 'Money':
-      return readMoney(buf, offset);
+      return readMoney(buf, offset, options);
 
     case 'Date':
       return readDate(buf, offset, options.useUTC);
@@ -529,7 +587,7 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       let scale;
       ({ value: scale, offset } = readUInt8(buf, offset));
 
-      return readNumeric(buf, offset, dataLength, precision, scale);
+      return readNumeric(buf, offset, dataLength, precision, scale, options);
     }
 
     case 'VarChar':

@@ -42,8 +42,11 @@ function execSql(
     return;
   }
 
+  let rows = 0;
+
   const request = new Request(cast ? 'select CAST(@param as varchar(max))' : 'select @param', function(err) {
     assert.ifError(err);
+    assert.strictEqual(rows, 1);
 
     connection.close();
   });
@@ -56,6 +59,8 @@ function execSql(
   });
 
   request.on('row', function(columns) {
+    rows++;
+
     assert.strictEqual(columns.length, 1);
 
     if (!expectedValue) {
@@ -103,18 +108,22 @@ function execSqlOutput(
   type: DataType,
   value: unknown,
   expectedValue?: unknown,
-  connectionOptions?: ConnectionOptions
+  connectionOptions?: ConnectionOptions,
+  options?: ParameterOptions
 ): void {
   const config = getConfig();
 
+  let returnValues = 0;
+
   const request = new Request('set @paramOut = @paramIn', function(err) {
     assert.ifError(err);
+    assert.strictEqual(returnValues, 1);
 
     connection.close();
   });
 
-  request.addParameter('paramIn', type, value);
-  request.addOutputParameter('paramOut', type);
+  request.addParameter('paramIn', type, value, options);
+  request.addOutputParameter('paramOut', type, undefined, options);
 
   request.on('doneInProc', function(rowCount, more) {
     assert.isTrue(more);
@@ -122,6 +131,8 @@ function execSqlOutput(
   });
 
   request.on('returnValue', function(name, returnValue, metadata) {
+    returnValues++;
+
     assert.strictEqual(name, 'paramOut');
 
     if (!expectedValue) {
@@ -269,6 +280,54 @@ describe('Parameterised Statements Test', function() {
 
   it('should test money', function(done) {
     execSql(done, TYPES.Money, 956455842.4566);
+  });
+
+  describe('decimal strings', function() {
+    const decimalAsString = { decimalAsString: true };
+
+    it('should send a decimal string exactly', function(done) {
+      execSql(done, TYPES.Decimal, '12345678901234567.123456789', null, { precision: 38, scale: 9 }, '12345678901234567.123456789', true);
+    });
+
+    it('should send a numeric string exactly', function(done) {
+      execSql(done, TYPES.Numeric, '-99999999999999999999999999999999999999', null, { precision: 38, scale: 0 }, '-99999999999999999999999999999999999999', true);
+    });
+
+    it('should round a decimal string half away from zero to the scale', function(done) {
+      execSql(done, TYPES.Decimal, '-0.145', null, { precision: 5, scale: 2 }, '-0.15', true);
+    });
+
+    it('should send a money string exactly', function(done) {
+      execSql(done, TYPES.Money, '922337203685477.5807', null, null, '922337203685477.5807', false, decimalAsString);
+    });
+
+    it('should send a smallmoney string exactly', function(done) {
+      execSql(done, TYPES.SmallMoney, '-214748.3648', null, null, '-214748.3648', false, decimalAsString);
+    });
+
+    it('should read a decimal parameter back as a string with `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, '12345678901234567.123456789', null, { precision: 38, scale: 9 }, '12345678901234567.123456789', false, decimalAsString);
+    });
+
+    it('should read a decimal number back as a string with `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, -5555.55, null, { precision: 6, scale: 2 }, '-5555.55', false, decimalAsString);
+    });
+
+    it('should read a decimal string back as a number without `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, '-5555.55', null, { precision: 6, scale: 2 }, -5555.55);
+    });
+
+    it('should read a decimal output parameter as a string with `decimalAsString`', function(done) {
+      execSqlOutput(done, TYPES.Decimal, '12345678901234567.123456789', '12345678901234567.123456789', decimalAsString, { precision: 38, scale: 9 });
+    });
+
+    it('should read a null decimal parameter back as null with `decimalAsString`', function(done) {
+      execSql(done, TYPES.Decimal, null, null, { precision: 38, scale: 9 }, null, false, decimalAsString);
+    });
+
+    it('should read a money output parameter as a string with `decimalAsString`', function(done) {
+      execSqlOutput(done, TYPES.Money, '-922337203685477.5808', '-922337203685477.5808', decimalAsString);
+    });
   });
 
   it('UniqueIdentifier when `lowerCaseGuids` option is `false`', function(done) {
