@@ -183,6 +183,24 @@ describe('`varchar` values in each code page', function() {
       }
       value += 'a\u{1F600}b\uD83Dc\uDE00';
 
+      // TDS 7.1 has no `varchar(max)`, so send pieces that fit in
+      // `varchar(8000)` (at most two bytes per character), and no streamed
+      // parameter, which is always sent as `varchar(max)`.
+      if (getConfig().options.tdsVersion === '7_1') {
+        for (let i = 0; i < value.length; i += 4000) {
+          const piece = value.slice(i, i + 4000);
+          const [[sent, expected]] = await execSql(`
+            SELECT CAST(@value AS varbinary(8000)), CAST(CAST(@unicode AS varchar(8000)) AS varbinary(8000))
+          `, (request) => {
+            request.addParameter('value', TYPES.VarChar, piece);
+            request.addParameter('unicode', TYPES.NVarChar, piece);
+          }) as Array<[Buffer, Buffer]>;
+
+          assert.isTrue(sent.equals(expected), `parameter with characters ${i} to ${i + piece.length - 1}`);
+        }
+        return;
+      }
+
       async function * chunks() {
         for (let i = 0; i < value.length; i += 1000) {
           yield value.slice(i, i + 1000);
