@@ -1,7 +1,10 @@
+// Do not edit: recorded by `npm run record:codepages`
+// (`scripts/record-sqlserver-encodings.js`) from SQL Server's own conversion of
+// every character from U+0000 to U+FFFF to `varchar` in a database of each
+// collation.
+//
 // How SQL Server encodes the characters that Windows' tables in
-// `codepage-encoding-overrides.ts` do not cover, recorded from SQL Server's own
-// conversion of every character from U+0080 to U+FFFF to `varchar` in a
-// database of each collation. These are:
+// `codepage-encoding-overrides.ts` do not cover. These are:
 //
 // - all the best-fit mappings of CP437 and CP850, for which the Unicode
 //   Consortium publishes no encoding tables (only the tables to decode them).

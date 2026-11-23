@@ -10,8 +10,8 @@
 // fails if the files are not what the tables generate (for example, after an
 // edit by hand).
 //
-// `src/codepage-sqlserver-encodings.ts` is not generated: see
-// `test/integration/codepage-test.ts` for how to update it.
+// `src/codepage-sqlserver-encodings.ts` is recorded from SQL Server instead, by
+// `npm run record:codepages` (`scripts/record-sqlserver-encodings.js`).
 
 'use strict';
 
@@ -435,7 +435,11 @@ export const ENCODING_OVERRIDES: { readonly [codepage: string]: string } = {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+module.exports = { formatOverrides };
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

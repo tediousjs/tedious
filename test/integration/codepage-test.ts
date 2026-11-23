@@ -152,6 +152,37 @@ describe('`varchar` values in each code page', function() {
         }
       }
       assert.deepEqual(differences.slice(0, 20), [], `${differences.length} byte sequences are decoded differently`);
+
+      if (!doubleByte) {
+        return;
+      }
+
+      // Three-byte values, where what the first two bytes are decoded as
+      // decides where the next character starts: a lead byte followed by an
+      // invalid trail byte (which may itself be a lead byte, or 0x00), and
+      // then another byte.
+      const sequences = [];
+      for (const lead of [0x81, 0xE0, 0xFC]) {
+        for (const second of [0x00, 0x20, 0x3F, 0x7F, 0x81, 0xA1, 0xFF]) {
+          for (const third of [0x00, 0x41, 0x81, 0xA1]) {
+            sequences.push(Buffer.of(lead, second, third).toString('hex'));
+          }
+        }
+      }
+
+      const threeBytes = await execSql(`
+        SELECT CAST(v AS varbinary(3)), v, CAST(v AS nvarchar(6))
+        FROM (VALUES ${sequences.map((sequence) => `(CAST(0x${sequence} AS varchar(3)))`).join(', ')}) AS n (v)
+      `);
+      assert.strictEqual(threeBytes.length, sequences.length);
+
+      const threeByteDifferences = [];
+      for (const [bytes, decoded, converted] of threeBytes as Array<[Buffer, string, string]>) {
+        if (decoded !== converted) {
+          threeByteDifferences.push(`${bytes.toString('hex')}: decoded ${hex(decoded)}, SQL Server ${hex(converted)}`);
+        }
+      }
+      assert.deepEqual(threeByteDifferences, []);
     });
   }
 
