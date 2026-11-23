@@ -1,18 +1,19 @@
-import BufferList from 'bl';
 import { Transform } from 'stream';
 
-import Debug from './debug';
-import Message from './message';
-import { Packet, HEADER_LENGTH } from './packet';
-import { ConnectionError } from './errors';
+import Debug from '../../src/debug';
+import Message from '../../src/message';
+import { Packet, HEADER_LENGTH } from '../../src/packet';
+import { ConnectionError } from '../../src/errors';
 
 /**
   IncomingMessageStream
-  Transform received TDS data into individual IncomingMessage streams.
+
+  Push-based message parser, used by tests to play the server side of a
+  connection. (tedious itself reads messages with `IncomingMessageReader`.)
 */
 class IncomingMessageStream extends Transform {
   declare debug: Debug;
-  declare bl: any;
+  declare buffered: Buffer;
   declare currentMessage: Message | undefined;
 
   constructor(debug: Debug) {
@@ -21,7 +22,7 @@ class IncomingMessageStream extends Transform {
     this.debug = debug;
 
     this.currentMessage = undefined;
-    this.bl = new BufferList();
+    this.buffered = Buffer.alloc(0);
   }
 
   pause() {
@@ -46,16 +47,16 @@ class IncomingMessageStream extends Transform {
 
   processBufferedData(callback: (err?: ConnectionError) => void) {
     // The packet header is always 8 bytes of length.
-    while (this.bl.length >= HEADER_LENGTH) {
+    while (this.buffered.length >= HEADER_LENGTH) {
       // Get the full packet length
-      const length = this.bl.readUInt16BE(2);
+      const length = this.buffered.readUInt16BE(2);
       if (length < HEADER_LENGTH) {
         return callback(new ConnectionError('Unable to process incoming packet'));
       }
 
-      if (this.bl.length >= length) {
-        const data = this.bl.slice(0, length);
-        this.bl.consume(length);
+      if (this.buffered.length >= length) {
+        const data = this.buffered.subarray(0, length);
+        this.buffered = this.buffered.subarray(length);
 
         // TODO: Get rid of creating `Packet` instances here.
         const packet = new Packet(data);
@@ -96,7 +97,7 @@ class IncomingMessageStream extends Transform {
   }
 
   _transform(chunk: Buffer, _encoding: string, callback: () => void) {
-    this.bl.append(chunk);
+    this.buffered = Buffer.concat([this.buffered, chunk]);
     this.processBufferedData(callback);
   }
 }

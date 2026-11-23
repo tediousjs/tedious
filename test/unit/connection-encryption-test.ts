@@ -228,7 +228,7 @@ describe('Connection encryption negotiation', function() {
       }
       await once(io.sendMessage(TYPE.PRELOGIN, Buffer.concat(chunks)), 'end');
     }
-    socket.unpipe();
+    io.detachIncoming();
     io.outgoingMessageStream.unpipe(socket);
     socket.pipe(pair.encrypted);
     pair.encrypted.pipe(socket);
@@ -288,7 +288,7 @@ describe('Connection encryption negotiation', function() {
       io.sendMessage(TYPE.RESPONSE, preloginResponse(1));
 
       const encryptedIo = await startServerTls(socket, io);
-      const [error, , next] = await Promise.all([result, closed, encryptedIo.incomingMessageIterator.next()]);
+      const [error, , next] = await Promise.all([result, closed, encryptedIo.readMessage().then(() => ({ done: false }), () => ({ done: true }))]);
       assert.instanceOf(error, ConnectionError);
       assert.match(error!.message, message);
       assert.isFalse(connection.messageIo.tlsNegotiationComplete);

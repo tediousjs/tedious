@@ -4,7 +4,7 @@ import * as net from 'net';
 
 import { Connection, Request, RequestError, TYPES } from '../../src/tedious';
 import { abortOnSignal } from '../../src/execution-options';
-import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessageStream from '../helpers/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';

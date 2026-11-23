@@ -2,7 +2,7 @@ import { assert } from 'chai';
 import * as net from 'net';
 import { Connection } from '../../src/tedious';
 import { tds71DeprecationWarning } from '../../src/token/handler';
-import IncomingMessageStream from '../../src/incoming-message-stream';
+import IncomingMessageStream from '../helpers/incoming-message-stream';
 import OutgoingMessageStream from '../../src/outgoing-message-stream';
 import Debug from '../../src/debug';
 import PreloginPayload from '../../src/prelogin-payload';

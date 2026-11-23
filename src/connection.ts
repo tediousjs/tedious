@@ -2217,7 +2217,7 @@ class Connection extends EventEmitter {
   /**
    * @private
    */
-  createTokenStreamParser(message: Message, handler: TokenHandler) {
+  createTokenStreamParser(message: AsyncIterable<Buffer>, handler: TokenHandler) {
     return new TokenStreamParser(message, this.debug, handler, this.config.options);
   }
 
