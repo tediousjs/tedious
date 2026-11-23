@@ -1,4 +1,5 @@
-// Generates `src/codepage-tables.ts` from Microsoft's mapping tables, which
+// Generates `src/codepage-tables.ts` and `src/codepage-encoding-overrides.ts`
+// from Microsoft's mapping tables, which
 // the Unicode Consortium publishes at
 // https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/ under the Unicode
 // License v3 (https://www.unicode.org/license.txt).
@@ -61,13 +62,14 @@ function parsePcTable(text) {
   return map;
 }
 
-// Parses the multi-byte to Unicode part of a WindowsBestFit table: the MBTABLE
-// section, the lead byte ranges of the DBCSRANGE section (each a line marked
-// "Lead Byte Range", followed by the DBCSTABLE sections of its lead bytes),
-// and a DBCSTABLE section for each lead byte.
+// Parses a WindowsBestFit table: the MBTABLE section, the lead byte ranges of
+// the DBCSRANGE section (each a line marked "Lead Byte Range", followed by the
+// DBCSTABLE sections of its lead bytes), a DBCSTABLE section for each lead
+// byte, and the WCTABLE section (how Windows encodes each character).
 function parseBestFit(text) {
   const single = new Map();
   const pairs = new Map();
+  const wc = new Map();
   const leadRanges = [];
   let defaultChar;
   let section;
@@ -95,19 +97,102 @@ function parseBestFit(text) {
       }
       section = 'dbcs';
       pairs.set(lead, new Map());
-    } else if (keyword === 'WCTABLE' || keyword === 'ENDCODEPAGE' || keyword === 'CODEPAGE') {
+    } else if (keyword === 'WCTABLE') {
+      section = 'wc';
+    } else if (keyword === 'ENDCODEPAGE' || keyword === 'CODEPAGE') {
       section = undefined;
     } else if (/^0x/i.test(keyword) && section !== undefined) {
       const [from, to] = [parseInt(words[0], 16), parseInt(words[1], 16)];
       if (section === 'mb') {
         single.set(from, to);
+      } else if (section === 'wc') {
+        wc.set(from, to);
       } else {
         pairs.get(lead).set(from, to);
       }
     }
   }
 
-  return { single, pairs, leadRanges, defaultChar };
+  return { single, pairs, leadRanges, defaultChar, wc };
+}
+
+// The characters Windows encodes other than as the first byte sequence that
+// decodes to them (single bytes first, then two-byte sequences in order),
+// which is how \`text-encoding.ts\` encodes a character by default.
+function encodingOverrides(single, pairs, wc) {
+  const inverse = new Map();
+  const add = (char, code) => {
+    if (char !== 0 && !inverse.has(char)) {
+      inverse.set(char, code);
+    }
+  };
+  for (let byte = 0; byte <= 0xFF; byte++) {
+    add(byte < 0x80 ? byte : (pairs.has(byte) ? 0 : (single.get(byte) ?? 0)), byte);
+  }
+  for (const [lead, trails] of [...pairs].sort(([a], [b]) => a - b)) {
+    for (let trail = 0x40; trail <= 0xFE; trail++) {
+      if (trails.has(trail)) {
+        add(trails.get(trail), (lead << 8) | trail);
+      }
+    }
+  }
+
+  const overrides = [];
+  for (const [char, code] of [...wc].sort(([a], [b]) => a - b)) {
+    if (char < 0x80) {
+      if (code !== char) {
+        throw new Error(`U+${char.toString(16)} is not encoded as ASCII`);
+      }
+    } else if (inverse.get(char) !== code && !(code === 0x3F && !inverse.has(char))) {
+      // A character is encoded as "?" by default, so mapping it to "?"
+      // (as WCTABLE does for U+FF1F, the full-width question mark) is not an
+      // override.
+      overrides.push([char, code]);
+    }
+  }
+  return overrides;
+}
+
+// Writes encoding overrides in the format \`codepage-encoding-overrides.ts\`
+// describes, as lines of a string literal.
+function formatOverrides(overrides) {
+  const hex4 = (n) => n.toString(16).toUpperCase().padStart(4, '0');
+  const code = (c) => c > 0xFF ? hex4(c) : hex4(c).slice(2);
+
+  // Runs of consecutive characters encoded as the same code, or as
+  // consecutive codes.
+  const runs = [];
+  for (const [char, value] of overrides) {
+    const run = runs[runs.length - 1];
+    if (run && char === run.first + run.count) {
+      if (run.count === 1 && (value === run.value || value === run.value + 1)) {
+        run.step = value - run.value;
+        run.count++;
+        continue;
+      }
+      if (run.count > 1 && value === run.value + run.step * run.count) {
+        run.count++;
+        continue;
+      }
+    }
+    runs.push({ first: char, value, count: 1, step: 0 });
+  }
+
+  const tokens = runs.map(({ first, value, count, step }) => (
+    count === 1 ? `${hex4(first)}:${code(value)}` : `${hex4(first)}-${hex4(first + count - 1)}:${code(value)}${step ? '+' : ''}`
+  ));
+
+  const lines = [];
+  let line = '';
+  for (const token of tokens) {
+    if (line.length + token.length + 1 > 96) {
+      lines.push(line);
+      line = '';
+    }
+    line += (line ? ' ' : '') + token;
+  }
+  lines.push(line);
+  return lines.map((text, i) => `    '${text}${i < lines.length - 1 ? ' ' : ''}'`).join(' +\n');
 }
 
 function hex(value, width) {
@@ -187,9 +272,17 @@ export const SINGLE_BYTE_HIGH_HALVES: { readonly [codepage: string]: string } = 
 `;
 
   const singles = [];
+  const overrides = [];
   for (const [codepage, url, file] of SINGLE_BYTE) {
     const text = await load(directory, url, file);
-    const map = file.startsWith('cp') ? parsePcTable(text) : parseBestFit(text).single;
+    let map;
+    if (file.startsWith('cp')) {
+      map = parsePcTable(text);
+    } else {
+      const bestFit = parseBestFit(text);
+      map = bestFit.single;
+      overrides.push([codepage, encodingOverrides(bestFit.single, new Map(), bestFit.wc)]);
+    }
     for (let byte = 0; byte < 0x80; byte++) {
       if (map.get(byte) !== byte) {
         throw new Error(`${codepage}: byte ${hex(byte, 2)} is not ASCII`);
@@ -233,7 +326,8 @@ export const DOUBLE_BYTE_TABLES: { readonly [codepage: string]: DoubleByteTable 
 
   const doubles = [];
   for (const [codepage, url, file] of DOUBLE_BYTE) {
-    const { single, pairs, leadRanges, defaultChar } = parseBestFit(await load(directory, url, file));
+    const { single, pairs, leadRanges, defaultChar, wc } = parseBestFit(await load(directory, url, file));
+    overrides.push([codepage, encodingOverrides(single, pairs, wc)]);
     for (let byte = 0; byte < 0x80; byte++) {
       if (single.get(byte) !== byte) {
         throw new Error(`${codepage}: byte ${hex(byte, 2)} is not ASCII`);
@@ -286,6 +380,37 @@ export const DOUBLE_BYTE_TABLES: { readonly [codepage: string]: DoubleByteTable 
   out += doubles.join(',\n') + '\n};\n';
 
   fs.writeFileSync(path.join(__dirname, '..', 'src', 'codepage-tables.ts'), out);
+
+  let overridesOut = LICENSE + `
+// Generated by \`scripts/generate-codepage-tables.js\` from the WCTABLE sections
+// of Microsoft's WindowsBestFit/bestfit<N>.txt tables, published by the Unicode
+// Consortium at https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/.
+//
+// How Windows encodes the characters whose encoding is not simply the first
+// byte sequence that decodes to them (see \`codepage-tables.ts\`). These are:
+//
+// - best-fit mappings: characters a code page does not have, which are
+//   encoded as a similar character, such as U+0100 (Ā) as "A" in CP1252, or
+//   the full-width forms from U+FF01 to U+FF5E as ASCII. Any other character the
+//   code page does not have is encoded as "?".
+// - in CP932 and CP950, the sequence chosen for characters that several
+//   sequences decode to, such as U+2170 (ⅰ) as IBM's 0xFA40 in CP932 rather
+//   than the first sequence for it, 0xEEEF.
+//
+// SQL Server encodes every character as these tables do, with the few
+// additions in \`codepage-sqlserver-encodings.ts\`.
+//
+// Each code page has a list of space-separated entries, in Unicode order:
+//
+// - \`UUUU:XX\`: U+UUUU is encoded as the byte (\`XX\`) or the two bytes (\`XXXX\`).
+// - \`UUUU-VVVV:XX\`: every character from U+UUUU to U+VVVV is encoded as \`XX\`.
+// - \`UUUU-VVVV:XX+\`: the characters from U+UUUU to U+VVVV are encoded as
+//   consecutive codes from \`XX\`.
+
+export const ENCODING_OVERRIDES: { readonly [codepage: string]: string } = {
+`;
+  overridesOut += overrides.map(([codepage, entries]) => `  ${codepage}:\n${formatOverrides(entries)}`).join(',\n') + '\n};\n';
+  fs.writeFileSync(path.join(__dirname, '..', 'src', 'codepage-encoding-overrides.ts'), overridesOut);
 }
 
 main().catch((error) => {

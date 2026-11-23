@@ -3,6 +3,7 @@ import { endianness } from 'os';
 
 import { DOUBLE_BYTE_TABLES, SINGLE_BYTE_HIGH_HALVES, type DoubleByteTable } from './codepage-tables';
 import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
+import { SQL_SERVER_ENCODINGS } from './codepage-sqlserver-encodings';
 
 // Converts `char`, `varchar` and `text` values between JavaScript strings and
 // the code page of their collation.
@@ -19,7 +20,8 @@ import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
 //
 // Encoding UTF-8 is left to Node.js. The legacy code pages are encoded with
 // the inverse of the decoding tables, adjusted with the best-fit mappings and
-// other choices SQL Server makes (see `codepage-encoding-overrides.ts`), so
+// other choices Windows and SQL Server make (see
+// `codepage-encoding-overrides.ts` and `codepage-sqlserver-encodings.ts`), so
 // that a value is encoded exactly as SQL Server would convert it to `varchar`
 // itself.
 
@@ -419,9 +421,14 @@ interface EncodingTable {
   readonly codes: Uint16Array | undefined;
 }
 
-// Applies the entries of `ENCODING_OVERRIDES` for a code page.
-function applyOverrides(overrides: string, set: (char: number, code: number) => void) {
-  for (const entry of overrides.split(' ')) {
+// Applies the entries of `ENCODING_OVERRIDES` and then of
+// `SQL_SERVER_ENCODINGS` for a code page.
+function applyOverrides(codepage: string, set: (char: number, code: number) => void) {
+  const entries = [ENCODING_OVERRIDES[codepage], SQL_SERVER_ENCODINGS[codepage]]
+    .filter((overrides) => overrides !== undefined)
+    .flatMap((overrides) => overrides.split(' '));
+
+  for (const entry of entries) {
     const match = /^([0-9A-F]{4})(?:-([0-9A-F]{4}))?:([0-9A-F]{2,4})(\+?)$/.exec(entry);
     if (match === null) {
       throw new Error(`Invalid encoding override: ${entry}.`);
@@ -439,7 +446,6 @@ function applyOverrides(overrides: string, set: (char: number, code: number) => 
 
 function buildEncodingTable(codepage: string): EncodingTable {
   const { high, lead, pairs, singleBytes } = tableFor(codepage);
-  const overrides = ENCODING_OVERRIDES[codepage];
 
   // Every character is encoded as the first byte sequence that decodes to it
   // (single bytes first, then two-byte sequences in order), unless SQL Server
@@ -454,7 +460,7 @@ function buildEncodingTable(codepage: string): EncodingTable {
         mapped[char] = 1;
       }
     }
-    applyOverrides(overrides, (char, code) => {
+    applyOverrides(codepage, (char, code) => {
       bytes[char] = code;
     });
     return { bytes, codes: undefined };
@@ -483,7 +489,7 @@ function buildEncodingTable(codepage: string): EncodingTable {
       }
     }
   }
-  applyOverrides(overrides, (char, code) => {
+  applyOverrides(codepage, (char, code) => {
     codes[char] = code;
   });
   return { bytes: undefined, codes };
