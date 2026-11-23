@@ -182,7 +182,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'VarChar':
     case 'Char': {
-      const codepage = metadata.collation!.codepage!;
+      const codepage = metadata.collation!.codepage;
 
       let dataLength;
       ({ offset, value: dataLength } = readUInt16LE(buf, offset));
@@ -235,7 +235,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
 
-      return readChars(buf, offset, dataLength, metadata.collation!.codepage!);
+      return readChars(buf, offset, dataLength, metadata.collation!.codepage);
     }
 
     case 'NText': {
@@ -539,7 +539,7 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       let collation;
       ({ value: collation, offset } = readCollation(buf, offset));
 
-      return readChars(buf, offset, dataLength, collation.codepage!);
+      return readChars(buf, offset, dataLength, collation.codepage);
     }
 
     case 'NVarChar':
@@ -601,11 +601,11 @@ class PLPReader {
   declare chunks: Buffer[];
   declare length: number;
 
-  // For a `varchar(max)` value, the decoder its chunks are decoded with as
-  // they arrive, and the text decoded so far. The decoder keeps a character
-  // that is split across chunks until its last byte has arrived.
+  // For a `varchar(max)` value, the chunks are decoded as they arrive, with
+  // `decoder`, into `parts`. The decoder keeps a character that is split
+  // across chunks until its last byte has arrived.
   declare decoder: StreamDecoder | undefined;
-  declare text: string[];
+  declare parts: string[];
 
   // Number of bytes of the current PLP chunk that have not been read yet.
   declare chunkRemaining: number;
@@ -617,7 +617,7 @@ class PLPReader {
     this.length = 0;
     this.chunkRemaining = 0;
     this.decoder = metadata.type.name === 'VarChar' ? createDecoder(metadata.collation?.codepage) : undefined;
-    this.text = [];
+    this.parts = [];
   }
 
   read(parser: Parser): unknown {
@@ -651,7 +651,7 @@ class PLPReader {
       }
 
       if (this.decoder !== undefined) {
-        this.text.push(this.decoder.write(buf.subarray(start, end)));
+        this.parts.push(this.decoder.write(buf.subarray(start, end)));
       } else {
         this.chunks.push(buf.subarray(start, end));
       }
@@ -665,8 +665,8 @@ class PLPReader {
     }
 
     if (this.decoder !== undefined) {
-      this.text.push(this.decoder.end());
-      return this.text.join('');
+      this.parts.push(this.decoder.end());
+      return this.parts.join('');
     }
 
     // `Buffer.concat` always copies, so the value never keeps the (possibly

@@ -6,11 +6,11 @@
 // - all the best-fit mappings of CP437 and CP850, for which the Unicode
 //   Consortium publishes no encoding tables (only the tables to decode them).
 // - best fits that newer versions of Windows (such as Windows Server 2022)
-//   have and the published tables do not: 27 spaces, dashes, quotes and primes
-//   from U+2000 to U+2036, U+2044, U+20A4 and U+2236 in the single-byte code
-//   pages, and U+3099 and U+309A in CP932. SQL Server uses them on Linux and
-//   on those versions of Windows. On older versions of Windows, it encodes the
-//   27 single-byte ones as "?" instead.
+//   have and the published tables do not: 28 spaces, dashes, quotes and primes
+//   from U+2000 to U+2036, U+2044, U+20A4 and U+2236 (10 to 27 of them in each
+//   single-byte code page), and U+3099 and U+309A in CP932. SQL Server uses
+//   them on Linux and on those versions of Windows. On older versions of
+//   Windows, it encodes the single-byte ones as "?" instead.
 //
 // They are applied after `ENCODING_OVERRIDES`, and in the same format.
 

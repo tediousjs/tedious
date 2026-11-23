@@ -1,8 +1,7 @@
 import { assert } from 'chai';
-import sinon from 'sinon';
-import { createHash } from 'crypto';
+import { createHash, type Hash } from 'crypto';
 
-import { createDecoder, createEncoder, decode, encode, resetTables } from '../../src/text-encoding';
+import { createDecoder, createEncoder, decode, encode } from '../../src/text-encoding';
 import { PLPReader } from '../../src/value-parser';
 import { NotEnoughDataError } from '../../src/token/helpers';
 import { type Metadata } from '../../src/metadata-parser';
@@ -87,7 +86,7 @@ describe('text encoding', function() {
       // Best-fit mappings from Windows' tables: Ā, full-width A, ∞.
       assert.deepEqual(encode('Āａ∞', 'CP1252'), Buffer.from('Aa8'));
       // One SQL Server adds: a punctuation space.
-      assert.deepEqual(encode('a b', 'CP1252'), Buffer.from('a b'));
+      assert.deepEqual(encode('a\u2008b', 'CP1252'), Buffer.from('a b'));
       // ◙ is a character of its own in CP437, but encoded as the control
       // character it shares the byte with.
       assert.deepEqual(encode('◙', 'CP437'), Buffer.of(0x0A));
@@ -116,10 +115,15 @@ describe('text encoding', function() {
       assert.strictEqual(decode(Buffer.of(0xA2, 0xCC, 0xA2, 0xA4), 'CP950'), '\u5341\u2550');
     });
 
-    it('fails to encode non-ASCII text in an unsupported code page', function() {
-      assert.deepEqual(encode('abc', 'CP1'), Buffer.from('abc'));
+    it('fails to encode or decode text in an unsupported code page', function() {
+      assert.throws(() => encode('abc', 'CP1'), Error, 'Unsupported code page: CP1.');
       assert.throws(() => encode('é', 'CP1'), Error, 'Unsupported code page: CP1.');
       assert.throws(() => createEncoder('CP1'), Error, 'Unsupported code page: CP1.');
+      assert.throws(() => decode(Buffer.from('abc'), 'CP1'), Error, 'Unsupported code page: CP1.');
+      assert.throws(() => createDecoder('CP1'), Error, 'Unsupported code page: CP1.');
+      // Names of the objects' own properties only.
+      assert.throws(() => encode('é', 'constructor'), Error, 'Unsupported code page: constructor.');
+      assert.throws(() => decode(Buffer.from([0xE9]), 'toString'), Error, 'Unsupported code page: toString.');
     });
 
     it('encodes streamed UTF-8 text with Node.js, keeping split surrogate pairs together', function() {
@@ -175,7 +179,7 @@ describe('text encoding', function() {
 
   describe('decoding', function() {
     it('decodes UTF-8, keeping a byte order mark', function() {
-      const value = '﻿héllo \u{1F600}';
+      const value = '\uFEFFhéllo \u{1F600}';
       assert.strictEqual(decode(Buffer.from(value, 'utf8'), 'utf-8'), value);
       assert.strictEqual(decode(Buffer.from(value, 'utf8'), undefined), value);
     });
@@ -198,7 +202,7 @@ describe('text encoding', function() {
     it('decodes CP437 and CP850 with the embedded tables', function() {
       assert.strictEqual(decode(Buffer.from([0xC9, 0xCD, 0xBB, 0x80, 0xE1, 0x9B]), 'CP437'), '╔═╗Çß¢');
       assert.strictEqual(decode(Buffer.from([0xC9, 0xCD, 0xBB, 0x80, 0xE1, 0x9B]), 'CP850'), '╔═╗Çßø');
-      assert.strictEqual(decode(Buffer.from([0x48, 0x82, 0x6C, 0x8A, 0xFF]), 'CP437'), 'Hélè ');
+      assert.strictEqual(decode(Buffer.from([0x48, 0x82, 0x6C, 0x8A, 0xFF]), 'CP437'), 'Hélè\u00A0');
     });
 
     it('decodes double-byte text', function() {
@@ -272,32 +276,6 @@ describe('text encoding', function() {
     it('decodes an invalid sequence split across the parts of a streamed value as a whole', function() {
       const decoder = createDecoder('CP932');
       assert.strictEqual(decoder.write(Buffer.from([0x61, 0x82])) + decoder.write(Buffer.from([0x20, 0x62])) + decoder.end(), 'a・b');
-    });
-
-    describe('without `TextDecoder` support for the legacy code pages', function() {
-      afterEach(function() {
-        sinon.restore();
-        resetTables();
-      });
-
-      // As on a Node.js build without full ICU, where `TextDecoder` only
-      // supports UTF-8 and UTF-16. tedious does not use it for code pages.
-      it('decodes and encodes every code page', function() {
-        resetTables();
-        const OriginalTextDecoder = globalThis.TextDecoder;
-        sinon.stub(globalThis, 'TextDecoder').callsFake(function(label?: string, options?: ConstructorParameters<typeof TextDecoder>[1]) {
-          if (label !== undefined && label !== 'utf-8') {
-            throw new RangeError(`The "${label}" encoding is not supported`);
-          }
-          return new OriginalTextDecoder(label, options);
-        });
-
-        assert.strictEqual(decode(Buffer.from([0x63, 0x61, 0x66, 0xE9]), 'CP1252'), 'café');
-        assert.strictEqual(decode(Buffer.from([0x93, 0xFA, 0x96, 0x7B]), 'CP932'), '日本');
-        assert.strictEqual(decode(Buffer.from([0xC7, 0xD1, 0x8C, 0x63]), 'CP949'), '한똠');
-        assert.deepEqual(encode('日本', 'CP932'), Buffer.from([0x93, 0xFA, 0x96, 0x7B]));
-        assert.deepEqual(encode('中文', 'CP936'), Buffer.from([0xD6, 0xD0, 0xCE, 0xC4]));
-      });
     });
   });
 
@@ -385,60 +363,184 @@ describe('text encoding', function() {
 
   // Every single byte (and, in the double-byte code pages, every two-byte
   // sequence from 0x8000 to 0xFFFF) decodes, and every UTF-16 code unit
-  // encodes, as SQL Server converts it: these hashes were recorded from the
-  // output that `test/integration/codepage-test.ts` checks against SQL Server,
-  // and match hashes of SQL Server's own conversions. If a change to the tables
-  // changes one, check it against SQL Server with that test.
+  // encodes, as SQL Server converts it. These hashes, of each range of inputs,
+  // were recorded from the output that `test/integration/codepage-test.ts`
+  // checks against SQL Server, and match hashes of SQL Server's own
+  // conversions. If a change to the tables changes one, check that range
+  // against SQL Server with that test.
   describe('conversion of every input', function() {
-    const hashes: { [codepage: string]: { decoding: string, encoding: string } } = {
-      CP437: { decoding: 'ea22d525a593bc3e', encoding: '0a2f605aa2b0b0c7' },
-      CP850: { decoding: 'a1a7917730e355f1', encoding: '4b77c18510d32149' },
-      CP874: { decoding: '8945a4955da0189c', encoding: 'e0b4591074a6958d' },
-      CP1250: { decoding: '3ffa1e185a6595f5', encoding: '70d698e671d742a3' },
-      CP1251: { decoding: '26067470e4fc6bcd', encoding: '38ed28d889b611cc' },
-      CP1252: { decoding: '94e2f8494a2525a7', encoding: '08e2dac05daa77f7' },
-      CP1253: { decoding: '9f301e773f264860', encoding: '6f34c50a4b2fcae4' },
-      CP1254: { decoding: 'ffb420a8fe95346f', encoding: 'ecbb2557b784b7fb' },
-      CP1255: { decoding: '16959000e2d8df26', encoding: '127954a94403289c' },
-      CP1256: { decoding: '0760c0d2abe2ae75', encoding: 'd01b3b228dcf1f7e' },
-      CP1257: { decoding: '6623460ce19cfb5d', encoding: '2e228e61af151118' },
-      CP1258: { decoding: 'bf19376d5405c712', encoding: 'c0a37706d962cac0' },
-      CP932: { decoding: 'dc20aa1c62e742c2', encoding: '86c70a39b8cc874d' },
-      CP936: { decoding: '599fe7edd0ab5801', encoding: 'd4fb917161fa2c52' },
-      CP949: { decoding: 'df6fb538e168c066', encoding: '9260fd1010203925' },
-      CP950: { decoding: '7f156c3d9b9215cc', encoding: '0f347d6401e7671c' }
+    // The ranges of byte sequences: the single bytes, and in a double-byte code
+    // page, the two-byte sequences of each 16 lead bytes from 0x80.
+    function decodingRanges(codepage: string): Array<[name: string, inputs: Buffer[]]> {
+      const ranges: Array<[string, Buffer[]]> = [['bytes 0x00 to 0xFF', Array.from({ length: 256 }, (_, byte) => Buffer.of(byte))]];
+      if (DOUBLE_BYTE_CODEPAGES.includes(codepage)) {
+        for (let first = 0x80; first <= 0xFF; first += 0x10) {
+          const inputs = [];
+          for (let lead = first; lead < first + 0x10; lead++) {
+            for (let trail = 0x00; trail <= 0xFF; trail++) {
+              inputs.push(Buffer.of(lead, trail));
+            }
+          }
+          ranges.push([`sequences 0x${first.toString(16).toUpperCase()}00 to 0x${(first + 0x0F).toString(16).toUpperCase()}FF`, inputs]);
+        }
+      }
+      return ranges;
+    }
+
+    function rangeHash(update: (hash: Hash) => void) {
+      const hash = createHash('sha256');
+      update(hash);
+      return hash.digest('hex').slice(0, 8);
+    }
+
+    const hashes: { [codepage: string]: { decoding: string[], encoding: string[] } } = {
+      CP437: {
+        decoding: ['ea22d525'],
+        encoding: [
+          '70276327', '89e62983', '73a2ee20', '5c92c8e8', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP850: {
+        decoding: ['a1a79177'],
+        encoding: [
+          'aa0a5231', '89e62983', 'ccb1b989', '6a63d00a', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP874: {
+        decoding: ['8945a495'],
+        encoding: [
+          '6a7bfba6', '89e62983', 'ef85043c', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '8e3fa9e7'
+        ]
+      },
+      CP1250: {
+        decoding: ['3ffa1e18'],
+        encoding: [
+          '7958da87', '89e62983', '167ba867', '3783d86f', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP1251: {
+        decoding: ['26067470'],
+        encoding: [
+          'c1076d1d', '89e62983', 'a0295c91', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP1252: {
+        decoding: ['94e2f849'],
+        encoding: [
+          '0433f7a2', '89e62983', 'fb1d7269', 'a54ca469', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP1253: {
+        decoding: ['9f301e77'],
+        encoding: [
+          'c8674b97', '89e62983', 'ea54df05', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '0f6f2619'
+        ]
+      },
+      CP1254: {
+        decoding: ['ffb420a8'],
+        encoding: [
+          'b0bcfd74', '89e62983', 'fe0fc797', '8d0b0354', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP1255: {
+        decoding: ['16959000'],
+        encoding: [
+          'b165193c', '89e62983', 'f7111e57', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '189fb5bd'
+        ]
+      },
+      CP1256: {
+        decoding: ['0760c0d2'],
+        encoding: [
+          '3ca6c126', '89e62983', '853306fe', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '3977136a'
+        ]
+      },
+      CP1257: {
+        decoding: ['6623460c'],
+        encoding: [
+          '66c03c45', '89e62983', '86a7a0da', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '37e02437'
+        ]
+      },
+      CP1258: {
+        decoding: ['bf19376d'],
+        encoding: [
+          '42ee2b02', '89e62983', 'a6f75e7b', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983',
+          '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '89e62983', '6cd81641'
+        ]
+      },
+      CP932: {
+        decoding: ['7ee98277', 'b779aa1e', 'cb01fae7', 'a848c9f1', '760544b8', '2c1060a3', 'f28db98f', '527a4d06', 'b1c80eed'],
+        encoding: [
+          '47be82bc', '89e62983', 'c8aebf11', 'a9ed7d4d', 'a789d2ce', '9d0e36b7', '2de3d76e', '61b50063',
+          '7b4b864b', 'b0e2ec18', '89e62983', '89e62983', '89e62983', '89e62983', '379d819d', 'b8c00c02'
+        ]
+      },
+      CP936: {
+        decoding: ['b79bfa61', '6fd63694', '9c879339', '134c899d', '04ef72b6', 'e6564190', 'e47c2797', 'e573a609', '2acb2805'],
+        encoding: [
+          'eefff454', '89e62983', '7f4fddfb', 'a9c7e12e', '4af93fb0', '01467672', '6bf657ad', '2618bb5f',
+          '6e22857e', 'ae93ce68', '89e62983', '89e62983', '89e62983', '89e62983', '3109b560', '8c73c8b5'
+        ]
+      },
+      CP949: {
+        decoding: ['f6f14ecd', 'aa3c157e', '3701f4ea', '45515c55', '745c8335', 'c226604e', 'a848dc1c', 'f52e6a92', '66a372ba'],
+        encoding: [
+          'e3078bee', 'abf08c0f', '963e9500', '751bafe1', '4e5a02d9', '520e8e0f', '5b0fbeee', 'b3b9c188',
+          '2c15e452', '0f6f8868', '18e7f0c5', '63b3bad0', '123c3481', '2aafd1dd', '25a13747', '5dd69f59'
+        ]
+      },
+      CP950: {
+        decoding: ['4c263a80', 'b0bf1d02', '334e18c1', 'a4b162a8', '4c317b3e', '5974492e', 'fac3ec7c', '059ace5c', '765a5f04'],
+        encoding: [
+          'c83ecd71', '89e62983', '3dc6c97b', 'cf60afbe', '40996066', '0af04563', 'cc8151d2', 'bb44e0c7',
+          'beb4fac7', 'efaff531', '89e62983', '89e62983', '89e62983', '89e62983', 'a62bdac6', 'c8eb6e36'
+        ]
+      }
     };
 
     for (const codepage of ALL_CODEPAGES) {
       it(`decodes every byte sequence in ${codepage} as SQL Server does`, function() {
-        const hash = createHash('sha256');
-        const add = (buf: Buffer) => {
-          hash.update(Buffer.from(decode(buf, codepage) + '\n', 'utf16le'));
-        };
-
-        for (let byte = 0; byte <= 0xFF; byte++) {
-          add(Buffer.of(byte));
-        }
-        if (DOUBLE_BYTE_CODEPAGES.includes(codepage)) {
-          for (let lead = 0x80; lead <= 0xFF; lead++) {
-            for (let trail = 0x00; trail <= 0xFF; trail++) {
-              add(Buffer.of(lead, trail));
+        const differing = [];
+        for (const [i, [name, inputs]] of decodingRanges(codepage).entries()) {
+          const actual = rangeHash((hash) => {
+            for (const buf of inputs) {
+              hash.update(Buffer.from(decode(buf, codepage) + '\n', 'utf16le'));
             }
+          });
+          if (actual !== hashes[codepage].decoding[i]) {
+            differing.push(name);
           }
         }
 
-        assert.strictEqual(hash.digest('hex').slice(0, 16), hashes[codepage].decoding);
+        assert.deepEqual(differing, [], 'decoded differently');
       });
 
       it(`encodes every UTF-16 code unit in ${codepage} as SQL Server does`, function() {
-        const hash = createHash('sha256');
-        for (let unit = 0; unit <= 0xFFFF; unit++) {
-          const bytes = encode(String.fromCharCode(unit), codepage);
-          hash.update(Buffer.of(bytes.length));
-          hash.update(bytes);
+        const differing = [];
+        for (let i = 0; i < 16; i++) {
+          const actual = rangeHash((hash) => {
+            for (let unit = i * 0x1000; unit < (i + 1) * 0x1000; unit++) {
+              const bytes = encode(String.fromCharCode(unit), codepage);
+              hash.update(Buffer.of(bytes.length));
+              hash.update(bytes);
+            }
+          });
+          if (actual !== hashes[codepage].encoding[i]) {
+            differing.push(`U+${(i * 0x1000).toString(16).toUpperCase().padStart(4, '0')} to U+${(i * 0x1000 + 0xFFF).toString(16).toUpperCase().padStart(4, '0')}`);
+          }
         }
 
-        assert.strictEqual(hash.digest('hex').slice(0, 16), hashes[codepage].encoding);
+        assert.deepEqual(differing, [], 'encoded differently');
       });
     }
   });
@@ -448,8 +550,8 @@ describe('text encoding', function() {
   // https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/) decode bytes and
   // sequences to, as samples. They include the C1 control characters, the
   // private use characters Windows maps some bytes to, the user-defined areas
-  // of the double-byte code pages, and the bytes and sequences `TextDecoder`
-  // does not decode as Windows does, which are corrected in `text-encoding.ts`.
+  // of the double-byte code pages, and bytes and sequences that Node.js'
+  // `TextDecoder` decodes differently.
   describe('decoding samples from Windows\' tables', function() {
     const singleByteSamples: { [codepage: string]: Array<[number, number]> } = {
       CP874: [[0x81, 0x0081], [0xDB, 0xF8C1], [0xFF, 0xF8C8]],
@@ -474,19 +576,19 @@ describe('text encoding', function() {
     const doubleByteSamples: { [codepage: string]: Array<[number[], string]> } = {
       CP932: [
         [[0x1A], '\u001A'], [[0x1C], '\u001C'], [[0x7F], '\u007F'], [[0x5C], '\\'], [[0x7E], '~'],
-        [[0x80], '\u0080'], [[0xA0], ''], [[0xB1], 'ｱ'], [[0xFD], ''], [[0xFF], ''],
+        [[0x80], '\u0080'], [[0xA0], '\uF8F0'], [[0xB1], 'ｱ'], [[0xFD], '\uF8F1'], [[0xFF], '\uF8F3'],
         [[0x81, 0x5F], '＼'], [[0x82, 0xA0], 'あ'], [[0x87, 0x40], '①'], [[0xED, 0x40], '纊'], [[0xFA, 0x40], 'ⅰ']
       ],
       CP936: [
-        [[0x80], '€'], [[0xFF], ''], [[0xB0, 0xA1], '啊'], [[0xA1, 0x40], ''], [[0xAA, 0xA1], ''],
-        [[0xA2, 0xE3], ''], [[0xA6, 0xD9], ''], [[0xFE, 0x50], ''], [[0xFE, 0xA0], '']
+        [[0x80], '€'], [[0xFF], '\uF8F5'], [[0xB0, 0xA1], '啊'], [[0xA1, 0x40], '\uE4C6'], [[0xAA, 0xA1], '\uE000'],
+        [[0xA2, 0xE3], '\uE76C'], [[0xA6, 0xD9], '\uE78D'], [[0xFE, 0x50], '\uE815'], [[0xFE, 0xA0], '\uE864']
       ],
       CP949: [
-        [[0x80], '\u0080'], [[0xFF], ''], [[0xB0, 0xA1], '가'], [[0x81, 0x41], '갂'], [[0xC6, 0x52], '힣'],
-        [[0xA2, 0xE6], '€'], [[0xA2, 0xE7], '®'], [[0xC9, 0xA1], '']
+        [[0x80], '\u0080'], [[0xFF], '\uF8F7'], [[0xB0, 0xA1], '가'], [[0x81, 0x41], '갂'], [[0xC6, 0x52], '힣'],
+        [[0xA2, 0xE6], '€'], [[0xA2, 0xE7], '®'], [[0xC9, 0xA1], '\uE000']
       ],
       CP950: [
-        [[0x80], '\u0080'], [[0xFF], ''], [[0xA4, 0x40], '一'], [[0xA3, 0xE1], '€'], [[0x81, 0x40], '']
+        [[0x80], '\u0080'], [[0xFF], '\uF8F8'], [[0xA4, 0x40], '一'], [[0xA3, 0xE1], '€'], [[0x81, 0x40], '\uEEB8']
       ]
     };
 

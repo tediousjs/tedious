@@ -13,17 +13,18 @@ import { SQL_SERVER_ENCODINGS } from './codepage-sqlserver-encodings';
 // - UTF-8 is decoded with Node.js' built-in UTF-8 decoder.
 // - The legacy code pages (CP437, CP850, CP874, CP1250 to CP1258, and the
 //   double-byte CP932, CP936, CP949 and CP950) are decoded with the tables in
-//   `codepage-tables.ts`, which are Windows' own (as are the ones SQL Server
-//   uses to convert `varchar` to `nvarchar`). As in Windows, an invalid byte
-//   sequence decodes to the code page's default character: "?", or U+30FB
-//   (・) in CP932.
+//   `codepage-tables.ts`, Microsoft's tables for these code pages, which SQL
+//   Server also uses to convert `varchar` to `nvarchar`. As in Windows, an
+//   invalid byte sequence decodes to the code page's default character: "?",
+//   or U+30FB (・) in CP932.
 //
 // Encoding UTF-8 is left to Node.js. The legacy code pages are encoded with
 // the inverse of the decoding tables, adjusted with the best-fit mappings and
 // other choices Windows and SQL Server make (see
 // `codepage-encoding-overrides.ts` and `codepage-sqlserver-encodings.ts`), so
-// that a value is encoded exactly as SQL Server would convert it to `varchar`
-// itself.
+// that a value is encoded as SQL Server converts it to `varchar` itself (on
+// Linux and on current versions of Windows; see
+// `codepage-sqlserver-encodings.ts`).
 
 const QUESTION_MARK = 0x3F;
 
@@ -47,7 +48,17 @@ export interface StreamEncoder {
 }
 
 function isUtf8(codepage: string | undefined) {
-  return codepage === undefined || codepage === 'utf-8' || codepage === 'utf8';
+  return codepage === undefined || codepage === 'utf-8';
+}
+
+function isSupported(codepage: string) {
+  return Object.hasOwn(SINGLE_BYTE_HIGH_HALVES, codepage) || Object.hasOwn(DOUBLE_BYTE_TABLES, codepage);
+}
+
+function assertSupported(codepage: string) {
+  if (!isSupported(codepage)) {
+    throw new Error(`Unsupported code page: ${codepage}.`);
+  }
 }
 
 const NON_ASCII = /[\u0080-\uFFFF]/;
@@ -58,33 +69,40 @@ function isAsciiString(value: string) {
 
 const LITTLE_ENDIAN = endianness() === 'LE';
 
-// --- Decoding ----------------------------------------------------------------
+/**
+ * How a single-byte code page is decoded.
+ */
+interface SingleByteCodepageTable {
+  readonly doubleByte: false;
+
+  // The UTF-16 code unit for every byte.
+  readonly singleBytes: Uint16Array;
+}
 
 /**
- * How the bytes 0x80 to 0xFF of a legacy code page are decoded.
+ * How a double-byte code page is decoded.
  */
-interface CodepageTable {
+interface DoubleByteCodepageTable {
+  readonly doubleByte: true;
+
   // The UTF-16 code unit for each single byte from 0x80 to 0xFF that is not a
   // lead byte, or 0 if the byte is not a character on its own.
   readonly high: Uint16Array;
 
-  // For a double-byte code page: 1 for each byte that starts a two-byte
-  // sequence.
-  readonly lead: Uint8Array | undefined;
+  // 1 for each byte that starts a two-byte sequence.
+  readonly lead: Uint8Array;
 
-  // For a double-byte code page: the UTF-16 code unit for each two-byte
-  // sequence, at `(lead - 0x80) << 8 | trail`, or 0 if the sequence is not a
-  // character.
-  readonly pairs: Uint16Array | undefined;
+  // The UTF-16 code unit for each two-byte sequence, at
+  // `(lead - 0x80) << 8 | trail`, or 0 if the sequence is not a character.
+  readonly pairs: Uint16Array;
 
-  // For a single-byte code page: the UTF-16 code unit for every byte.
-  readonly singleBytes: Uint16Array | undefined;
-
-  // For a double-byte code page: what an invalid byte sequence decodes to.
+  // What an invalid byte sequence decodes to.
   readonly defaultChar: number;
 }
 
-function buildDoubleByteTable(spec: DoubleByteTable): CodepageTable {
+type CodepageTable = SingleByteCodepageTable | DoubleByteCodepageTable;
+
+function buildDoubleByteTable(spec: DoubleByteTable): DoubleByteCodepageTable {
   const lead = new Uint8Array(256);
   const leads = [];
   for (const [first, last] of spec.leadBytes) {
@@ -111,51 +129,35 @@ function buildDoubleByteTable(spec: DoubleByteTable): CodepageTable {
     }
   }
 
-  return { high, lead, pairs, singleBytes: undefined, defaultChar: spec.defaultChar };
+  return { doubleByte: true, high, lead, pairs, defaultChar: spec.defaultChar };
 }
 
-function buildSingleByteTable(highHalf: string): CodepageTable {
-  const high = new Uint16Array(128);
+function buildSingleByteTable(highHalf: string): SingleByteCodepageTable {
   const singleBytes = new Uint16Array(256);
   for (let i = 0; i < 128; i++) {
-    high[i] = highHalf.charCodeAt(i);
     singleBytes[i] = i;
-    singleBytes[0x80 + i] = high[i];
+    singleBytes[0x80 + i] = highHalf.charCodeAt(i);
   }
-  return { high, lead: undefined, pairs: undefined, singleBytes, defaultChar: QUESTION_MARK };
+  return { doubleByte: false, singleBytes };
 }
 
 const tables = new Map<string, CodepageTable>();
 
-/**
- * Forgets the decoding and encoding tables built so far. Only for tests.
- *
- * @private
- */
-export function resetTables() {
-  tables.clear();
-  encodingTables.clear();
-}
-
 function tableFor(codepage: string): CodepageTable {
   let table = tables.get(codepage);
   if (table === undefined) {
-    const highHalf = SINGLE_BYTE_HIGH_HALVES[codepage];
-    const doubleByte = DOUBLE_BYTE_TABLES[codepage];
-    if (highHalf !== undefined) {
-      table = buildSingleByteTable(highHalf);
-    } else if (doubleByte !== undefined) {
-      table = buildDoubleByteTable(doubleByte);
-    } else {
-      throw new Error(`Unsupported code page: ${codepage}.`);
-    }
+    assertSupported(codepage);
+    table = Object.hasOwn(SINGLE_BYTE_HIGH_HALVES, codepage) ?
+      buildSingleByteTable(SINGLE_BYTE_HIGH_HALVES[codepage]) :
+      buildDoubleByteTable(DOUBLE_BYTE_TABLES[codepage]);
     tables.set(codepage, table);
   }
   return table;
 }
 
 // Allocates a buffer for `count` UTF-16 code units and a `Uint16Array` view of
-// it. The view needs an even offset, which pooled buffers always have.
+// it. The view needs an even offset, which pooled buffers always have; an
+// unpooled buffer is used otherwise.
 function allocateUnits(count: number): [Buffer, Uint16Array] {
   let out = Buffer.allocUnsafe(count * 2);
   if (out.byteOffset % 2 !== 0) {
@@ -181,7 +183,7 @@ function decodeSingleByte(buf: Buffer, singleBytes: Uint16Array): string {
 }
 
 class TableDecoder implements StreamDecoder {
-  declare table: CodepageTable;
+  declare readonly table: CodepageTable;
 
   // A lead byte at the end of the last part, or -1.
   declare pending: number;
@@ -192,16 +194,21 @@ class TableDecoder implements StreamDecoder {
   }
 
   write(buf: Buffer): string {
-    let pending = this.pending;
-    if (pending === -1 && isAscii(buf)) {
+    if (this.pending === -1 && isAscii(buf)) {
       return buf.toString('latin1');
     }
+    return this.decodeBytes(buf);
+  }
 
-    const { high, lead, pairs, singleBytes, defaultChar } = this.table;
-
-    if (singleBytes !== undefined) {
-      return decodeSingleByte(buf, singleBytes);
+  // Decodes a part, without the ASCII fast path.
+  decodeBytes(buf: Buffer): string {
+    const table = this.table;
+    if (!table.doubleByte) {
+      return decodeSingleByte(buf, table.singleBytes);
     }
+
+    const { high, lead, pairs, defaultChar } = table;
+    let pending = this.pending;
 
     // Every byte decodes to at most one UTF-16 code unit, but a lead byte left
     // over from the last part can add a character.
@@ -213,7 +220,7 @@ class TableDecoder implements StreamDecoder {
       let char;
 
       if (pending !== -1) {
-        char = pairs![((pending - 0x80) << 8) | byte];
+        char = pairs[((pending - 0x80) << 8) | byte];
         pending = -1;
 
         if (char === 0) {
@@ -230,7 +237,7 @@ class TableDecoder implements StreamDecoder {
         }
       } else if (byte < 0x80) {
         char = byte;
-      } else if (lead !== undefined && lead[byte] === 1) {
+      } else if (lead[byte] === 1) {
         pending = byte;
         continue;
       } else {
@@ -247,7 +254,7 @@ class TableDecoder implements StreamDecoder {
   end(): string {
     // A lead byte at the end of a value (which SQL Server itself never
     // stores) decodes to the default character, as any invalid sequence.
-    if (this.pending !== -1) {
+    if (this.pending !== -1 && this.table.doubleByte) {
       this.pending = -1;
       return String.fromCharCode(this.table.defaultChar);
     }
@@ -337,7 +344,7 @@ function isRestrictedLead(byte: number) {
 }
 
 class Utf8Decoder implements StreamDecoder {
-  declare decoder: TextDecoder;
+  declare readonly decoder: TextDecoder;
 
   // A lead byte from the end of the last part whose continuation byte is
   // needed to tell how an invalid sequence decodes (see `withWindowsErrors`),
@@ -357,7 +364,8 @@ class Utf8Decoder implements StreamDecoder {
     }
 
     if (buf.length > 0 && isRestrictedLead(buf[buf.length - 1])) {
-      this.pending = buf.subarray(buf.length - 1);
+      // A copy, so as not to keep the rest of `buf` alive.
+      this.pending = Buffer.from(buf.subarray(buf.length - 1));
       buf = buf.subarray(0, buf.length - 1);
     }
 
@@ -381,7 +389,7 @@ export function createDecoder(codepage: string | undefined): StreamDecoder {
   if (isUtf8(codepage)) {
     return new Utf8Decoder();
   }
-  return new TableDecoder(tableFor(codepage!));
+  return new TableDecoder(tableFor(codepage));
 }
 
 /**
@@ -395,16 +403,14 @@ export function decode(buf: Buffer, codepage: string | undefined): string {
     return withWindowsErrors(buf).toString('utf8');
   }
 
+  assertSupported(codepage);
   if (isAscii(buf)) {
     return buf.toString('latin1');
   }
 
-  const decoder = new TableDecoder(tableFor(codepage!));
-  return decoder.write(buf) + decoder.end();
+  const decoder = new TableDecoder(tableFor(codepage));
+  return decoder.decodeBytes(buf) + decoder.end();
 }
-
-// --- Encoding ----------------------------------------------------------------
-
 
 /**
  * How every UTF-16 code unit is encoded in a legacy code page. As in SQL
@@ -424,9 +430,9 @@ interface EncodingTable {
 // Applies the entries of `ENCODING_OVERRIDES` and then of
 // `SQL_SERVER_ENCODINGS` for a code page.
 function applyOverrides(codepage: string, set: (char: number, code: number) => void) {
-  const entries = [ENCODING_OVERRIDES[codepage], SQL_SERVER_ENCODINGS[codepage]]
-    .filter((overrides) => overrides !== undefined)
-    .flatMap((overrides) => overrides.split(' '));
+  const entries = [ENCODING_OVERRIDES, SQL_SERVER_ENCODINGS]
+    .filter((overrides) => Object.hasOwn(overrides, codepage))
+    .flatMap((overrides) => overrides[codepage].split(' '));
 
   for (const entry of entries) {
     const match = /^([0-9A-F]{4})(?:-([0-9A-F]{4}))?:([0-9A-F]{2,4})(\+?)$/.exec(entry);
@@ -445,12 +451,13 @@ function applyOverrides(codepage: string, set: (char: number, code: number) => v
 }
 
 function buildEncodingTable(codepage: string): EncodingTable {
-  const { high, lead, pairs, singleBytes } = tableFor(codepage);
+  const table = tableFor(codepage);
 
   // Every character is encoded as the first byte sequence that decodes to it
-  // (single bytes first, then two-byte sequences in order), unless SQL Server
-  // encodes it otherwise.
-  if (singleBytes !== undefined) {
+  // (single bytes first, then two-byte sequences in order), unless Windows or
+  // SQL Server encodes it otherwise.
+  if (!table.doubleByte) {
+    const { singleBytes } = table;
     const bytes = new Uint8Array(0x10000).fill(QUESTION_MARK);
     const mapped = new Uint8Array(0x10000);
     for (let byte = 0; byte <= 0xFF; byte++) {
@@ -466,6 +473,7 @@ function buildEncodingTable(codepage: string): EncodingTable {
     return { bytes, codes: undefined };
   }
 
+  const { high, lead, pairs } = table;
   const codes = new Uint16Array(0x10000).fill(QUESTION_MARK);
   const mapped = new Uint8Array(0x10000);
   const add = (char: number, code: number) => {
@@ -483,9 +491,9 @@ function buildEncodingTable(codepage: string): EncodingTable {
     add(high[byte - 0x80], byte);
   }
   for (let leadByte = 0x80; leadByte <= 0xFF; leadByte++) {
-    if (lead![leadByte]) {
+    if (lead[leadByte]) {
       for (let trail = 0x40; trail <= 0xFE; trail++) {
-        add(pairs![((leadByte - 0x80) << 8) | trail], (leadByte << 8) | trail);
+        add(pairs[((leadByte - 0x80) << 8) | trail], (leadByte << 8) | trail);
       }
     }
   }
@@ -507,11 +515,14 @@ function encodingTableFor(codepage: string): EncodingTable {
 }
 
 // The UTF-16 code units of a string. Reading them from a buffer is much faster
-// than calling `charCodeAt` for each.
+// than calling `charCodeAt` for each. As in `allocateUnits`, the view needs an
+// even offset.
 function codeUnits(value: string): Uint16Array {
   let buf = Buffer.from(value, 'utf16le');
   if (buf.byteOffset % 2 !== 0) {
-    buf = Buffer.from(buf);
+    const copy = Buffer.allocUnsafeSlow(buf.length);
+    buf.copy(copy);
+    buf = copy;
   }
   if (!LITTLE_ENDIAN) {
     buf.swap16();
@@ -547,7 +558,9 @@ function encodeWithTable(value: string, table: EncodingTable): Buffer {
  * Encodes a value in the given code page, as SQL Server converts an
  * `nvarchar` value to `varchar` in a collation with this code page: a
  * character the code page does not have is encoded as a similar one (a
- * "best fit") where Windows defines one, and otherwise as "?".
+ * "best fit") where Windows defines one, and otherwise as "?". Each UTF-16
+ * code unit is encoded on its own, so a character outside of the Basic
+ * Multilingual Plane is encoded as "??".
  *
  * @param codepage A collation's code page, such as `CP1252` or `utf-8`.
  */
@@ -555,6 +568,8 @@ export function encode(value: string, codepage: string): Buffer {
   if (isUtf8(codepage)) {
     return Buffer.from(value, 'utf8');
   }
+
+  assertSupported(codepage);
 
   // All the legacy code pages are ASCII compatible.
   if (isAsciiString(value)) {
@@ -600,7 +615,7 @@ class Utf8Encoder implements StreamEncoder {
 }
 
 class LegacyEncoder implements StreamEncoder {
-  declare codepage: string;
+  declare readonly codepage: string;
 
   constructor(codepage: string) {
     this.codepage = codepage;
@@ -628,8 +643,6 @@ export function createEncoder(codepage: string): StreamEncoder {
     return new Utf8Encoder();
   }
 
-  // Fail now, rather than on the first non-ASCII chunk, if the code page is
-  // not supported.
-  encodingTableFor(codepage);
+  assertSupported(codepage);
   return new LegacyEncoder(codepage);
 }

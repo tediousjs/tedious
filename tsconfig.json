@@ -21,6 +21,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "test/**/*.js",
+    "scripts/**/*.js",
     "eslint.config.mjs"
   ],
 
