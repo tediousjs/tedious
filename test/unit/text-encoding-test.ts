@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 import sinon from 'sinon';
-import iconv from 'iconv-lite';
+import { createHash } from 'crypto';
 
 import { createDecoder, createEncoder, decode, encode, resetTables } from '../../src/text-encoding';
 import { PLPReader } from '../../src/value-parser';
@@ -40,7 +40,6 @@ describe('text encoding', function() {
 
         const encoded = encode(value, codepage);
         assert.deepEqual(encoded, Buffer.from(value, 'latin1'));
-        assert.deepEqual(encoded, iconv.encode(value, codepage));
       });
     }
 
@@ -399,52 +398,74 @@ describe('text encoding', function() {
     });
   });
 
-  // Compares decoding with `iconv-lite`, which tedious used before, for every
-  // single byte and every two-byte sequence in the double-byte code pages.
-  //
-  // Wherever the two differ, the new decoding is what Windows' own tables for
-  // the code page define (WindowsBestFit/bestfit<N>.txt, and PC/CP437.TXT and
-  // PC/CP850.TXT, at https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/),
-  // which SQL Server also uses to convert `varchar` to `nvarchar`. The
-  // differences fall into two kinds:
-  //
-  // - `iconv-lite` has no mapping for a byte or sequence that Windows maps,
-  //   and decodes it to U+FFFD. These are the C1 control characters in the
-  //   Windows code pages (CP1252 0x81 is U+0081), the private use characters
-  //   Windows maps some unassigned bytes to (CP1253 0xAA is U+F8F9, CP932 0xA0
-  //   is U+F8F0), and the user-defined areas of the double-byte code pages
-  //   (CP936 0xAAA1 is U+E000, CP950 0x8140 is U+EEB8).
-  //
-  // - An invalid byte sequence (a lead byte with a byte that does not make a
-  //   character with it, or with no byte after it), which `iconv-lite`
-  //   decodes to U+FFFD (followed by the trail byte, as a character of its
-  //   own), and which is decoded to the code page's default character here,
-  //   as in Windows (with the trail byte, unless it is 0x00).
-  //
-  // Otherwise, the two never decode a byte or sequence to different
-  // characters.
-  describe('equivalence with `iconv-lite`', function() {
-    // The single bytes that decode differently, all of which `iconv-lite`
-    // decodes to U+FFFD.
-    const singleByteDifferences: { [codepage: string]: number[] } = {
-      CP437: [],
-      CP850: [],
-      CP874: [
-        0x81, 0x82, 0x83, 0x84, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E, 0x8F, 0x90, 0x98,
-        0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, 0xDB, 0xDC, 0xDD, 0xDE, 0xFC, 0xFD, 0xFE, 0xFF
-      ],
-      CP1250: [0x81, 0x83, 0x88, 0x90, 0x98],
-      CP1251: [0x98],
-      CP1252: [0x81, 0x8D, 0x8F, 0x90, 0x9D],
-      CP1253: [0x81, 0x88, 0x8A, 0x8C, 0x8D, 0x8E, 0x8F, 0x90, 0x98, 0x9A, 0x9C, 0x9D, 0x9E, 0x9F, 0xAA, 0xD2, 0xFF],
-      CP1254: [0x81, 0x8D, 0x8E, 0x8F, 0x90, 0x9D, 0x9E],
-      CP1255: [0x81, 0x8A, 0x8C, 0x8D, 0x8E, 0x8F, 0x90, 0x9A, 0x9C, 0x9D, 0x9E, 0x9F, 0xD9, 0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0xDF, 0xFB, 0xFC, 0xFF],
-      CP1256: [],
-      CP1257: [0x81, 0x83, 0x88, 0x8A, 0x8C, 0x90, 0x98, 0x9A, 0x9C, 0x9F, 0xA1, 0xA5],
-      CP1258: [0x81, 0x8A, 0x8D, 0x8E, 0x8F, 0x90, 0x9A, 0x9D, 0x9E]
+  // Every single byte (and, in the double-byte code pages, every two-byte
+  // sequence from 0x8000 to 0xFFFF) decodes, and every UTF-16 code unit
+  // encodes, as SQL Server converts it: these hashes were recorded from the
+  // output that `test/integration/codepage-test.ts` checks against SQL Server,
+  // and match hashes of SQL Server's own conversions. If a change to the tables
+  // changes one, check it against SQL Server with that test.
+  describe('conversion of every input', function() {
+    const hashes: { [codepage: string]: { decoding: string, encoding: string } } = {
+      CP437: { decoding: 'ea22d525a593bc3e', encoding: '0a2f605aa2b0b0c7' },
+      CP850: { decoding: 'a1a7917730e355f1', encoding: '4b77c18510d32149' },
+      CP874: { decoding: '8945a4955da0189c', encoding: 'e0b4591074a6958d' },
+      CP1250: { decoding: '3ffa1e185a6595f5', encoding: '70d698e671d742a3' },
+      CP1251: { decoding: '26067470e4fc6bcd', encoding: '38ed28d889b611cc' },
+      CP1252: { decoding: '94e2f8494a2525a7', encoding: '08e2dac05daa77f7' },
+      CP1253: { decoding: '9f301e773f264860', encoding: '6f34c50a4b2fcae4' },
+      CP1254: { decoding: 'ffb420a8fe95346f', encoding: 'ecbb2557b784b7fb' },
+      CP1255: { decoding: '16959000e2d8df26', encoding: '127954a94403289c' },
+      CP1256: { decoding: '0760c0d2abe2ae75', encoding: 'd01b3b228dcf1f7e' },
+      CP1257: { decoding: '6623460ce19cfb5d', encoding: '2e228e61af151118' },
+      CP1258: { decoding: 'bf19376d5405c712', encoding: 'c0a37706d962cac0' },
+      CP932: { decoding: 'dc20aa1c62e742c2', encoding: '86c70a39b8cc874d' },
+      CP936: { decoding: '599fe7edd0ab5801', encoding: 'd4fb917161fa2c52' },
+      CP949: { decoding: 'df6fb538e168c066', encoding: '9260fd1010203925' },
+      CP950: { decoding: '7f156c3d9b9215cc', encoding: '0f347d6401e7671c' }
     };
 
-    // Characters Windows decodes the differing bytes to, as samples.
+    for (const codepage of ALL_CODEPAGES) {
+      it(`decodes every byte sequence in ${codepage} as SQL Server does`, function() {
+        const hash = createHash('sha256');
+        const add = (buf: Buffer) => {
+          hash.update(Buffer.from(decode(buf, codepage) + '\n', 'utf16le'));
+        };
+
+        for (let byte = 0; byte <= 0xFF; byte++) {
+          add(Buffer.of(byte));
+        }
+        if (DOUBLE_BYTE_CODEPAGES.includes(codepage)) {
+          for (let lead = 0x80; lead <= 0xFF; lead++) {
+            for (let trail = 0x00; trail <= 0xFF; trail++) {
+              add(Buffer.of(lead, trail));
+            }
+          }
+        }
+
+        assert.strictEqual(hash.digest('hex').slice(0, 16), hashes[codepage].decoding);
+      });
+
+      it(`encodes every UTF-16 code unit in ${codepage} as SQL Server does`, function() {
+        const hash = createHash('sha256');
+        for (let unit = 0; unit <= 0xFFFF; unit++) {
+          const bytes = encode(String.fromCharCode(unit), codepage);
+          hash.update(Buffer.of(bytes.length));
+          hash.update(bytes);
+        }
+
+        assert.strictEqual(hash.digest('hex').slice(0, 16), hashes[codepage].encoding);
+      });
+    }
+  });
+
+  // Characters Windows' own tables for each code page (WindowsBestFit/
+  // bestfit<N>.txt, and PC/CP437.TXT and PC/CP850.TXT, at
+  // https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/) decode bytes and
+  // sequences to, as samples. They include the C1 control characters, the
+  // private use characters Windows maps some bytes to, the user-defined areas
+  // of the double-byte code pages, and the bytes and sequences `TextDecoder`
+  // does not decode as Windows does, which are corrected in `text-encoding.ts`.
+  describe('decoding samples from Windows\' tables', function() {
     const singleByteSamples: { [codepage: string]: Array<[number, number]> } = {
       CP874: [[0x81, 0x0081], [0xDB, 0xF8C1], [0xFF, 0xF8C8]],
       CP1250: [[0x81, 0x0081], [0x98, 0x0098]],
@@ -457,41 +478,14 @@ describe('text encoding', function() {
       CP1258: [[0x81, 0x0081]]
     };
 
-    for (const codepage of SINGLE_BYTE_CODEPAGES) {
-      it(`decodes every byte in ${codepage} as \`iconv-lite\` does, except where it has no mapping`, function() {
-        const differences = [];
-        for (let byte = 0; byte <= 0xFF; byte++) {
-          const buf = Buffer.of(byte);
-          const expected = iconv.decode(buf, codepage);
-          const actual = decode(buf, codepage);
-          if (actual !== expected) {
-            assert.strictEqual(expected, '�', `0x${byte.toString(16)}`);
-            assert.strictEqual(actual.length, 1, `0x${byte.toString(16)}`);
-            assert.notStrictEqual(actual, '�', `0x${byte.toString(16)}`);
-            differences.push(byte);
-          }
-        }
-
-        assert.deepEqual(differences, singleByteDifferences[codepage]);
-
-        for (const [byte, char] of singleByteSamples[codepage] ?? []) {
-          assert.strictEqual(decode(Buffer.of(byte), codepage), String.fromCharCode(char));
+    for (const [codepage, samples] of Object.entries(singleByteSamples)) {
+      it(`decodes ${codepage} as Windows does`, function() {
+        for (const [byte, char] of samples) {
+          assert.strictEqual(decode(Buffer.of(byte), codepage), String.fromCharCode(char), `0x${byte.toString(16)}`);
         }
       });
     }
 
-    // How many inputs (single bytes, and two bytes from 0x8000 to 0xFFFF)
-    // decode differently, of each kind.
-    const doubleByteDifferences: { [codepage: string]: { iconvHasNoMapping: number, invalidSequence: number } } = {
-      CP932: { iconvHasNoMapping: 1231, invalidSequence: 9896 },
-      CP936: { iconvHasNoMapping: 2281, invalidSequence: 8694 },
-      CP949: { iconvHasNoMapping: 450, invalidSequence: 15398 },
-      CP950: { iconvHasNoMapping: 6479, invalidSequence: 12914 }
-    };
-
-    // Characters Windows decodes bytes and sequences to, as samples. They
-    // include the bytes and sequences `TextDecoder` does not decode as Windows
-    // does, which are corrected in `text-encoding.ts`.
     const doubleByteSamples: { [codepage: string]: Array<[number[], string]> } = {
       CP932: [
         [[0x1A], '\u001A'], [[0x1C], '\u001C'], [[0x7F], '\u007F'], [[0x5C], '\\'], [[0x7E], '~'],
@@ -511,80 +505,11 @@ describe('text encoding', function() {
       ]
     };
 
-    for (const codepage of DOUBLE_BYTE_CODEPAGES) {
-      it(`decodes every byte and two-byte sequence in ${codepage} as \`iconv-lite\` does, except where it has no mapping or the sequence is invalid`, function() {
-        const differences = { iconvHasNoMapping: 0, invalidSequence: 0 };
-
-        const compare = (buf: Buffer) => {
-          const expected = iconv.decode(buf, codepage);
-          const actual = decode(buf, codepage);
-          if (actual === expected) {
-            return;
-          }
-
-          const description = `${buf.toString('hex')}: iconv-lite ${hex(expected)}, decoded ${hex(actual)}`;
-          assert.include(expected, '�', description);
-          assert.notInclude(actual, '�', description);
-          const defaultChar = codepage === 'CP932' ? '・' : '?';
-          // An invalid sequence adds a default character, except for a lead
-          // byte followed by a "?" (0x3F), which both decode to one.
-          const count = (text: string) => text.split(defaultChar).length;
-          if (count(actual) > count(expected) || (actual === defaultChar && expected === '\uFFFD' + defaultChar)) {
-            differences.invalidSequence++;
-          } else {
-            differences.iconvHasNoMapping++;
-          }
-        };
-
-        for (let byte = 0; byte <= 0xFF; byte++) {
-          compare(Buffer.of(byte));
-        }
-
-        for (let lead = 0x80; lead <= 0xFF; lead++) {
-          for (let trail = 0x00; trail <= 0xFF; trail++) {
-            compare(Buffer.of(lead, trail));
-          }
-        }
-
-        assert.deepEqual(differences, doubleByteDifferences[codepage]);
-
-        for (const [bytes, char] of doubleByteSamples[codepage]) {
+    for (const [codepage, samples] of Object.entries(doubleByteSamples)) {
+      it(`decodes ${codepage} as Windows does`, function() {
+        for (const [bytes, char] of samples) {
           assert.strictEqual(hex(decode(Buffer.from(bytes), codepage)), hex(char), Buffer.from(bytes).toString('hex'));
         }
-      });
-    }
-
-    // Where `iconv-lite` encodes a character to bytes that decode back to it,
-    // it is encoded the same way, except for these CP950 characters that
-    // several sequences decode to, where SQL Server picks another one.
-    const encodingDifferences: { [codepage: string]: Array<[number, string, string]> } = {
-      CP950: [
-        [0x2550, 'f9f9', 'a2a4'], [0x255E, 'f9e9', 'a2a5'], [0x2561, 'f9eb', 'a2a7'],
-        [0x256A, 'f9ea', 'a2a6'], [0x5341, 'a451', 'a2cc'], [0x5345, 'a4ca', 'a2ce']
-      ]
-    };
-
-    for (const codepage of ALL_CODEPAGES) {
-      it(`encodes every character in ${codepage} as \`iconv-lite\` does where it encodes the character itself`, function() {
-        const differences: Array<[number, string, string]> = [];
-        for (let char = 0x80; char <= 0xFFFF; char++) {
-          if (char >= 0xD800 && char <= 0xDFFF) {
-            continue;
-          }
-
-          const value = String.fromCharCode(char);
-          const expected = iconv.encode(value, codepage);
-          if (decode(expected, codepage) !== value) {
-            continue;
-          }
-
-          const actual = encode(value, codepage);
-          if (!actual.equals(expected)) {
-            differences.push([char, actual.toString('hex'), expected.toString('hex')]);
-          }
-        }
-
-        assert.deepEqual(differences, encodingDifferences[codepage] ?? []);
       });
     }
   });
