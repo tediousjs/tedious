@@ -95,6 +95,11 @@ validation in this mode. See the
 ## Documentation
 More documentation and code samples are available at [tediousjs.github.io/tedious/](https://tediousjs.github.io/tedious/)
 
+### Authentication deprecation
+
+`azure-active-directory-password` authentication is deprecated and will be removed in a future version.
+Use `token-credential` authentication with a suitable credential from [`@azure/identity`](https://www.npmjs.com/package/@azure/identity) instead.
+
 <a name="name"></a>
 ## Name
 _Tedious_ is simply derived from a fast, slightly garbled, pronunciation of the letters T, D and S.
