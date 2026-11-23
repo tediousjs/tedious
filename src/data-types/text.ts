@@ -64,7 +64,7 @@ const Text: DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return encode(value, collation.codepage, 'Text');
+    return encode(value, collation.codepage);
   }
 };
 

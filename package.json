@@ -153,13 +153,5 @@
     "extension": [
       ".ts"
     ]
-  },
-  "peerDependencies": {
-    "iconv-lite": "^0.7.0"
-  },
-  "peerDependenciesMeta": {
-    "iconv-lite": {
-      "optional": true
-    }
   }
 }

@@ -69,7 +69,7 @@ const VarChar: { maximumLength: number } & DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return encode(value, collation.codepage, 'VarChar');
+    return encode(value, collation.codepage);
   },
 
   resolve(parameter, collation) {
@@ -125,7 +125,7 @@ const VarChar: { maximumLength: number } & DataType = {
     // it as `varchar(max)` and checked the collation.
     if (isAsyncIterable(parameter.value)) {
       const codepage = parameter.collation!.codepage!;
-      const encoder = createEncoder(codepage, 'VarChar');
+      const encoder = createEncoder(codepage);
       return writePlpStream(
         buffer,
         parameter.value,

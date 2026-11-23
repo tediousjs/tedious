@@ -2,19 +2,15 @@ import { assert } from 'chai';
 import sinon from 'sinon';
 import iconv from 'iconv-lite';
 
-import { createDecoder, createEncoder, decode, encode, resetDecodingTables } from '../../src/text-encoding';
-import { iconvLoader, resetIconv } from '../../src/iconv';
+import { createDecoder, createEncoder, decode, encode, resetTables } from '../../src/text-encoding';
 import { PLPReader } from '../../src/value-parser';
 import { NotEnoughDataError } from '../../src/token/helpers';
 import { type Metadata } from '../../src/metadata-parser';
 import { Collation } from '../../src/collation';
-import { typeByName as TYPES, resolveParameter, type Parameter } from '../../src/data-type';
+import { typeByName as TYPES } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 import Request from '../../src/request';
-import { RequestError, InputError } from '../../src/errors';
-import BulkLoad from '../../src/bulk-load';
-import { BulkLoadPayload } from '../../src/bulk-load-payload';
-import RpcRequestPayload from '../../src/rpcrequest-payload';
+import { RequestError } from '../../src/errors';
 
 const SINGLE_BYTE_CODEPAGES = ['CP437', 'CP850', 'CP874', 'CP1250', 'CP1251', 'CP1252', 'CP1253', 'CP1254', 'CP1255', 'CP1256', 'CP1257', 'CP1258'];
 const DOUBLE_BYTE_CODEPAGES = ['CP932', 'CP936', 'CP949', 'CP950'];
@@ -28,37 +24,11 @@ function hex(text: string) {
   return Array.from(text, (c) => 'U+' + c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')).join(' ');
 }
 
-function moduleNotFound(name: string) {
-  const error = new Error(`Cannot find module '${name}'`) as NodeJS.ErrnoException;
-  error.code = 'MODULE_NOT_FOUND';
-  return error;
-}
-
-// Simulates `iconv-lite` not being installed for the duration of a test.
-function withoutIconv() {
-  let load: sinon.SinonStub;
-
-  beforeEach(function() {
-    resetIconv();
-    load = sinon.stub(iconvLoader, 'load').throws(moduleNotFound('iconv-lite'));
-  });
-
-  afterEach(function() {
-    load.restore();
-    resetIconv();
-  });
-
-  return () => load;
-}
-
 describe('text encoding', function() {
-  describe('encoding without `iconv-lite`', function() {
-    const load = withoutIconv();
-
+  describe('encoding', function() {
     it('encodes UTF-8 text with Node.js', function() {
       const value = 'héllo wörld \u{1F600} \uD83D';
-      assert.deepEqual(encode(value, 'utf-8', 'VarChar'), Buffer.from(value, 'utf8'));
-      assert.isTrue(load().notCalled);
+      assert.deepEqual(encode(value, 'utf-8'), Buffer.from(value, 'utf8'));
     });
 
     for (const codepage of ALL_CODEPAGES) {
@@ -68,157 +38,139 @@ describe('text encoding', function() {
           value += String.fromCharCode(i);
         }
 
-        const encoded = encode(value, codepage, 'VarChar');
+        const encoded = encode(value, codepage);
         assert.deepEqual(encoded, Buffer.from(value, 'latin1'));
         assert.deepEqual(encoded, iconv.encode(value, codepage));
-        assert.isTrue(load().notCalled);
       });
     }
 
     it('encodes an empty string', function() {
-      assert.deepEqual(encode('', 'CP1252', 'VarChar'), Buffer.alloc(0));
-      assert.isTrue(load().notCalled);
+      assert.deepEqual(encode('', 'CP1252'), Buffer.alloc(0));
+      assert.deepEqual(encode('', 'CP932'), Buffer.alloc(0));
+    });
+
+    it('encodes the characters a code page has', function() {
+      assert.deepEqual(encode('café', 'CP1252'), Buffer.from([0x63, 0x61, 0x66, 0xE9]));
+      assert.deepEqual(encode('Ωμέγα', 'CP1253'), Buffer.from([0xD9, 0xEC, 0xDD, 0xE3, 0xE1]));
+      assert.deepEqual(encode('╔═╗', 'CP437'), Buffer.from([0xC9, 0xCD, 0xBB]));
+      assert.deepEqual(encode('a日本b', 'CP932'), Buffer.from([0x61, 0x93, 0xFA, 0x96, 0x7B, 0x62]));
+      assert.deepEqual(encode('한똠', 'CP949'), Buffer.from([0xC7, 0xD1, 0x8C, 0x63]));
+    });
+
+    for (const codepage of ALL_CODEPAGES) {
+      it(`encodes every character ${codepage} decodes to back to bytes that decode to it`, function() {
+        const doubleByte = DOUBLE_BYTE_CODEPAGES.includes(codepage);
+        const sequences = [];
+        for (let byte = 0x80; byte <= 0xFF; byte++) {
+          sequences.push(Buffer.of(byte));
+          if (doubleByte) {
+            for (let trail = 0x40; trail <= 0xFE; trail++) {
+              sequences.push(Buffer.of(byte, trail));
+            }
+          }
+        }
+
+        let characters = 0;
+        for (const bytes of sequences) {
+          const char = decode(bytes, codepage);
+          if (char.length !== 1 || char === '�') {
+            continue;
+          }
+
+          characters++;
+          assert.strictEqual(decode(encode(char, codepage), codepage), char, `${hex(char)} (${bytes.toString('hex')})`);
+        }
+        assert.isAbove(characters, 100);
+      });
+    }
+
+    it('encodes a character the code page does not have as a similar one, as SQL Server does', function() {
+      // Best-fit mappings from Windows' tables: Ā, full-width A, ∞.
+      assert.deepEqual(encode('Āａ∞', 'CP1252'), Buffer.from('Aa8'));
+      // One SQL Server adds: a punctuation space.
+      assert.deepEqual(encode('a b', 'CP1252'), Buffer.from('a b'));
+      // ◙ is a character of its own in CP437, but encoded as the control
+      // character it shares the byte with.
+      assert.deepEqual(encode('◙', 'CP437'), Buffer.of(0x0A));
+      assert.deepEqual(encode('Ａ', 'CP932'), Buffer.of(0x82, 0x60));
+    });
+
+    it('encodes other characters the code page does not have as "?"', function() {
+      assert.deepEqual(encode('a日b', 'CP1252'), Buffer.from('a?b'));
+      assert.deepEqual(encode('�', 'CP1252'), Buffer.from('?'));
+      assert.deepEqual(encode('ก', 'CP932'), Buffer.from('?'));
+    });
+
+    it('encodes each surrogate as "?", as SQL Server does', function() {
+      for (const codepage of ALL_CODEPAGES) {
+        assert.deepEqual(encode('a\u{1F600}b', codepage), Buffer.from('a??b'), codepage);
+        assert.deepEqual(encode('a\uD83Db\uDE00', codepage), Buffer.from('a?b?'), codepage);
+      }
+    });
+
+    it('encodes a character several sequences decode to as SQL Server does', function() {
+      // As IBM's extension rather than NEC's selection of it.
+      assert.deepEqual(encode('ⅰ', 'CP932'), Buffer.of(0xFA, 0x40));
+      assert.strictEqual(decode(Buffer.of(0xEE, 0xEF), 'CP932'), 'ⅰ');
+
+      assert.deepEqual(encode('\u5341\u2550', 'CP950'), Buffer.of(0xA4, 0x51, 0xF9, 0xF9));
+      assert.strictEqual(decode(Buffer.of(0xA2, 0xCC, 0xA2, 0xA4), 'CP950'), '\u5341\u2550');
+    });
+
+    it('fails to encode non-ASCII text in an unsupported code page', function() {
+      assert.deepEqual(encode('abc', 'CP1'), Buffer.from('abc'));
+      assert.throws(() => encode('é', 'CP1'), Error, 'Unsupported code page: CP1.');
+      assert.throws(() => createEncoder('CP1'), Error, 'Unsupported code page: CP1.');
     });
 
     it('encodes streamed UTF-8 text with Node.js, keeping split surrogate pairs together', function() {
-      const encoder = createEncoder('utf-8', 'VarChar');
+      const encoder = createEncoder('utf-8');
       const chunks = [encoder.write('a\uD83D'), encoder.write(''), encoder.write('\uDE00b\uD83D'), encoder.end()];
       assert.deepEqual(Buffer.concat(chunks.filter((c) => c !== undefined)), Buffer.from('a\u{1F600}b\uD83D', 'utf8'));
-      assert.isTrue(load().notCalled);
     });
 
-    it('encodes streamed ASCII text in a legacy code page as is', function() {
-      const encoder = createEncoder('CP1252', 'VarChar');
-      assert.deepEqual(encoder.write('abc'), Buffer.from('abc'));
-      assert.deepEqual(encoder.write(''), Buffer.alloc(0));
-      assert.isUndefined(encoder.end());
-      assert.isTrue(load().notCalled);
-    });
-
-    it('fails to encode non-ASCII text in a legacy code page, naming the code page and the fix', function() {
-      assert.throws(
-        () => encode('café', 'CP1252', 'VarChar'),
-        Error,
-        'Sending non-ASCII text as VarChar with code page CP1252 requires the `iconv-lite` package. Install it, or send the value as NVarChar.'
-      );
-    });
-
-    it('suggests the matching Unicode type', function() {
-      assert.throws(() => encode('café', 'CP1252', 'Char'), Error, 'send the value as NChar.');
-      assert.throws(() => encode('café', 'CP1252', 'Text'), Error, 'Sending non-ASCII text as Text with code page CP1252');
-    });
-
-    it('keeps the module resolution error as the cause', function() {
-      try {
-        encode('café', 'CP1252', 'VarChar');
-      } catch (error: any) {
-        assert.strictEqual(error.cause.code, 'MODULE_NOT_FOUND');
-        return;
+    it('encodes streamed text in a legacy code page as a whole value would be', function() {
+      const value = 'ab日\u{1F600}本Ａ';
+      for (let split = 0; split <= value.length; split++) {
+        const encoder = createEncoder('CP932');
+        const chunks = [encoder.write(value.slice(0, split)), encoder.write(''), encoder.write(value.slice(split)), encoder.end()];
+        assert.deepEqual(Buffer.concat(chunks.filter((c) => c !== undefined)), encode(value, 'CP932'), `split at ${split}`);
       }
-      assert.fail('expected an error');
     });
 
-    it('fails to encode streamed non-ASCII text once it reaches it', function() {
-      const encoder = createEncoder('CP932', 'VarChar');
-      assert.deepEqual(encoder.write('abc'), Buffer.from('abc'));
-      assert.throws(() => encoder.write('日本'), Error, 'Sending non-ASCII text as VarChar with code page CP932 requires the `iconv-lite` package.');
+    it('encodes a parameter in the collation\'s code page', function() {
+      const request = new Request('select @p', () => {});
+      request.addParameter('p', TYPES.VarChar, 'café Ā');
+      request.addParameter('q', TYPES.Char, 'naïve');
+      request.validateParameters(latin1Collation, options);
+
+      assert.deepEqual(request.parameters[0].value, Buffer.from([0x63, 0x61, 0x66, 0xE9, 0x20, 0x41]));
+      assert.deepEqual(request.parameters[1].value, Buffer.from([0x6E, 0x61, 0xEF, 0x76, 0x65]));
     });
 
-    it('fails a parameter with a non-ASCII value as an EPARAM request error', function() {
+    it('encodes a parameter in a UTF-8 collation as UTF-8', function() {
+      const request = new Request('select @p', () => {});
+      request.addParameter('p', TYPES.VarChar, 'café');
+      request.validateParameters(utf8Collation, options);
+
+      assert.deepEqual(request.parameters[0].value, Buffer.from('café', 'utf8'));
+    });
+
+    it('fails a parameter in an unsupported code page as an EPARAM request error', function() {
       const request = new Request('select @p', () => {});
       request.addParameter('p', TYPES.VarChar, 'café');
 
+      const collation: Collation = Object.create(latin1Collation, { codepage: { value: 'CP1' } });
+
       try {
-        request.validateParameters(latin1Collation, options);
+        request.validateParameters(collation, options);
       } catch (error: any) {
         assert.instanceOf(error, RequestError);
         assert.strictEqual(error.code, 'EPARAM');
-        assert.include(error.message, 'Validation failed for parameter \'p\'.');
-        assert.include(error.message, 'requires the `iconv-lite` package');
+        assert.include(error.message, 'Unsupported code page: CP1.');
         return;
       }
       assert.fail('expected an error');
-    });
-
-    it('sends a parameter with an ASCII or UTF-8 value', function() {
-      const ascii = new Request('select @p', () => {});
-      ascii.addParameter('p', TYPES.VarChar, 'cafe');
-      ascii.validateParameters(latin1Collation, options);
-
-      const utf8 = new Request('select @p', () => {});
-      utf8.addParameter('p', TYPES.VarChar, 'café');
-      utf8.validateParameters(utf8Collation, options);
-
-      assert.isTrue(load().notCalled);
-    });
-
-    it('fails a streamed parameter with a non-ASCII value as an input error', async function() {
-      async function * source() {
-        yield 'abc';
-        yield 'café';
-      }
-
-      const parameter: Parameter = { type: TYPES.VarChar, name: 'p', value: source(), output: false };
-      const resolved = resolveParameter(parameter, latin1Collation, options);
-      const payload = new RpcRequestPayload('p', [resolved], Buffer.alloc(8), options);
-
-      try {
-        for await (const chunk of payload) {
-          assert.instanceOf(chunk, Buffer);
-        }
-      } catch (error: any) {
-        assert.instanceOf(error, InputError);
-        assert.include((error.cause as Error).message, 'requires the `iconv-lite` package');
-        return;
-      }
-      assert.fail('expected an error');
-    });
-
-    it('fails a bulk load row with a non-ASCII value as an input error', async function() {
-      const bulkLoad = new BulkLoad('table', latin1Collation, options, {}, () => {});
-      bulkLoad.addColumn('value', TYPES.VarChar, { length: 10, nullable: true });
-
-      try {
-        for await (const chunk of new BulkLoadPayload(bulkLoad, [['ok'], ['café']])) {
-          assert.instanceOf(chunk, Buffer);
-        }
-      } catch (error: any) {
-        assert.instanceOf(error, InputError);
-        assert.strictEqual(error.message, 'Column \'value\' could not be validated at row index 1');
-        assert.include((error.cause as Error).message, 'Sending non-ASCII text as VarChar with code page CP1252');
-        return;
-      }
-      assert.fail('expected an error');
-    });
-  });
-
-  describe('loading `iconv-lite`', function() {
-    afterEach(function() {
-      sinon.restore();
-      resetIconv();
-    });
-
-    it('loads it once, on first use', function() {
-      resetIconv();
-      const load = sinon.spy(iconvLoader, 'load');
-
-      assert.deepEqual(encode('café', 'CP1252', 'VarChar'), Buffer.from([0x63, 0x61, 0x66, 0xE9]));
-      assert.deepEqual(encode('naïve', 'CP1252', 'VarChar'), iconv.encode('naïve', 'CP1252'));
-      assert.strictEqual(load.callCount, 1);
-    });
-
-    it('rethrows other errors loading it', function() {
-      resetIconv();
-      const cause = moduleNotFound('safer-buffer');
-      sinon.stub(iconvLoader, 'load').throws(cause);
-
-      assert.throws(() => encode('café', 'CP1252', 'VarChar'), cause);
-    });
-
-    it('encodes streamed text in a legacy code page with it, keeping split surrogate pairs together', function() {
-      const encoder = createEncoder('CP932', 'VarChar');
-      const chunks = [encoder.write('ab'), encoder.write('日\uD83D'), encoder.write('\uDE00本'), encoder.end()];
-      assert.deepEqual(Buffer.concat(chunks.filter((c) => c !== undefined)), iconv.encode('ab日\u{1F600}本', 'CP932'));
     });
   });
 
@@ -251,10 +203,10 @@ describe('text encoding', function() {
     });
 
     it('decodes double-byte text', function() {
-      assert.strictEqual(decode(iconv.encode('日本語 テキスト', 'CP932'), 'CP932'), '日本語 テキスト');
-      assert.strictEqual(decode(iconv.encode('中文文本', 'CP936'), 'CP936'), '中文文本');
-      assert.strictEqual(decode(iconv.encode('한국어 똠방각하', 'CP949'), 'CP949'), '한국어 똠방각하');
-      assert.strictEqual(decode(iconv.encode('中文文本', 'CP950'), 'CP950'), '中文文本');
+      assert.strictEqual(decode(encode('日本語 テキスト', 'CP932'), 'CP932'), '日本語 テキスト');
+      assert.strictEqual(decode(encode('中文文本', 'CP936'), 'CP936'), '中文文本');
+      assert.strictEqual(decode(encode('한국어 똠방각하', 'CP949'), 'CP949'), '한국어 똠방각하');
+      assert.strictEqual(decode(encode('中文文本', 'CP950'), 'CP950'), '中文文本');
     });
 
     it('decodes a lead byte at the end of a value to a replacement character', function() {
@@ -268,7 +220,7 @@ describe('text encoding', function() {
     it('decodes characters split across the parts of a streamed value', function() {
       for (const codepage of [...DOUBLE_BYTE_CODEPAGES, 'utf-8']) {
         const value = { 'CP932': 'aあ日b', 'CP936': 'a中文b', 'CP949': 'a한똠b', 'CP950': 'a中文b', 'utf-8': 'aé日\u{1F600}b' }[codepage]!;
-        const bytes = codepage === 'utf-8' ? Buffer.from(value, 'utf8') : iconv.encode(value, codepage);
+        const bytes = codepage === 'utf-8' ? Buffer.from(value, 'utf8') : encode(value, codepage);
 
         for (let split = 0; split <= bytes.length; split++) {
           const decoder = createDecoder(codepage);
@@ -287,26 +239,41 @@ describe('text encoding', function() {
     describe('if `TextDecoder` does not support a double-byte code page', function() {
       afterEach(function() {
         sinon.restore();
-        resetDecodingTables();
+        resetTables();
       });
 
       it('fails with an error naming the code page', function() {
-        resetDecodingTables();
+        resetTables();
         sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('The "shift_jis" encoding is not supported'));
 
         assert.throws(
           () => decode(Buffer.from([0x82, 0xA0]), 'CP932'),
           Error,
-          'Decoding text in code page CP932 requires a Node.js build with full ICU support, but its TextDecoder does not support the \'shift_jis\' encoding.'
+          'Text in code page CP932 requires a Node.js build with full ICU support, but its TextDecoder does not support the \'shift_jis\' encoding.'
         );
       });
 
       it('still decodes single-byte code pages and ASCII', function() {
-        resetDecodingTables();
+        resetTables();
         sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('not supported'));
 
         assert.strictEqual(decode(Buffer.from([0x63, 0x61, 0x66, 0xE9]), 'CP1252'), 'café');
         assert.strictEqual(decode(Buffer.from('abc'), 'CP932'), 'abc');
+      });
+
+      it('fails to encode non-ASCII text in that code page with the same error', function() {
+        resetTables();
+        sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('not supported'));
+
+        assert.throws(() => encode('日本', 'CP932'), Error, 'Text in code page CP932 requires a Node.js build with full ICU support');
+      });
+
+      it('still encodes single-byte code pages and ASCII', function() {
+        resetTables();
+        sinon.stub(globalThis, 'TextDecoder').throws(new RangeError('not supported'));
+
+        assert.deepEqual(encode('café', 'CP1252'), Buffer.from([0x63, 0x61, 0x66, 0xE9]));
+        assert.deepEqual(encode('abc', 'CP932'), Buffer.from('abc'));
       });
     });
   });
@@ -374,7 +341,7 @@ describe('text encoding', function() {
 
     it('decodes characters split across PLP chunks', function() {
       for (const [collation, value, bytes] of [
-        [japaneseCollation, 'あいう日本', iconv.encode('あいう日本', 'CP932')],
+        [japaneseCollation, 'あいう日本', encode('あいう日本', 'CP932')],
         [utf8Collation, 'é日\u{1F600}', Buffer.from('é日\u{1F600}', 'utf8')]
       ] as const) {
         for (let size = 1; size <= bytes.length; size++) {
@@ -385,7 +352,7 @@ describe('text encoding', function() {
     });
 
     it('decodes characters split across the incoming data', function() {
-      const bytes = iconv.encode('あいう日本', 'CP932');
+      const bytes = encode('あいう日本', 'CP932');
       const data = plp(bytes, [3, 4]);
       for (let partSize = 1; partSize <= data.length; partSize++) {
         assert.strictEqual(read(metadataFor(japaneseCollation), data, partSize), 'あいう日本', `parts of ${partSize}`);
@@ -541,6 +508,40 @@ describe('text encoding', function() {
         for (const [bytes, char] of doubleByteSamples[codepage]) {
           assert.strictEqual(hex(decode(Buffer.from(bytes), codepage)), hex(char), Buffer.from(bytes).toString('hex'));
         }
+      });
+    }
+
+    // Where `iconv-lite` encodes a character to bytes that decode back to it,
+    // it is encoded the same way, except for these CP950 characters that
+    // several sequences decode to, where SQL Server picks another one.
+    const encodingDifferences: { [codepage: string]: Array<[number, string, string]> } = {
+      CP950: [
+        [0x2550, 'f9f9', 'a2a4'], [0x255E, 'f9e9', 'a2a5'], [0x2561, 'f9eb', 'a2a7'],
+        [0x256A, 'f9ea', 'a2a6'], [0x5341, 'a451', 'a2cc'], [0x5345, 'a4ca', 'a2ce']
+      ]
+    };
+
+    for (const codepage of ALL_CODEPAGES) {
+      it(`encodes every character in ${codepage} as \`iconv-lite\` does where it encodes the character itself`, function() {
+        const differences: Array<[number, string, string]> = [];
+        for (let char = 0x80; char <= 0xFFFF; char++) {
+          if (char >= 0xD800 && char <= 0xDFFF) {
+            continue;
+          }
+
+          const value = String.fromCharCode(char);
+          const expected = iconv.encode(value, codepage);
+          if (decode(expected, codepage) !== value) {
+            continue;
+          }
+
+          const actual = encode(value, codepage);
+          if (!actual.equals(expected)) {
+            differences.push([char, actual.toString('hex'), expected.toString('hex')]);
+          }
+        }
+
+        assert.deepEqual(differences, encodingDifferences[codepage] ?? []);
       });
     }
   });

@@ -82,7 +82,7 @@ const Char: { maximumLength: number } & DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return encode(value, collation.codepage, 'Char');
+    return encode(value, collation.codepage);
   }
 };
 

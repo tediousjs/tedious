@@ -2,12 +2,12 @@ import { isAscii } from 'buffer';
 import { endianness } from 'os';
 
 import { SINGLE_BYTE_HIGH_HALVES } from './codepage-tables';
-import { loadIconv } from './iconv';
+import { ENCODING_OVERRIDES } from './codepage-encoding-overrides';
 
 // Converts `char`, `varchar` and `text` values between JavaScript strings and
 // the code page of their collation.
 //
-// Decoding never needs `iconv-lite`:
+// Decoding:
 //
 // - UTF-8 is decoded with Node.js' built-in UTF-8 decoder.
 // - The single-byte code pages (CP437, CP850, CP874 and CP1250 to CP1258) are
@@ -18,9 +18,11 @@ import { loadIconv } from './iconv';
 //   corrections listed in `DOUBLE_BYTE_CODEPAGES` where `TextDecoder` does not
 //   decode a byte sequence as Windows does.
 //
-// Encoding needs `iconv-lite` only for non-ASCII text in a legacy code page:
-// UTF-8 is encoded by Node.js, and all the legacy code pages are ASCII
-// compatible.
+// Encoding UTF-8 is left to Node.js. The legacy code pages are encoded with
+// the inverse of the decoding tables, adjusted with the best-fit mappings and
+// other choices SQL Server makes (see `codepage-encoding-overrides.ts`), so
+// that a value is encoded exactly as SQL Server would convert it to `varchar`
+// itself.
 
 const REPLACEMENT_CHARACTER = 0xFFFD;
 
@@ -144,7 +146,7 @@ function createTextDecoder(codepage: string, label: string) {
     return new TextDecoder(label);
   } catch (error) {
     throw new Error(
-      `Decoding text in code page ${codepage} requires a Node.js build with full ICU support, ` +
+      `Text in code page ${codepage} requires a Node.js build with full ICU support, ` +
       `but its TextDecoder does not support the '${label}' encoding.`,
       { cause: error }
     );
@@ -268,12 +270,13 @@ function buildSingleByteTable(highHalf: string): CodepageTable {
 const tables = new Map<string, CodepageTable>();
 
 /**
- * Forgets the decoding tables built so far. Only for tests.
+ * Forgets the decoding and encoding tables built so far. Only for tests.
  *
  * @private
  */
-export function resetDecodingTables() {
+export function resetTables() {
   tables.clear();
+  encodingTables.clear();
 }
 
 function tableFor(codepage: string): CodepageTable {
@@ -443,18 +446,150 @@ export function decode(buf: Buffer, codepage: string | undefined): string {
 
 // --- Encoding ----------------------------------------------------------------
 
+const QUESTION_MARK = 0x3F;
+
 /**
- * Encodes a value in the given code page.
- *
- * Non-ASCII text in a legacy (non-UTF-8) code page needs the optional
- * `iconv-lite` package; if it is not installed, this throws an error naming
- * the code page and the type.
+ * How every UTF-16 code unit is encoded in a legacy code page. As in SQL
+ * Server, each code unit is encoded on its own: a character the code page does
+ * not have, and any surrogate (so a character outside of the Basic
+ * Multilingual Plane is two), is encoded as "?".
+ */
+interface EncodingTable {
+  // For a single-byte code page: the byte for each code unit.
+  readonly bytes: Uint8Array | undefined;
+
+  // For a double-byte code page: the byte (below 0x100) or the two bytes (lead
+  // byte first) for each code unit.
+  readonly codes: Uint16Array | undefined;
+}
+
+// Applies the entries of `ENCODING_OVERRIDES` for a code page.
+function applyOverrides(overrides: string, set: (char: number, code: number) => void) {
+  for (const entry of overrides.split(' ')) {
+    const match = /^([0-9A-F]{4})(?:-([0-9A-F]{4}))?:([0-9A-F]{2,4})(\+?)$/.exec(entry);
+    if (match === null) {
+      throw new Error(`Invalid encoding override: ${entry}.`);
+    }
+
+    const first = parseInt(match[1], 16);
+    const last = match[2] === undefined ? first : parseInt(match[2], 16);
+    const code = parseInt(match[3], 16);
+    const step = match[4] === '+' ? 1 : 0;
+    for (let char = first; char <= last; char++) {
+      set(char, code + (char - first) * step);
+    }
+  }
+}
+
+function buildEncodingTable(codepage: string): EncodingTable {
+  const { high, lead, pairs, singleBytes } = tableFor(codepage);
+  const overrides = ENCODING_OVERRIDES[codepage];
+
+  // Every character is encoded as the first byte sequence that decodes to it
+  // (single bytes first, then two-byte sequences in order), unless SQL Server
+  // encodes it otherwise.
+  if (singleBytes !== undefined) {
+    const bytes = new Uint8Array(0x10000).fill(QUESTION_MARK);
+    const mapped = new Uint8Array(0x10000);
+    for (let byte = 0; byte <= 0xFF; byte++) {
+      const char = singleBytes[byte];
+      if (!mapped[char]) {
+        bytes[char] = byte;
+        mapped[char] = 1;
+      }
+    }
+    applyOverrides(overrides, (char, code) => {
+      bytes[char] = code;
+    });
+    return { bytes, codes: undefined };
+  }
+
+  const codes = new Uint16Array(0x10000).fill(QUESTION_MARK);
+  const mapped = new Uint8Array(0x10000);
+  const add = (char: number, code: number) => {
+    if (char !== 0 && !mapped[char]) {
+      codes[char] = code;
+      mapped[char] = 1;
+    }
+  };
+
+  for (let byte = 0; byte < 0x80; byte++) {
+    codes[byte] = byte;
+    mapped[byte] = 1;
+  }
+  for (let byte = 0x80; byte <= 0xFF; byte++) {
+    add(high[byte - 0x80], byte);
+  }
+  for (let leadByte = 0x80; leadByte <= 0xFF; leadByte++) {
+    if (lead![leadByte]) {
+      for (let trail = 0x40; trail <= 0xFE; trail++) {
+        add(pairs![((leadByte - 0x80) << 8) | trail], (leadByte << 8) | trail);
+      }
+    }
+  }
+  applyOverrides(overrides, (char, code) => {
+    codes[char] = code;
+  });
+  return { bytes: undefined, codes };
+}
+
+const encodingTables = new Map<string, EncodingTable>();
+
+function encodingTableFor(codepage: string): EncodingTable {
+  let table = encodingTables.get(codepage);
+  if (table === undefined) {
+    table = buildEncodingTable(codepage);
+    encodingTables.set(codepage, table);
+  }
+  return table;
+}
+
+// The UTF-16 code units of a string. Reading them from a buffer is much faster
+// than calling `charCodeAt` for each.
+function codeUnits(value: string): Uint16Array {
+  let buf = Buffer.from(value, 'utf16le');
+  if (buf.byteOffset % 2 !== 0) {
+    buf = Buffer.from(buf);
+  }
+  if (!LITTLE_ENDIAN) {
+    buf.swap16();
+  }
+  return new Uint16Array(buf.buffer, buf.byteOffset, value.length);
+}
+
+function encodeWithTable(value: string, table: EncodingTable): Buffer {
+  const { bytes, codes } = table;
+  const units = codeUnits(value);
+
+  if (bytes !== undefined) {
+    const out = Buffer.allocUnsafe(units.length);
+    for (let i = 0; i < units.length; i++) {
+      out[i] = bytes[units[i]];
+    }
+    return out;
+  }
+
+  const out = Buffer.allocUnsafe(units.length * 2);
+  let length = 0;
+  for (let i = 0; i < units.length; i++) {
+    const code = codes![units[i]];
+    if (code > 0xFF) {
+      out[length++] = code >> 8;
+    }
+    out[length++] = code & 0xFF;
+  }
+  return out.subarray(0, length);
+}
+
+/**
+ * Encodes a value in the given code page, as SQL Server converts an
+ * `nvarchar` value to `varchar` in a collation with this code page: a
+ * character the code page does not have is encoded as a similar one (a
+ * "best fit") where Windows defines one, and otherwise as "?".
  *
  * @param codepage A collation's code page, such as `CP1252` or `utf-8`.
- * @param typeName The name of the data type being encoded, for the error
- *   message if `iconv-lite` is needed but not installed.
  */
-export function encode(value: string, codepage: string, typeName: string): Buffer {
+export function encode(value: string, codepage: string): Buffer {
   if (isUtf8(codepage)) {
     return Buffer.from(value, 'utf8');
   }
@@ -464,7 +599,7 @@ export function encode(value: string, codepage: string, typeName: string): Buffe
     return Buffer.from(value, 'latin1');
   }
 
-  return loadIconv(codepage, typeName).encode(value, codepage);
+  return encodeWithTable(value, encodingTableFor(codepage));
 }
 
 class Utf8Encoder implements StreamEncoder {
@@ -504,46 +639,35 @@ class Utf8Encoder implements StreamEncoder {
 
 class LegacyEncoder implements StreamEncoder {
   declare codepage: string;
-  declare typeName: string;
-  declare encoder: { write(str: string): Buffer, end(): Buffer | undefined } | undefined;
 
-  constructor(codepage: string, typeName: string) {
+  constructor(codepage: string) {
     this.codepage = codepage;
-    this.typeName = typeName;
-    this.encoder = undefined;
   }
 
+  // Every UTF-16 code unit is encoded on its own, so nothing (such as half a
+  // surrogate pair) carries over from one chunk to the next.
   write(chunk: string): Buffer {
-    // Until a chunk has non-ASCII text, there is nothing (such as half a
-    // surrogate pair) to carry over to the next chunk.
-    if (this.encoder === undefined) {
-      if (isAsciiString(chunk)) {
-        return Buffer.from(chunk, 'latin1');
-      }
-
-      this.encoder = loadIconv(this.codepage, this.typeName).getEncoder(this.codepage);
-    }
-
-    return this.encoder.write(chunk);
+    return encode(chunk, this.codepage);
   }
 
   end(): Buffer | undefined {
-    return this.encoder?.end();
+    return undefined;
   }
 }
 
 /**
  * Creates an encoder for a value in the given code page that is written in
- * parts. As with `encode`, non-ASCII text in a legacy code page needs the
- * optional `iconv-lite` package.
+ * parts. Each part is encoded as `encode` does.
  *
  * @param codepage A collation's code page, such as `CP1252` or `utf-8`.
- * @param typeName The name of the data type being encoded, for the error
- *   message if `iconv-lite` is needed but not installed.
  */
-export function createEncoder(codepage: string, typeName: string): StreamEncoder {
+export function createEncoder(codepage: string): StreamEncoder {
   if (isUtf8(codepage)) {
     return new Utf8Encoder();
   }
-  return new LegacyEncoder(codepage, typeName);
+
+  // Fail now, rather than on the first non-ASCII chunk, if the code page is
+  // not supported.
+  encodingTableFor(codepage);
+  return new LegacyEncoder(codepage);
 }
