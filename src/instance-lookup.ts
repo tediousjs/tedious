@@ -2,7 +2,7 @@ import dns from 'dns';
 
 import { sendMessage } from './sender';
 
-const SQL_SERVER_BROWSER_PORT = 1434;
+export const SQL_SERVER_BROWSER_PORT = 1434;
 const TIMEOUT = 2 * 1000;
 const RETRIES = 3;
 // There are three bytes at the start of the response, whose purpose is unknown.
@@ -55,6 +55,7 @@ export async function instanceLookup(options: { server: string, instanceName: st
 
     try {
       response = await sendMessage(options.server, port, lookup, AbortSignal.any([ signal, timeoutSignal ]), request);
+      break;
     } catch (err) {
       // If the current attempt timed out, continue with the next
       if (timeoutSignal.aborted) {
