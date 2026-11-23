@@ -737,6 +737,37 @@ describe('BulkLoad', function() {
     assert.strictEqual(request.canceled, false);
   });
 
+  describe('generated SQL', function() {
+    function buildBulkLoad(table: string) {
+      const bulkLoad = new BulkLoad(table, undefined, connectionOptions, {}, () => {});
+      bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+      bulkLoad.addColumn('a]b', TYPES.Int, { nullable: true });
+      bulkLoad.addColumn('x], [y', TYPES.Int, { nullable: true });
+      return bulkLoad;
+    }
+
+    it('quotes column names and escapes `]` in them in the bulk insert statement', function() {
+      assert.strictEqual(
+        buildBulkLoad('dbo.MyTable').getBulkInsertSql(),
+        'insert bulk dbo.MyTable([id] int, [a]]b] int, [x]], [y] int)'
+      );
+    });
+
+    it('quotes column names and escapes `]` in them in the table creation statement', function() {
+      assert.strictEqual(
+        buildBulkLoad('#tmp').getTableCreationSql(),
+        'CREATE TABLE #tmp(\n[id] int NOT NULL,\n[a]]b] int NULL,\n[x]], [y] int NULL\n)'
+      );
+    });
+
+    it('uses the table name as-is', function() {
+      assert.strictEqual(
+        buildBulkLoad('[my schema].[my]]table]').getBulkInsertSql(),
+        'insert bulk [my schema].[my]]table]([id] int, [a]]b] int, [x]], [y] int)'
+      );
+    });
+  });
+
   describe('#addColumn', function() {
     it('resolves the length for types with ids outside the legacy variable-length id bit pattern', function() {
       // Like the type ids introduced in TDS 7.2 and later (e.g. VECTORTYPE

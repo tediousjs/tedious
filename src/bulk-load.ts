@@ -39,6 +39,13 @@ const DONE_STATUS = {
 };
 
 /**
+ * Quotes a name as a T-SQL delimited identifier, escaping any `]` it contains.
+ */
+function quoteIdentifier(name: string): string {
+  return '[' + name.replace(/]/g, ']]') + ']';
+}
+
+/**
  * @private
  */
 interface InternalOptions {
@@ -74,6 +81,11 @@ export interface Options {
 
   /**
    * Specifies the ordering of the data to possibly increase bulk insert performance, using T-SQL [ORDER](https://docs.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms177468(v=sql.105)). (default: `{}`)
+   *
+   * Each key is a column reference that is inserted into the generated SQL as-is, without quoting
+   * or escaping, so never build it from untrusted input. Unlike the column names passed to
+   * {@link BulkLoad.addColumn}, a name with special characters has to be quoted yourself as a
+   * delimited identifier, doubling any `]` (e.g. `{ '[my]]column]': 'ASC' }`).
    */
   order?: InternalOptions['order'] | undefined;
 }
@@ -285,7 +297,7 @@ class BulkLoad extends EventEmitter {
    * bulkLoad.addColumn('MyIntColumn', TYPES.Int, { nullable: false });
    * ```
    *
-   * @param name The name of the column.
+   * @param name The name of the column. It is quoted and escaped in the generated SQL, so it can contain any character, including `]`.
    * @param type One of the supported `data types`.
    * @param __namedParameters Additional column type information. At a minimum, `nullable` must be set to true or false.
    * @param length For VarChar, NVarChar, VarBinary. Use length as `Infinity` for VarChar(max), NVarChar(max) and VarBinary(max).
@@ -385,7 +397,7 @@ class BulkLoad extends EventEmitter {
       if (i !== 0) {
         sql += ', ';
       }
-      sql += '[' + c.name + '] ' + (c.type.declaration(c));
+      sql += quoteIdentifier(c.name) + ' ' + (c.type.declaration(c));
     }
     sql += ')';
 
@@ -401,6 +413,8 @@ class BulkLoad extends EventEmitter {
    * var sql = bulkLoad.getTableCreationSql();
    * ```
    *
+   * The table name is used as-is (see {@link Connection.newBulkLoad}), while column names are quoted and escaped.
+   *
    * A side note on bulk inserting into temporary tables: if you want to access a local temporary table after executing the bulk load,
    * you'll need to use the same connection and execute your requests using {@link Connection.execSqlBatch} instead of {@link Connection.execSql}
    */
@@ -411,7 +425,7 @@ class BulkLoad extends EventEmitter {
       if (i !== 0) {
         sql += ',\n';
       }
-      sql += '[' + c.name + '] ' + (c.type.declaration(c));
+      sql += quoteIdentifier(c.name) + ' ' + (c.type.declaration(c));
       if (c.nullable !== undefined) {
         sql += ' ' + (c.nullable ? 'NULL' : 'NOT NULL');
       }
