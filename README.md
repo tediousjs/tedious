@@ -23,6 +23,27 @@ Tedious requires [Node.js 22 or later](https://nodejs.org/). Install the package
 npm install tedious
 ```
 
+### Text in legacy code pages
+
+Tedious converts `varchar`, `char` and `text` values from and to the code page
+of their collation itself, as SQL Server converts them from and to `nvarchar`:
+
+- In a legacy code page (any collation but a UTF-8 one), a character the code
+  page does not have is sent as a similar one where Windows defines one (such
+  as `Ā` as `A`), and otherwise as `?`. A character outside of the Basic
+  Multilingual Plane, such as an emoji, is sent as `??`. SQL Server on older
+  versions of Windows has fewer of these similar characters: it converts some
+  spaces and dashes (such as U+2009, the thin space) to `?`, where tedious
+  sends a space or a dash as SQL Server does on Linux and on current versions
+  of Windows.
+- An invalid byte sequence in a value is decoded to `?` (or `・` in Japanese
+  collations) in a double-byte code page, and to U+FFFD in UTF-8.
+- A byte order mark at the start of a value in a UTF-8 collation is kept, as
+  it is in an `nvarchar` value.
+
+To send any character unchanged, use `NVarChar`, `NChar` or `NText`, or a
+UTF-8 collation.
+
 ## Getting started
 
 Platform-specific guides are available for:
@@ -118,3 +139,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The code page tables tedious uses to convert `varchar` values are derived from
+data files of the Unicode Consortium, under the Unicode License v3, whose
+notice is at the top of `src/codepage-tables.ts` and
+`src/codepage-encoding-overrides.ts`.

@@ -2,7 +2,8 @@ import Parser, { type ParserOptions } from './token/stream-parser';
 import { type Metadata, readCollation } from './metadata-parser';
 import { TYPE } from './data-type';
 
-import iconv from 'iconv-lite';
+import { decode } from './text-encoding';
+import { type Encoding } from './collation';
 import { bufferToLowerCaseGuid, bufferToUpperCaseGuid } from './guid-parser';
 import { NotEnoughDataError, Result, readBigInt64LE, readBigUInt64LE, readDoubleLE, readFloatLE, readInt16LE, readInt32LE, readUInt16LE, readUInt32LE, readUInt8, readUInt24LE, readUInt40LE, readUNumeric64LE, readUNumeric96LE, readUNumeric128LE } from './token/helpers';
 
@@ -12,7 +13,6 @@ const THREE_AND_A_THIRD = 3 + (1 / 3);
 const MONEY_DIVISOR = 10000;
 const PLP_NULL = 0xFFFFFFFFFFFFFFFFn;
 const UNKNOWN_PLP_LEN = 0xFFFFFFFFFFFFFFFEn;
-const DEFAULT_ENCODING = 'utf8';
 
 function readTinyInt(buf: Buffer, offset: number): Result<number> {
   return readUInt8(buf, offset);
@@ -183,7 +183,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
 
     case 'VarChar':
     case 'Char': {
-      const codepage = metadata.collation!.codepage!;
+      const codepage = metadata.collation!.codepage;
 
       let dataLength;
       ({ offset, value: dataLength } = readUInt16LE(buf, offset));
@@ -236,7 +236,7 @@ function readValue(buf: Buffer, offset: number, metadata: Metadata, options: Par
       let dataLength;
       ({ offset, value: dataLength } = readUInt32LE(buf, offset));
 
-      return readChars(buf, offset, dataLength, metadata.collation!.codepage!);
+      return readChars(buf, offset, dataLength, metadata.collation!.codepage);
     }
 
     case 'NText': {
@@ -540,7 +540,7 @@ function readVariant(buf: Buffer, offset: number, options: ParserOptions, dataLe
       let collation;
       ({ value: collation, offset } = readCollation(buf, offset));
 
-      return readChars(buf, offset, dataLength, collation.codepage!);
+      return readChars(buf, offset, dataLength, collation.codepage);
     }
 
     case 'NVarChar':
@@ -567,12 +567,12 @@ function readBinary(buf: Buffer, offset: number, dataLength: number): Result<Buf
   return new Result(buf.slice(offset, offset + dataLength), offset + dataLength);
 }
 
-function readChars(buf: Buffer, offset: number, dataLength: number, codepage: string): Result<string> {
+function readChars(buf: Buffer, offset: number, dataLength: number, codepage: Encoding | undefined): Result<string> {
   if (buf.length < offset + dataLength) {
     throw new NotEnoughDataError(offset + dataLength);
   }
 
-  return new Result(iconv.decode(buf.slice(offset, offset + dataLength), codepage ?? DEFAULT_ENCODING), offset + dataLength);
+  return new Result(decode(buf.subarray(offset, offset + dataLength), codepage), offset + dataLength);
 }
 
 function readNChars(buf: Buffer, offset: number, dataLength: number): Result<string> {
@@ -663,7 +663,7 @@ class PLPReader {
         return data.toString('ucs2');
 
       case 'VarChar':
-        return iconv.decode(data, this.metadata.collation?.codepage ?? DEFAULT_ENCODING);
+        return decode(data, this.metadata.collation?.codepage);
 
       default:
         return data;

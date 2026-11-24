@@ -1,4 +1,4 @@
-import iconv from 'iconv-lite';
+import { encode, createEncoder } from '../text-encoding';
 
 import { type DataType, type ParameterData } from '../data-type';
 import { isAsyncIterable, writePlpStream, writePlpValue } from './plp-stream';
@@ -69,7 +69,7 @@ const VarChar: { maximumLength: number } & DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return iconv.encode(value, collation.codepage);
+    return encode(value, collation.codepage);
   },
 
   resolve(parameter, collation) {
@@ -125,7 +125,7 @@ const VarChar: { maximumLength: number } & DataType = {
     // it as `varchar(max)` and checked the collation.
     if (isAsyncIterable(parameter.value)) {
       const codepage = parameter.collation!.codepage!;
-      const encoder = iconv.getEncoder(codepage);
+      const encoder = createEncoder(codepage);
       return writePlpStream(
         buffer,
         parameter.value,

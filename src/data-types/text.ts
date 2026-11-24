@@ -1,4 +1,4 @@
-import iconv from 'iconv-lite';
+import { encode } from '../text-encoding';
 
 import { type DataType } from '../data-type';
 
@@ -64,7 +64,7 @@ const Text: DataType = {
       throw new Error('The collation set by the server has no associated encoding.');
     }
 
-    return iconv.encode(value, collation.codepage);
+    return encode(value, collation.codepage);
   }
 };
 

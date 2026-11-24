@@ -64,7 +64,6 @@
     "@azure/keyvault-keys": "^4.10.2",
     "@types/node": ">=22",
     "bl": "^6.1.4",
-    "iconv-lite": "^0.7.0",
     "js-md4": "^0.3.2",
     "native-duplexpair": "^1.0.0"
   },
@@ -100,7 +99,9 @@
   },
   "scripts": {
     "docs": "typedoc",
-    "lint": "eslint src test --ext .js,.ts && tsc",
+    "lint": "eslint src test scripts --ext .js,.ts && tsc",
+    "generate:codepages": "node scripts/generate-codepage-tables.js",
+    "record:codepages": "node scripts/record-sqlserver-encodings.js",
     "test": "mocha --forbid-only test/unit test/unit/token test/unit/tracking-buffer",
     "test-integration": "mocha --forbid-only test/integration/",
     "test-all": "mocha --forbid-only test/unit/ test/unit/token/ test/unit/tracking-buffer test/integration/",
