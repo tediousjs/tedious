@@ -35,11 +35,27 @@ for key_id in $key_ids; do
     --body "$(jq -n --arg keyId "$key_id" '{keyId: $keyId}')" || status=1
 done
 
-servers=$(az sql server list --resource-group "$AZURE_RESOURCE_GROUP" --output json \
-  | jq -r --arg prefix "$prefix" '.[] | select(.name | startswith($prefix)) | .name')
-for name in $servers; do
+list_servers() {
+  az sql server list --resource-group "$AZURE_RESOURCE_GROUP" --output json \
+    | jq -r --arg prefix "$prefix" '.[] | select(.name | startswith($prefix)) | .name'
+}
+
+# Start all deletions without waiting on each: a blocking `az sql server
+# delete` has hung for 30 minutes before. Azure carries out an accepted
+# deletion either way, and the hourly cleanup retries anything left.
+for name in $(list_servers); do
   echo "Deleting $name"
-  az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes || status=1
+  az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes --no-wait || status=1
+done
+
+deadline=$((SECONDS + ${TEARDOWN_WAIT_SECONDS:-900}))
+while remaining=$(list_servers) && [[ -n "$remaining" ]]; do
+  if (( SECONDS >= deadline )); then
+    echo "::warning::Still deleting after $(( ${TEARDOWN_WAIT_SECONDS:-900} / 60 )) minutes: $(tr '\n' ' ' <<< "$remaining")"
+    status=1
+    break
+  fi
+  sleep 15
 done
 
 az logout

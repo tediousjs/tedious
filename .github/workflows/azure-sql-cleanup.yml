@@ -54,9 +54,11 @@ jobs:
           | jq -r --argjson cutoff "$cutoff" \
             '.[] | select(.tags["tedious-ci"] == "true" and ((.tags["created-at"] // "0") | tonumber) < $cutoff) | .name')
 
+        # Without waiting on each: the next hourly run retries any that are
+        # still there.
         for name in $servers; do
           echo "Deleting $name"
-          az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes || status=1
+          az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes --no-wait || status=1
         done
 
         exit "$status"
