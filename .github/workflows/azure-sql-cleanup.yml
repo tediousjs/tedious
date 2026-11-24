@@ -54,9 +54,11 @@ jobs:
           | jq -r --argjson cutoff "$cutoff" \
             '.[] | select(.tags["tedious-ci"] == "true" and ((.tags["created-at"] // "0") | tonumber) < $cutoff) | .name')
 
+        # Without waiting on each: the next hourly run retries any that are
+        # still there.
         for name in $servers; do
           echo "Deleting $name"
-          az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes || status=1
+          az sql server delete --resource-group "$AZURE_RESOURCE_GROUP" --name "$name" --yes --no-wait || status=1
         done
 
         exit "$status"
@@ -77,6 +79,52 @@ jobs:
           echo "Removing client secret $key_id"
           az rest --method POST --uri "$app/removePassword" \
             --body "$(jq -n --arg keyId "$key_id" '{keyId: $keyId}')" || status=1
+        done
+
+        exit "$status"
+
+    # Per-job app registrations of the service principal configs, then any
+    # that were deleted but not purged from the directory's deleted items.
+    # Only names in the per-job format (tedious-ci-<run>-<attempt>-<config>)
+    # match, and never the shared test app, which may have a similar name.
+    - name: Delete leftover app registrations
+      if: always()
+      run: |
+        set -euo pipefail
+        cutoff=$(date -u -d "-$MAX_AGE_SECONDS seconds" +%Y-%m-%dT%H:%M:%SZ)
+        graph="https://graph.microsoft.com/v1.0"
+        status=0
+
+        app_ids=$(az rest --method GET \
+          --uri "$graph/applications?\$filter=startswith(displayName,'tedious-ci-')&\$select=id,appId,displayName,createdDateTime" \
+          | jq -r --arg cutoff "$cutoff" --arg shared "$TEST_APP_CLIENT_ID" '
+            .value[]
+            | select(.displayName | test("^tedious-ci-[0-9]+-[0-9]+-"))
+            | select(.appId != $shared)
+            | select(.createdDateTime < $cutoff)
+            | .id')
+        for app_id in $app_ids; do
+          echo "Deleting app registration $app_id"
+          az rest --method DELETE --uri "$graph/applications/$app_id" || { status=1; continue; }
+          az rest --method DELETE --uri "$graph/directory/deletedItems/$app_id" \
+            || echo "::warning::Could not purge deleted app registration $app_id."
+        done
+
+        # Best effort: Entra removes deleted apps after 30 days anyway.
+        if ! deleted=$(az rest --method GET \
+            --uri "$graph/directory/deletedItems/microsoft.graph.application?\$filter=startswith(displayName,'tedious-ci-')&\$select=id,appId,displayName"); then
+          echo "::warning::Could not list deleted app registrations."
+          deleted='{"value": []}'
+        fi
+        deleted_ids=$(jq -r --arg shared "$TEST_APP_CLIENT_ID" '
+          .value[]
+          | select(.displayName | test("^tedious-ci-[0-9]+-[0-9]+-"))
+          | select(.appId != $shared)
+          | .id' <<< "$deleted")
+        for app_id in $deleted_ids; do
+          echo "Purging deleted app registration $app_id"
+          az rest --method DELETE --uri "$graph/directory/deletedItems/$app_id" \
+            || echo "::warning::Could not purge deleted app registration $app_id."
         done
 
         exit "$status"

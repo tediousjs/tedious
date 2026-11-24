@@ -19,11 +19,13 @@ deleted when the test run finishes. Three workflows are involved:
    event, before its jobs have runners), `azure-sql-provision.yml` runs one
    job per config (`provision.sh`). Each job:
    - creates the server `tedious-ci-<run>-<attempt>-<config>` right away, with
-     a random SQL admin password that only exists for this server, the
-     `tedious-ci-sql-admins` Entra group as Entra admin, a `tedious` database,
-     and tags `tedious-ci=true` and `created-at=<epoch>`. For the service
-     principal configs, it also adds a client secret that expires after two
-     hours to the test app;
+     a random SQL admin password that only exists for this server, a
+     `tedious` database, and tags `tedious-ci=true` and `created-at=<epoch>`;
+   - for the service principal configs (`azure-ad-sp-secret`,
+     `token-credential`), first creates an app registration named after the
+     server, with a client secret that expires after two hours, and makes it
+     the server's Entra admin. It waits until the secret can get a token. For
+     the other configs, the `tedious-ci-sql-admins` group is the Entra admin;
    - waits for its test job's request and validates it (a single IPv4
      address, an RSA key of 3072 to 8192 bits, size limits);
    - opens the server's firewall to the requesting runner's IP only;
@@ -43,10 +45,10 @@ deleted when the test run finishes. Three workflows are involved:
    private key and runs the integration tests.
 4. **Teardown.** When the test run completes (passed, failed or cancelled),
    `azure-sql-provision.yml` runs again (`teardown.sh`) and deletes all
-   servers and client secrets for that run attempt. A concurrency group makes
+   servers and app registrations for that run attempt. A concurrency group makes
    the teardown wait for any provisioning still in progress.
-5. **Fallback.** `azure-sql-cleanup.yml` deletes tagged servers and test app
-   client secrets more than two hours old.
+5. **Fallback.** `azure-sql-cleanup.yml` deletes tagged servers and
+   `tedious-ci-*` app registrations more than two hours old.
 
 ## Pull requests from forks
 
@@ -65,14 +67,11 @@ What pull request code can get hold of:
 | Azure OIDC / provisioner identity | No (only in `azure-sql-provision.yml`) | — |
 | `GITHUB_TOKEN` | Read-only | `contents: read`, `actions: read` |
 | SQL admin password | Yes | That server only; gone when the server is deleted |
-| Test app client secret | Yes (SP configs) | Expires after 2h, removed at teardown; only grants access to CI servers |
+| Per-job app client secret | Yes (SP configs) | Admin of that job's server only; expires after 2h, app deleted at teardown |
 | Entra test user password | Never for forks or Dependabot | Long-lived repository secret |
 
 Remaining risks:
 
-- **Other CI servers.** A leaked test app secret gives admin access to every CI
-  server that exists until the secret expires. Those servers are throwaway
-  and hold no data.
 - **Compute use.** A pull request controls its own copy of `azure-sql.yml`. It
   can get at most four servers (S0 by default) per run attempt, for as long as
   its run lasts. The cleanup workflow deletes them after two hours at most.
@@ -135,7 +134,8 @@ az role assignment create --assignee-object-id "$PROVISIONER_SP_ID" \
 
 # Microsoft Graph Application.ReadWrite.OwnedBy, granted directly as an app
 # role assignment (the same thing admin consent does). It lets the
-# provisioner add and remove client secrets on apps it owns.
+# provisioner create the per-job app registrations and manage the ones it
+# created, and no others.
 GRAPH_SP_ID=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
 az rest --method POST \
   --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$PROVISIONER_SP_ID/appRoleAssignments" \
@@ -154,27 +154,23 @@ Use an app registration here, not a user-assigned managed identity in the
 CI resource group: `Contributor` on that group would let the provisioner add
 federated credentials to such an identity.
 
-### 2. The test app (what the tests authenticate as)
+### 2. The public client app (for `azure-ad-password` only)
 
-If the current CI setup's app (the old `AZURE_AD_SP_CLIENT_ID` secret) already
-has public client flows enabled, you can reuse it instead of creating one.
-Just make the provisioner an owner and delete its old long-lived client secret.
+The Entra password tests sign in through a public client app. It needs no
+secrets, no Azure roles and no Graph permissions. If the current CI setup's
+app (the old `AZURE_AD_SP_CLIENT_ID` secret) already has public client flows
+enabled, reuse it, and delete its long-lived client secrets once the old
+Azure jobs are gone.
 
 ```sh
 TEST_APP_ID=$(az ad app create --display-name tedious-ci-test \
   --is-fallback-public-client true --query appId -o tsv)
-TEST_SP_ID=$(az ad sp create --id "$TEST_APP_ID" --query id -o tsv)
-
-# Lets the provisioner mint and remove the short-lived client secrets.
-az ad app owner add --id "$TEST_APP_ID" --owner-object-id "$PROVISIONER_SP_ID"
 ```
 
-Give the test app **no** Azure role assignments and no Graph permissions. Its
-only access is via the group below.
-
-If your tenant has an app management policy that blocks or limits password
-credentials, it must allow client secrets on this app with a lifetime of at
-least two hours.
+The service principal tests don't use this app. They get an app
+registration per job (see "How a test run works"). If your tenant has an app
+management policy that limits password credentials, it must allow the
+provisioner's apps a client secret with a lifetime of at least two hours.
 
 ### 3. The Entra test user (for `azure-ad-password` only)
 
@@ -190,19 +186,18 @@ These tests never run for pull requests from forks or Dependabot.
 
 ### 4. The admin group
 
-Every CI server gets this group as its Entra admin, which gives its members
-`dbo` on the `tedious` database. Service principals can log in to Azure SQL
-through group membership. No server identity or Directory Readers role is
-needed, because nothing runs `CREATE USER ... FROM EXTERNAL PROVIDER`.
+The servers of the `azure-default` and `azure-ad-password` configs get this
+group as their Entra admin, which gives its members `dbo` on the `tedious`
+database. No server identity or Directory Readers role is needed, because
+nothing runs `CREATE USER ... FROM EXTERNAL PROVIDER`.
 
 ```sh
 GROUP_ID=$(az ad group create --display-name tedious-ci-sql-admins \
   --mail-nickname tedious-ci-sql-admins --query id -o tsv)
-az ad group member add --group "$GROUP_ID" --member-id "$TEST_SP_ID"
 az ad group member add --group "$GROUP_ID" --member-id "$(az ad user show --id <test user UPN> --query id -o tsv)"
 ```
 
-The group must contain only the test app and the test user.
+The group must contain only the test user.
 
 ### 5. Budget alert (recommended)
 
@@ -230,8 +225,7 @@ az sql db create -g "$RG" -s "$NAME" -n tedious --service-objective S0 --backup-
 #   cp test/config.azure-default.ts test/config.ts
 #   AZURE_SERVER=$NAME.database.windows.net AZURE_USERNAME=tedious AZURE_PASSWORD=$PW \
 #     npm run test-integration
-# and the same with a temporary client secret on the test app for
-# test/config.azure-ad-sp-secret.ts.
+# (The service principal configs need a per-job app, see provision.sh.)
 
 az sql server delete -g "$RG" -n "$NAME" --yes
 ```
