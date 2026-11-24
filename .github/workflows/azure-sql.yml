@@ -1,0 +1,107 @@
+name: Azure SQL
+
+# Runs the integration tests against Azure SQL, with a fresh server for each
+# job. This workflow never has Azure access, and for pull requests from forks
+# it runs with no secrets and a read-only token, like any other
+# `pull_request` workflow. The server comes from `azure-sql-provision.yml`,
+# which runs from the default branch:
+#
+# 1. Each job publishes a request artifact: this runner's IP and the public
+#    half of a one-time key pair.
+# 2. The provisioning workflow creates a server that only that IP can reach,
+#    and publishes the credentials encrypted to that key.
+# 3. The job decrypts the credentials and runs the tests.
+# 4. Once this run completes, the provisioning workflow deletes the servers.
+#    `azure-sql-cleanup.yml` deletes anything left behind.
+#
+# See `.github/AZURE_SQL_CI.md` for setup and the security model.
+#
+# The provisioning workflow finds this workflow by its name, and its jobs
+# by the `(<config>)` part of their names. Keep both when editing.
+
+on:
+  push:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  pull_request:
+    branches: [ "master", "alpha", "beta", "*.x" ]
+
+  workflow_dispatch:
+
+concurrency:
+  # Pull request runs share a group per PR, so a new push cancels the older
+  # run. Push runs get a unique group (the run id), so they are never
+  # cancelled. A cancelled run still triggers the teardown.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  test:
+    name: Azure SQL (${{ matrix.config }}) / Node.js 22.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      actions: read # to find the credentials artifact
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each entry is the suffix of a `test/config.*.ts` file. The Entra ID
+        # password tests need the test user's password, a repository secret
+        # that GitHub does not pass to runs from forks or Dependabot, so they
+        # are left out for those.
+        config: ${{ fromJSON((github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.type == 'Bot')) && '["azure-default", "azure-ad-sp-secret", "token-credential"]' || '["azure-default", "azure-ad-password", "azure-ad-sp-secret", "token-credential"]') }}
+
+    env:
+      CONFIG: ${{ matrix.config }}
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Use Node.js 22
+      uses: actions/setup-node@v7.1.0
+      with:
+        node-version: 22
+        cache: 'npm'
+
+    - name: Request an Azure SQL server
+      run: .github/scripts/azure-sql/request-server.sh
+
+    - name: Publish the request
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: azure-sql-request-${{ github.run_attempt }}-${{ matrix.config }}
+        path: ${{ runner.temp }}/azure-sql/request/request.json
+        retention-days: 1
+        if-no-files-found: error
+
+    # Runs while the server is being created.
+    - run: npm ci
+
+    # The provisioning jobs may still be queued for a runner, so this allows
+    # for more than the few minutes server creation takes.
+    - name: Wait for the Azure SQL server
+      timeout-minutes: 45
+      env:
+        GH_TOKEN: ${{ github.token }}
+        WAIT_SECONDS: 2400
+      run: .github/scripts/azure-sql/wait-for-server.sh
+
+    - name: Set up test configuration
+      run: cp -f "test/config.$CONFIG.ts" test/config.ts
+
+    - name: Run integration tests
+      env:
+        AZURE_AD_USERNAME: ${{ matrix.config == 'azure-ad-password' && secrets.AZURE_AD_USERNAME || '' }}
+        AZURE_AD_PASSWORD: ${{ matrix.config == 'azure-ad-password' && secrets.AZURE_AD_PASSWORD || '' }}
+      run: npx nyc --reporter=lcov npm run test-integration
+
+    - uses: codecov/codecov-action@v7.1.1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
