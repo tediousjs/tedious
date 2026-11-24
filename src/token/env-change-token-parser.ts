@@ -18,6 +18,10 @@ import {
 
 import { NotEnoughDataError, readBVarByte, readBVarChar, readUInt16LE, readUInt8, readUsVarByte, Result } from './helpers';
 
+// The range of packet sizes allowed by the TDS protocol.
+const MIN_PACKET_SIZE = 512;
+const MAX_PACKET_SIZE = 32767;
+
 const types: { [key: number]: { name: string, event?: string }} = {
   1: {
     name: 'DATABASE',
@@ -82,8 +86,18 @@ function _readNewAndOldValue(buf: Buffer, offset: number, length: number, type: 
       ({ offset, value: oldValue } = readBVarChar(buf, offset));
 
       switch (type.name) {
-        case 'PACKET_SIZE':
-          return new Result(new PacketSizeEnvChangeToken(parseInt(newValue), parseInt(oldValue)), offset);
+        case 'PACKET_SIZE': {
+          const newPacketSize = Number(newValue);
+
+          // The packet size is used to split outgoing messages into packets. A value
+          // outside the range allowed by the TDS protocol (e.g. 8 or less, which leaves
+          // no room for data after the packet header) can't be used safely.
+          if (!Number.isInteger(newPacketSize) || newPacketSize < MIN_PACKET_SIZE || newPacketSize > MAX_PACKET_SIZE) {
+            throw new Error(`Server sent an invalid packet size: ${JSON.stringify(newValue)} (must be between ${MIN_PACKET_SIZE} and ${MAX_PACKET_SIZE})`);
+          }
+
+          return new Result(new PacketSizeEnvChangeToken(newPacketSize, parseInt(oldValue)), offset);
+        }
 
         case 'DATABASE':
           return new Result(new DatabaseEnvChangeToken(newValue, oldValue), offset);
