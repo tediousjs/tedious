@@ -51,6 +51,11 @@ interface Options {
     build: number;
     subbuild: number;
   };
+  /**
+   * The instance name to send in the `INSTOPT` option. If not set, an empty
+   * instance name is sent, which the server always accepts.
+   */
+  instanceName?: string | undefined;
 }
 
 /*
@@ -151,6 +156,9 @@ class PreloginPayload {
 
   createInstanceOption() {
     const buffer = new WritableTrackingBuffer();
+    if (this.options.instanceName) {
+      buffer.writeString(this.options.instanceName, 'utf8');
+    }
     buffer.writeUInt8(0x00);
     return {
       token: TOKEN.INSTOPT,

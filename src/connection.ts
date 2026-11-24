@@ -706,7 +706,13 @@ export interface ConnectionOptions {
    *
    * (no default)
    *
-   * Mutually exclusive with {@link port}.
+   * If {@link port} is also set, the connection is made to that port directly,
+   * no SQL Server Browser lookup takes place, and the instance name is not used.
+   *
+   * Otherwise, the port is looked up via the SQL Server Browser, and the
+   * instance name is also sent to the server during PRELOGIN, so that it can
+   * confirm that the port belongs to that instance. If the server reports a
+   * mismatch, the connection fails with an `EINSTLOOKUP` error.
    */
   instanceName?: string | undefined;
 
@@ -766,9 +772,11 @@ export interface ConnectionOptions {
   packetSize?: number;
 
   /**
-   * Port to connect to (default: `1433`).
+   * Port to connect to (default: `1433`, unless {@link instanceName} is set).
    *
-   * Mutually exclusive with {@link instanceName}
+   * If {@link instanceName} is also set, this port is used directly instead of
+   * looking up the instance's port via the SQL Server Browser, and the instance
+   * name is ignored.
    */
   port?: number | undefined;
 
@@ -1354,10 +1362,6 @@ class Connection extends EventEmitter {
     };
 
     if (config.options) {
-      if (config.options.port && config.options.instanceName) {
-        throw new Error('Port and instanceName are mutually exclusive, but ' + config.options.port + ' and ' + config.options.instanceName + ' provided');
-      }
-
       if (config.options.abortTransactionOnError !== undefined) {
         if (typeof config.options.abortTransactionOnError !== 'boolean' && config.options.abortTransactionOnError !== null) {
           throw new TypeError('The "config.options.abortTransactionOnError" property must be of type string or null.');
@@ -1593,7 +1597,11 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.instanceName = config.options.instanceName;
-        this.config.options.port = undefined;
+
+        // Without an explicit port, the port is looked up via the SQL Server Browser.
+        if (config.options.port === undefined) {
+          this.config.options.port = undefined;
+        }
       }
 
       if (config.options.isolationLevel !== undefined) {
@@ -1644,7 +1652,6 @@ class Connection extends EventEmitter {
         }
 
         this.config.options.port = config.options.port;
-        this.config.options.instanceName = undefined;
       }
 
       if (config.options.readOnlyIntent !== undefined) {
@@ -2112,6 +2119,16 @@ class Connection extends EventEmitter {
 
           this.transitionTo(this.STATE.SENT_PRELOGIN);
           const preloginResponse = await this.readPreloginResponse(signal);
+
+          // A server that is not the requested instance answers the `INSTOPT`
+          // option with `0x01`. As an instance name is only sent when the port
+          // was looked up via the SQL Server Browser, this means that the
+          // lookup returned a port that belongs to a different instance.
+          const instanceName = this.getPreloginInstanceName();
+          if (instanceName !== undefined && preloginResponse.instance === 0x01) {
+            throw new ConnectionError(`Port ${port} on ${this.config.server}, returned by the SQL Server Browser for instance '${instanceName}', belongs to a different instance`, 'EINSTLOOKUP');
+          }
+
           await this.performTlsNegotiation(preloginResponse, signal);
 
           this.sendLogin7Packet();
@@ -2497,6 +2514,38 @@ class Connection extends EventEmitter {
   }
 
   /**
+   * The instance name to send in the `INSTOPT` PRELOGIN option, or `undefined`
+   * to send an empty instance name, which the server always accepts.
+   *
+   * The instance name is only sent to verify a port that was looked up via
+   * the SQL Server Browser. Microsoft.Data.SqlClient uses the `INSTOPT`
+   * response for the same purpose, and its managed networking implementation
+   * (used on Linux and macOS) never sends an instance name at all:
+   *
+   * - With an explicit port, or after a redirect (which always carries a
+   *   port), no instance name is sent.
+   * - `MSSQLSERVER` (the default instance) is not sent, because SQL Server
+   *   2008 R2 and older do not accept it.
+   * - Instance names with characters other than printable ASCII are not sent,
+   *   because the server compares the name in its own code page, which is
+   *   unknown to the client.
+   *
+   * @private
+   */
+  getPreloginInstanceName(): string | undefined {
+    if (this.routingData || this.config.options.port !== undefined) {
+      return undefined;
+    }
+
+    const instanceName = this.config.options.instanceName;
+    if (instanceName === undefined || instanceName === '' || instanceName.toUpperCase() === 'MSSQLSERVER' || !/^[ -~]+$/.test(instanceName)) {
+      return undefined;
+    }
+
+    return instanceName;
+  }
+
+  /**
    * @private
    */
   sendPreLogin() {
@@ -2506,7 +2555,8 @@ class Connection extends EventEmitter {
       // this function. Therefore, the encrypt will be set to false here.
       // Otherwise, we will set encrypt here based on the encrypt Boolean value from the configuration.
       encrypt: typeof this.config.options.encrypt === 'boolean' && this.config.options.encrypt,
-      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 }
+      version: { major: Number(major), minor: Number(minor), build: Number(build), subbuild: 0 },
+      instanceName: this.getPreloginInstanceName()
     });
 
     this.messageIo.sendMessage(TYPE.PRELOGIN, payload.data);

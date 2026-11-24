@@ -226,7 +226,7 @@ describe('Connecting to a server that sends a re-routing information', function(
     }
   });
 
-  it('connects to the server specified in the re-routing data, ignoring instance name information', async function() {
+  it('connects to the server specified in the re-routing data, without sending its instance name in PRELOGIN', async function() {
     routingServer.on('connection', async (connection) => {
       const debug = new Debug();
       const incomingMessageStream = new IncomingMessageStream(debug);
@@ -304,6 +304,17 @@ describe('Connecting to a server that sends a re-routing information', function(
           for await (const data of message) {
             chunks.push(data);
           }
+
+          // The routing target always carries a port, so its instance name is
+          // not sent in `INSTOPT`.
+          const prelogin = Buffer.concat(chunks);
+          let optionOffset = 0;
+          while (prelogin[optionOffset] !== 0x02) {
+            optionOffset += 5;
+          }
+          const instanceOffset = prelogin.readUInt16BE(optionOffset + 1);
+          const instanceLength = prelogin.readUInt16BE(optionOffset + 3);
+          assert.strictEqual(prelogin.toString('utf8', instanceOffset, instanceOffset + instanceLength), '\x00');
 
           const responsePayload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
           const responseMessage = new Message({ type: 0x12 });

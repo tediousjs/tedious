@@ -39,6 +39,50 @@ describe('PreloginPayload', function() {
     assertPayload(payload, 'NOT_SUP', { major: 0, minor: 0, build: 0, subbuild: 0 });
   });
 
+  describe('instance name', function() {
+    function readInstanceOption(data: Buffer): Buffer {
+      let offset = 0;
+      while (data[offset] !== 0xFF) {
+        if (data[offset] === 0x02) {
+          const dataOffset = data.readUInt16BE(offset + 1);
+          const dataLength = data.readUInt16BE(offset + 3);
+          return data.subarray(dataOffset, dataOffset + dataLength);
+        }
+        offset += 5;
+      }
+      throw new Error('No INSTOPT option found');
+    }
+
+    it('sends an empty instance name by default', function() {
+      const payload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 } });
+      assert.deepEqual(readInstanceOption(payload.data), Buffer.from([0x00]));
+    });
+
+    it('sends the given instance name, null-terminated', function() {
+      const payload = new PreloginPayload({ encrypt: false, version: { major: 0, minor: 0, build: 0, subbuild: 0 }, instanceName: 'SQLEXPRESS' });
+      assert.deepEqual(readInstanceOption(payload.data), Buffer.concat([Buffer.from('SQLEXPRESS'), Buffer.from([0x00])]));
+
+      // The other options are still read correctly after the longer `INSTOPT` value.
+      const parsed = new PreloginPayload(payload.data);
+      assert.strictEqual(parsed.encryptionString, 'NOT_SUP');
+      assert.strictEqual(parsed.threadId, 0);
+      assert.strictEqual(parsed.marsString, 'OFF');
+      assert.strictEqual(parsed.fedAuthRequired, 1);
+    });
+
+    it('reads a server response rejecting the instance name', function() {
+      const data = new PreloginPayload().data;
+      // Find the INSTOPT option and set its single response byte to 0x01.
+      let offset = 0;
+      while (data[offset] !== 0x02) {
+        offset += 5;
+      }
+      data.writeUInt8(0x01, data.readUInt16BE(offset + 1));
+
+      assert.strictEqual(new PreloginPayload(data).instance, 0x01);
+    });
+  });
+
   describe('#toString', function() {
     it('formats the payload as zero-padded upper-case hex', function() {
       const payload = new PreloginPayload({ encrypt: true, version: { major: 11, minor: 3, build: 2, subbuild: 0 } });
