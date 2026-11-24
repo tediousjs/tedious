@@ -753,6 +753,18 @@ describe('Parameterised Statements Test', function() {
         new Date('December 4, 2011 10:04:23')
       );
     });
+
+    it('should write the offset a `Date` carries as `offsetMinutes`', function(done) {
+      execSql(
+        done,
+        TYPES.DateTimeOffset,
+        Object.assign(new Date(Date.UTC(2014, 1, 14, 17, 59, 59, 999)), { offsetMinutes: 330 }),
+        '7_3_A',
+        null,
+        '2014-02-14 23:29:59.9990000 +05:30',
+        true
+      );
+    });
   });
 
   it('should test output bit true', function(done) {
