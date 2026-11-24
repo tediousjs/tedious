@@ -8,5 +8,6 @@ Running an existing benchmark is easy, simply execute the benchmark file with `n
 node benchmarks/query/select-many-rows.js
 ```
 
-**NOTE:** The benchmarks try to load `tedious` code from `lib`, so make sure
-you run `npm run prepublish` first.
+**NOTE:** Before running benchmarks, run `npm run build` from the repository root
+and `npm install` inside `benchmarks/`. This builds the driver in `lib` and installs
+the benchmarks' local `tedious` dependency.
