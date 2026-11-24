@@ -5,6 +5,7 @@ import Request from '../../src/request';
 import { typeByName as TYPES } from '../../src/data-type';
 import { encode } from '../../src/text-encoding';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { COLLATIONS, SQL_SERVER_ENCODINGS_QUERY, quoteName } from '../../scripts/codepage-collations';
 
 import defaultConfig from '../config';
 
@@ -18,26 +19,6 @@ function getConfig() {
     }
   };
 }
-
-// A collation for each code page tedious decodes.
-const COLLATIONS: Array<[codepage: string, collation: string, doubleByte: boolean]> = [
-  ['CP437', 'SQL_Latin1_General_CP437_CI_AS', false],
-  ['CP850', 'SQL_Latin1_General_CP850_CI_AS', false],
-  ['CP874', 'Thai_CI_AS', false],
-  ['CP1250', 'Czech_CI_AS', false],
-  ['CP1251', 'Cyrillic_General_CI_AS', false],
-  ['CP1252', 'Latin1_General_CI_AS', false],
-  ['CP1253', 'Greek_CI_AS', false],
-  ['CP1254', 'Turkish_CI_AS', false],
-  ['CP1255', 'Hebrew_CI_AS', false],
-  ['CP1256', 'Arabic_CI_AS', false],
-  ['CP1257', 'Lithuanian_CI_AS', false],
-  ['CP1258', 'Vietnamese_CI_AS', false],
-  ['CP932', 'Japanese_CI_AS', true],
-  ['CP936', 'Chinese_PRC_CI_AS', true],
-  ['CP949', 'Korean_Wansung_CI_AS', true],
-  ['CP950', 'Chinese_Taiwan_Stroke_CI_AS', true]
-];
 
 const DATABASE = '__tedious_codepages';
 
@@ -104,7 +85,7 @@ describe('`varchar` values in each code page', function() {
       return;
     }
 
-    await execSqlBatch('USE ' + originalDatabaseName);
+    await execSqlBatch('USE ' + quoteName(originalDatabaseName));
     await execSqlBatch(`DROP DATABASE IF EXISTS ${DATABASE}`);
 
     await new Promise<void>((resolve) => {
@@ -224,10 +205,7 @@ describe('`varchar` values in each code page', function() {
       await useDatabaseWithCollation(collation);
 
       // Every character on its own, as SQL Server converts it.
-      const rows = await execSql(`
-        SELECT v, CAST(CAST(NCHAR(v) AS varchar(4)) AS varbinary(4))
-        FROM (SELECT TOP (65536) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1 AS v FROM sys.all_columns a CROSS JOIN sys.all_columns b) AS n
-      `);
+      const rows = await execSql(SQL_SERVER_ENCODINGS_QUERY);
       assert.strictEqual(rows.length, 65536);
 
       const differences = [];

@@ -1,18 +1,18 @@
 import { assert } from 'chai';
 import { createHash, type Hash } from 'crypto';
 
-import { createDecoder, createEncoder, decode, encode } from '../../src/text-encoding';
+import { createEncoder, decode, encode } from '../../src/text-encoding';
 import { PLPReader } from '../../src/value-parser';
 import { NotEnoughDataError } from '../../src/token/helpers';
 import { type Metadata } from '../../src/metadata-parser';
-import { Collation } from '../../src/collation';
+import { Collation, type Encoding } from '../../src/collation';
 import { typeByName as TYPES } from '../../src/data-type';
 import { type InternalConnectionOptions } from '../../src/connection';
 import Request from '../../src/request';
 import { RequestError } from '../../src/errors';
 
-const SINGLE_BYTE_CODEPAGES = ['CP437', 'CP850', 'CP874', 'CP1250', 'CP1251', 'CP1252', 'CP1253', 'CP1254', 'CP1255', 'CP1256', 'CP1257', 'CP1258'];
-const DOUBLE_BYTE_CODEPAGES = ['CP932', 'CP936', 'CP949', 'CP950'];
+const SINGLE_BYTE_CODEPAGES: Encoding[] = ['CP437', 'CP850', 'CP874', 'CP1250', 'CP1251', 'CP1252', 'CP1253', 'CP1254', 'CP1255', 'CP1256', 'CP1257', 'CP1258'];
+const DOUBLE_BYTE_CODEPAGES: Encoding[] = ['CP932', 'CP936', 'CP949', 'CP950'];
 const ALL_CODEPAGES = [...SINGLE_BYTE_CODEPAGES, ...DOUBLE_BYTE_CODEPAGES];
 
 const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
@@ -116,14 +116,16 @@ describe('text encoding', function() {
     });
 
     it('fails to encode or decode text in an unsupported code page', function() {
-      assert.throws(() => encode('abc', 'CP1'), Error, 'Unsupported code page: CP1.');
-      assert.throws(() => encode('é', 'CP1'), Error, 'Unsupported code page: CP1.');
-      assert.throws(() => createEncoder('CP1'), Error, 'Unsupported code page: CP1.');
-      assert.throws(() => decode(Buffer.from('abc'), 'CP1'), Error, 'Unsupported code page: CP1.');
-      assert.throws(() => createDecoder('CP1'), Error, 'Unsupported code page: CP1.');
+      // `Collation` only has supported code pages, but this is checked at
+      // runtime too.
+      const unsupported = 'CP1' as Encoding;
+      assert.throws(() => encode('abc', unsupported), Error, 'Unsupported code page: CP1.');
+      assert.throws(() => encode('é', unsupported), Error, 'Unsupported code page: CP1.');
+      assert.throws(() => createEncoder(unsupported), Error, 'Unsupported code page: CP1.');
+      assert.throws(() => decode(Buffer.from('abc'), unsupported), Error, 'Unsupported code page: CP1.');
       // Names of the objects' own properties only.
-      assert.throws(() => encode('é', 'constructor'), Error, 'Unsupported code page: constructor.');
-      assert.throws(() => decode(Buffer.from([0xE9]), 'toString'), Error, 'Unsupported code page: toString.');
+      assert.throws(() => encode('é', 'constructor' as Encoding), Error, 'Unsupported code page: constructor.');
+      assert.throws(() => decode(Buffer.from([0xE9]), 'toString' as Encoding), Error, 'Unsupported code page: toString.');
     });
 
     it('encodes streamed UTF-8 text with Node.js, keeping split surrogate pairs together', function() {
@@ -243,40 +245,6 @@ describe('text encoding', function() {
       // And valid sequences with these lead bytes are characters.
       assert.strictEqual(decode(Buffer.from('e0a080ed9fbff0908080f48fbfbf', 'hex'), 'utf-8'), '\u0800\uD7FF\u{10000}\u{10FFFF}');
     });
-
-    it('decodes streamed invalid UTF-8 as a whole value would be, at every split', function() {
-      const bytes = Buffer.from('61eda080e08080f0808080f48fbfbfc3a9f4908061eda061ed', 'hex');
-      const expected = decode(bytes, 'utf-8');
-      for (let split = 0; split <= bytes.length; split++) {
-        const decoder = createDecoder('utf-8');
-        const text = decoder.write(bytes.subarray(0, split)) + decoder.write(Buffer.alloc(0)) + decoder.write(bytes.subarray(split)) + decoder.end();
-        assert.strictEqual(text, expected, `split at ${split}`);
-      }
-    });
-
-    it('decodes characters split across the parts of a streamed value', function() {
-      for (const codepage of [...DOUBLE_BYTE_CODEPAGES, 'utf-8']) {
-        const value = { 'CP932': 'aあ日b', 'CP936': 'a中文b', 'CP949': 'a한똠b', 'CP950': 'a中文b', 'utf-8': 'aé日\u{1F600}b' }[codepage]!;
-        const bytes = codepage === 'utf-8' ? Buffer.from(value, 'utf8') : encode(value, codepage);
-
-        for (let split = 0; split <= bytes.length; split++) {
-          const decoder = createDecoder(codepage);
-          const text = decoder.write(bytes.subarray(0, split)) + decoder.write(Buffer.alloc(0)) + decoder.write(bytes.subarray(split)) + decoder.end();
-          assert.strictEqual(text, value, `${codepage}, split at ${split}`);
-        }
-      }
-    });
-
-    it('decodes a lead byte at the end of a streamed value to the default character', function() {
-      const decoder = createDecoder('CP949');
-      assert.strictEqual(decoder.write(Buffer.from([0x61, 0xB0])), 'a');
-      assert.strictEqual(decoder.end(), '?');
-    });
-
-    it('decodes an invalid sequence split across the parts of a streamed value as a whole', function() {
-      const decoder = createDecoder('CP932');
-      assert.strictEqual(decoder.write(Buffer.from([0x61, 0x82])) + decoder.write(Buffer.from([0x20, 0x62])) + decoder.end(), 'a・b');
-    });
   });
 
   describe('decoding a `varchar(max)` value', function() {
@@ -371,7 +339,7 @@ describe('text encoding', function() {
   describe('conversion of every input', function() {
     // The ranges of byte sequences: the single bytes, and in a double-byte code
     // page, the two-byte sequences of each 16 lead bytes from 0x80.
-    function decodingRanges(codepage: string): Array<[name: string, inputs: Buffer[]]> {
+    function decodingRanges(codepage: Encoding): Array<[name: string, inputs: Buffer[]]> {
       const ranges: Array<[string, Buffer[]]> = [['bytes 0x00 to 0xFF', Array.from({ length: 256 }, (_, byte) => Buffer.of(byte))]];
       if (DOUBLE_BYTE_CODEPAGES.includes(codepage)) {
         for (let first = 0x80; first <= 0xFF; first += 0x10) {
@@ -565,7 +533,7 @@ describe('text encoding', function() {
       CP1258: [[0x81, 0x0081]]
     };
 
-    for (const [codepage, samples] of Object.entries(singleByteSamples)) {
+    for (const [codepage, samples] of Object.entries(singleByteSamples) as Array<[Encoding, Array<[number, number]>]>) {
       it(`decodes ${codepage} as Windows does`, function() {
         for (const [byte, char] of samples) {
           assert.strictEqual(decode(Buffer.of(byte), codepage), String.fromCharCode(char), `0x${byte.toString(16)}`);
@@ -592,7 +560,7 @@ describe('text encoding', function() {
       ]
     };
 
-    for (const [codepage, samples] of Object.entries(doubleByteSamples)) {
+    for (const [codepage, samples] of Object.entries(doubleByteSamples) as Array<[Encoding, Array<[number[], string]>]>) {
       it(`decodes ${codepage} as Windows does`, function() {
         for (const [bytes, char] of samples) {
           assert.strictEqual(hex(decode(Buffer.from(bytes), codepage)), hex(char), Buffer.from(bytes).toString('hex'));

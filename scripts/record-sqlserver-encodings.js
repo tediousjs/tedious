@@ -19,32 +19,11 @@ const os = require('os');
 const path = require('path');
 
 const { Connection, Request } = require('../lib/tedious');
-const { SINGLE_BYTE_HIGH_HALVES, DOUBLE_BYTE_TABLES } = require('../lib/codepage-tables');
-const { ENCODING_OVERRIDES } = require('../lib/codepage-encoding-overrides');
+const { buildEncodingTable } = require('../lib/text-encoding');
 const { formatOverrides } = require('./generate-codepage-tables');
-
-// A collation for each code page.
-const COLLATIONS = [
-  ['CP437', 'SQL_Latin1_General_CP437_CI_AS'],
-  ['CP850', 'SQL_Latin1_General_CP850_CI_AS'],
-  ['CP874', 'Thai_CI_AS'],
-  ['CP1250', 'Czech_CI_AS'],
-  ['CP1251', 'Cyrillic_General_CI_AS'],
-  ['CP1252', 'Latin1_General_CI_AS'],
-  ['CP1253', 'Greek_CI_AS'],
-  ['CP1254', 'Turkish_CI_AS'],
-  ['CP1255', 'Hebrew_CI_AS'],
-  ['CP1256', 'Arabic_CI_AS'],
-  ['CP1257', 'Lithuanian_CI_AS'],
-  ['CP1258', 'Vietnamese_CI_AS'],
-  ['CP932', 'Japanese_CI_AS'],
-  ['CP936', 'Chinese_PRC_CI_AS'],
-  ['CP949', 'Korean_Wansung_CI_AS'],
-  ['CP950', 'Chinese_Taiwan_Stroke_CI_AS']
-];
+const { COLLATIONS, SQL_SERVER_ENCODINGS_QUERY, quoteName } = require('./codepage-collations');
 
 const DATABASE = '__tedious_codepages';
-const QUESTION_MARK = 0x3F;
 
 const HEADER = `// Do not edit: recorded by \`npm run record:codepages\`
 // (\`scripts/record-sqlserver-encodings.js\`) from SQL Server's own conversion of
@@ -67,59 +46,6 @@ const HEADER = `// Do not edit: recorded by \`npm run record:codepages\`
 
 export const SQL_SERVER_ENCODINGS: { readonly [codepage: string]: string } = {
 `;
-
-// How tedious encodes each UTF-16 code unit without these encodings: as the
-// first byte sequence that decodes to it, or as `ENCODING_OVERRIDES` says (see
-// `buildEncodingTable` in `src/text-encoding.ts`).
-function baseline(codepage) {
-  const codes = new Uint16Array(0x10000).fill(QUESTION_MARK);
-  const mapped = new Uint8Array(0x10000);
-  const add = (char, code) => {
-    if (char !== 0 && !mapped[char]) {
-      codes[char] = code;
-      mapped[char] = 1;
-    }
-  };
-
-  for (let byte = 0; byte < 0x80; byte++) {
-    codes[byte] = byte;
-    mapped[byte] = 1;
-  }
-
-  if (Object.hasOwn(SINGLE_BYTE_HIGH_HALVES, codepage)) {
-    const high = SINGLE_BYTE_HIGH_HALVES[codepage];
-    for (let byte = 0x80; byte <= 0xFF; byte++) {
-      add(high.charCodeAt(byte - 0x80), byte);
-    }
-  } else {
-    // See `DOUBLE_BYTE_TABLES` for the layout of the data.
-    const { leadBytes, data } = DOUBLE_BYTE_TABLES[codepage];
-    const buf = Buffer.from(data, 'base64');
-    for (let byte = 0x80; byte <= 0xFF; byte++) {
-      add(buf.readUInt16LE((byte - 0x80) * 2), byte);
-    }
-    let offset = 256;
-    for (const [first, last] of leadBytes) {
-      for (let lead = first; lead <= last; lead++) {
-        for (let trail = 0x40; trail <= 0xFE; trail++) {
-          add(buf.readUInt16LE(offset), (lead << 8) | trail);
-          offset += 2;
-        }
-      }
-    }
-  }
-
-  for (const entry of Object.hasOwn(ENCODING_OVERRIDES, codepage) ? ENCODING_OVERRIDES[codepage].split(' ') : []) {
-    const [, first, last, code, step] = /^([0-9A-F]{4})(?:-([0-9A-F]{4}))?:([0-9A-F]{2,4})(\+?)$/.exec(entry);
-    const from = parseInt(first, 16);
-    const to = last === undefined ? from : parseInt(last, 16);
-    for (let char = from; char <= to; char++) {
-      codes[char] = parseInt(code, 16) + (step === '+' ? char - from : 0);
-    }
-  }
-
-  return codes;
-}
 
 function connect() {
   const { config } = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.tedious', 'test-connection.json'), 'utf8'));
@@ -146,23 +72,21 @@ async function main() {
   const entries = [];
   try {
     for (const [codepage, collation] of COLLATIONS) {
-      await execSql(connection, `USE ${originalDatabase}; DROP DATABASE IF EXISTS ${DATABASE}`);
+      await execSql(connection, `USE ${quoteName(originalDatabase)}; DROP DATABASE IF EXISTS ${DATABASE}`);
       await execSql(connection, `CREATE DATABASE ${DATABASE} COLLATE ${collation}`);
       await execSql(connection, `USE ${DATABASE}`);
 
-      const rows = await execSql(connection, `
-        SELECT v, CAST(CAST(NCHAR(v) AS varchar(4)) AS varbinary(4))
-        FROM (SELECT TOP (65536) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1 AS v FROM sys.all_columns a CROSS JOIN sys.all_columns b) AS n
-      `);
+      const rows = await execSql(connection, SQL_SERVER_ENCODINGS_QUERY);
 
-      const codes = baseline(codepage);
+      // How tedious encodes each UTF-16 code unit without these encodings.
+      const { codes } = buildEncodingTable(codepage, false);
       const differences = [];
       for (const [v, bytes] of rows) {
         const char = Number(v);
-        const code = bytes.length === 2 ? (bytes[0] << 8) | bytes[1] : bytes[0];
         if (bytes.length > 2 || bytes.length === 0) {
           throw new Error(`${codepage}: U+${char.toString(16)} is encoded as ${bytes.toString('hex')}`);
         }
+        const code = bytes.length === 2 ? (bytes[0] << 8) | bytes[1] : bytes[0];
         if (code !== codes[char]) {
           differences.push([char, code]);
         }
@@ -174,7 +98,7 @@ async function main() {
       }
     }
   } finally {
-    await execSql(connection, `USE ${originalDatabase}; DROP DATABASE IF EXISTS ${DATABASE}`);
+    await execSql(connection, `USE ${quoteName(originalDatabase)}; DROP DATABASE IF EXISTS ${DATABASE}`);
     connection.close();
   }
 

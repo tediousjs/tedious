@@ -28,13 +28,14 @@ npm install tedious
 Tedious converts `varchar`, `char` and `text` values from and to the code page
 of their collation itself, as SQL Server converts them from and to `nvarchar`:
 
-- A character the code page does not have is sent as a similar one where
-  Windows defines one (such as `Ā` as `A`), and otherwise as `?`. A character
-  outside of the Basic Multilingual Plane, such as an emoji, is sent as `??`.
-  SQL Server on older versions of Windows has fewer of these similar
-  characters: it converts some spaces and dashes (such as U+2009, the thin
-  space) to `?`, where tedious sends a space or a dash as SQL Server does on
-  Linux and on current versions of Windows.
+- In a legacy code page (any collation but a UTF-8 one), a character the code
+  page does not have is sent as a similar one where Windows defines one (such
+  as `Ā` as `A`), and otherwise as `?`. A character outside of the Basic
+  Multilingual Plane, such as an emoji, is sent as `??`. SQL Server on older
+  versions of Windows has fewer of these similar characters: it converts some
+  spaces and dashes (such as U+2009, the thin space) to `?`, where tedious
+  sends a space or a dash as SQL Server does on Linux and on current versions
+  of Windows.
 - An invalid byte sequence in a value is decoded to `?` (or `・` in Japanese
   collations) in a double-byte code page, and to U+FFFD in UTF-8.
 - A byte order mark at the start of a value in a UTF-8 collation is kept, as

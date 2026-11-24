@@ -1,4 +1,4 @@
-type Encoding = 'utf-8' | 'CP437' | 'CP850' | 'CP874' | 'CP932' | 'CP936' | 'CP949' | 'CP950' | 'CP1250' | 'CP1251' | 'CP1252' | 'CP1253' | 'CP1254' | 'CP1255' | 'CP1256' | 'CP1257' | 'CP1258';
+export type Encoding = 'utf-8' | 'CP437' | 'CP850' | 'CP874' | 'CP932' | 'CP936' | 'CP949' | 'CP950' | 'CP1250' | 'CP1251' | 'CP1252' | 'CP1253' | 'CP1254' | 'CP1255' | 'CP1256' | 'CP1257' | 'CP1258';
 
 // http://technet.microsoft.com/en-us/library/aa176553(v=sql.80).aspx
 export const codepageByLanguageId: { [key: number]: Encoding } = {
