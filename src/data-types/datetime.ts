@@ -1,8 +1,8 @@
 import { type DataType } from '../data-type';
 import DateTimeN from './datetimen';
-import { ChronoUnit, LocalDate } from '@js-joda/core';
+import { epochDay } from './temporal';
 
-const EPOCH_DATE = LocalDate.ofYearDay(1900, 1);
+const EPOCH_DATE = epochDay(1900, 1, 1);
 const TYPE_INFO = Buffer.from([DateTimeN.id, 0x08]);
 
 const DateTime: DataType = {
@@ -27,10 +27,10 @@ const DateTime: DataType = {
 
     let days: number, milliseconds: number;
     if (options.useUTC) {
-      days = EPOCH_DATE.until(LocalDate.of(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()), ChronoUnit.DAYS);
+      days = epochDay(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate()) - EPOCH_DATE;
       milliseconds = ((value.getUTCHours() * 60 + value.getUTCMinutes()) * 60 + value.getUTCSeconds()) * 1000 + value.getUTCMilliseconds();
     } else {
-      days = EPOCH_DATE.until(LocalDate.of(value.getFullYear(), value.getMonth() + 1, value.getDate()), ChronoUnit.DAYS);
+      days = epochDay(value.getFullYear(), value.getMonth() + 1, value.getDate()) - EPOCH_DATE;
       milliseconds = ((value.getHours() * 60 + value.getMinutes()) * 60 + value.getSeconds()) * 1000 + value.getMilliseconds();
     }
 

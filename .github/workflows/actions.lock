@@ -3,12 +3,16 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
+    '.github/workflows/azure-sql-cleanup.yml': []
+    '.github/workflows/azure-sql-provision.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'actions/upload-artifact@v7.0.2'
     '.github/workflows/claude-code-review.yml':
         - 'actions/checkout@v7.0.1'
-        - 'anthropics/claude-code-action@v1.0.268'
+        - 'anthropics/claude-code-action@v1.0.271'
     '.github/workflows/claude.yml':
         - 'actions/checkout@v7.0.1'
-        - 'anthropics/claude-code-action@v1.0.268'
+        - 'anthropics/claude-code-action@v1.0.271'
     '.github/workflows/codeql-analysis.yml':
         - 'actions/checkout@v7.0.1'
         - 'github/codeql-action@v4.39.3'
@@ -41,14 +45,19 @@ dependencies:
         commit: 'sha1-949feb2413d6458794dcd2491c4babbbce0c15c1'
         owner_id: 44036562
         repo_id: 189476904
+    'actions/upload-artifact@v7.0.2':
+        ref: 'v7.0.2'
+        commit: 'sha1-cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+        owner_id: 44036562
+        repo_id: 192625955
     'amannn/action-semantic-pull-request@v6.1.2':
         ref: 'v6.1.2'
         commit: 'sha1-2252a14e810aa9b85c2d560bd7070c802206ecf6'
         owner_id: 4038316
         repo_id: 220418983
-    'anthropics/claude-code-action@v1.0.268':
-        ref: 'v1.0.268'
-        commit: 'sha1-c0949c50a78c1ec8ce2647db36629b870e715d0c'
+    'anthropics/claude-code-action@v1.0.271':
+        ref: 'v1.0.271'
+        commit: 'sha1-4fa93a88de49bbef68b10eb15aabedf28ca0e1ed'
         owner_id: 76263028
         repo_id: 986421638
         uses:

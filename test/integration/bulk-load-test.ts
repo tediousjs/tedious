@@ -84,6 +84,43 @@ describe('BulkLoad', function() {
     connection.execSqlBatch(request);
   });
 
+  it('allows bulk loading into columns whose names contain `]`', function(done) {
+    const bulkLoad = connection.newBulkLoad('#tmpTestTable', (err, rowCount) => {
+      if (err) {
+        return done(err);
+      }
+
+      assert.strictEqual(rowCount, 2);
+
+      const rows: unknown[] = [];
+      const request = new Request('SELECT [id], [a]]b], [x]], [y] FROM #tmpTestTable ORDER BY [id]', (err) => {
+        if (err) {
+          return done(err);
+        }
+
+        assert.deepEqual(rows, [[1, 'one', 10], [2, 'two', 20]]);
+        done();
+      });
+      request.on('row', (columns) => rows.push([columns[0].value, columns[1].value, columns[2].value]));
+      connection.execSql(request);
+    });
+
+    bulkLoad.addColumn('id', TYPES.Int, { nullable: false });
+    bulkLoad.addColumn('a]b', TYPES.NVarChar, { length: 50, nullable: true });
+    bulkLoad.addColumn('x], [y', TYPES.Int, { nullable: true });
+
+    connection.execSqlBatch(new Request(bulkLoad.getTableCreationSql(), (err) => {
+      if (err) {
+        return done(err);
+      }
+
+      connection.execBulkLoad(bulkLoad, [
+        { 'id': 1, 'a]b': 'one', 'x], [y': 10 },
+        [2, 'two', 20],
+      ]);
+    }));
+  });
+
   describe('Binary columns', function() {
     for (const length of [3, undefined]) {
       it(`pads shorter values to ${length === undefined ? 'the default length of 8000' : 'the declared length'}`, function(done) {
