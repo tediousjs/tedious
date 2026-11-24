@@ -127,6 +127,82 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  # Runs the tests against the Azure SQL Database container, which runs the
+  # Azure SQL Database engine locally. Unlike the jobs against a real Azure SQL
+  # server below, it needs no secrets, so it also runs for pull requests from
+  # forks. The container is in public preview and only has a `latest` tag, so
+  # failures here do not fail the workflow.
+  test-azure-sql-db-container:
+    name: Azure SQL Database Container / Node.js 22.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    env:
+      MSSQL_IMAGE: mcr.microsoft.com/mssql/azure-sql-db-server:latest
+
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Use Node.js 22
+      uses: actions/setup-node@v7.1.0
+      with:
+        node-version: 22
+        cache: 'npm'
+
+    - name: Generate TLS Certificate
+      run: |
+        openssl req -x509 -newkey rsa:4096 -nodes -addext "extendedKeyUsage = serverAuth" -subj '/CN=localhost' -keyout ./test/fixtures/mssql.key -out ./test/fixtures/mssql.crt
+
+    - name: Start containers
+      run: |
+        docker compose -f "test/docker-compose.linux.yml" up --detach
+
+    - name: Set up CI configuration
+      shell: bash
+      run: cp -f test/config.ci.ts test/config.ts
+
+    - run: npm ci
+
+    - name: Wait for the database to accept connections
+      run: |
+        container=$(docker compose -f "test/docker-compose.linux.yml" ps -q mssql)
+        for _ in $(seq 1 60); do
+          if docker exec "$container" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'yourStrong(!)Password' -C -l 2 -Q 'SELECT 1' > /dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 2
+        done
+        docker compose -f "test/docker-compose.linux.yml" logs mssql
+        exit 1
+
+    - name: run integration tests (TDS 7.4)
+      env:
+        TEDIOUS_TDS_VERSION: 7_4
+      run: npx mocha --forbid-only test/integration/
+
+    - name: run integration tests (TDS 7.3B)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_B
+      run: npx mocha --forbid-only test/integration/
+
+    - name: run integration tests (TDS 7.3A)
+      env:
+        TEDIOUS_TDS_VERSION: 7_3_A
+      run: npx mocha --forbid-only test/integration/
+
+    - name: run integration tests (TDS 7.2)
+      env:
+        TEDIOUS_TDS_VERSION: 7_2
+      run: npx mocha --forbid-only test/integration/
+
+    - name: run integration tests (TDS 7.1)
+      env:
+        TEDIOUS_TDS_VERSION: 7_1
+      run: npx mocha --forbid-only test/integration/
+
   test-windows:
     name: SQL Server ${{ matrix.mssql-version }} Windows / Node.js ${{ matrix.node-version }}
     runs-on: windows-2022
