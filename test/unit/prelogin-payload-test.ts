@@ -33,6 +33,11 @@ describe('PreloginPayload', function() {
     assertPayload(payload, 'ON', { major: 11, minor: 3, build: 2, subbuild: 0 });
   });
 
+  it('should encrypt the login packet only', function() {
+    const payload = new PreloginPayload({ encrypt: 'login', version: { major: 11, minor: 3, build: 2, subbuild: 0 } });
+    assertPayload(payload, 'OFF', { major: 11, minor: 3, build: 2, subbuild: 0 });
+  });
+
   it('should create from buffer', function() {
     const payload = new PreloginPayload();
     new PreloginPayload(payload.data);
