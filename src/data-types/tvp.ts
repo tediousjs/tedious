@@ -53,7 +53,7 @@ function validateTable(value: unknown): TvpValue | null {
   // A vector column's base type and length are checked up front: the base
   // type determines the vector support version the request needs.
   for (const column of (value as TvpValue).columns) {
-    if (column.type === Vector) {
+    if (column != null && column.type === Vector) {
       try {
         validateVectorColumn(column.baseType, column.length);
       } catch (error: any) {
@@ -127,9 +127,16 @@ function writeRow(buffer: WritableTrackingBuffer, columns: TvpColumn[], cells: P
 
     try {
       cell.value = column.type.validate(row[k], collation);
-      // TvpColumnData
+    } catch (error) {
+      throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
+    }
+
+    try {
       column.type.writeValue(buffer, cell, options);
     } catch (error) {
+      if (column.type !== Vector) {
+        throw error;
+      }
       throw new InputError(`TVP column '${column.name}' has invalid data at row index ${rowIndex}`, { cause: error });
     }
   }

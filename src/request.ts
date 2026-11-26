@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { type Parameter, type DataType, type ResolvedParameter, resolveParameter } from './data-type';
-import { type VectorBaseType } from './data-types/vector';
+import { Vector, type VectorBaseType } from './data-types/vector';
 import { RequestError } from './errors';
 
 import Connection, { type InternalConnectionOptions } from './connection';
@@ -530,7 +530,9 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  makeParamsParameter(parameters: Parameter[]) {
+  makeParamsParameter(parameters: Parameter[]): string;
+  makeParamsParameter(parameters: Parameter[], onVectorError: (error: RequestError) => void): string | undefined;
+  makeParamsParameter(parameters: Parameter[], onVectorError?: (error: RequestError) => void) {
     let paramsParameter = '';
     for (let i = 0, len = parameters.length; i < len; i++) {
       const parameter = parameters[i];
@@ -541,7 +543,15 @@ class Request extends EventEmitter {
       try {
         paramsParameter += parameter.type.declaration(parameter);
       } catch (error: any) {
-        throw new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
+        if (parameter.type !== Vector) {
+          throw error;
+        }
+        const requestError = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
+        if (onVectorError) {
+          onVectorError(requestError);
+          return;
+        }
+        throw requestError;
       }
       if (parameter.output) {
         paramsParameter += ' OUTPUT';

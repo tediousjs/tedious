@@ -2874,8 +2874,10 @@ class Connection extends EventEmitter {
    */
   checkVectorSupport(types: Iterable<VectorTypeUse>): RequestError | undefined {
     let required = 0;
-    for (const { type, baseType } of types) {
-      required = Math.max(required, requiredVectorSupportVersion(type, baseType));
+    for (const usage of types) {
+      if (usage != null) {
+        required = Math.max(required, requiredVectorSupportVersion(usage.type, usage.baseType));
+      }
     }
 
     if (required <= this.vectorSupportVersion) {
@@ -3190,15 +3192,17 @@ class Connection extends EventEmitter {
       scale: undefined
     }));
 
-    let params;
-    try {
-      params = request.parameters.length ? request.makeParamsParameter(request.parameters) : null;
-    } catch (error: any) {
+    const declaration: { error?: RequestError } = {};
+    const params = request.parameters.length ? request.makeParamsParameter(request.parameters, (error) => {
+      declaration.error = error;
+    }) : null;
+    if (declaration.error) {
+      const error = declaration.error;
       request.error = error;
 
       process.nextTick(() => {
         this.debug.log(error.message);
-        request.callback(error);
+        originalCallback(request).call(request, error);
       });
 
       return;
