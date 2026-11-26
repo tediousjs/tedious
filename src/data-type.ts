@@ -37,6 +37,7 @@ import DateTimeOffset from './data-types/datetimeoffset';
 import UDT from './data-types/udt';
 import TVP from './data-types/tvp';
 import Variant from './data-types/sql-variant';
+import { Vector, type VectorBaseType } from './data-types/vector';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { type InternalConnectionOptions } from './connection';
@@ -53,6 +54,8 @@ export interface Parameter {
   length?: number | undefined;
   precision?: number | undefined;
   scale?: number | undefined;
+  // For `TYPES.Vector`: the base type of its elements.
+  baseType?: VectorBaseType | undefined;
 
   nullable?: boolean | undefined;
 
@@ -66,6 +69,8 @@ export interface ParameterData<T = any> {
   length?: number | undefined;
   scale?: number | undefined;
   precision?: number | undefined;
+  // For `TYPES.Vector`: the base type of its elements.
+  baseType?: VectorBaseType | undefined;
 
   collation?: Collation | undefined;
 
@@ -266,6 +271,7 @@ export const TYPE = {
   [UDT.id]: UDT,
   [TVP.id]: TVP,
   [Variant.id]: Variant,
+  [Vector.id]: Vector,
 };
 
 /**
@@ -538,6 +544,26 @@ export const TYPE = {
  *     <td>-</td>
  *   </tr>
  * </tbody>
+ *
+ * <tbody>
+ *   <tr class="group-heading">
+ *     <th colspan="5">Vectors<sup>5</sup></th>
+ *   </tr>
+ *   <tr>
+ *     <td><code>vector(n)</code></td>
+ *     <td><code>{@link TYPES.Vector}</code></td>
+ *     <td><code>Float32Array</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ *   <tr>
+ *     <td><code>vector(n, float16)</code></td>
+ *     <td><code>{@link TYPES.Vector}</code></td>
+ *     <td><code>Float16Array</code></td>
+ *     <td>✓</td>
+ *     <td>✓</td>
+ *   </tr>
+ * </tbody>
  * </table>
  *
  * <ol>
@@ -569,6 +595,38 @@ export const TYPE = {
  *       Note that the order of bytes is not the same as the character representation. See
  *       <a href="http://msdn.microsoft.com/en-us/library/ms190215.aspx">Using uniqueidentifier Data</a>
  *       for an example of the different ordering of bytes.
+ *     </p>
+ *   </li>
+ *   <li>
+ *     <h4>Vector</h4>
+ *     <p>
+ *       Requires SQL Server 2025 (or newer), Azure SQL Database, Azure SQL Managed Instance or SQL database in
+ *       Microsoft Fabric, and TDS 7.4. Vectors are sent and received in SQL Server's native binary format once the
+ *       server has acknowledged the vector support feature extension at login. This must be enabled with the
+ *       {@link ConnectionOptions.vectorTypeSupport} connection option (<code>'v1'</code> or <code>'v2'</code>; the
+ *       default is <code>'off'</code>). <code>float16</code> vectors require <code>vectorTypeSupport</code>
+ *       <code>'v2'</code>, a server that supports them, and a Node.js version with <code>Float16Array</code>.
+ *     </p>
+ *     <p>
+ *       Values are returned as a <code>Float32Array</code> for <code>vector(n)</code> and as a
+ *       <code>Float16Array</code> for <code>vector(n, float16)</code>. The column's metadata holds the dimension count
+ *       as <code>dimensions</code> and the base type (<code>'float32'</code> or <code>'float16'</code>) as
+ *       <code>baseType</code>.
+ *     </p>
+ *     <p>
+ *       A parameter, bulk load or table-valued parameter value must be a <code>Float32Array</code> or
+ *       <code>Float16Array</code> with finite elements. A parameter value determines its base type. The
+ *       <code>baseType</code> option is needed for <code>null</code> and output parameters, bulk load columns and
+ *       table-valued parameter columns, and must match a value when both are given. The number of dimensions is given
+ *       with the <code>length</code> option. It is required for bulk load and table-valued parameter columns and for
+ *       <code>null</code> parameter values, and otherwise inferred from the value. A vector has between 1 and 1998
+ *       (<code>float32</code>) or 3996 (<code>float16</code>) dimensions.
+ *     </p>
+ *     <p>
+ *       Without native vector support, <code>vector</code> columns are returned as JSON array text, and
+ *       <code>TYPES.Vector</code> is rejected. Vectors can still be sent as JSON array text with
+ *       {@link TYPES.NVarChar}, wrapped in <code>CAST(@v AS vector(n))</code> where a vector function such as
+ *       <code>VECTOR_DISTANCE</code> needs a <code>vector</code> argument.
  *     </p>
  *   </li>
  * </ol>
@@ -604,7 +662,8 @@ export const TYPES = {
   DateTimeOffset,
   UDT,
   TVP,
-  Variant
+  Variant,
+  Vector
 };
 
 export const typeByName = TYPES;

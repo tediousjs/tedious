@@ -4,6 +4,7 @@ import { TYPE, type DataType } from './data-type';
 import { type CryptoMetadata } from './always-encrypted/types';
 
 import { formatHex } from './format-hex';
+import { vectorBaseTypeFromDimensionType, vectorDimensionsFromTypeInfo, type VectorBaseType } from './data-types/vector';
 
 import { Result, NotEnoughDataError, readUInt8, readBVarChar, readUsVarChar, readUInt16LE, readUInt32LE } from './token/helpers';
 
@@ -42,13 +43,25 @@ export type BaseMetadata = {
   scale: number | undefined;
 
   /**
-   * The length, for char, varchar, nvarchar and varbinary.
+   * The length, for char, varchar, nvarchar and varbinary, and the maximum length in bytes of vector.
    */
   dataLength: number | undefined;
 
   schema: XmlSchema | undefined;
 
   udtInfo: UdtInfo | undefined;
+
+  /**
+   * The base type of the elements of a vector column: `'float32'` or
+   * `'float16'`. Only present for vector columns.
+   */
+  baseType?: VectorBaseType | undefined;
+
+  /**
+   * The number of dimensions of a vector column. Only present for vector
+   * columns.
+   */
+  dimensions?: number | undefined;
 }
 
 export type Metadata = {
@@ -346,6 +359,28 @@ function readMetadata(buf: Buffer, offset: number, options: ParserOptions): Resu
         dataLength: undefined,
         schema: undefined,
         udtInfo: udtInfo
+      }, offset);
+    }
+
+    case 'Vector': {
+      let dataLength;
+      ({ offset, value: dataLength } = readUInt16LE(buf, offset));
+
+      let dimensionType;
+      ({ offset, value: dimensionType } = readUInt8(buf, offset));
+
+      return new Result({
+        userType: userType,
+        flags: flags,
+        type: type,
+        collation: undefined,
+        precision: undefined,
+        scale: undefined,
+        dataLength: dataLength,
+        schema: undefined,
+        udtInfo: undefined,
+        baseType: vectorBaseTypeFromDimensionType(dimensionType),
+        dimensions: vectorDimensionsFromTypeInfo(dataLength, dimensionType)
       }, offset);
     }
 

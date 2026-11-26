@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { type Parameter, type DataType, type ResolvedParameter, resolveParameter } from './data-type';
+import { Vector, type VectorBaseType } from './data-types/vector';
 import { RequestError } from './errors';
 
 import Connection, { type InternalConnectionOptions } from './connection';
@@ -37,6 +38,12 @@ export interface ParameterOptions {
   output?: boolean;
   length?: number;
   precision?: number;
+
+  /**
+   * For Vector, the base type when there is no value to infer it from:
+   * `'float32'` (the default) or `'float16'`.
+   */
+  baseType?: VectorBaseType;
 
   /**
    * For Numeric and Decimal, the number of digits after the decimal point.
@@ -475,10 +482,16 @@ class Request extends EventEmitter {
    *   `request.addParameter('createdAt', TYPES.DateTime2, date, { scale: 3 })`
    *   sends the value with three fractional-second digits. For DateTime2
    *   parameters, the default is 7 for non-null values and 0 for `null` values.
+   *
+   *   For `TYPES.Vector`, the value must be a `Float32Array` or
+   *   `Float16Array`, which determines the base type. `length` is the number
+   *   of dimensions. It is inferred from the value, and required when the
+   *   value is `null` or `undefined`, e.g. for an output parameter. Set
+   *   `baseType` to `'float16'` when there is no value.
    */
   // TODO: `type` must be a valid TDS value type
   addParameter(name: string, type: DataType, value?: unknown, options?: Readonly<ParameterOptions> | null) {
-    const { output = false, length, precision, scale } = options ?? {};
+    const { output = false, length, precision, scale, baseType } = options ?? {};
 
     const parameter: Parameter = {
       type: type,
@@ -487,7 +500,8 @@ class Request extends EventEmitter {
       output: output,
       length: length,
       precision: precision,
-      scale: scale
+      scale: scale,
+      baseType: baseType
     };
 
     this.parameters.push(parameter);
@@ -516,7 +530,9 @@ class Request extends EventEmitter {
   /**
    * @private
    */
-  makeParamsParameter(parameters: Parameter[]) {
+  makeParamsParameter(parameters: Parameter[]): string;
+  makeParamsParameter(parameters: Parameter[], onVectorError: (error: RequestError) => void): string | undefined;
+  makeParamsParameter(parameters: Parameter[], onVectorError?: (error: RequestError) => void) {
     let paramsParameter = '';
     for (let i = 0, len = parameters.length; i < len; i++) {
       const parameter = parameters[i];
@@ -524,7 +540,19 @@ class Request extends EventEmitter {
         paramsParameter += ', ';
       }
       paramsParameter += '@' + parameter.name + ' ';
-      paramsParameter += parameter.type.declaration(parameter);
+      try {
+        paramsParameter += parameter.type.declaration(parameter);
+      } catch (error: any) {
+        if (parameter.type !== Vector) {
+          throw error;
+        }
+        const requestError = new RequestError('Validation failed for parameter \'' + parameter.name + '\'. ' + error.message, 'EPARAM', { cause: error });
+        if (onVectorError) {
+          onVectorError(requestError);
+          return;
+        }
+        throw requestError;
+      }
       if (parameter.output) {
         paramsParameter += ' OUTPUT';
       }

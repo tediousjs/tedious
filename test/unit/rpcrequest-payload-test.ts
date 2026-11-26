@@ -225,4 +225,29 @@ describe('RpcRequestPayload', function() {
     assert.instanceOf((error as InputError).cause, TypeError);
     assert.strictEqual(((error as InputError).cause as TypeError).message, 'Binary value of 5 bytes exceeds the declared length of 3.');
   });
+
+  it('reports the column and row for a VECTOR TVP write error', async function() {
+    const options = { tdsVersion: '7_4', useUTC: true } as InternalConnectionOptions;
+    const resolved = resolveParameter({
+      type: TYPES.TVP, name: 'tvp', output: false,
+      value: {
+        name: 'TestType',
+        columns: [{ name: 'v', type: TYPES.Vector, length: 3 }],
+        rows: [[new Float32Array([1, 2])]]
+      }
+    }, undefined, options);
+
+    let error: unknown;
+    try {
+      await collect(new RpcRequestPayload('p', [resolved], txnDescriptor, options));
+    } catch (err) {
+      error = err;
+    }
+
+    assert.instanceOf(error, InputError);
+    const columnError = (error as InputError).cause as InputError;
+    assert.instanceOf(columnError, InputError);
+    assert.strictEqual(columnError.message, "TVP column 'v' has invalid data at row index 0");
+    assert.instanceOf(columnError.cause, TypeError);
+  });
 });

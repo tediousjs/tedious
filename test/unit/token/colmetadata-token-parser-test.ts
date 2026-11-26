@@ -118,4 +118,70 @@ describe('Colmetadata Token Parser', function() {
     assert.strictEqual(token.columns[0].colName, 'name');
     assert.strictEqual(token.columns[0].dataLength, length);
   });
+
+  describe('vector columns', function() {
+    function writeColumn(buffer: WritableTrackingBuffer, name: string, typeInfo: number[]) {
+      buffer.writeUInt32LE(0); // UserType
+      buffer.writeUInt16LE(0x0001); // Flags: nullable
+      buffer.writeBuffer(Buffer.from(typeInfo));
+      buffer.writeBVarchar(name, 'ucs2');
+    }
+
+    async function parseColumns(...columns: Array<[string, number[]]>) {
+      const buffer = new WritableTrackingBuffer();
+      buffer.writeUInt8(0x81);
+      buffer.writeUInt16LE(columns.length);
+      for (const [name, typeInfo] of columns) {
+        writeColumn(buffer, name, typeInfo);
+      }
+
+      const token = (await StreamParser.parseTokens([buffer.data], options).next()).value;
+      assert.instanceOf(token, ColMetadataToken);
+      return token.columns;
+    }
+
+    it('should parse vector column metadata', async function() {
+      const [v32, v16, id] = await parseColumns(
+        ['v32', [0xF5, 0x14, 0x00, 0x00]],
+        ['v16', [0xF5, 0x0E, 0x00, 0x01]],
+        ['id', [0x26, 0x04]]
+      );
+
+      assert.strictEqual(v32.type, typeByName.Vector);
+      assert.strictEqual(v32.baseType, 'float32');
+      assert.strictEqual(v32.dimensions, 3);
+      assert.strictEqual(v32.dataLength, 20);
+      assert.isUndefined(v32.precision);
+
+      assert.strictEqual(v16.type, typeByName.Vector);
+      assert.strictEqual(v16.baseType, 'float16');
+      assert.strictEqual(v16.dimensions, 3);
+      assert.strictEqual(v16.dataLength, 14);
+
+      // The following column is parsed from the right offset.
+      assert.strictEqual(id.type.name, 'IntN');
+      assert.strictEqual(id.colName, 'id');
+      assert.isUndefined(id.baseType);
+    });
+
+    it('should reject an unknown dimension type', async function() {
+      let error: Error | undefined;
+      try {
+        await parseColumns(['v', [0xF5, 0x14, 0x00, 0x02]]);
+      } catch (err) {
+        error = err as Error;
+      }
+      assert.include(error?.message, 'Unsupported vector dimension type 0x02');
+    });
+
+    it('should reject a length that does not fit the dimension type', async function() {
+      let error: Error | undefined;
+      try {
+        await parseColumns(['v', [0xF5, 0x13, 0x00, 0x00]]);
+      } catch (err) {
+        error = err as Error;
+      }
+      assert.include(error?.message, 'Invalid vector TYPE_INFO: length 19 is not valid for float32 elements');
+    });
+  });
 });

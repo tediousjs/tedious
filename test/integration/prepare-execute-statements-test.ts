@@ -3,7 +3,9 @@ import { typeByName as TYPES } from '../../src/data-type';
 
 import Connection from '../../src/connection';
 import Request from '../../src/request';
+import { RequestError } from '../../src/errors';
 import { debugOptionsFromEnv } from '../helpers/debug-options-from-env';
+import { requireVectorSupport } from '../helpers/vector-support';
 
 import defaultConfig from '../config';
 
@@ -517,6 +519,72 @@ describe('Prepare Execute Statement', function() {
 
     if (process.env.TEDIOUS_DEBUG) {
       connection.on('debug', console.log);
+    }
+  });
+
+  it('should prepare execute with vector parameters', async function() {
+    const config = getConfig();
+    const connection = new Connection({ ...config, options: { ...config.options, vectorTypeSupport: 'v2' } });
+    await new Promise<void>((resolve, reject) => connection.connect((err) => (err ? reject(err) : resolve())));
+
+    try {
+      await requireVectorSupport(this, connection);
+
+      const values: unknown[] = [];
+      await new Promise<void>((resolve, reject) => {
+        let executions = 0;
+        const request = new Request('select @param', (err) => {
+          if (err) {
+            return reject(err);
+          }
+
+          if (++executions === 2) {
+            return resolve();
+          }
+
+          connection.execute(request, { param: null });
+        });
+
+        // A prepared vector parameter needs its number of dimensions.
+        request.addParameter('param', TYPES.Vector, undefined, { length: 3 });
+        request.on('row', (columns) => values.push(columns[0].value));
+        request.on('error', reject);
+        request.on('prepared', () => connection.execute(request, { param: new Float32Array([1, 2.5, -3]) }));
+        connection.prepare(request);
+      });
+
+      assert.instanceOf(values[0], Float32Array);
+      assert.deepEqual([Array.from(values[0] as Float32Array), values[1]], [[1, 2.5, -3], null]);
+    } finally {
+      await new Promise<void>((resolve) => {
+        connection.on('end', () => resolve());
+        connection.close();
+      });
+    }
+  });
+
+  it('reports a vector declaration error from prepare through the callback', async function() {
+    const connection = new Connection(getConfig());
+    await new Promise<void>((resolve, reject) => connection.connect((err) => (err ? reject(err) : resolve())));
+
+    try {
+      let request!: Request;
+      const callbackError = new Promise<Error | null | undefined>((resolve) => {
+        request = new Request('select @param', resolve);
+      });
+      request.addParameter('param', TYPES.Vector);
+
+      assert.doesNotThrow(() => connection.prepare(request));
+      const error = await callbackError;
+      assert.instanceOf(error, RequestError);
+      assert.strictEqual((error as RequestError).code, 'EPARAM');
+      assert.include(error!.message, 'Validation failed for parameter \'param\'.');
+      assert.include(error!.message, 'must be specified with the `length` option');
+    } finally {
+      await new Promise<void>((resolve) => {
+        connection.on('end', () => resolve());
+        connection.close();
+      });
     }
   });
 });
